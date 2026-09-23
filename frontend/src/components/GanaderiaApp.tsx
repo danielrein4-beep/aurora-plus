@@ -1,5 +1,10 @@
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
+import ModalImportarHato from "./ModalImportarHato";
+import TenantSoporteWidget from "./TenantSoporteWidget";
+import EngordeGanadero from "./EngordeGanadero";
+import SociedadesCeba from "./SociedadesCeba";
+import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
   contarPendientesGanaderia,
@@ -7,8 +12,7 @@ import {
   esFalloDeConexion,
   generarClaveIdempotencia,
 } from "../offlineQueueGanaderia";
-import { useState, useEffect } from "react";
-import AuroraLogo from "../AuroraLogo";
+import { Fragment, useState, useEffect } from "react";
 import { AuroraGradientDef } from "../Icons";
 import ThemeToggle from "./ThemeToggle";
 import {
@@ -18,7 +22,7 @@ import {
   IconWheat, IconSyringe, IconWrench, IconTractor, IconTruck, IconBolt, IconBox,
   IconWarning, IconFire, IconMilk, IconEdit, IconSettings, IconPin, IconCow,
   IconSnowflake, IconTag, IconShield, IconDna, IconScale, IconSprout, IconCart,
-  IconMeat, IconRefresh, IconBulb, IconCoins
+  IconMeat, IconRefresh, IconBulb, IconCoins, IconDashboardGrid, IconUpload
 } from "../Icons";
 import GanaderiaMapa from "./GanaderiaMapa";
 import { useAuth } from "../context/AuthContext";
@@ -44,7 +48,9 @@ import {
   type EventoReproductivoGanaderia, type RegistroPesoGanaderia,
   type GdpGanaderiaResponse,
   type TanqueLeche, type VentaLecheTanque,
-  type GastoGanaderia, type VentaGanaderiaResumen
+  type GastoGanaderia, type VentaGanaderiaResumen,
+  listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
+  tasaVigente, actualizarTasa,
 } from "../api";
 
 interface Props {
@@ -213,6 +219,22 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       localStorage.setItem("aurora_ganaderia_tasa_cop", String(nuevaCop));
     } catch {}
     setModalEditarTasas(false);
+    // El motor financiero (caja, despachos, ventas) usa las tasas del backend:
+    // sin esto Ganadería mostraba una tasa y el backend rechazaba toda venta en Bs/COP.
+    Promise.all([
+      nuevaBcv > 0 ? actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: nuevaBcv, origen: "PERSONALIZADA" }) : null,
+      nuevaCop > 0 ? actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: nuevaCop, origen: "PERSONALIZADA" }) : null,
+    ]).catch((err: any) => notificar(`Las tasas quedaron en pantalla pero no se guardaron en el sistema: ${err?.message || "revise la conexión"}`));
+  };
+
+  /** Garantiza que el backend tenga la tasa USD→moneda que el usuario ve en pantalla. */
+  const asegurarTasaEnBackend = async (moneda: "VES" | "COP") => {
+    try {
+      await tasaVigente(tenantId, "USD", moneda);
+    } catch {
+      const tasa = moneda === "VES" ? tasaBCV : tasaCOP;
+      if (tasa > 0) await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: moneda, tasa, origen: "PERSONALIZADA" });
+    }
   };
 
   // Tanque de Leche & Ventas en Cisterna
@@ -223,11 +245,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [vaqueraDestino, setVaqueraDestino] = useState<"TANQUE" | "VENTA_DIRECTA">("TANQUE");
 
   const [formVentaLeche, setFormVentaLeche] = useState({
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: fechaLocalISO(),
     litrosVendidos: 200,
     precioLitroUSD: 0.55,
     compradorOPlanta: "",
     monedaPago: "USD",
+    // Lo cobrado en Bs/COP; vacío = el equivalente a la tasa configurada.
+    montoRecibido: "",
     notas: "",
   });
 
@@ -243,7 +267,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
 
   // Pestaña principal activa
-  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
+  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "engorde" | "sociedades" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
+  const [sidebarAbierto, setSidebarAbierto] = useState(false);
+  const [aperturaSoporte, setAperturaSoporte] = useState(0);
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
@@ -257,7 +283,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [cargandoFicha, setCargandoFicha] = useState(false);
 
   // Sub-vistas por pestaña
-  const [subPotreros, setSubPotreros] = useState<"mapa" | "lista">("mapa");
+  const [subPotreros, setSubPotreros] = useState<"mapa" | "lista">("lista");
   const [subInventario, setSubInventario] = useState<"matriz" | "fichas" | "distribucion">("matriz");
 
   // Estados de datos
@@ -275,6 +301,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Modales
   const [modalNuevoAnimal, setModalNuevoAnimal] = useState(false);
+  const [modalImportarHato, setModalImportarHato] = useState(false);
+  // Última jornada de vacunación registrada: ofrece descargar su constancia PDF.
+  const [ultimaVacunacion, setUltimaVacunacion] = useState<{ fecha: string; vacunaId: number; nombre: string; cantidad: number } | null>(null);
+  const [prenezActual, setPrenezActual] = useState<PrenezActualGanaderia[]>([]);
+  const [categoriaExpandida, setCategoriaExpandida] = useState<string | null>(null);
+  const puedeImportarHato = user?.rol === "DUENO_ADMIN" || user?.rol === "ADMINISTRADOR_FINCA";
   const [modalNuevoPotrero, setModalNuevoPotrero] = useState(false);
   const [modalRotar, setModalRotar] = useState<PotreroGanaderia | null>(null);
   const [modalOrdeno, setModalOrdeno] = useState(false);
@@ -359,6 +391,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
   const [ventaModo, setVentaModo] = useState<"INDIVIDUAL" | "MULTIPLE">("INDIVIDUAL");
   const [animalesVentaSeleccionados, setAnimalesVentaSeleccionados] = useState<number[]>([]);
+  // Venta en lote: filtro por arete/nombre y peso de báscula por animal (precargado con el del sistema).
+  const [busquedaVenta, setBusquedaVenta] = useState("");
+  const [pesosVenta, setPesosVenta] = useState<Record<number, string>>({});
+  /** Peso con el que se vende: el de báscula si se escribió, si no el del sistema. */
+  const pesoVentaDe = (id: number) => {
+    const escrito = Number(String(pesosVenta[id] ?? "").replace(",", "."));
+    return escrito > 0 ? escrito : (animales.find(a => a.id === id)?.pesoActual || 0);
+  };
   const [ultimaVentaId, setUltimaVentaId] = useState<number | null>(null);
   const [ultimoDespachoLecheId, setUltimoDespachoLecheId] = useState<number | null>(null);
 
@@ -379,6 +419,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Estados para Modo Vaquera Rápida (Bulk Entry de Ordeño Diario)
   const [modalVaqueraRapida, setModalVaqueraRapida] = useState(false);
+  const [busquedaVaquera, setBusquedaVaquera] = useState("");
   const [vaqueraFecha, setVaqueraFecha] = useState(new Date().toISOString().slice(0, 10));
   const [vaqueraTurno, setVaqueraTurno] = useState<"MANANA" | "TARDE" | "DOBLE">("MANANA");
   const [vaqueraPrecioUSD, setVaqueraPrecioUSD] = useState<number>(0.45);
@@ -556,12 +597,22 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   const cargarDatos = async () => {
     try {
-      const [resAnimales, resPotreros, resVacunas, resAlertas] = await Promise.allSettled([
+      const [resAnimales, resPotreros, resVacunas, resAlertas, resPrenez] = await Promise.allSettled([
         listarAnimalesGanaderia(),
         listarPotrerosGanaderia(),
         listarVacunasGanaderia(),
         obtenerAlertasGanaderia(tenantId, 30),
+        listarPrenezActualGanaderia(),
       ]);
+
+      if (resPrenez.status === "fulfilled") {
+        setPrenezActual(resPrenez.value ?? []);
+      }
+
+      // Tasas: la vigente del backend es la que usa caja; si existe, es la que se muestra.
+      const [tVes, tCop] = await Promise.allSettled([tasaVigente(tenantId, "USD", "VES"), tasaVigente(tenantId, "USD", "COP")]);
+      if (tVes.status === "fulfilled" && Number(tVes.value?.tasa) > 0) setTasaBCV(Number(tVes.value.tasa));
+      if (tCop.status === "fulfilled" && Number(tCop.value?.tasa) > 0) setTasaCOP(Number(tCop.value.tasa));
 
       if (resAnimales.status === "fulfilled") {
         setAnimales(resAnimales.value ?? []);
@@ -649,6 +700,46 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       Math.max(1, animalesActivos.filter(cat.filter).length)
     ),
   }));
+
+  // Desglose del hato: dentro de cada categoría, cuántos por raza y, de las
+  // hembras, cuántas preñadas y de qué padrote (último servicio/diagnóstico).
+  const SIN_PADROTE = "Sin padrote registrado";
+  const prenezPorHembra = new Map(prenezActual.map(p => [p.hembraId, p]));
+  const padroteDe = (a: AnimalGanaderia) => {
+    const p = prenezPorHembra.get(a.id);
+    return p ? (p.padrote || SIN_PADROTE) : null;
+  };
+  const desglosePorRaza = (lista: AnimalGanaderia[]) => {
+    const grupos = new Map<string, { raza: string; cabezas: number; prenadas: number; porPadrote: Map<string, number> }>();
+    for (const a of lista) {
+      const raza = a.raza?.trim() || "Sin raza";
+      const g = grupos.get(raza) ?? { raza, cabezas: 0, prenadas: 0, porPadrote: new Map<string, number>() };
+      g.cabezas++;
+      const padrote = padroteDe(a);
+      if (padrote) {
+        g.prenadas++;
+        g.porPadrote.set(padrote, (g.porPadrote.get(padrote) ?? 0) + 1);
+      }
+      grupos.set(raza, g);
+    }
+    return [...grupos.values()].sort((x, y) => y.cabezas - x.cabezas);
+  };
+  const prenezPorPadrote = (() => {
+    const grupos = new Map<string, { padrote: string; prenadas: number; porRaza: Map<string, number> }>();
+    for (const a of animalesActivos) {
+      const padrote = padroteDe(a);
+      if (!padrote) continue;
+      const g = grupos.get(padrote) ?? { padrote, prenadas: 0, porRaza: new Map<string, number>() };
+      g.prenadas++;
+      const raza = a.raza?.trim() || "Sin raza";
+      g.porRaza.set(raza, (g.porRaza.get(raza) ?? 0) + 1);
+      grupos.set(padrote, g);
+    }
+    // "Sin padrote registrado" siempre al final
+    return [...grupos.values()].sort((x, y) =>
+      (x.padrote === SIN_PADROTE ? 1 : 0) - (y.padrote === SIN_PADROTE ? 1 : 0) || y.prenadas - x.prenadas);
+  })();
+  const totalPrenadas = prenezPorPadrote.reduce((s, g) => s + g.prenadas, 0);
 
   // Filtrado de animales
   const animalesFiltrados = animales.filter(a => {
@@ -786,6 +877,27 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }
   };
 
+  // Abre la venta de animales; "MULTIPLE" = vender un lote seleccionando varios animales.
+  const abrirVentaAnimales = (modo: "INDIVIDUAL" | "MULTIPLE") => {
+    const activos = animales.filter(a => a.estado === "ACTIVO" || !a.estado);
+    if (activos.length > 0) {
+      setFormVenta({
+        animalId: activos[0].id,
+        comprador: "",
+        precioUSD: 0,
+        precioPorKg: 0,
+        pesoSalida: activos[0].pesoActual || 0,
+        motivo: "BENEFICIO",
+      });
+    }
+    setVentaModo(modo);
+    setAnimalesVentaSeleccionados([]);
+    setBusquedaVenta("");
+    setPesosVenta({});
+    setUltimaVentaId(null);
+    setModalVentaAnimal(true);
+  };
+
   // Manejador: Despacho por Venta / Beneficio (POST /api/ganaderia/ventas a través de VentaAnimalController)
   const handleRegistrarVentaAnimal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -801,9 +913,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     // (así se vende "por kilo" real, cada uno con su peso); si no, en modo individual
     // se usa el precio total tal cual, y en lote se reparte el precio total en partes iguales.
     const precioPorAnimal = (id: number): number => {
-      const animal = animales.find(a => a.id === id);
-      if (formVenta.precioPorKg > 0 && animal?.pesoActual) {
-        return Number((animal.pesoActual * formVenta.precioPorKg).toFixed(2));
+      const peso = ventaModo === "INDIVIDUAL" ? (Number(formVenta.pesoSalida) || animales.find(a => a.id === id)?.pesoActual || 0) : pesoVentaDe(id);
+      if (formVenta.precioPorKg > 0 && peso > 0) {
+        return Number((peso * formVenta.precioPorKg).toFixed(2));
       }
       if (ventaModo === "INDIVIDUAL") return Number(formVenta.precioUSD) || 0;
       return Number((Number(formVenta.precioUSD) / idsVenta.length).toFixed(2));
@@ -816,8 +928,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
     try {
       // 1. Si se registró nuevo peso en báscula antes del despacho (solo modo individual), actualizar peso del animal
-      if (ventaModo === "INDIVIDUAL" && formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0) {
-        await actualizarAnimalGanaderia(formVenta.animalId, { pesoActual: Number(formVenta.pesoSalida) });
+      // El peso de báscula al vender se guarda como pesaje: cierra la curva de engorde del animal.
+      const fechaVenta = fechaLocalISO();
+      if (ventaModo === "INDIVIDUAL" && formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0
+          && Number(formVenta.pesoSalida) !== animales.find(a => a.id === formVenta.animalId)?.pesoActual) {
+        await registrarPesoGanaderia(tenantId, formVenta.animalId, Number(formVenta.pesoSalida), fechaVenta);
+      }
+      if (ventaModo === "MULTIPLE") {
+        for (const id of idsVenta) {
+          const peso = pesoVentaDe(id);
+          if (peso > 0 && peso !== animales.find(a => a.id === id)?.pesoActual) {
+            await registrarPesoGanaderia(tenantId, id, peso, fechaVenta);
+          }
+        }
       }
 
       // 2. Registrar la venta oficial en el backend con VentaAnimalController (guarda comprador, precio,
@@ -851,6 +974,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       motivo: "BENEFICIO",
     });
     setAnimalesVentaSeleccionados([]);
+    setPesosVenta({});
   };
 
   // Manejador: Registrar Celo (Evento Reproductivo dedicado)
@@ -1024,6 +1148,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }));
 
     setVaqueraFilas(filas);
+    setBusquedaVaquera("");
     setModalVaqueraRapida(true);
   };
 
@@ -1178,6 +1303,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     setModalOrdeno(false);
   };
 
+  // Equivalente del despacho en la moneda de cobro, a la tasa configurada.
+  const equivalenteDespachoLeche = () => {
+    const totalUSD = formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD;
+    if (formVentaLeche.monedaPago === "VES") return Math.round(totalUSD * tasaBCV * 100) / 100;
+    if (formVentaLeche.monedaPago === "COP") return Math.round(totalUSD * tasaCOP);
+    return totalUSD;
+  };
+
   // Manejador: Despacho / Venta de Leche desde el Tanque
   const handleGuardarVentaLeche = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1198,13 +1331,27 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       return;
     }
 
+    // Cobrado en Bs o COP: el backend necesita lo que entró de verdad a caja.
+    let montoRecibido: number | undefined;
+    if (formVentaLeche.monedaPago !== "USD") {
+      montoRecibido = Number(String(formVentaLeche.montoRecibido).replace(",", ".")) || equivalenteDespachoLeche();
+      if (!montoRecibido || montoRecibido <= 0) {
+        notificar(`Indique el monto recibido en ${formVentaLeche.monedaPago}.`);
+        return;
+      }
+    }
+
     try {
+      if (formVentaLeche.monedaPago === "VES" || formVentaLeche.monedaPago === "COP") {
+        await asegurarTasaEnBackend(formVentaLeche.monedaPago);
+      }
       const res = await registrarDespachoLecheTanque(tenantId, {
         fecha: formVentaLeche.fecha,
         litrosVendidos: litros,
         precioLitroUSD: precio,
         compradorOPlanta: formVentaLeche.compradorOPlanta.trim(),
         monedaPago: formVentaLeche.monedaPago,
+        montoRecibido,
         notas: formVentaLeche.notas,
       });
 
@@ -1213,11 +1360,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       setUltimoDespachoLecheId(res.venta?.id ?? null);
       notificar(`Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
       setFormVentaLeche({
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: fechaLocalISO(),
         litrosVendidos: Math.min(200, res.tanque.stockActualLitros),
         precioLitroUSD: precioLecheUSD,
         compradorOPlanta: "",
         monedaPago: "USD",
+        montoRecibido: "",
         notas: "",
       });
     } catch (err: any) {
@@ -1398,10 +1546,11 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     const vacunaSeleccionada = vacunas.find(v => v.id === Number(formVacuna.vacunaId));
 
     try {
+      const fechaAplicacion = fechaLocalISO();
       await aplicarVacunaLoteGanaderia(tenantId, {
         animalIds: idsParaAplicar,
         vacunaId: Number(formVacuna.vacunaId),
-        fechaAplicacion: new Date().toISOString().slice(0, 10),
+        fechaAplicacion,
         lote: formVacuna.lote,
         veterinarioResponsable: formVacuna.veterinario,
         costo: Number(formVacuna.costo),
@@ -1417,6 +1566,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       const detalleRetiro = retiroMsg.length > 0 ? ` (${retiroMsg.join(" • ")})` : " (Sin tiempo de retiro obligatorio)";
 
       notificar(`Vacuna '${vacunaSeleccionada?.nombre || "aplicada"}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
+      setUltimaVacunacion({
+        fecha: fechaAplicacion,
+        vacunaId: Number(formVacuna.vacunaId),
+        nombre: vacunaSeleccionada?.nombre || "Vacuna",
+        cantidad: idsParaAplicar.length,
+      });
 
       // Recargar alertas sanitarias para reflejar inmediatamente los bloqueos de leche y carne
       obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
@@ -1528,38 +1683,187 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 relative flex flex-col font-['Inter']">
+    <div className="h-screen flex overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 font-['Inter']">
       <AuroraGradientDef />
 
       {/* Notificación Flotante */}
       {notificacion && (
-        <div className="fixed top-5 right-5 z-[2000] apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
+        <div className="fixed top-5 right-5 z-[2100] apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
           <IconCheckCircle size={18} />
           <span>{notificacion}</span>
         </div>
       )}
 
-      {/* ── HEADER SUPERIOR DEL CENTRO AGROPECUARIO: APPLE GLASS ── */}
-      <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40 backdrop-blur-2xl">
-        <div className="flex items-center gap-3.5">
-          <div className="p-1.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-            <AuroraLogo size={26} />
+      {/* ══════════════════════ SIDEBAR (drawer en móvil, fijo en desktop) — mismo patrón institucional que Comercio/Horeca ══════════════════════ */}
+      {sidebarAbierto && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarAbierto(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+          sidebarAbierto ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Identidad de la finca — mismo patrón institucional que Comercio (A+ de respaldo, sin íconos de rubro). */}
+        <button
+          onClick={onSalir}
+          className="flex items-center gap-3 text-left group cursor-pointer px-5 py-4 border-b border-slate-200"
+          title="Volver al Hub General"
+        >
+          <div className="w-10 h-10 rounded-md border border-slate-200 bg-white text-slate-700 flex items-center justify-center overflow-hidden group-hover:border-teal-300 transition-colors flex-shrink-0">
+            <span className="font-semibold tracking-[-0.06em] text-sm" aria-label="Aurora Plus">A+</span>
           </div>
-          <div className="text-left">
-            <div className="font-['Outfit'] font-black text-lg sm:text-xl text-aurora leading-none flex items-center gap-2">
-              <span>Aurora Agro & Finca</span>
-              <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-bold">
-                Cattle Pro
-              </span>
+          <div className="min-w-0">
+            <div className="font-['IBM_Plex_Sans'] font-semibold text-sm text-slate-900 leading-tight tracking-tight truncate">
+              {user?.empresa || "Mi Finca"}
             </div>
-            <div className="text-slate-500 dark:text-white/45 text-[11px] font-medium mt-0.5">
-              Hato, Potreros, Leche, GDP & Sanidad • {user?.empresa || "Finca Santa Elena"}
+            <div className="text-[10px] text-slate-400 tracking-[0.02em] truncate font-medium mt-1">
+              Ganadería by <span className="font-semibold text-slate-600">A+</span>
             </div>
           </div>
+        </button>
+
+        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
+          {([
+            {
+              titulo: "Operación",
+              items: [
+                { id: "resumen" as const, Icon: IconDashboardGrid, etiqueta: "Panel General", badge: 0 },
+                { id: "inventario" as const, Icon: IconCow, etiqueta: "Hato & Inventario", badge: 0 },
+                { id: "potreros" as const, Icon: IconPin, etiqueta: "Potreros", badge: 0 },
+                { id: "engorde" as const, Icon: IconScale, etiqueta: "Engorde (GDP)", badge: 0 },
+                { id: "sociedades" as const, Icon: IconUsers, etiqueta: "Ceba en sociedad", badge: 0 },
+                { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción & Pesajes", badge: 0 },
+              ],
+            },
+            {
+              titulo: "Control",
+              items: [
+                { id: "sanidad" as const, Icon: IconSyringe, etiqueta: "Sanidad & Trazabilidad", badge: alertasSanitarias.length },
+                { id: "eventos" as const, Icon: IconCalendar, etiqueta: "Centro de Eventos", badge: 0 },
+                { id: "reportes" as const, Icon: IconChart, etiqueta: "Centro de Reportes", badge: 0 },
+                ...(user?.rol === "DUENO_ADMIN" ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría", badge: 0 }] : []),
+              ],
+            },
+          ]).map((grupo) => (
+            <div key={grupo.titulo} className="space-y-1.5">
+              <div className="px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {grupo.titulo}
+              </div>
+              {grupo.items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
+                  className={`sidebar-glare w-full flex items-center gap-3 border-l-2 px-3 py-2.5 rounded-md font-medium text-[13px] transition-colors cursor-pointer ${
+                    tab === item.id
+                      ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
+                      : "text-slate-800 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
+                  }`}
+                >
+                  <span className={tab === item.id ? "text-teal-700" : "text-slate-500"}><item.Icon size={15} /></span>
+                  <span className="flex-1 text-left">{item.etiqueta}</span>
+                  {item.badge > 0 && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ))}
+
+          {/* Acciones rápidas de campo */}
+          <div className="pt-3 mt-3 border-t border-slate-100 space-y-1">
+            <div className="px-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Acciones rápidas
+            </div>
+            <button
+              type="button"
+              onClick={() => { abrirVaqueraRapida(); setSidebarAbierto(false); }}
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            >
+              <span className="text-slate-400"><IconMilk size={16} /></span>
+              <span className="flex-1 text-left">Ordeño rápido</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setModalNuevoAnimal(true); setSidebarAbierto(false); }}
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            >
+              <span className="text-slate-400"><IconTag size={16} /></span>
+              <span className="flex-1 text-left">Alta de animal</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { abrirVentaAnimales("MULTIPLE"); setSidebarAbierto(false); }}
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            >
+              <span className="text-slate-400"><IconCoins size={16} /></span>
+              <span className="flex-1 text-left">Vender animales</span>
+            </button>
+            {puedeImportarHato && (
+              <button
+                type="button"
+                onClick={() => { setModalImportarHato(true); setSidebarAbierto(false); }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+              >
+                <span className="text-slate-400"><IconUpload size={16} /></span>
+                <span className="flex-1 text-left">Importar hato</span>
+              </button>
+            )}
+          </div>
+        </nav>
+
+        {/* Soporte: tickets con el equipo de Aurora (super admin) */}
+        <div className="px-3 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => { setAperturaSoporte(n => n + 1); setSidebarAbierto(false); }}
+            title="Solicitar ayuda al equipo de Aurora y ver tus tickets"
+            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          >
+            <span className="text-slate-400">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </span>
+            <span className="flex-1 text-left">Soporte</span>
+          </button>
         </div>
 
+        {/* Salir al Hub */}
+        <div className="p-4 border-t border-slate-100">
+          <button
+            onClick={onSalir}
+            className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left"
+          >
+            ← Salir al Hub
+          </button>
+        </div>
+      </aside>
+
+      {/* ══════════════════════ COLUMNA DERECHA: TOPBAR + CONTENIDO ══════════════════════ */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+
+      {/* ── TOPBAR: SINCRONIZACIÓN, MONEDAS, LECHE, FISCAL Y TEMA ── */}
+      <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between lg:justify-end gap-3 sticky top-0 z-30 backdrop-blur-2xl">
+        <button
+          onClick={() => setSidebarAbierto(true)}
+          className="lg:hidden p-2 -ml-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+          aria-label="Abrir menú"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
                 {/* Barra de Tasas Multi-Moneda & Precio Leche Centralizado */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {/* Badge Modo Campo / Sincronizacion Offline */}
           <button
             type="button"
@@ -1642,123 +1946,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           </button>
         </div>
 
-        {/* Acciones de Cabecera */}
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={abrirVaqueraRapida}
-            className="btn-cyber-neon text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-md hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer">
-            <span>Ordeño Rápido</span>
-          </button>
-
-          <button
-            onClick={() => setModalNuevoAnimal(true)}
-            className="apple-glass px-3.5 py-2 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer">
-            <span>+ Alta Animal</span>
-          </button>
-
-          <ThemeToggle className="scale-[0.72] origin-right" />
-
-          <button
-            onClick={onSalir}
-            className="apple-glass-btn text-xs font-semibold px-4 py-2 rounded-xl text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer">
-            ← Volver al Hub
-          </button>
-        </div>
+        <ThemeToggle className="scale-[0.72] origin-right" />
       </header>
-
-      {/* ── NAVEGACIÓN INTELIGENTE Y ORDENADA (SEGMENTED PILLS) ── */}
-      <div className="border-b border-slate-300/50 dark:border-white/10 px-4 sm:px-8 py-2.5 bg-slate-100/60 dark:bg-white/[0.02] backdrop-blur-md overflow-x-auto">
-        <div className="max-w-7xl mx-auto flex items-center gap-1.5 text-xs whitespace-nowrap">
-          
-          <button
-            onClick={() => setTab("resumen")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "resumen"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Panel General</span>
-          </button>
-
-          <button
-            onClick={() => setTab("potreros")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "potreros"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Mapa & Potreros</span>
-          </button>
-
-          <button
-            onClick={() => setTab("inventario")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "inventario"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Hato & Inventario</span>
-          </button>
-
-          <button
-            onClick={() => setTab("sanidad")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "sanidad"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Sanidad & Trazabilidad</span>
-            {alertasSanitarias.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500 text-slate-950">
-                {alertasSanitarias.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setTab("eventos")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "eventos"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Centro de Eventos</span>
-          </button>
-
-          <button
-            onClick={() => setTab("produccion")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "produccion"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Producción & Pesajes</span>
-          </button>
-
-          <button
-            onClick={() => setTab("reportes")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "reportes"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Centro de Reportes</span>
-          </button>
-
-          {user?.rol === "DUENO_ADMIN" && (
-            <button
-              onClick={() => setTab("auditoria")}
-              className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                tab === "auditoria"
-                  ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                  : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-              }`}>
-              <span>Bitácora de Auditoría</span>
-            </button>
-          )}
-
-        </div>
-      </div>
 
       {/* ── CUERPO PRINCIPAL ── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -2173,18 +2362,18 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
               <div className="flex items-center gap-2">
                 <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1 text-xs">
                   <button
+                    onClick={() => setSubPotreros("lista")}
+                    className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
+                      subPotreros === "lista" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
+                    }`}>
+                    Gestión de Potreros ({potreros.length})
+                  </button>
+                  <button
                     onClick={() => setSubPotreros("mapa")}
                     className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
                       subPotreros === "mapa" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
                     Mapa Satelital
-                  </button>
-                  <button
-                    onClick={() => setSubPotreros("lista")}
-                    className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
-                      subPotreros === "lista" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
-                    }`}>
-                    Lista & Aforos ({potreros.length})
                   </button>
                 </div>
 
@@ -2206,74 +2395,127 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 onGuardarPotreroTrazado={handleGuardarPotreroTrazado}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {potreros.map(pot => {
-                  const enDescanso = pot.estado === "EN_DESCANSO";
+              (() => {
+                // Días desde una fecha ISO (inicio de uso o de descanso).
+                const diasDesde = (iso?: string) => {
+                  if (!iso) return null;
+                  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+                  if (isNaN(d.getTime())) return null;
+                  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+                };
+                const animalesEn = (potId: number) => animalesActivos.filter(a => a.potrero?.id === potId);
+                const sinPotrero = animalesActivos.filter(a => !a.potrero).length;
+                const haTotal = potreros.reduce((s, p) => s + (Number(p.areaHectareas) || 0), 0);
+                if (potreros.length === 0) {
                   return (
-                    <div
-                      key={pot.id}
-                      className={`apple-glass rounded-3xl p-6 border text-left space-y-4 transition-all ${
-                        enDescanso
-                          ? "border-amber-500/30 bg-amber-500/[0.02]"
-                          : "border-emerald-500/40 bg-emerald-500/[0.03]"
-                      }`}>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            {pot.color && (
-                              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: pot.color }} />
-                            )}
-                            <span className="font-mono text-[10px] text-slate-400 font-bold">{pot.codigo || `POT-${pot.id}`}</span>
-                          </div>
-                          <h4 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white mt-1">
-                            {pot.nombre}
-                          </h4>
-                        </div>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                          enDescanso
-                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                            : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                        }`}>
-                          {enDescanso ? "EN DESCANSO" : "ACTIVO"}
-                        </span>
-                      </div>
-
-                      <div className="space-y-2 text-xs text-slate-600 dark:text-white/70">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Área:</span>
-                          <span className="font-semibold">{pot.areaHectareas} ha</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Especie Forrajera:</span>
-                          <span className="font-semibold">{pot.tipoPasto || "Pasto Natural"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Capacidad Máxima:</span>
-                          <span className="font-semibold">{pot.capacidadAnimales || 25} animales</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Descanso Mínimo:</span>
-                          <span className="font-semibold">{pot.diasDescansoMinimo || 28} días</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-200/60 dark:border-white/10 flex items-center justify-between">
-                        {pot.estado === "ACTIVO" ? (
-                          <button
-                            onClick={() => setModalRotar(pot)}
-                            className="w-full btn-cyber-neon text-white text-xs font-bold py-2 rounded-xl cursor-pointer text-center">
-                            Rotar Hato de este Potrero →
-                          </button>
-                        ) : (
-                          <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1.5">
-                            <span>Recuperación de forraje activa</span>
-                          </div>
-                        )}
-                      </div>
+                    <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center space-y-3">
+                      <p className="text-sm text-slate-600">Todavía no hay potreros registrados.</p>
+                      <button onClick={abrirNuevoPotrero} className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer">
+                        + Agregar el primer potrero
+                      </button>
                     </div>
                   );
-                })}
-              </div>
+                }
+                return (
+                  <div className="space-y-3">
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                          <tr>
+                            <th className="p-3">Potrero</th>
+                            <th className="p-3 text-right">Área</th>
+                            <th className="p-3">Pasto</th>
+                            <th className="p-3">Estado</th>
+                            <th className="p-3 text-right">Animales hoy</th>
+                            <th className="p-3 text-right">Capacidad</th>
+                            <th className="p-3 text-right">Carga</th>
+                            <th className="p-3 text-right">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {potreros.map(pot => {
+                            const enDescanso = pot.estado === "EN_DESCANSO";
+                            const enMantenimiento = pot.estado === "EN_MANTENIMIENTO";
+                            const dias = diasDesde(enDescanso ? pot.fechaInicioDescanso : pot.fechaInicioUso);
+                            const listo = enDescanso && dias != null && pot.diasDescansoMinimo != null && dias >= pot.diasDescansoMinimo;
+                            const ocupantes = animalesEn(pot.id).length;
+                            const area = Number(pot.areaHectareas) || 0;
+                            const sobrecargado = pot.capacidadAnimales != null && ocupantes > pot.capacidadAnimales;
+                            return (
+                              <tr key={pot.id} className="hover:bg-slate-50/70">
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: pot.color || "#94A3B8" }} />
+                                    <div>
+                                      <div className="font-semibold text-slate-900">{pot.nombre}</div>
+                                      <div className="font-mono text-[10px] text-slate-400">{pot.codigo || `POT-${pot.id}`}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="p-3 text-right font-mono text-slate-800">{area > 0 ? `${area} ha` : "—"}</td>
+                                <td className="p-3 text-slate-700">{pot.tipoPasto || <span className="text-slate-400">Sin definir</span>}</td>
+                                <td className="p-3">
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    enDescanso ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                      : enMantenimiento ? "bg-slate-100 text-slate-600 border border-slate-200"
+                                      : "bg-teal-50 text-teal-800 border border-teal-200"
+                                  }`}>
+                                    {enDescanso ? "En descanso" : enMantenimiento ? "Mantenimiento" : "En uso"}
+                                  </span>
+                                  <div className="text-[10px] text-slate-500 mt-1">
+                                    {dias != null ? `${dias} día${dias === 1 ? "" : "s"}` : "Sin fecha"}
+                                    {enDescanso && pot.diasDescansoMinimo != null && ` de ${pot.diasDescansoMinimo} mínimos`}
+                                    {listo && <span className="ml-1 font-semibold text-teal-700">· listo para usar</span>}
+                                  </div>
+                                </td>
+                                <td className={`p-3 text-right font-mono font-bold ${sobrecargado ? "text-rose-600" : "text-slate-900"}`}>
+                                  {ocupantes}
+                                </td>
+                                <td className="p-3 text-right font-mono text-slate-600">{pot.capacidadAnimales ?? "—"}</td>
+                                <td className="p-3 text-right font-mono text-slate-600">{area > 0 ? `${(ocupantes / area).toFixed(2)} cab/ha` : "—"}</td>
+                                <td className="p-3">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => abrirEditarPotrero(pot)}
+                                      className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer">
+                                      Editar
+                                    </button>
+                                    {!enDescanso && ocupantes > 0 && (
+                                      <button
+                                        onClick={() => setModalRotar(pot)}
+                                        className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-800 !text-white font-semibold cursor-pointer">
+                                        Rotar
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot className="bg-slate-50 border-t border-slate-200 text-[11px] font-bold text-slate-700">
+                          <tr>
+                            <td className="p-3">Total ({potreros.length} potreros)</td>
+                            <td className="p-3 text-right font-mono">{haTotal.toFixed(1)} ha</td>
+                            <td className="p-3" colSpan={2}>
+                              {potreros.filter(p => p.estado === "EN_DESCANSO").length} en descanso
+                            </td>
+                            <td className="p-3 text-right font-mono">{animalesActivos.length - sinPotrero}</td>
+                            <td className="p-3" />
+                            <td className="p-3 text-right font-mono">{haTotal > 0 ? `${((animalesActivos.length - sinPotrero) / haTotal).toFixed(2)} cab/ha` : "—"}</td>
+                            <td className="p-3" />
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    {sinPotrero > 0 && (
+                      <p className="text-[11px] text-amber-700">
+                        {sinPotrero} animal(es) activos no tienen potrero asignado. Asígnelos desde su ficha o al importar el hato.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()
             )}
 
           </div>
@@ -2322,6 +2564,22 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
 
                 <button
+                  onClick={() => abrirVentaAnimales("MULTIPLE")}
+                  className="apple-glass-btn text-xs font-bold px-3.5 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                  <IconCoins size={13} />
+                  <span>Vender lote</span>
+                </button>
+
+                {puedeImportarHato && (
+                  <button
+                    onClick={() => setModalImportarHato(true)}
+                    className="apple-glass-btn text-xs font-bold px-3.5 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                    <IconUpload size={13} />
+                    <span>Importar hato</span>
+                  </button>
+                )}
+
+                <button
                   onClick={exportarInventarioXLSX}
                   className="apple-glass-btn text-xs font-bold px-3.5 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer">
                   Descargar XLSX
@@ -2347,10 +2605,20 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
                       {matrizConteos.map(cat => {
                         const pct = totalAnimales > 0 ? ((cat.count / totalAnimales) * 100).toFixed(1) : "0.0";
+                        const expandida = categoriaExpandida === cat.key && cat.count > 0;
                         return (
-                          <tr key={cat.key} className="hover:bg-white/5 transition-colors">
+                          <Fragment key={cat.key}>
+                          <tr className="hover:bg-white/5 transition-colors">
                             <td className="p-4 font-bold text-slate-900 dark:text-white">
-                              {cat.label}
+                              <button
+                                type="button"
+                                disabled={cat.count === 0}
+                                onClick={() => setCategoriaExpandida(expandida ? null : cat.key)}
+                                className="flex items-center gap-2 cursor-pointer disabled:cursor-default"
+                                title={cat.count > 0 ? "Ver desglose por raza" : undefined}>
+                                <span className={`inline-block w-3 text-slate-400 transition-transform ${expandida ? "rotate-90" : ""} ${cat.count === 0 ? "opacity-0" : ""}`}>›</span>
+                                <span>{cat.label}</span>
+                              </button>
                             </td>
                             <td className="p-4 text-center font-mono font-black text-emerald-500 dark:text-emerald-400 text-sm">
                               {cat.count}
@@ -2374,13 +2642,38 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                               </button>
                             </td>
                           </tr>
+                          {expandida && desglosePorRaza(animalesActivos.filter(cat.filter)).map(g => (
+                            <tr key={`${cat.key}-${g.raza}`} className="bg-slate-50/70 dark:bg-white/[0.02]">
+                              <td className="py-2.5 pl-11 pr-4 text-slate-700 dark:text-white/80">{g.raza}</td>
+                              <td className="py-2.5 px-4 text-center font-mono font-bold text-slate-900 dark:text-white">{g.cabezas}</td>
+                              <td colSpan={3} className="py-2.5 px-4 text-slate-600 dark:text-white/60">
+                                {g.prenadas > 0 ? (
+                                  <span>
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{g.prenadas} preñadas</span>
+                                    {" · "}
+                                    {[...g.porPadrote.entries()].map(([padrote, n]) => `${n} de ${padrote}`).join(" · ")}
+                                  </span>
+                                ) : cat.key === "VACA" || cat.key === "NOVILLA" ? (
+                                  <span className="text-slate-400 dark:text-white/40">Ninguna preñada</span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
+                          </Fragment>
                         );
                       })}
                       <tr className="bg-emerald-500/5 font-bold">
-                        <td className="p-4 text-slate-900 dark:text-white">TOTAL ACTIVOS</td>
+                        <td className="p-4 text-slate-900 dark:text-white">
+                          TOTAL ACTIVOS
+                          {animalesActivos.some(a => a.sociedadCebaId) && (
+                            <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                              {animalesActivos.filter(a => !a.sociedadCebaId).length} propios · {animalesActivos.filter(a => a.sociedadCebaId).length} en sociedad
+                            </div>
+                          )}
+                        </td>
                         <td className="p-4 text-center font-mono text-emerald-500 dark:text-emerald-400 text-base">{totalAnimales}</td>
                         <td className="p-4 text-center font-mono text-slate-600 dark:text-white/70">
-                          {Math.round(animales.reduce((sum, a) => sum + (a.pesoActual || 0), 0) / Math.max(1, totalAnimales))} kg
+                          {Math.round(animalesActivos.reduce((sum, a) => sum + (a.pesoActual || 0), 0) / Math.max(1, totalAnimales))} kg
                         </td>
                         <td className="p-4 text-center font-mono text-slate-400">100%</td>
                         <td className="p-4 text-right">
@@ -2393,6 +2686,37 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                       </tr>
                     </tbody>
                   </table>
+                </div>
+
+                {/* Preñez por padrote */}
+                <div className="rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass p-5 space-y-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">Preñez por padrote</h4>
+                    <span className="text-xs text-slate-500 dark:text-white/50">
+                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">{totalPrenadas}</span> hembras preñadas
+                    </span>
+                  </div>
+                  {prenezPorPadrote.length === 0 ? (
+                    <p className="text-xs text-slate-500 dark:text-white/50">
+                      No hay hembras preñadas registradas. Registre el diagnóstico en Centro de Eventos o impórtelas con su padrote.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-slate-200/60 dark:divide-white/5">
+                      {prenezPorPadrote.map(g => (
+                        <div key={g.padrote} className="py-2.5 flex items-center justify-between gap-4 text-xs">
+                          <div className="min-w-0">
+                            <div className={`font-bold truncate ${g.padrote === SIN_PADROTE ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>
+                              {g.padrote}
+                            </div>
+                            <div className="text-slate-500 dark:text-white/50 truncate">
+                              {[...g.porRaza.entries()].map(([raza, n]) => `${n} ${raza}`).join(" · ")}
+                            </div>
+                          </div>
+                          <div className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400 flex-shrink-0">{g.prenadas}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2769,14 +3093,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 <div className="space-y-6">
                 {/* Selector rápido de Arete */}
                 <div className="p-4 rounded-3xl apple-glass border border-white/10 space-y-3">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 min-w-0">
                     <label className="text-xs font-bold text-slate-700 dark:text-white/70">
                       Seleccionar Animal por Arete para ver Ficha Completa:
                     </label>
                     <select
                       value={animalFichaId || ""}
                       onChange={(e) => setAnimalFichaId(Number(e.target.value))}
-                      className="px-4 py-2 rounded-xl bg-slate-800 border border-white/15 text-white font-mono font-bold text-xs cursor-pointer focus:border-emerald-500"
+                      className="w-full sm:w-auto max-w-full min-w-0 truncate px-4 py-2 rounded-xl bg-slate-800 border border-white/15 text-white font-mono font-bold text-xs cursor-pointer focus:border-emerald-500"
                     >
                       {animales.map((a) => (
                         <option key={a.id} value={a.id}>
@@ -2906,7 +3230,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                           <div className="p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-between">
                             <span className="text-xs text-sky-300 font-medium">Ganancia Diaria (GDP):</span>
                             <span className="font-mono font-black text-sm text-white">
-                              {fichaGdp?.gdpKgDia ? `+${fichaGdp.gdpKgDia.toFixed(2)} kg/día` : "+0.68 kg/día"}
+                              {fichaGdp?.gdpKgDia != null ? `${fichaGdp.gdpKgDia >= 0 ? "+" : ""}${Number(fichaGdp.gdpKgDia).toFixed(2)} kg/día` : "Faltan pesajes"}
                             </span>
                           </div>
 
@@ -3421,22 +3745,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <span className="text-[10px] text-emerald-400 font-bold">Ingresar →</span>
                   </button>
                   <button
-                    onClick={() => {
-                      if (animales.length > 0) {
-                        setFormVenta({
-                          animalId: animales[0].id,
-                          comprador: "",
-                          precioUSD: 0,
-                          precioPorKg: 0,
-                          pesoSalida: animales[0].pesoActual || 0,
-                          motivo: "BENEFICIO",
-                        });
-                      }
-                      setVentaModo("INDIVIDUAL");
-                      setAnimalesVentaSeleccionados([]);
-                      setUltimaVentaId(null);
-                      setModalVentaAnimal(true);
-                    }}
+                    onClick={() => abrirVentaAnimales("INDIVIDUAL")}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Venta / Beneficio (Salida Real)</span>
                     <span className="text-[10px] text-rose-400 font-bold">Despachar →</span>
@@ -3851,6 +4160,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
               </div>
 
+              <ReportesCampoGanaderia vacunas={vacunas} notificar={notificar} />
+
               {/* 3 Tarjetas de Resumen Financiero Semanal (Semana Actual) */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Tarjeta 1: Ingresos de la Semana */}
@@ -4185,11 +4496,30 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           );
         })()}
 
+        {tab === "engorde" && (
+          <EngordeGanadero
+            tenantId={tenantId}
+            puedeCorregir={puedeImportarHato}
+            notificar={notificar}
+            onCambio={cargarDatos}
+          />
+        )}
+
+        {tab === "sociedades" && (
+          <SociedadesCeba
+            animales={animales}
+            puedeGestionar={puedeImportarHato}
+            notificar={notificar}
+            onCambio={cargarDatos}
+          />
+        )}
+
         {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (
           <BitacoraAuditoria moduloSugerido="GANADERIA" />
         )}
 
       </main>
+      </div>
 
       {/* ── MODAL: ACTUALIZAR TASAS A MANO ── */}
       {modalEditarTasas && (
@@ -4625,7 +4955,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <label className="text-[11px] font-bold text-slate-300 block mb-1">Moneda de Pago</label>
                   <select
                     value={formVentaLeche.monedaPago}
-                    onChange={e => setFormVentaLeche({ ...formVentaLeche, monedaPago: e.target.value })}
+                    onChange={e => setFormVentaLeche({ ...formVentaLeche, monedaPago: e.target.value, montoRecibido: "" })}
                     className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-sky-500 focus:outline-none">
                     <option value="USD">USD ($ Dólares)</option>
                     {monedasConfig.VES && <option value="VES">VES (Bs. Bolívares)</option>}
@@ -4666,6 +4996,25 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <span>Equivalente en Pesos:</span>
                     <span className="font-mono font-bold">
                       COP ${Math.round((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaCOP).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                {formVentaLeche.monedaPago !== "USD" && (
+                  <div className="pt-2 mt-1 border-t border-emerald-500/20 space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/50 block">
+                      Monto recibido en {formVentaLeche.monedaPago === "VES" ? "Bolívares" : "Pesos"} *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formVentaLeche.montoRecibido}
+                      placeholder={equivalenteDespachoLeche().toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      onChange={e => setFormVentaLeche({ ...formVentaLeche, montoRecibido: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-white/5 border border-slate-300/80 dark:border-white/15 text-sm font-mono text-slate-900 dark:text-white"
+                    />
+                    <span className="text-[10px] text-slate-500 dark:text-white/40">
+                      Vacío = equivalente a la tasa configurada. Escriba lo que pagó la planta si fue otra tasa.
                     </span>
                   </div>
                 )}
@@ -4789,6 +5138,47 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       ───────────────────────────────────────────────────────────── */}
 
       {/* MODAL: ALTA DE ANIMAL */}
+      {ultimaVacunacion && (
+        <div className="fixed bottom-5 right-5 z-30 apple-glass rounded-2xl border border-emerald-500/40 shadow-2xl p-4 max-w-sm text-left space-y-2.5 animate-fade-in">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-xs">
+              <div className="font-bold text-slate-900 dark:text-white">Vacunación registrada</div>
+              <div className="text-slate-500 dark:text-white/60">
+                {ultimaVacunacion.nombre} · {ultimaVacunacion.cantidad} animal(es)
+              </div>
+            </div>
+            <button onClick={() => setUltimaVacunacion(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer" aria-label="Cerrar">
+              <IconClose size={16} />
+            </button>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                abrirPdf(await descargarConstanciaVacunacionPdf(ultimaVacunacion.fecha, ultimaVacunacion.fecha, ultimaVacunacion.vacunaId));
+              } catch (e) {
+                notificar(`No se pudo generar la constancia: ${e instanceof Error ? e.message : "intente de nuevo"}`);
+              }
+            }}
+            className="w-full btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
+            <IconDownload size={13} />
+            <span>Descargar constancia PDF</span>
+          </button>
+        </div>
+      )}
+
+      <TenantSoporteWidget solicitudApertura={aperturaSoporte} soloConTicketActivo />
+
+      {modalImportarHato && (
+        <ModalImportarHato
+          onCerrar={() => setModalImportarHato(false)}
+          onImportado={(cantidad) => {
+            setModalImportarHato(false);
+            notificar(`${cantidad} animales importados al hato.`);
+            cargarDatos();
+          }}
+        />
+      )}
+
       {modalNuevoAnimal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
@@ -6392,7 +6782,17 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         const idsSeleccionados = ventaModo === "INDIVIDUAL"
           ? (formVenta.animalId ? [formVenta.animalId] : [])
           : animalesVentaSeleccionados;
-        const pesoTotalSeleccion = idsSeleccionados.reduce((sum, id) => sum + (animales.find(a => a.id === id)?.pesoActual || 0), 0);
+        const pesoTotalSeleccion = ventaModo === "INDIVIDUAL"
+          ? (Number(formVenta.pesoSalida) || animales.find(a => a.id === formVenta.animalId)?.pesoActual || 0)
+          : idsSeleccionados.reduce((sum, id) => sum + pesoVentaDe(id), 0);
+        const termino = busquedaVenta.trim().toLowerCase();
+        const animalesVentaFiltrados = termino
+          ? animalesActivosVenta.filter(a =>
+              a.arete.toLowerCase().includes(termino) ||
+              (a.nombre || "").toLowerCase().includes(termino) ||
+              (a.raza || "").toLowerCase().includes(termino) ||
+              (a.tipoAnimal || "").toLowerCase().includes(termino))
+          : animalesActivosVenta;
         const totalEstimado = formVenta.precioPorKg > 0
           ? pesoTotalSeleccion * formVenta.precioPorKg
           : Number(formVenta.precioUSD) || 0;
@@ -6456,7 +6856,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   type="button"
                   onClick={() => setVentaModo("INDIVIDUAL")}
                   className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                    ventaModo === "INDIVIDUAL" ? "bg-rose-500 text-white shadow-md" : "text-slate-400 hover:text-white"
+                    ventaModo === "INDIVIDUAL" ? "bg-teal-700 !text-white shadow-sm" : "text-slate-400 hover:text-white"
                   }`}>
                   Individual
                 </button>
@@ -6464,7 +6864,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   type="button"
                   onClick={() => setVentaModo("MULTIPLE")}
                   className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                    ventaModo === "MULTIPLE" ? "bg-rose-500 text-white shadow-md" : "text-slate-400 hover:text-white"
+                    ventaModo === "MULTIPLE" ? "bg-teal-700 !text-white shadow-sm" : "text-slate-400 hover:text-white"
                   }`}>
                   Lote / Varios Animales
                 </button>
@@ -6501,38 +6901,72 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <label className="text-slate-400 block">Animales a Despachar *</label>
                     <button
                       type="button"
-                      onClick={() => setAnimalesVentaSeleccionados(
-                        animalesVentaSeleccionados.length === animalesActivosVenta.length ? [] : animalesActivosVenta.map(a => a.id)
-                      )}
-                      className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer">
-                      {animalesVentaSeleccionados.length === animalesActivosVenta.length ? "Desmarcar todos" : `Todos (${animalesActivosVenta.length})`}
+                      onClick={() => {
+                        const idsFiltro = animalesVentaFiltrados.map(a => a.id);
+                        const todosMarcados = idsFiltro.length > 0 && idsFiltro.every(id => animalesVentaSeleccionados.includes(id));
+                        setAnimalesVentaSeleccionados(prev => todosMarcados
+                          ? prev.filter(id => !idsFiltro.includes(id))
+                          : [...new Set([...prev, ...idsFiltro])]);
+                      }}
+                      className="text-[11px] font-bold text-teal-700 hover:text-teal-900 cursor-pointer">
+                      {animalesVentaFiltrados.length > 0 && animalesVentaFiltrados.every(a => animalesVentaSeleccionados.includes(a.id))
+                        ? "Desmarcar los mostrados"
+                        : `Marcar los mostrados (${animalesVentaFiltrados.length})`}
                     </button>
                   </div>
-                  <div className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/70 p-2 space-y-1">
-                    {animalesActivosVenta.map(a => {
+                  <input
+                    type="search"
+                    value={busquedaVenta}
+                    onChange={e => setBusquedaVenta(e.target.value)}
+                    placeholder="Buscar por número de arete, nombre, raza o tipo..."
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:border-teal-600 focus:outline-none"
+                  />
+                  <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 space-y-0.5">
+                    {animalesVentaFiltrados.length === 0 && (
+                      <div className="p-3 text-center text-[11px] text-slate-500">Ningún animal coincide con “{busquedaVenta}”.</div>
+                    )}
+                    {animalesVentaFiltrados.map(a => {
                       const isSel = animalesVentaSeleccionados.includes(a.id);
                       return (
-                        <label key={a.id} className={`flex items-center justify-between p-1.5 rounded-lg text-[11px] cursor-pointer transition-colors ${
-                          isSel ? "bg-rose-500/20 text-white font-bold" : "hover:bg-white/5 text-slate-300"
+                        <div key={a.id} className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-[11px] transition-colors ${
+                          isSel ? "bg-teal-50 text-slate-900 font-semibold" : "hover:bg-slate-50 text-slate-700"
                         }`}>
-                          <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                             <input
                               type="checkbox"
                               checked={isSel}
                               onChange={e => setAnimalesVentaSeleccionados(prev =>
                                 e.target.checked ? [...prev, a.id] : prev.filter(id => id !== a.id)
                               )}
-                              className="rounded text-rose-500 focus:ring-0"
+                              className="rounded accent-teal-700 focus:ring-0"
                             />
-                            <span className="font-mono text-rose-300">{a.arete}</span>
-                            <span>{a.nombre || a.tipoAnimal}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-400">{a.pesoActual || 0} kg</span>
-                        </label>
+                            <span className="font-mono text-teal-800">{a.arete}</span>
+                            <span className="truncate">{a.nombre || a.tipoAnimal}{a.raza ? ` · ${a.raza}` : ""}</span>
+                          </label>
+                          {isSel ? (
+                            <div className="flex items-center gap-1 flex-shrink-0" title="Peso en báscula al momento de la venta">
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={pesosVenta[a.id] ?? String(a.pesoActual || "")}
+                                onFocus={e => e.target.select()}
+                                onChange={e => setPesosVenta(prev => ({ ...prev, [a.id]: e.target.value }))}
+                                className="w-20 px-2 py-1 rounded-md border border-slate-300 bg-white text-right font-mono text-[11px] text-slate-900 focus:border-teal-600 focus:outline-none"
+                              />
+                              <span className="text-[10px] text-slate-500">kg</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 flex-shrink-0">{a.pesoActual || 0} kg</span>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
-                  <div className="text-[11px] text-right font-bold text-rose-400">
+                  <div className="text-[10px] text-slate-500">
+                    Al marcar un animal se muestra su peso del sistema; cámbielo si lo pesó en báscula al vender. El nuevo peso queda guardado en su ficha.
+                  </div>
+                  <div className="text-[11px] text-right font-bold text-teal-800">
                     {animalesVentaSeleccionados.length} animal(es) · {pesoTotalSeleccion} kg total
                   </div>
                 </div>
@@ -6627,7 +7061,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer transition-colors shadow-lg">
+                  className="px-6 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 !text-white font-bold cursor-pointer transition-colors shadow-sm">
                   Confirmar Salida por Venta
                 </button>
               </div>
@@ -6829,10 +7263,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
               </div>
 
+              {/* Buscador de vaca: filtra filas sin perder lo ya digitado en las demás */}
+              <input
+                type="search"
+                value={busquedaVaquera}
+                onChange={e => setBusquedaVaquera(e.target.value)}
+                placeholder="Buscar vaca por número de arete o nombre..."
+                className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-sm focus:border-teal-600 focus:outline-none"
+              />
+
               {/* Tabla de Entrada Ultrarrápida por Teclado */}
-              <div className="flex-1 overflow-y-auto max-h-72 rounded-2xl border border-white/10 bg-slate-900/60">
+              <div className="flex-1 overflow-y-auto max-h-72 rounded-2xl border border-slate-200 bg-white">
                 <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-900 border-b border-white/10 text-slate-400 text-[11px] uppercase font-bold z-10">
+                  <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase font-bold z-10">
                     <tr>
                       <th className="p-3 w-12 text-center">#</th>
                       <th className="p-3">Arete / Vaca</th>
@@ -6849,6 +7292,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {vaqueraFilas.map((fila, idx) => {
+                      const q = busquedaVaquera.trim().toLowerCase();
+                      if (q && !String(fila.arete || "").toLowerCase().includes(q) && !String(fila.nombre || "").toLowerCase().includes(q)) {
+                        return null;
+                      }
                       const totalFila = (Number(fila.litrosManana) || 0) + (Number(fila.litrosTarde) || 0);
                       const esMastitis = fila.estado === "MASTITIS";
                       const esCalostro = fila.estado === "CALOSTRO";

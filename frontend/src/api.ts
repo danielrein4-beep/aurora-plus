@@ -3597,6 +3597,10 @@ export interface AnimalGanaderia {
   valorEstimado?: number;
   codigoQr?: string;
   lote?: string;
+  /** Ceba en sociedad: null = animal propio. */
+  sociedadCebaId?: number | null;
+  pesoEntradaSociedad?: number | null;
+  fechaEntradaSociedad?: string | null;
   estadoReproductivo?: "VACIA" | "PREÑADA" | "EN_ESPERA" | string;
   estadoProductivo?: "CRIANDO" | "ORDEÑO" | "SECA" | string;
 }
@@ -3760,6 +3764,85 @@ export function crearAnimalGanaderia(tenantId: number, datos: {
   });
 }
 
+/** Fila del Excel de carga inicial del hato — todo texto, el backend valida y normaliza. */
+export interface FilaImportacionHato {
+  arete?: string;
+  tipoIdentificador?: string;
+  nombre?: string;
+  especie?: string;
+  raza?: string;
+  sexo?: string;
+  tipoAnimal?: string;
+  fechaNacimiento?: string;
+  pesoActual?: string;
+  valorEstimado?: string;
+  potrero?: string;
+  lote?: string;
+  areteMadre?: string;
+  aretePadre?: string;
+  estadoReproductivo?: string;
+  estadoProductivo?: string;
+  padrotePrenez?: string;
+  fechaProbableParto?: string;
+}
+
+export interface ResultadoImportacionHato {
+  confirmado: boolean;
+  totalFilas: number;
+  animalesImportados: number;
+  preneces: number;
+  errores: Array<{ fila: number; campo: string | null; mensaje: string }>;
+  porTipo: Record<string, number>;
+  porRaza: Record<string, number>;
+}
+
+/** confirmar=false: solo vista previa. confirmar=true: guarda todo o nada. */
+export function importarHatoGanaderia(filas: FilaImportacionHato[], confirmar: boolean): Promise<ResultadoImportacionHato> {
+  return request(`/api/ganaderia/animales/importar?confirmar=${confirmar}`, {
+    method: "POST",
+    body: JSON.stringify({ filas }),
+  });
+}
+
+export interface PrenezActualGanaderia {
+  hembraId: number;
+  sementalId: number | null;
+  padrote: string | null;
+  fechaProbableParto: string | null;
+}
+
+export function listarPrenezActualGanaderia(): Promise<PrenezActualGanaderia[]> {
+  return request(`/api/ganaderia/animales/prenez-actual`);
+}
+
+async function descargarPdfGanaderia(ruta: string): Promise<Blob> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(ruta, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) {
+    // El backend devuelve el motivo (p. ej. "admite hasta 93 días") en el cuerpo
+    const cuerpo = await res.json().catch(() => null);
+    throw new ApiError(cuerpo?.message || cuerpo?.error || `Error ${res.status}`);
+  }
+  return res.blob();
+}
+
+/** Reporte PDF de ordeño: diario (desde = hasta) o semanal/rango. Fechas YYYY-MM-DD. */
+export function descargarReporteOrdenoPdf(desde: string, hasta: string): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/ordeno/reporte/pdf?desde=${desde}&hasta=${hasta}`);
+}
+
+/** Constancia PDF de vacunación de una jornada (o rango), opcionalmente de una sola vacuna. */
+export function descargarConstanciaVacunacionPdf(desde: string, hasta: string, vacunaId?: number): Promise<Blob> {
+  const q = vacunaId ? `&vacunaId=${vacunaId}` : "";
+  return descargarPdfGanaderia(`/api/ganaderia/vacunas/constancia/pdf?desde=${desde}&hasta=${hasta}${q}`);
+}
+
 export function actualizarAnimalGanaderia(id: number, datos: Partial<AnimalGanaderia>): Promise<AnimalGanaderia> {
   return request(`/api/ganaderia/animales/${id}`, {
     method: "PUT",
@@ -3842,6 +3925,8 @@ export function registrarDespachoLecheTanque(tenantId: number, datos: {
   precioLitroUSD: number;
   compradorOPlanta: string;
   monedaPago?: string;
+  /** Monto efectivamente cobrado en monedaPago (obligatorio si no es USD). */
+  montoRecibido?: number;
   notas?: string;
 }): Promise<{ tanque: TanqueLeche; venta: VentaLecheTanque; mensaje: string }> {
   return request(`/api/ganaderia/ordeno/tanque/despacho?tenantId=${tenantId}`, {
@@ -3878,6 +3963,127 @@ export function registrarPesoGanaderia(tenantId: number, animalId: number, pesoK
 
 export function obtenerCurvaPesoGanaderia(animalId: number): Promise<RegistroPesoGanaderia[]> {
   return request(`/api/ganaderia/pesos/animal/${animalId}`);
+}
+
+/** Fila del resumen de engorde: GDP total y del último tramo; null cuando no hay pesajes suficientes. */
+export interface FilaEngordeGanaderia {
+  animalId: number;
+  arete: string;
+  nombre: string | null;
+  tipoAnimal: string | null;
+  raza: string | null;
+  sexo: string | null;
+  lote: string | null;
+  potreroId: number | null;
+  potrero: string | null;
+  cantidadPesajes: number;
+  pesoInicial: number | null;
+  fechaInicial: string | null;
+  pesoUltimo: number | null;
+  fechaUltimo: string | null;
+  dias: number | null;
+  gananciaTotalKg: number | null;
+  gdpKgDia: number | null;
+  gdpUltimoPeriodoKgDia: number | null;
+}
+
+export function resumenEngordeGanaderia(): Promise<FilaEngordeGanaderia[]> {
+  return request(`/api/ganaderia/pesos/resumen-engorde`);
+}
+
+export function editarPesoGanaderia(id: number, datos: { pesoKg?: number; fecha?: string }): Promise<RegistroPesoGanaderia> {
+  return request(`/api/ganaderia/pesos/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function eliminarPesoGanaderia(id: number): Promise<void> {
+  return request(`/api/ganaderia/pesos/${id}`, { method: "DELETE" });
+}
+
+// ── Ceba en sociedad (reparto de kilos ganados) ──
+
+export interface SociedadCebaGanaderia {
+  id: number;
+  nombreSocio: string;
+  documentoSocio?: string | null;
+  telefonoSocio?: string | null;
+  porcentajeFinca: number;
+  fechaInicio: string;
+  estado: "ACTIVA" | "CERRADA" | string;
+  fechaCierre?: string | null;
+  notas?: string | null;
+}
+
+export interface LineaLiquidacionSociedad {
+  animalId: number;
+  arete: string;
+  nombre: string | null;
+  tipoAnimal: string | null;
+  estado: string;
+  fechaEntrada: string | null;
+  diasEnFinca: number | null;
+  pesoEntrada: number | null;
+  pesoActual: number | null;
+  kilosGanados: number | null;
+  kilosFinca: number | null;
+  kilosSocio: number | null;
+  kilosTotalesSocio: number | null;
+  gdpKgDia: number | null;
+  precioVentaUSD: number | null;
+  precioKgUSD: number | null;
+  montoFincaUSD: number | null;
+  montoSocioUSD: number | null;
+}
+
+export interface ResumenSociedadCeba {
+  sociedad: SociedadCebaGanaderia;
+  porcentajeSocio: number;
+  animalesActivos: number;
+  animalesVendidos: number;
+  pesoEntradaTotal: number;
+  pesoActualTotal: number;
+  kilosGanadosTotal: number;
+  kilosFincaTotal: number;
+  kilosSocioTotal: number;
+  montoFincaVendidosUSD: number;
+  montoSocioVendidosUSD: number;
+  lineas: LineaLiquidacionSociedad[];
+}
+
+export interface DatosSociedadCeba {
+  nombreSocio?: string;
+  documentoSocio?: string;
+  telefonoSocio?: string;
+  porcentajeFinca?: number;
+  fechaInicio?: string;
+  notas?: string;
+}
+
+export function listarSociedadesCeba(): Promise<ResumenSociedadCeba[]> {
+  return request(`/api/ganaderia/sociedades`);
+}
+
+export function crearSociedadCeba(datos: DatosSociedadCeba): Promise<SociedadCebaGanaderia> {
+  return request(`/api/ganaderia/sociedades`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarSociedadCeba(id: number, datos: DatosSociedadCeba): Promise<SociedadCebaGanaderia> {
+  return request(`/api/ganaderia/sociedades/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function asignarAnimalesSociedadCeba(id: number, animalIds: number[], fechaEntrada?: string): Promise<{ asignados: number }> {
+  return request(`/api/ganaderia/sociedades/${id}/animales`, { method: "POST", body: JSON.stringify({ animalIds, fechaEntrada }) });
+}
+
+export function corregirPesoEntradaSociedadCeba(id: number, animalId: number, pesoEntrada: number): Promise<void> {
+  return request(`/api/ganaderia/sociedades/${id}/animales/${animalId}`, { method: "PUT", body: JSON.stringify({ pesoEntrada }) });
+}
+
+export function quitarAnimalSociedadCeba(id: number, animalId: number): Promise<void> {
+  return request(`/api/ganaderia/sociedades/${id}/animales/${animalId}`, { method: "DELETE" });
+}
+
+export function cerrarSociedadCeba(id: number): Promise<SociedadCebaGanaderia> {
+  return request(`/api/ganaderia/sociedades/${id}/cerrar`, { method: "POST" });
 }
 
 export function obtenerGdpGanaderia(animalId: number): Promise<GdpGanaderiaResponse> {

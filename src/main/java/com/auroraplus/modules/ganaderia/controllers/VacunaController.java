@@ -29,6 +29,23 @@ public class VacunaController {
     private GanaderiaSanidadService ganaderiaSanidadService;
 
     @Autowired
+    private com.auroraplus.modules.ganaderia.services.GanaderiaReportesPdfService reportesPdfService;
+
+    /** Constancia PDF de vacunación: animales vacunados, vacuna, lote, próxima dosis y retiros. */
+    @GetMapping(value = "/constancia/pdf", produces = org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> constanciaPdf(@RequestParam LocalDate desde,
+                                                @RequestParam(required = false) LocalDate hasta,
+                                                @RequestParam(required = false) Long vacunaId) throws Exception {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        LocalDate h = hasta != null ? hasta : desde;
+        byte[] pdf = reportesPdfService.constanciaVacunacion(tenantId, desde, h, vacunaId);
+        return ResponseEntity.ok()
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"constancia-vacunacion-" + desde + ".pdf\"")
+            .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+            .body(pdf);
+    }
+
+    @Autowired
     private com.auroraplus.modules.ganaderia.repositories.AnimalRepository animalRepository;
 
     // P0: el tenant SIEMPRE sale de TenantContext (JWT verificado) — antes se aceptaba un

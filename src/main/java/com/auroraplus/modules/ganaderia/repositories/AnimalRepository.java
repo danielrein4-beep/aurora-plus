@@ -19,6 +19,7 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
     // ── Métodos tenant-scoped (P0) — usar siempre estos en lugar de findAll/findByEstado ──
     List<Animal> findByTenantId(Long tenantId);
     List<Animal> findByTenantIdAndEstado(Long tenantId, String estado);
+    List<Animal> findByTenantIdAndSociedadCebaId(Long tenantId, Long sociedadCebaId);
     Optional<Animal> findByAreteAndTenantId(String arete, Long tenantId);
     List<Animal> findByPotreroIdAndEstadoAndTenantId(Long potreroId, String estado, Long tenantId);
 

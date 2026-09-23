@@ -14,7 +14,7 @@ import java.time.Period;
  * reproducción a lo largo de su vida productiva.
  */
 @Entity
-@Table(name = "animales", indexes = {
+@Table(name = "animales", uniqueConstraints = @UniqueConstraint(name = "uk_animales_tenant_arete", columnNames = {"tenant_id", "arete"}), indexes = {
     @Index(name = "idx_animal_tenant_arete", columnList = "tenant_id, arete")
 })
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
@@ -27,7 +27,7 @@ public class Animal {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    @Column(nullable = false, unique = true, length = 30)
+    @Column(nullable = false, length = 30) // único por finca (uk_animales_tenant_arete), no global
     private String arete;
 
     private String nombre;
@@ -93,6 +93,24 @@ public class Animal {
     // Estado productivo: CRIANDO, ORDEÑO, SECA
     @Column(name = "estado_productivo", length = 30)
     private String estadoProductivo = "SECA";
+
+    // Ceba en sociedad: null = animal propio de la finca.
+    @Column(name = "sociedad_ceba_id")
+    private Long sociedadCebaId;
+
+    // Peso y fecha con que entró a la sociedad: base de los kilos ganados a repartir.
+    @Column(name = "peso_entrada_sociedad", precision = 10, scale = 2)
+    private BigDecimal pesoEntradaSociedad;
+
+    @Column(name = "fecha_entrada_sociedad")
+    private LocalDate fechaEntradaSociedad;
+
+    public Long getSociedadCebaId() { return sociedadCebaId; }
+    public void setSociedadCebaId(Long sociedadCebaId) { this.sociedadCebaId = sociedadCebaId; }
+    public BigDecimal getPesoEntradaSociedad() { return pesoEntradaSociedad; }
+    public void setPesoEntradaSociedad(BigDecimal pesoEntradaSociedad) { this.pesoEntradaSociedad = pesoEntradaSociedad; }
+    public LocalDate getFechaEntradaSociedad() { return fechaEntradaSociedad; }
+    public void setFechaEntradaSociedad(LocalDate fechaEntradaSociedad) { this.fechaEntradaSociedad = fechaEntradaSociedad; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

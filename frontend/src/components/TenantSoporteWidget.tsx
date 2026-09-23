@@ -11,7 +11,16 @@ import {
   leerSesion,
 } from "../api";
 
-export default function TenantSoporteWidget() {
+interface Props {
+  /** Cada vez que cambia (p. ej. un contador desde el sidebar), abre el panel en la lista de tickets. */
+  solicitudApertura?: number;
+  /** true: la burbuja flotante solo aparece mientras haya un ticket abierto o en atención. */
+  soloConTicketActivo?: boolean;
+}
+
+const ESTADOS_CERRADOS = ["RESUELTO", "CERRADO"];
+
+export default function TenantSoporteWidget({ solicitudApertura, soloConTicketActivo = false }: Props = {}) {
   const [abierto, setAbierto] = useState(false);
   const [vista, setVista] = useState<"LISTA" | "NUEVO" | "CHAT">("LISTA");
   const [tickets, setTickets] = useState<SaasSoporteTicket[]>([]);
@@ -55,6 +64,23 @@ export default function TenantSoporteWidget() {
       cargarTickets();
     }
   }, [abierto]);
+
+  // Apertura desde afuera (sidebar "Soporte").
+  useEffect(() => {
+    if (solicitudApertura) {
+      setVista("LISTA");
+      setAbierto(true);
+    }
+  }, [solicitudApertura]);
+
+  // Para decidir si mostrar la burbuja hay que conocer los tickets aunque el panel esté cerrado.
+  useEffect(() => {
+    if (!soloConTicketActivo) return;
+    cargarTickets();
+    const intervalo = setInterval(cargarTickets, 60000);
+    return () => clearInterval(intervalo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soloConTicketActivo]);
 
   // Polling para mensajes en vivo cuando esta en CHAT
   useEffect(() => {
@@ -128,11 +154,13 @@ export default function TenantSoporteWidget() {
   };
 
   const ticketsNoLeidos = tickets.reduce((acc, t) => acc + (t.mensajesNoLeidos || 0), 0);
+  const hayTicketActivo = tickets.some((t) => !ESTADOS_CERRADOS.includes(String(t.estado).toUpperCase()));
+  const mostrarBurbuja = !abierto && (!soloConTicketActivo || hayTicketActivo);
 
   return (
     <>
       {/* BOTON FLOTANTE DE ASISTENCIA */}
-      {!abierto && (
+      {mostrarBurbuja && (
         <div className="fixed bottom-5 right-5 z-40">
           <button
             onClick={() => setAbierto(true)}

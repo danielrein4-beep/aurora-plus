@@ -42,6 +42,14 @@ public class RegistroAuditoriaService {
         YA_REGISTRADO_EN_ESTA_REQUEST.set(true);
     }
 
+    /**
+     * Para un POST que no modifica datos (p. ej. una vista previa que solo valida):
+     * evita que AuditoriaAutoInterceptor lo anote como "CREAR" sin haber creado nada.
+     */
+    public void omitirRegistroAutomatico() {
+        YA_REGISTRADO_EN_ESTA_REQUEST.set(true);
+    }
+
     /** Usado solo por AuditoriaAutoInterceptor para saber si ya se registró esta request a mano. */
     public boolean yaRegistradoEnEstaRequest() {
         return YA_REGISTRADO_EN_ESTA_REQUEST.get();

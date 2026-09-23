@@ -389,6 +389,30 @@ body {
   color: #1D1D1F !important;
 }
 
+/* Misma neutralización para las variantes TRANSLÚCIDAS (bg-slate-900/60,
+   bg-slate-800/90...): la regla de arriba no las alcanza y en modo claro
+   quedaban como un gris apagado (tabla del ordeño masivo, sugerencias del
+   catálogo de vacunas, modales de Ganadería/Horeca). Se llevan a la
+   superficie institucional clara. Solo en modo claro: el oscuro las necesita. */
+:where(html:not(.dark)) :is(
+  .bg-slate-950\/25, .bg-slate-950\/40, .bg-slate-950\/50, .bg-slate-950\/60,
+  .bg-slate-950\/70, .bg-slate-950\/80, .bg-slate-950\/90, .bg-slate-950\/95,
+  .bg-slate-900\/30, .bg-slate-900\/40, .bg-slate-900\/50, .bg-slate-900\/60,
+  .bg-slate-900\/70, .bg-slate-900\/75, .bg-slate-900\/80, .bg-slate-900\/85,
+  .bg-slate-900\/90, .bg-slate-900\/95,
+  .bg-slate-800\/30, .bg-slate-800\/40, .bg-slate-800\/50, .bg-slate-800\/60,
+  .bg-slate-800\/70, .bg-slate-800\/80, .bg-slate-800\/90
+) {
+  background-color: #FFFFFF !important;
+  color: #1D1D1F !important;
+}
+:where(html:not(.dark)) :is(
+  .bg-slate-700\/50, .bg-slate-700\/70, .bg-slate-700\/80, .bg-slate-700\/90
+) {
+  background-color: #F3F7F7 !important;
+  color: #1D1D1F !important;
+}
+
 /* La regla de arriba solo cubre bg-* plano — un panel armado con
    bg-gradient-to-* + from-slate-900/via-.../to-slate-900 (ej. el panel
    principal de Dashboard) pinta su propio degradado oscuro por encima vía

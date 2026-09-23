@@ -62,6 +62,29 @@ public class RegistroPesoController {
         return ResponseEntity.ok(registro);
     }
 
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.GanaderiaEngordeService engordeService;
+
+    /** GDP de todos los animales activos de la finca (vista de Engorde). */
+    @GetMapping("/resumen-engorde")
+    public List<com.auroraplus.modules.ganaderia.services.GanaderiaEngordeService.FilaEngorde> resumenEngorde() {
+        return engordeService.resumen(GanaderiaTenantAccess.requireTenant());
+    }
+
+    /** Corrige un pesaje mal digitado (peso y/o fecha); el peso de la ficha queda igual al último pesaje. */
+    @PutMapping("/{id}")
+    public ResponseEntity<RegistroPeso> editar(@PathVariable Long id, @RequestBody RegistroRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        return ResponseEntity.ok(engordeService.editar(GanaderiaTenantAccess.requireTenant(), id, request.fecha, request.pesoKg));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        engordeService.eliminar(GanaderiaTenantAccess.requireTenant(), id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/animal/{animalId}")
     public List<RegistroPeso> curvaAnimal(@PathVariable Long animalId) {
         Long tenantId = GanaderiaTenantAccess.requireTenant();
