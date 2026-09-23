@@ -19,6 +19,8 @@ import FichaAnamnesisRiesgo from "./FichaAnamnesisRiesgo";
 import EvolucionClinicaSesiones from "./EvolucionClinicaSesiones";
 import RecetasOdontologicas from "./RecetasOdontologicas";
 import ConsentimientosOdontologicos from "./ConsentimientosOdontologicos";
+import PanelClinicaOdontologia from "./PanelClinicaOdontologia";
+import KitsInsumosOdontologia from "./KitsInsumosOdontologia";
 
 interface ModuloOdontologiaProps {
   pacientes: Paciente[] | null;
@@ -30,6 +32,8 @@ interface ModuloOdontologiaProps {
 }
 
 type PestanaOdonto = 
+  | "hoy"
+  | "insumos"
   | "anamnesis"
   | "odontograma" 
   | "periodonto" 
@@ -54,7 +58,7 @@ export default function ModuloOdontologia({
     return null;
   });
 
-  const [pestanaActiva, setPestanaActiva] = useState<PestanaOdonto>("odontograma");
+  const [pestanaActiva, setPestanaActiva] = useState<PestanaOdonto>("hoy");
   const [busqueda, setBusqueda] = useState("");
 
   const pacienteSeleccionado = useMemo(() => {
@@ -234,6 +238,29 @@ export default function ModuloOdontologia({
         <div className="mt-5 pt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center gap-2 overflow-x-auto pb-1">
           <button
             type="button"
+            onClick={() => setPestanaActiva("hoy")}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "hoy"
+                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-black shadow-md"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Hoy en la clinica</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPestanaActiva("insumos")}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "insumos"
+                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-black shadow-md"
+                : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+            }`}
+          >
+            <span>Insumos y kits</span>
+          </button>
+          <span className="w-px h-6 bg-slate-200 dark:bg-white/10 shrink-0" aria-hidden="true" />
+          <button
+            type="button"
             onClick={() => setPestanaActiva("anamnesis")}
             className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "anamnesis"
@@ -342,8 +369,18 @@ export default function ModuloOdontologia({
         </div>
       </div>
 
-      {/* Vistas segun la pestana activa */}
-      {pacienteSeleccionado ? (
+      {/* Vistas segun la pestana activa. "Hoy" e "Insumos" son de la clinica, no de un paciente. */}
+      {pestanaActiva === "hoy" ? (
+        <PanelClinicaOdontologia
+          clinicaNombre={config?.clinicaNombre}
+          onAbrirPaciente={(id) => {
+            seleccionarPaciente(id);
+            setPestanaActiva("planes");
+          }}
+        />
+      ) : pestanaActiva === "insumos" ? (
+        <KitsInsumosOdontologia />
+      ) : pacienteSeleccionado ? (
         <>
           {pestanaActiva === "anamnesis" && (
             <FichaAnamnesisRiesgo

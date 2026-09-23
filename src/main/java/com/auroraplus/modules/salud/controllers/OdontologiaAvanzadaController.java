@@ -10,6 +10,7 @@ import com.auroraplus.modules.salud.entities.SalaEspera;
 import com.auroraplus.modules.salud.repositories.CobroConsultaRepository;
 import com.auroraplus.modules.salud.repositories.PacienteRepository;
 import com.auroraplus.modules.salud.repositories.SalaEsperaRepository;
+import com.auroraplus.modules.salud.services.OdontologiaInsumosService;
 import com.auroraplus.modules.salud.services.SalaEsperaService;
 import com.auroraplus.modules.salud.services.SaludFinanzasService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,9 @@ public class OdontologiaAvanzadaController {
 
     @Autowired
     private CobroConsultaRepository cobroConsultaRepository;
+
+    @Autowired
+    private OdontologiaInsumosService odontologiaInsumosService;
 
     private void validarPermisoClinico() {
         String rol = AuthContext.getRol();
@@ -504,29 +508,19 @@ public class OdontologiaAvanzadaController {
             estadoPlan, tenantId, planId
         );
 
-        // Buscar si existe un kit para este procedimiento
-        String procClave = proc.toUpperCase().replace(" ", "_");
-        List<Map<String, Object>> kits = jdbcTemplate.queryForList(
-            "SELECT * FROM salud_odontologia_kits_procedimientos WHERE tenant_id = ? AND (procedimiento_clave = ? OR LOWER(nombre_kit) LIKE LOWER(?))",
-            tenantId, procClave, "%" + proc + "%"
+        // Descuento real del inventario segun el kit del procedimiento; lo que no se
+        // pudo descontar queda informado en el item, sin revertir el procedimiento.
+        OdontologiaInsumosService.ResultadoDescuento descuento = odontologiaInsumosService.descontarKit(tenantId, proc, itemId);
+        jdbcTemplate.update(
+            "UPDATE salud_odontologia_plan_items SET kit_descargado = ?, detalle_insumos = ? WHERE tenant_id = ? AND id = ?",
+            descuento.completo(), descuento.resumen(), tenantId, itemId
         );
 
-        // Salud aun no tiene inventario de insumos: se informa el kit de referencia
-        // sin afirmar un descuento de stock que no ocurre.
-        String detalleInsumos = "Procedimiento completado.";
-        String insumosKit = "[]";
-        if (!kits.isEmpty()) {
-            detalleInsumos = "Procedimiento completado. Kit de referencia: " + kits.get(0).get("nombre_kit")
-                + " (el descuento automatico de inventario aun no esta conectado).";
-            Object json = kits.get(0).get("insumos_json");
-            insumosKit = json != null ? json.toString() : "[]";
-        }
-
         return ResponseEntity.ok(Map.of(
-            "mensaje", detalleInsumos,
+            "mensaje", "Procedimiento completado. " + descuento.resumen(),
             "estado", "REALIZADO",
             "estadoPlan", estadoPlan,
-            "insumosKit", insumosKit
+            "insumos", descuento.comoMapa()
         ));
     }
 
@@ -796,7 +790,8 @@ public class OdontologiaAvanzadaController {
     public ResponseEntity<?> listarKits() {
         Long tenantId = TenantContext.getCurrentTenant();
         List<Map<String, Object>> kits = jdbcTemplate.queryForList(
-            "SELECT * FROM salud_odontologia_kits_procedimientos WHERE tenant_id = ? AND activo = true ORDER BY nombre_kit ASC",
+            "SELECT id, procedimiento_clave, nombre_kit, insumos_json::text AS insumos_json, palabras_clave, activo " +
+            "FROM salud_odontologia_kits_procedimientos WHERE tenant_id = ? AND activo = true ORDER BY nombre_kit ASC",
             tenantId
         );
         return ResponseEntity.ok(kits);
