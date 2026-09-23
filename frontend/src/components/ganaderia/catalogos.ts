@@ -12,3 +12,16 @@ export const CATEGORIAS_GASTO_GANADERIA = [
   { id: "SERVICIOS", label: "Servicios Básicos / Electricidad / Agua", icon: IconBolt, colorBadge: "text-orange-400 bg-orange-500/10 border-orange-500/30" },
   { id: "OTROS", label: "Otros Gastos Operativos", icon: IconBox, colorBadge: "text-slate-300 bg-slate-500/10 border-slate-500/30" },
 ];
+
+// Catálogo sugerido de razas bovinas — se ofrece como datalist (autocompletar)
+// pero el campo sigue siendo texto libre por si la raza real no está en la lista.
+export const RAZAS_BOVINAS_COMUNES = [
+  "Brahman", "Gyr", "Gyrolando", "Pardo Suizo", "Holstein", "Jersey",
+  "Angus", "Brangus", "Simmental", "Charolais", "Nelore", "Senepol",
+  "Guzerat", "Criollo Limonero", "Carora", "Romosinuano", "Mestizo",
+  // Cruces / F1 más comunes en fincas de doble propósito — el campo sigue
+  // siendo texto libre, así que cualquier otra combinación se puede escribir igual.
+  "F1 Brahman x Gyr", "F1 Brahman x Holstein", "F1 Gyr x Holstein",
+  "F1 Pardo Suizo x Cebú", "F1 Angus x Brahman (Brangus)",
+  "5/8 Holstein x Cebú", "3/4 Cebú x Europeo", "Cruzado (especificar)",
+];
