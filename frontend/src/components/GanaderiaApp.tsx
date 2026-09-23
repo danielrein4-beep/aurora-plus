@@ -387,6 +387,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
   const [ventaModo, setVentaModo] = useState<"INDIVIDUAL" | "MULTIPLE">("INDIVIDUAL");
   const [animalesVentaSeleccionados, setAnimalesVentaSeleccionados] = useState<number[]>([]);
+  // Venta en lote: filtro por arete/nombre y peso de báscula por animal (precargado con el del sistema).
+  const [busquedaVenta, setBusquedaVenta] = useState("");
+  const [pesosVenta, setPesosVenta] = useState<Record<number, string>>({});
+  /** Peso con el que se vende: el de báscula si se escribió, si no el del sistema. */
+  const pesoVentaDe = (id: number) => {
+    const escrito = Number(String(pesosVenta[id] ?? "").replace(",", "."));
+    return escrito > 0 ? escrito : (animales.find(a => a.id === id)?.pesoActual || 0);
+  };
   const [ultimaVentaId, setUltimaVentaId] = useState<number | null>(null);
   const [ultimoDespachoLecheId, setUltimoDespachoLecheId] = useState<number | null>(null);
 
@@ -407,6 +415,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Estados para Modo Vaquera Rápida (Bulk Entry de Ordeño Diario)
   const [modalVaqueraRapida, setModalVaqueraRapida] = useState(false);
+  const [busquedaVaquera, setBusquedaVaquera] = useState("");
   const [vaqueraFecha, setVaqueraFecha] = useState(new Date().toISOString().slice(0, 10));
   const [vaqueraTurno, setVaqueraTurno] = useState<"MANANA" | "TARDE" | "DOBLE">("MANANA");
   const [vaqueraPrecioUSD, setVaqueraPrecioUSD] = useState<number>(0.45);
@@ -879,6 +888,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }
     setVentaModo(modo);
     setAnimalesVentaSeleccionados([]);
+    setBusquedaVenta("");
+    setPesosVenta({});
     setUltimaVentaId(null);
     setModalVentaAnimal(true);
   };
@@ -898,9 +909,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     // (así se vende "por kilo" real, cada uno con su peso); si no, en modo individual
     // se usa el precio total tal cual, y en lote se reparte el precio total en partes iguales.
     const precioPorAnimal = (id: number): number => {
-      const animal = animales.find(a => a.id === id);
-      if (formVenta.precioPorKg > 0 && animal?.pesoActual) {
-        return Number((animal.pesoActual * formVenta.precioPorKg).toFixed(2));
+      const peso = ventaModo === "INDIVIDUAL" ? (Number(formVenta.pesoSalida) || animales.find(a => a.id === id)?.pesoActual || 0) : pesoVentaDe(id);
+      if (formVenta.precioPorKg > 0 && peso > 0) {
+        return Number((peso * formVenta.precioPorKg).toFixed(2));
       }
       if (ventaModo === "INDIVIDUAL") return Number(formVenta.precioUSD) || 0;
       return Number((Number(formVenta.precioUSD) / idsVenta.length).toFixed(2));
@@ -915,6 +926,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       // 1. Si se registró nuevo peso en báscula antes del despacho (solo modo individual), actualizar peso del animal
       if (ventaModo === "INDIVIDUAL" && formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0) {
         await actualizarAnimalGanaderia(formVenta.animalId, { pesoActual: Number(formVenta.pesoSalida) });
+      }
+      if (ventaModo === "MULTIPLE") {
+        for (const id of idsVenta) {
+          const peso = pesoVentaDe(id);
+          if (peso > 0 && peso !== animales.find(a => a.id === id)?.pesoActual) {
+            await actualizarAnimalGanaderia(id, { pesoActual: peso });
+          }
+        }
       }
 
       // 2. Registrar la venta oficial en el backend con VentaAnimalController (guarda comprador, precio,
@@ -948,6 +967,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       motivo: "BENEFICIO",
     });
     setAnimalesVentaSeleccionados([]);
+    setPesosVenta({});
   };
 
   // Manejador: Registrar Celo (Evento Reproductivo dedicado)
@@ -1121,6 +1141,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }));
 
     setVaqueraFilas(filas);
+    setBusquedaVaquera("");
     setModalVaqueraRapida(true);
   };
 
@@ -6655,7 +6676,17 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         const idsSeleccionados = ventaModo === "INDIVIDUAL"
           ? (formVenta.animalId ? [formVenta.animalId] : [])
           : animalesVentaSeleccionados;
-        const pesoTotalSeleccion = idsSeleccionados.reduce((sum, id) => sum + (animales.find(a => a.id === id)?.pesoActual || 0), 0);
+        const pesoTotalSeleccion = ventaModo === "INDIVIDUAL"
+          ? (Number(formVenta.pesoSalida) || animales.find(a => a.id === formVenta.animalId)?.pesoActual || 0)
+          : idsSeleccionados.reduce((sum, id) => sum + pesoVentaDe(id), 0);
+        const termino = busquedaVenta.trim().toLowerCase();
+        const animalesVentaFiltrados = termino
+          ? animalesActivosVenta.filter(a =>
+              a.arete.toLowerCase().includes(termino) ||
+              (a.nombre || "").toLowerCase().includes(termino) ||
+              (a.raza || "").toLowerCase().includes(termino) ||
+              (a.tipoAnimal || "").toLowerCase().includes(termino))
+          : animalesActivosVenta;
         const totalEstimado = formVenta.precioPorKg > 0
           ? pesoTotalSeleccion * formVenta.precioPorKg
           : Number(formVenta.precioUSD) || 0;
@@ -6719,7 +6750,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   type="button"
                   onClick={() => setVentaModo("INDIVIDUAL")}
                   className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                    ventaModo === "INDIVIDUAL" ? "bg-rose-500 text-white shadow-md" : "text-slate-400 hover:text-white"
+                    ventaModo === "INDIVIDUAL" ? "bg-teal-700 !text-white shadow-sm" : "text-slate-400 hover:text-white"
                   }`}>
                   Individual
                 </button>
@@ -6727,7 +6758,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   type="button"
                   onClick={() => setVentaModo("MULTIPLE")}
                   className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                    ventaModo === "MULTIPLE" ? "bg-rose-500 text-white shadow-md" : "text-slate-400 hover:text-white"
+                    ventaModo === "MULTIPLE" ? "bg-teal-700 !text-white shadow-sm" : "text-slate-400 hover:text-white"
                   }`}>
                   Lote / Varios Animales
                 </button>
@@ -6764,38 +6795,72 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <label className="text-slate-400 block">Animales a Despachar *</label>
                     <button
                       type="button"
-                      onClick={() => setAnimalesVentaSeleccionados(
-                        animalesVentaSeleccionados.length === animalesActivosVenta.length ? [] : animalesActivosVenta.map(a => a.id)
-                      )}
-                      className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer">
-                      {animalesVentaSeleccionados.length === animalesActivosVenta.length ? "Desmarcar todos" : `Todos (${animalesActivosVenta.length})`}
+                      onClick={() => {
+                        const idsFiltro = animalesVentaFiltrados.map(a => a.id);
+                        const todosMarcados = idsFiltro.length > 0 && idsFiltro.every(id => animalesVentaSeleccionados.includes(id));
+                        setAnimalesVentaSeleccionados(prev => todosMarcados
+                          ? prev.filter(id => !idsFiltro.includes(id))
+                          : [...new Set([...prev, ...idsFiltro])]);
+                      }}
+                      className="text-[11px] font-bold text-teal-700 hover:text-teal-900 cursor-pointer">
+                      {animalesVentaFiltrados.length > 0 && animalesVentaFiltrados.every(a => animalesVentaSeleccionados.includes(a.id))
+                        ? "Desmarcar los mostrados"
+                        : `Marcar los mostrados (${animalesVentaFiltrados.length})`}
                     </button>
                   </div>
-                  <div className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-slate-950/70 p-2 space-y-1">
-                    {animalesActivosVenta.map(a => {
+                  <input
+                    type="search"
+                    value={busquedaVenta}
+                    onChange={e => setBusquedaVenta(e.target.value)}
+                    placeholder="Buscar por número de arete, nombre, raza o tipo..."
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:border-teal-600 focus:outline-none"
+                  />
+                  <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 space-y-0.5">
+                    {animalesVentaFiltrados.length === 0 && (
+                      <div className="p-3 text-center text-[11px] text-slate-500">Ningún animal coincide con “{busquedaVenta}”.</div>
+                    )}
+                    {animalesVentaFiltrados.map(a => {
                       const isSel = animalesVentaSeleccionados.includes(a.id);
                       return (
-                        <label key={a.id} className={`flex items-center justify-between p-1.5 rounded-lg text-[11px] cursor-pointer transition-colors ${
-                          isSel ? "bg-rose-500/20 text-white font-bold" : "hover:bg-white/5 text-slate-300"
+                        <div key={a.id} className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-[11px] transition-colors ${
+                          isSel ? "bg-teal-50 text-slate-900 font-semibold" : "hover:bg-slate-50 text-slate-700"
                         }`}>
-                          <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                             <input
                               type="checkbox"
                               checked={isSel}
                               onChange={e => setAnimalesVentaSeleccionados(prev =>
                                 e.target.checked ? [...prev, a.id] : prev.filter(id => id !== a.id)
                               )}
-                              className="rounded text-rose-500 focus:ring-0"
+                              className="rounded accent-teal-700 focus:ring-0"
                             />
-                            <span className="font-mono text-rose-300">{a.arete}</span>
-                            <span>{a.nombre || a.tipoAnimal}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-400">{a.pesoActual || 0} kg</span>
-                        </label>
+                            <span className="font-mono text-teal-800">{a.arete}</span>
+                            <span className="truncate">{a.nombre || a.tipoAnimal}{a.raza ? ` · ${a.raza}` : ""}</span>
+                          </label>
+                          {isSel ? (
+                            <div className="flex items-center gap-1 flex-shrink-0" title="Peso en báscula al momento de la venta">
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={pesosVenta[a.id] ?? String(a.pesoActual || "")}
+                                onFocus={e => e.target.select()}
+                                onChange={e => setPesosVenta(prev => ({ ...prev, [a.id]: e.target.value }))}
+                                className="w-20 px-2 py-1 rounded-md border border-slate-300 bg-white text-right font-mono text-[11px] text-slate-900 focus:border-teal-600 focus:outline-none"
+                              />
+                              <span className="text-[10px] text-slate-500">kg</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 flex-shrink-0">{a.pesoActual || 0} kg</span>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
-                  <div className="text-[11px] text-right font-bold text-rose-400">
+                  <div className="text-[10px] text-slate-500">
+                    Al marcar un animal se muestra su peso del sistema; cámbielo si lo pesó en báscula al vender. El nuevo peso queda guardado en su ficha.
+                  </div>
+                  <div className="text-[11px] text-right font-bold text-teal-800">
                     {animalesVentaSeleccionados.length} animal(es) · {pesoTotalSeleccion} kg total
                   </div>
                 </div>
@@ -6890,7 +6955,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer transition-colors shadow-lg">
+                  className="px-6 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 !text-white font-bold cursor-pointer transition-colors shadow-sm">
                   Confirmar Salida por Venta
                 </button>
               </div>
@@ -7092,10 +7157,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
               </div>
 
+              {/* Buscador de vaca: filtra filas sin perder lo ya digitado en las demás */}
+              <input
+                type="search"
+                value={busquedaVaquera}
+                onChange={e => setBusquedaVaquera(e.target.value)}
+                placeholder="Buscar vaca por número de arete o nombre..."
+                className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-sm focus:border-teal-600 focus:outline-none"
+              />
+
               {/* Tabla de Entrada Ultrarrápida por Teclado */}
-              <div className="flex-1 overflow-y-auto max-h-72 rounded-2xl border border-white/10 bg-slate-900/60">
+              <div className="flex-1 overflow-y-auto max-h-72 rounded-2xl border border-slate-200 bg-white">
                 <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-900 border-b border-white/10 text-slate-400 text-[11px] uppercase font-bold z-10">
+                  <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase font-bold z-10">
                     <tr>
                       <th className="p-3 w-12 text-center">#</th>
                       <th className="p-3">Arete / Vaca</th>
@@ -7112,6 +7186,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {vaqueraFilas.map((fila, idx) => {
+                      const q = busquedaVaquera.trim().toLowerCase();
+                      if (q && !String(fila.arete || "").toLowerCase().includes(q) && !String(fila.nombre || "").toLowerCase().includes(q)) {
+                        return null;
+                      }
                       const totalFila = (Number(fila.litrosManana) || 0) + (Number(fila.litrosTarde) || 0);
                       const esMastitis = fila.estado === "MASTITIS";
                       const esCalostro = fila.estado === "CALOSTRO";
