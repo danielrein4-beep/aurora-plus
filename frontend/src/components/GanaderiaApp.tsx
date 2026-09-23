@@ -1,9 +1,29 @@
+import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
+
+import {
+  listarAnimalesGanaderia, listarPotrerosGanaderia, rotarPotreroGanaderia, registrarOrdenoGanaderia,
+  obtenerReporteOrdenoGanaderia, registrarPesoGanaderia, listarVacunasGanaderia,
+  aplicarVacunaGanaderia, obtenerAlertasGanaderia, obtenerAlertasSanitariasGanaderia,
+  obtenerStockTanqueLeche, obtenerVentasLecheTanque, listarGastosGanaderia, listarVentasGanaderia,
+  type AnimalGanaderia, type PotreroGanaderia, type RegistroOrdenoGanaderia,
+  type TableroAlertasGanaderia, type VacunaGanaderia, type AlertaSanitariaGanaderia,
+  type TanqueLeche, type VentaLecheTanque, type GastoGanaderia, type VentaGanaderiaResumen,
+  listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
+  tasaVigente, actualizarTasa,
+} from "../api";
+
+import { AuroraGradientDef, IconCheckCircle, IconClose, IconDownload } from "../Icons";
+import { useAuth } from "../context/AuthContext";
+import { contarPendientesGanaderia, procesarColaGanaderia } from "../offlineQueueGanaderia";
+
 import BitacoraAuditoria from "./BitacoraAuditoria";
-import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
 import ModalImportarHato from "./ModalImportarHato";
 import TenantSoporteWidget from "./TenantSoporteWidget";
 import EngordeGanadero from "./EngordeGanadero";
 import SociedadesCeba from "./SociedadesCeba";
+import { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
+
 import ModalVentaAnimales, { type ModoVenta } from "./ganaderia/ModalVentaAnimales";
 import ModalJornadaOrdeno, { vacasDeOrdeno } from "./ganaderia/ModalJornadaOrdeno";
 import ModalVacunacion, { type VacunacionAplicada } from "./ganaderia/ModalVacunacion";
@@ -14,7 +34,6 @@ import ModalOrdeno from "./ganaderia/ModalOrdeno";
 import ModalGasto from "./ganaderia/ModalGasto";
 import ModalRotarPotrero from "./ganaderia/ModalRotarPotrero";
 import ModalPotrero, { potreroVacio, type FormPotrero } from "./ganaderia/ModalPotrero";
-import { CATEGORIAS_GASTO_GANADERIA } from "./ganaderia/catalogos";
 import ModalAltaAnimal, { type FormAltaAnimal } from "./ganaderia/ModalAltaAnimal";
 import ModalEditarAnimal from "./ganaderia/ModalEditarAnimal";
 import ModalPesaje from "./ganaderia/ModalPesaje";
@@ -24,6 +43,7 @@ import ModalPrecioLeche from "./ganaderia/ModalPrecioLeche";
 import ModalDatosFiscales from "./ganaderia/ModalDatosFiscales";
 import ModalDespachoLeche from "./ganaderia/ModalDespachoLeche";
 import ModalCalibrarTanque from "./ganaderia/ModalCalibrarTanque";
+
 import SeccionProduccion from "./ganaderia/SeccionProduccion";
 import SeccionEventos from "./ganaderia/SeccionEventos";
 import SeccionFinanzas from "./ganaderia/SeccionFinanzas";
@@ -34,54 +54,6 @@ import SeccionSanidad from "./ganaderia/SeccionSanidad";
 import BarraLateralGanaderia from "./ganaderia/BarraLateralGanaderia";
 import BarraSuperiorGanaderia from "./ganaderia/BarraSuperiorGanaderia";
 import type { TabGanaderia, SubPotreros, SubInventario, SubSanidad } from "./ganaderia/tipos";
-import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
-import {
-  encolarAccionGanaderia,
-  contarPendientesGanaderia,
-  procesarColaGanaderia,
-  esFalloDeConexion,
-  generarClaveIdempotencia,
-} from "../offlineQueueGanaderia";
-import { Fragment, useState, useEffect } from "react";
-import { AuroraGradientDef } from "../Icons";
-import ThemeToggle from "./ThemeToggle";
-import {
-  IconCheckCircle, IconClose, IconDownload, IconFileText,
-  IconCalendar, IconCard, IconCustomize, IconRocket, IconChart,
-  IconPrescription, IconUsers, IconHourglass,
-  IconWheat, IconSyringe, IconWrench, IconTractor, IconTruck, IconBolt, IconBox,
-  IconWarning, IconFire, IconMilk, IconEdit, IconSettings, IconPin, IconCow,
-  IconSnowflake, IconTag, IconShield, IconDna, IconScale, IconSprout, IconCart,
-  IconMeat, IconRefresh, IconBulb, IconCoins, IconDashboardGrid, IconUpload
-} from "../Icons";
-import GanaderiaMapa from "./GanaderiaMapa";
-import { useAuth } from "../context/AuthContext";
-import * as XLSX from "xlsx";
-import {
-  listarAnimalesGanaderia, crearAnimalGanaderia, actualizarAnimalGanaderia, moverAnimalGanaderia,
-  registrarVentaGanaderia,
-  listarPotrerosGanaderia, crearPotreroGanaderia, actualizarPotreroGanaderia, rotarPotreroGanaderia,
-  registrarOrdenoGanaderia, obtenerReporteOrdenoGanaderia,
-  registrarPesoGanaderia, obtenerGdpGanaderia,
-  listarVacunasGanaderia, crearVacunaGanaderia, aplicarVacunaGanaderia, aplicarVacunaLoteGanaderia,
-  obtenerAlertasGanaderia, registrarEventoReproductivoGanaderia,
-  obtenerAlertasSanitariasGanaderia, obtenerVacunasPorAnimal, obtenerMedicamentosPorAnimal,
-  obtenerDatosFiscalesNegocio, actualizarDatosFiscalesNegocio,
-  descargarNotaEntregaVentaAnimalPdf, descargarNotaEntregaDespachoLechePdf, descargarAlertasSanitariasExcel,
-  obtenerEventosReproductivosPorHembra, obtenerCurvaPesoGanaderia,
-  registrarMastitisGanaderia,
-  obtenerStockTanqueLeche, registrarDespachoLecheTanque, obtenerVentasLecheTanque, configurarTanqueLeche,
-  listarGastosGanaderia, crearGastoGanaderia, listarVentasGanaderia,
-  type AnimalGanaderia, type PotreroGanaderia, type RegistroOrdenoGanaderia,
-  type TableroAlertasGanaderia, type VacunaGanaderia,
-  type AlertaSanitariaGanaderia, type AplicacionVacunaGanaderia, type AplicacionMedicamentoGanaderia,
-  type EventoReproductivoGanaderia, type RegistroPesoGanaderia,
-  type GdpGanaderiaResponse,
-  type TanqueLeche, type VentaLecheTanque,
-  type GastoGanaderia, type VentaGanaderiaResumen,
-  listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
-  tasaVigente, actualizarTasa, descargarInventarioHatoPdf, descargarReportePotrerosPdf,
-} from "../api";
 
 interface Props {
   onSalir: () => void;
@@ -269,10 +241,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [modalEditarAnimal, setModalEditarAnimal] = useState<AnimalGanaderia | null>(null);
   const [modalDatosFiscales, setModalDatosFiscales] = useState(false);
 
-
   // Modo vaquera rápida (jornada de ordeño de todo el rebaño): ver ganaderia/ModalJornadaOrdeno
   const [vaqueraAbierta, setVaqueraAbierta] = useState(false);
-
 
   // Notificaciones flotantes
   const [notificacion, setNotificacion] = useState<string | null>(null);
@@ -311,8 +281,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     setSubSanidad("individual");
     setAnimalFichaId(deepLinkAnimalId);
   }, [deepLinkAnimalId, animales]);
-
-
 
   const cargarDatos = async () => {
     try {
@@ -383,8 +351,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Métricas calculadas
   const totalAnimales = animalesActivos.length;
-
-
 
   // Abre el modal de edición precargado con los datos reales del animal
   const abrirEditarAnimal = (animal: AnimalGanaderia) => setModalEditarAnimal(animal);
@@ -472,7 +438,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Ordeño individual guardado: a la lista y, si fue al tanque, al stock del tanque.
   const alRegistrarOrdeno = (nuevoReg: RegistroOrdenoGanaderia, litrosAlTanque: number) =>
     alGuardarJornada([nuevoReg], litrosAlTanque);
-
 
   // Sincronizacion de operaciones de campo realizadas offline (manga/potreros)
   const handleSincronizarManual = async () => {
