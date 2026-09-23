@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm,
-  IconEducation, IconConstruction, IconCustomize, IconWarning, IconClose, IconCheck, IconLock,
+  IconEducation, IconConstruction, IconWarning, IconClose, IconCheck, IconLock,
   IconCard, IconBank, IconPrescription,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
@@ -104,14 +104,6 @@ const INDUSTRIES: IndustryItem[] = [
     isReady: false,
     tagline: "Vertical en Desarrollo: Aurora Obras & Construcción Civil Pro",
   },
-  {
-    id: "otro",
-    label: "Otro Rubro Comercial",
-    Icon: IconCustomize,
-    desc: "Arquitectura modular para industrias a medida",
-    badge: "Disponible",
-    isReady: true,
-  },
 ];
 
 const CLINIC_MODULES = [
@@ -139,13 +131,13 @@ const HARDWARE_MODULES = [
 ];
 
 const RESTAURANT_MODULES = [
-  // Salón/Mesas y Cocina (KDS) todavía no están disponibles en producción
-  // (ver PLAN_ACTUAL/premium en RestauranteApp.tsx — quedan en pausa
-  // mientras el negocio se enfoca en Ventas/Inventario/Administración) —
-  // ofrecerlos como si ya se pudieran activar acá sería prometer algo que
-  // el tenant nuevo no va a encontrar disponible al entrar.
-  { id: "salon", label: "Salón & Mapa de Mesas", desc: "Abrir comandas por mesa, delivery propio o recoger en tienda", defaultOn: true, disponible: false },
-  { id: "cocina", label: "Cocina en Tiempo Real (KDS)", desc: "Tablero por estación: pendiente, preparando, listo", defaultOn: true, disponible: false },
+  // Salón/Mesas y Cocina (KDS) ya están activos en producción para el piloto
+  // (ver PLAN_ACTUAL="PRO" en RestauranteApp.tsx, que los deja visibles para
+  // todos los tenants) — este onboarding había quedado desactualizado
+  // marcándolos "Próximamente" cuando el tenant nuevo sí los encuentra
+  // disponibles al entrar.
+  { id: "salon", label: "Salón & Mapa de Mesas", desc: "Abrir comandas por mesa, delivery propio o recoger en tienda", defaultOn: true },
+  { id: "cocina", label: "Cocina en Tiempo Real (KDS)", desc: "Tablero por estación: pendiente, preparando, listo", defaultOn: true },
   { id: "recetas", label: "Recetas & Escandallo de Costos", desc: "Costeo por ingrediente y margen real por plato", defaultOn: true },
   { id: "fastbar", label: "Fast-Bar", desc: "Venta rápida de tragos por botella/mililitraje", defaultOn: true },
   { id: "compras", label: "Compras, Proveedores & Vencimientos", desc: "Registro de facturas de insumos con alertas de caducidad", defaultOn: true },

@@ -131,6 +131,18 @@ export function IconCustomize({ size = 24 }: IconProps) {
   );
 }
 
+/** Automatización conectada: flujos verificables, no robots ni magia visual. */
+export function IconAutomation({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3.5" y="4" width="5" height="5" rx="1" {...s} />
+      <rect x="15.5" y="9.5" width="5" height="5" rx="1" {...s} />
+      <rect x="3.5" y="15" width="5" height="5" rx="1" {...s} />
+      <path d="M8.5 6.5h3a3 3 0 0 1 3 3v2.5M8.5 17.5h3a3 3 0 0 0 3-3v-2.5M12 12h2.5" {...s} />
+    </svg>
+  );
+}
+
 export function IconChart({ size = 24, className, stroke }: IconProps) {
   const st = getStyle(className, stroke);
   return (

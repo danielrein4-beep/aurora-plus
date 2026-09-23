@@ -54,7 +54,7 @@ function RestaurantePage() {
 
 function ComercioPage() {
   const navigate = useNavigate();
-  return <ComercioApp onSalir={() => navigate("/dashboard")} />;
+  return <ComercioApp onSalir={() => navigate("/dashboard")} onIrAEquipoRoles={() => navigate("/dashboard?tab=team")} />;
 }
 
 function GanaderiaPage() {

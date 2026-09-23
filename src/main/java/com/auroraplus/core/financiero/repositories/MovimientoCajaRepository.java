@@ -8,9 +8,12 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MovimientoCajaRepository extends JpaRepository<MovimientoCaja, Long> {
+
+    Optional<MovimientoCaja> findByIdAndTenantId(Long id, Long tenantId);
 
     @Query("SELECT COALESCE(SUM(m.monto), 0) FROM MovimientoCaja m WHERE m.tenantId = :tenantId AND m.moneda = :moneda AND m.tipo = :tipo")
     BigDecimal sumarMontoPorTipoYMoneda(@Param("tenantId") Long tenantId, @Param("moneda") String moneda, @Param("tipo") MovimientoCaja.TipoMovimiento tipo);

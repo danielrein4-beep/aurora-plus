@@ -10,6 +10,7 @@ import com.auroraplus.modules.comercio.entities.PedidoWebComercio;
 import com.auroraplus.modules.comercio.repositories.PedidoWebComercioRepository;
 import com.auroraplus.modules.repuestos.entities.RepuestoItem;
 import com.auroraplus.modules.repuestos.repositories.RepuestoItemRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/public/catalogo")
@@ -38,6 +40,8 @@ public class CatalogoPublicoController {
 
     @Autowired
     private PedidoWebComercioRepository pedidoWebRepository;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Resolucion segura de la tienda EXCLUSIVAMENTE por su slug publico (ej:
@@ -66,36 +70,58 @@ public class CatalogoPublicoController {
         Long tenantId = licencia.getTenantId();
 
         BigDecimal tasaVes = BigDecimal.valueOf(50.0);
+        // COP es opcional: solo se expone si el dueño la configuró en Finanzas > Tasas
+        // de Cambio (USD -> COP). Si no existe fila, se omite del todo en vez de
+        // inventar una tasa — mostrar un precio en COP inventado sería peor que no
+        // mostrarlo.
+        BigDecimal tasaCop = null;
         if (tasaCambioRepository != null) {
             Optional<TasaCambio> tc = tasaCambioRepository
                 .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES");
             if (tc.isPresent() && tc.get().getTasa() != null && tc.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {
                 tasaVes = tc.get().getTasa();
             }
+            Optional<TasaCambio> tcCop = tasaCambioRepository
+                .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "COP");
+            if (tcCop.isPresent() && tcCop.get().getTasa() != null && tcCop.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {
+                tasaCop = tcCop.get().getTasa();
+            }
         }
 
         List<Map<String, Object>> productos = new ArrayList<>();
 
-        // 1. Items de repuestos si existen
+        // 1. Items de repuestos si existen — ocultos del catálogo público si el dueño los
+        // marcó `visible=false` (ver RepuestoItemController), y ordenados por
+        // ordenVisualizacion (el dueño decide qué aparece primero), empatando por nombre.
+        // Los que comparten `grupoVariante` (ej. mismo zapato en varias tallas — cada
+        // talla sigue siendo un RepuestoItem con SU PROPIO stock) se juntan en UNA sola
+        // tarjeta con un arreglo `variantes`, en vez de aparecer como productos sueltos.
         if (repuestoItemRepository != null) {
-            List<RepuestoItem> items = repuestoItemRepository.findByTenantId(tenantId);
-            for (RepuestoItem item : items) {
-                BigDecimal precioUsd = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
-                BigDecimal precioBs = precioUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
+            List<RepuestoItem> items = repuestoItemRepository.findByTenantId(tenantId).stream()
+                .filter(item -> !Boolean.FALSE.equals(item.getVisible()))
+                .sorted(Comparator
+                    .comparingInt((RepuestoItem item) -> item.getOrdenVisualizacion() != null ? item.getOrdenVisualizacion() : 0)
+                    .thenComparing(item -> item.getDescripcion() != null ? item.getDescripcion() : ""))
+                .collect(Collectors.toList());
 
-                Map<String, Object> p = new LinkedHashMap<>();
-                p.put("id", "rep-" + item.getId());
-                p.put("codigo", item.getCodigoSku());
-                p.put("oem", item.getCodigoOriginalOem());
-                p.put("nombre", item.getDescripcion());
-                p.put("categoria", "Repuestos");
-                p.put("stock", item.getStockActual() != null ? item.getStockActual() : BigDecimal.ZERO);
-                p.put("precioUsd", precioUsd);
-                p.put("precioBs", precioBs);
-                p.put("unidad", item.getUnidadBase() != null ? item.getUnidadBase() : "Pza");
-                p.put("precioMayorista", item.getPrecioMayorista());
-                p.put("cantidadMinimaMayorista", item.getCantidadMinimaMayorista());
-                productos.add(p);
+            Map<String, List<RepuestoItem>> variantesPorGrupo = new LinkedHashMap<>();
+            for (RepuestoItem item : items) {
+                String grupo = item.getGrupoVariante();
+                if (grupo != null && !grupo.isBlank()) {
+                    variantesPorGrupo.computeIfAbsent(grupo.trim(), k -> new ArrayList<>()).add(item);
+                }
+            }
+
+            Set<String> gruposYaAgregados = new HashSet<>();
+            for (RepuestoItem item : items) {
+                String grupo = item.getGrupoVariante();
+                if (grupo != null && !grupo.isBlank()) {
+                    String clave = grupo.trim();
+                    if (!gruposYaAgregados.add(clave)) continue; // ya se agregó la tarjeta de este grupo
+                    productos.add(construirTarjetaAgrupada(variantesPorGrupo.get(clave), tasaVes, tasaCop));
+                } else {
+                    productos.add(construirTarjetaRepuesto(item, tasaVes, tasaCop));
+                }
             }
         }
 
@@ -114,6 +140,9 @@ public class CatalogoPublicoController {
                 p.put("stock", art.getStockActual() != null ? art.getStockActual() : BigDecimal.ZERO);
                 p.put("precioUsd", precioUsd);
                 p.put("precioBs", precioBs);
+                if (tasaCop != null) {
+                    p.put("precioCop", precioUsd.multiply(tasaCop).setScale(2, RoundingMode.HALF_UP));
+                }
                 p.put("unidad", art.getUnidadMedida() != null ? art.getUnidadMedida() : "Unidad");
                 productos.add(p);
             }
@@ -139,6 +168,28 @@ public class CatalogoPublicoController {
         pagoMovil.put("documento", licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : (licencia.getRif() != null ? licencia.getRif() : ""));
         pagoMovil.put("titular", licencia.getPagoMovilTitular() != null ? licencia.getPagoMovilTitular() : licencia.getNombreEmpresa());
 
+        // Mismo criterio que Pago Movil: "activo" exige ademas que el dato real
+        // que identifica la cuenta este configurado, para que nunca se muestre un
+        // metodo "disponible" sin datos reales detras (ver comentario arriba).
+        boolean zelleConfigurado = licencia.getZelleCorreo() != null && !licencia.getZelleCorreo().isBlank();
+        Map<String, Object> zelle = new LinkedHashMap<>();
+        zelle.put("activo", licencia.isZelleActivo() && zelleConfigurado);
+        zelle.put("correo", licencia.getZelleCorreo() != null ? licencia.getZelleCorreo() : "");
+        zelle.put("titular", licencia.getZelleTitular() != null ? licencia.getZelleTitular() : licencia.getNombreEmpresa());
+
+        boolean binanceConfigurado = licencia.getBinancePayId() != null && !licencia.getBinancePayId().isBlank();
+        Map<String, Object> binance = new LinkedHashMap<>();
+        binance.put("activo", licencia.isBinanceManualActivo() && binanceConfigurado);
+        binance.put("payId", licencia.getBinancePayId() != null ? licencia.getBinancePayId() : "");
+
+        boolean bancolombiaConfigurado = licencia.getBancolombiaCuenta() != null && !licencia.getBancolombiaCuenta().isBlank();
+        Map<String, Object> bancolombia = new LinkedHashMap<>();
+        bancolombia.put("activo", licencia.isBancolombiaActivo() && bancolombiaConfigurado);
+        bancolombia.put("cuenta", licencia.getBancolombiaCuenta() != null ? licencia.getBancolombiaCuenta() : "");
+        bancolombia.put("tipoCuenta", licencia.getBancolombiaTipoCuenta() != null ? licencia.getBancolombiaTipoCuenta() : "");
+        bancolombia.put("titular", licencia.getBancolombiaTitular() != null ? licencia.getBancolombiaTitular() : licencia.getNombreEmpresa());
+        bancolombia.put("documento", licencia.getBancolombiaDocumento() != null ? licencia.getBancolombiaDocumento() : "");
+
         Map<String, Object> resp = new LinkedHashMap<>();
         // Nunca se expone el tenantId real en la respuesta publica — antes se
         // devolvia siempre, lo que le regalaba a cualquiera el mapeo slug->id
@@ -154,13 +205,103 @@ public class CatalogoPublicoController {
         if (licencia.isPersonalizacionTiendaActiva()) {
             resp.put("colorAcentoTienda", licencia.getColorAcentoTienda());
             resp.put("bannerBase64", licencia.getBannerBase64());
+            resp.put("estiloBannerTienda", licencia.getEstiloBannerTienda());
         }
         resp.put("tasaVes", tasaVes);
+        if (tasaCop != null) {
+            resp.put("tasaCop", tasaCop);
+        }
         resp.put("costoEnvioDelivery", licencia.getCostoEnvioDelivery());
         resp.put("pagoMovil", pagoMovil);
+        resp.put("zelle", zelle);
+        resp.put("binance", binance);
+        resp.put("bancolombia", bancolombia);
         resp.put("productos", productos);
 
         return ResponseEntity.ok(resp);
+    }
+
+    /** Tarjeta de un RepuestoItem individual (sin variantes) — mismo mapa que antes de agrupar. */
+    private Map<String, Object> construirTarjetaRepuesto(RepuestoItem item, BigDecimal tasaVes, BigDecimal tasaCop) {
+        BigDecimal precioUsd = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
+        BigDecimal precioBs = precioUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
+
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("id", "rep-" + item.getId());
+        p.put("codigo", item.getCodigoSku());
+        p.put("oem", item.getCodigoOriginalOem());
+        p.put("nombre", item.getDescripcion());
+        p.put("categoria", item.getCategoria() != null && !item.getCategoria().isBlank() ? item.getCategoria() : "General");
+        p.put("stock", item.getStockActual() != null ? item.getStockActual() : BigDecimal.ZERO);
+        p.put("precioUsd", precioUsd);
+        p.put("precioBs", precioBs);
+        if (tasaCop != null) {
+            p.put("precioCop", precioUsd.multiply(tasaCop).setScale(2, RoundingMode.HALF_UP));
+        }
+        p.put("unidad", item.getUnidadBase() != null ? item.getUnidadBase() : "Pza");
+        p.put("precioMayorista", item.getPrecioMayorista());
+        p.put("cantidadMinimaMayorista", item.getCantidadMinimaMayorista());
+        p.put("descripcion", item.getDescripcionLarga());
+        // imagenBase64 ya es un data-URI completo ("data:image/...;base64,...") — el
+        // frontend lo usa directo como <img src>, sin necesidad de una URL alojada.
+        p.put("imagenUrl", item.getImagenBase64());
+        return p;
+    }
+
+    /**
+     * Tarjeta ÚNICA para un grupo de variantes (ej. mismo zapato en varias tallas). El
+     * inventario real sigue siendo un RepuestoItem por variante, cada uno con su propio
+     * stock — esto solo arma la vista agrupada que consume el catálogo público
+     * (selector de talla/color). La tarjeta usa nombre/foto/descripción/categoría del
+     * primer miembro (ya viene ordenado por ordenVisualizacion) como representante, y
+     * expone cada variante real en `variantes` para que el selector pueda vender la
+     * correcta.
+     */
+    private Map<String, Object> construirTarjetaAgrupada(List<RepuestoItem> variantesGrupo, BigDecimal tasaVes, BigDecimal tasaCop) {
+        RepuestoItem representante = variantesGrupo.get(0);
+        Map<String, Object> p = construirTarjetaRepuesto(representante, tasaVes, tasaCop);
+        p.put("id", "grp-" + representante.getGrupoVariante().trim());
+
+        BigDecimal stockTotal = BigDecimal.ZERO;
+        BigDecimal precioMinUsd = null;
+        List<Map<String, Object>> variantes = new ArrayList<>();
+        for (RepuestoItem v : variantesGrupo) {
+            BigDecimal precioUsd = v.getPrecioVenta() != null ? v.getPrecioVenta() : BigDecimal.ZERO;
+            BigDecimal precioBs = precioUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal stock = v.getStockActual() != null ? v.getStockActual() : BigDecimal.ZERO;
+            stockTotal = stockTotal.add(stock);
+            if (precioMinUsd == null || precioUsd.compareTo(precioMinUsd) < 0) precioMinUsd = precioUsd;
+
+            Map<String, Object> variante = new LinkedHashMap<>();
+            variante.put("id", "rep-" + v.getId());
+            variante.put("atributo", v.getAtributoVariante() != null && !v.getAtributoVariante().isBlank()
+                ? v.getAtributoVariante() : v.getCodigoSku());
+            variante.put("color", v.getColorVariante() != null && !v.getColorVariante().isBlank() ? v.getColorVariante() : null);
+            variante.put("precioUsd", precioUsd);
+            variante.put("precioBs", precioBs);
+            if (tasaCop != null) {
+                variante.put("precioCop", precioUsd.multiply(tasaCop).setScale(2, RoundingMode.HALF_UP));
+            }
+            variante.put("stock", stock);
+            // Cada variante ya es su propio RepuestoItem con su propia foto — si el dueño le
+            // subió una distinta (ej. el mismo zapato en rojo vs. azul), la página pública
+            // puede cambiarla al elegir el color, sin que esto exista un modelo nuevo.
+            variante.put("imagenUrl", v.getImagenBase64());
+            variantes.add(variante);
+        }
+
+        // El precio/stock de la tarjeta representan "desde cuánto" y "cuánto hay en
+        // total" — el precio/stock REAL de lo que se compra sale de la variante elegida
+        // en el selector, no de estos campos de la tarjeta.
+        BigDecimal precioMinReal = precioMinUsd != null ? precioMinUsd : BigDecimal.ZERO;
+        p.put("precioUsd", precioMinReal);
+        p.put("precioBs", precioMinReal.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP));
+        if (tasaCop != null) {
+            p.put("precioCop", precioMinReal.multiply(tasaCop).setScale(2, RoundingMode.HALF_UP));
+        }
+        p.put("stock", stockTotal);
+        p.put("variantes", variantes);
+        return p;
     }
 
     private List<Map<String, Object>> generarCatalogoModelo(BigDecimal tasaVes) {
@@ -208,6 +349,7 @@ public class CatalogoPublicoController {
     public static class CrearPedidoWebRequest {
         public String clienteNombre;
         public String clienteTelefono;
+        public String clienteEmail;
         public String tipoEntrega;
         public String direccionEntrega;
         public String metodoPago;
@@ -285,8 +427,12 @@ public class CatalogoPublicoController {
         PedidoWebComercio pedido = new PedidoWebComercio();
         pedido.setTenantId(tenantId);
         pedido.setNumeroPedido(numPedido);
+        pedido.setAccessToken(UUID.randomUUID().toString());
         pedido.setClienteNombre(req.clienteNombre != null && !req.clienteNombre.isBlank() ? req.clienteNombre : "Cliente Web");
         pedido.setClienteTelefono(req.clienteTelefono != null ? req.clienteTelefono : "");
+        if (req.clienteEmail != null && !req.clienteEmail.isBlank()) {
+            pedido.setClienteEmail(req.clienteEmail.trim());
+        }
         pedido.setTipoEntrega(req.tipoEntrega != null ? req.tipoEntrega : "DELIVERY");
         pedido.setDireccionEntrega(req.direccionEntrega != null ? req.direccionEntrega : "");
         pedido.setMetodoPago(req.metodoPago != null ? req.metodoPago : "PAGO_MOVIL");
@@ -300,6 +446,7 @@ public class CatalogoPublicoController {
         msgWhatsapp.append("Pedido: #").append(numPedido).append("\n\n");
         msgWhatsapp.append("*DETALLE DEL PEDIDO:*\n");
 
+        List<Map<String, Object>> itemsEstructurados = new ArrayList<>();
         BigDecimal totalUsdReal = BigDecimal.ZERO;
         for (LineaPedidoDto it : req.items) {
             ProductoResuelto producto = resolverProductoReal(tenantId, it.productoId, tasaVes);
@@ -322,6 +469,10 @@ public class CatalogoPublicoController {
             itemsTxt.append(cantidad).append("x ").append(nombre).append(" ($").append(producto.precio).append("); ");
             msgWhatsapp.append("- ").append(cantidad).append("x ").append(nombre)
                     .append(" ($").append(subtotal).append(" USD)\n");
+
+            // productoId/cantidad tal como llegaron (validados arriba) — lo que
+            // ConfirmacionPedidoWebService necesita para reproducir la venta real.
+            itemsEstructurados.add(Map.of("productoId", it.productoId, "cantidad", cantidad, "nombre", nombre));
         }
 
         if (totalUsdReal.compareTo(BigDecimal.ZERO) == 0) {
@@ -341,6 +492,12 @@ public class CatalogoPublicoController {
         pedido.setTotalUsd(totalUsdReal);
         pedido.setTotalBs(totalUsdReal.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP));
         pedido.setItemsJson(itemsTxt.toString());
+        try {
+            pedido.setItemsEstructuradosJson(objectMapper.writeValueAsString(itemsEstructurados));
+        } catch (Exception e) {
+            // No debe bloquear la creacion del pedido — si falla, el pedido igual se crea y
+            // se puede confirmar manualmente (ver ConfirmacionPedidoWebService).
+        }
         PedidoWebComercio guardado = pedidoWebRepository.save(pedido);
 
         msgWhatsapp.append("\n*TOTAL A PAGAR:* $").append(pedido.getTotalUsd()).append(" USD");
@@ -399,7 +556,51 @@ public class CatalogoPublicoController {
         resp.put("estado", guardado.getEstado());
         resp.put("whatsappUrl", whatsappUrl);
         resp.put("mensajeTexto", msgWhatsapp.toString());
+        resp.put("accessToken", guardado.getAccessToken());
 
         return ResponseEntity.ok(resp);
+    }
+
+    public static class ComprobantePagoRequest {
+        public String accessToken;
+        public String capturaBase64;
+    }
+
+    /**
+     * Sube la captura/foto del pago (Pago Móvil, Zelle, transferencia, etc.) para que
+     * el dueño del negocio la verifique — el objetivo del dueño es NO tener que
+     * pedirla por WhatsApp por separado. Solo el propio cliente que creó el pedido
+     * puede hacerlo, autenticado con el accessToken aleatorio que se le devolvió al
+     * confirmar (nunca con el numeroPedido, adivinable por fuerza bruta — ver
+     * comentario en PedidoWebComercio.accessToken).
+     */
+    @PostMapping("/{identificador}/pedidos/{pedidoId}/comprobante")
+    public ResponseEntity<?> subirComprobantePago(
+            @PathVariable String identificador,
+            @PathVariable Long pedidoId,
+            @RequestBody ComprobantePagoRequest req) {
+        LicenciaTenant licencia = resolverLicencia(identificador);
+        if (licencia == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Tienda no encontrada"));
+        }
+        if (req.accessToken == null || req.accessToken.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Falta el token de acceso del pedido"));
+        }
+        if (req.capturaBase64 == null || req.capturaBase64.isBlank() || !req.capturaBase64.startsWith("data:image")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "La captura debe ser una imagen válida"));
+        }
+
+        Optional<PedidoWebComercio> pedidoOpt = pedidoWebRepository.findByIdAndTenantId(pedidoId, licencia.getTenantId());
+        if (pedidoOpt.isEmpty() || !req.accessToken.equals(pedidoOpt.get().getAccessToken())) {
+            // Mismo mensaje genérico para "no existe" y "token incorrecto" — no le
+            // regalamos a un atacante la diferencia entre ambos casos.
+            return ResponseEntity.status(404).body(Map.of("error", "Pedido no encontrado"));
+        }
+
+        PedidoWebComercio pedido = pedidoOpt.get();
+        pedido.setCapturaPagoBase64(req.capturaBase64);
+        pedidoWebRepository.save(pedido);
+
+        return ResponseEntity.ok(Map.of("ok", true));
     }
 }

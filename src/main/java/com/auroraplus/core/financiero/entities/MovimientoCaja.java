@@ -81,6 +81,15 @@ public class MovimientoCaja {
     @Column(name = "referencia_id")
     private Long referenciaId;
 
+    // Captura/foto del pago (Pago Móvil, Zelle, transferencia, etc.) que el
+    // cajero adjunta al cobrar — este registro es el único lugar donde una
+    // venta del POS vive de forma DURADERA en el servidor (el detalle línea
+    // por línea del ticket solo vive en localStorage del navegador), así que
+    // es el ancla correcta para el comprobante, no algo que se pueda perder
+    // al cambiar de dispositivo o limpiar caché.
+    @Column(name = "captura_pago_base64", columnDefinition = "TEXT")
+    private String capturaPagoBase64;
+
     public enum TipoMovimiento { INGRESO, EGRESO, CXC, CXP }
 
     // Getters y Setters
@@ -116,4 +125,6 @@ public class MovimientoCaja {
     public void setReferenciaTipo(String referenciaTipo) { this.referenciaTipo = referenciaTipo; }
     public Long getReferenciaId() { return referenciaId; }
     public void setReferenciaId(Long referenciaId) { this.referenciaId = referenciaId; }
+    public String getCapturaPagoBase64() { return capturaPagoBase64; }
+    public void setCapturaPagoBase64(String capturaPagoBase64) { this.capturaPagoBase64 = capturaPagoBase64; }
 }

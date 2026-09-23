@@ -1,7 +1,7 @@
 import { obtenerCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
 import TenantSoporteWidget from "../components/TenantSoporteWidget";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconCard, IconUsers, IconCustomize,
@@ -26,6 +26,10 @@ import {
   resumenPeriodoAbierto,
   listarMovimientos,
   alertasVencimiento,
+  listarUsuariosPropios,
+  crearUsuarioPropio,
+  desactivarUsuarioPropio,
+  type UsuarioTenant,
   type Paciente,
   type CitaMedica,
   type AnimalGanaderia,
@@ -285,11 +289,74 @@ const VERTICAL_METADATA: Record<string, {
   },
 };
 
+// Etiquetas legibles de Usuario.Rol (backend) — compartido entre todas las
+// verticales, ver core.auth.entities.Usuario.Rol para la lista real de roles
+// que el backend acepta.
+const ROL_LABEL: Record<string, string> = {
+  DUENO_ADMIN: "Dueño / Administrador",
+  CAJERO_VENDEDOR: "Cajero / Vendedor",
+  ENCARGADO_INVENTARIO: "Encargado de Inventario",
+  MEDICO: "Médico",
+  RECEPCIONISTA: "Recepcionista",
+  MESERO: "Mesero",
+  ADMINISTRADOR_FINCA: "Administrador de Finca",
+  ENCARGADO_FINCA: "Encargado de Finca",
+  TRABAJADOR_FINCA: "Trabajador de Finca",
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, logout, trialDaysLeft, reportPayment } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"vertical" | "billing" | "team" | "settings">("vertical");
+  // Permite abrir directo en una pestaña (ej. "?tab=team" desde el acceso rapido de
+  // Configuracion en Comercio) sin duplicar la logica de Equipo & Roles ahi tambien.
+  const tabInicial = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<"vertical" | "billing" | "team" | "settings">(
+    tabInicial === "team" || tabInicial === "billing" || tabInicial === "settings" ? tabInicial : "vertical"
+  );
+  // Equipo & Roles — antes el botón "Invitar Colaborador" solo mostraba un alert() sin
+  // crear nada; el backend (/api/auth/usuarios) ya existía completo, no estaba conectado.
+  const [equipoUsuarios, setEquipoUsuarios] = useState<UsuarioTenant[]>([]);
+  const [cargandoEquipo, setCargandoEquipo] = useState(false);
+  const [errorEquipo, setErrorEquipo] = useState<string | null>(null);
+  const [modalNuevoColaborador, setModalNuevoColaborador] = useState(false);
+  const [guardandoColaborador, setGuardandoColaborador] = useState(false);
+
+  const esDuenoAdmin = user?.rol === "DUENO_ADMIN";
+  // listarUsuariosPropios devuelve TODOS los usuarios del tenant, incluido el propio
+  // Dueño/Administrador — ya se muestra aparte en la tarjeta "Tú" de arriba, así que se
+  // excluye de la lista de colaboradores (evita mostrarlo duplicado con un botón
+  // "Desactivar" que, si el backend no lo bloqueara, dejaría al dueño sin poder
+  // volver a entrar). El User de sesión no trae un id numérico — se compara por
+  // username/email, que es como el backend identifica al usuario (ver AuthService).
+  const colaboradores = equipoUsuarios.filter((u) => u.username?.toLowerCase() !== user?.email?.toLowerCase());
+
+  const cargarEquipo = () => {
+    if (!user?.tenantId || !esDuenoAdmin) return;
+    setCargandoEquipo(true);
+    setErrorEquipo(null);
+    listarUsuariosPropios(user.tenantId)
+      .then(setEquipoUsuarios)
+      .catch((err: any) => setErrorEquipo(err?.message || "No se pudo cargar el equipo."))
+      .finally(() => setCargandoEquipo(false));
+  };
+
+  useEffect(() => {
+    if (activeTab === "team") cargarEquipo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user?.tenantId]);
+
+  const desactivarColaborador = async (usuarioId: number) => {
+    if (!user?.tenantId) return;
+    if (!window.confirm("¿Desactivar a este colaborador? Ya no podrá iniciar sesión, pero su historial de acciones se conserva.")) return;
+    try {
+      await desactivarUsuarioPropio(user.tenantId, usuarioId);
+      cargarEquipo();
+    } catch (err: any) {
+      setErrorEquipo(err?.message || "No se pudo desactivar al colaborador.");
+    }
+  };
   const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">("kpis");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [cuentasCobro, setCuentasCobro] = useState<SaasCuentasCobroConfig>(obtenerCuentasCobro);
@@ -739,16 +806,18 @@ export default function Dashboard() {
             <span>Facturación & Pagos</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab("team")}
-            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
-              activeTab === "team"
-                ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
-                : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
-            }`}>
-            <IconUsers size={15} />
-            <span>Equipo & Roles</span>
-          </button>
+          {esDuenoAdmin && (
+            <button
+              onClick={() => setActiveTab("team")}
+              className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+                activeTab === "team"
+                  ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
+                  : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
+              }`}>
+              <IconUsers size={15} />
+              <span>Equipo & Roles</span>
+            </button>
+          )}
 
           <button
             onClick={() => navigate("/onboarding")}
@@ -1473,7 +1542,7 @@ export default function Dashboard() {
         )}
 
         {/* ── PESTAÑA 3: EQUIPO Y ROLES ── */}
-        {activeTab === "team" && (
+        {activeTab === "team" && esDuenoAdmin && (
           <div className="apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left shadow-xl">
             <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-300/60 dark:border-white/10">
               <div>
@@ -1481,15 +1550,19 @@ export default function Dashboard() {
                   Equipo de Trabajo & Accesos
                 </h3>
                 <p className="text-slate-500 dark:text-white/45 text-sm mt-1">
-                  Administra los colaboradores autorizados y sus niveles de permiso en la plataforma.
+                  Crea un usuario y contraseña por cada colaborador, con su propio rol. Solo tú, como Dueño/Administrador, ves esta pantalla y la Auditoría.
                 </p>
               </div>
               <button
-                onClick={() => alert("Enlace de invitación generado y copiado al portapapeles")}
+                onClick={() => setModalNuevoColaborador(true)}
                 className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md">
-                + Invitar Colaborador
+                + Nuevo Colaborador
               </button>
             </div>
+
+            {errorEquipo && (
+              <p className="text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{errorEquipo}</p>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
@@ -1498,23 +1571,127 @@ export default function Dashboard() {
                   {user?.nombre || "Usuario Administrador"}
                 </div>
                 <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">
-                  {user?.rol || "Propietario / Admin"}
+                  {ROL_LABEL[user?.rol || ""] || user?.rol || "Propietario / Admin"}
                 </div>
                 <div className="text-xs text-slate-500 dark:text-white/40 font-mono">
                   {user?.email || "admin@auroraplus.com"}
                 </div>
+                <span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">
+                  Tú (Dueño/Administrador)
+                </span>
               </div>
 
-              <div className="apple-glass rounded-2xl p-6 border border-dashed border-slate-300 dark:border-white/20 flex flex-col justify-center items-center text-center col-span-1 md:col-span-2 space-y-2">
-                <p className="text-slate-500 dark:text-white/50 text-xs max-w-sm">
-                  Sin colaboradores adicionales registrados aún. Puedes invitar a encargados de almacén, cajeros, veterinarios o personal operativo según tu vertical.
-                </p>
-                <button
-                  onClick={() => alert("Enlace de invitación generado")}
-                  className="text-teal-600 dark:text-teal-400 font-bold text-xs hover:underline cursor-pointer">
-                  + Generar enlace de acceso para equipo
+              {cargandoEquipo ? (
+                <div className="apple-glass rounded-2xl p-6 border border-white/10 flex items-center justify-center col-span-1 md:col-span-2 text-xs text-slate-500 dark:text-white/50">
+                  Cargando equipo…
+                </div>
+              ) : colaboradores.length === 0 ? (
+                <div className="apple-glass rounded-2xl p-6 border border-dashed border-slate-300 dark:border-white/20 flex flex-col justify-center items-center text-center col-span-1 md:col-span-2 space-y-2">
+                  <p className="text-slate-500 dark:text-white/50 text-xs max-w-sm">
+                    Sin colaboradores adicionales registrados aún. Crea uno con usuario, contraseña y rol (encargado de almacén, cajero, veterinario, etc. según tu vertical).
+                  </p>
+                </div>
+              ) : (
+                <div className="col-span-1 md:col-span-2 space-y-2">
+                  {colaboradores.map((u) => (
+                    <div key={u.id} className="apple-glass rounded-2xl p-4 border border-white/10 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white truncate">
+                            {u.nombreCompleto || u.username}
+                          </span>
+                          {!u.activo && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-500/15 text-slate-500 dark:text-white/50 px-2 py-0.5 rounded-full shrink-0">
+                              Desactivado
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-white/40 font-mono">@{u.username}</div>
+                        <div className="text-[11px] font-semibold text-teal-600 dark:text-teal-400">{ROL_LABEL[u.rol] || u.rol}</div>
+                      </div>
+                      {u.activo && (
+                        <button
+                          onClick={() => desactivarColaborador(u.id)}
+                          className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 cursor-pointer shrink-0"
+                        >
+                          Desactivar
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL NUEVO COLABORADOR ── */}
+        {modalNuevoColaborador && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalNuevoColaborador(false)}>
+            <div className="apple-glass rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl cursor-default text-left" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-300/60 dark:border-white/10">
+                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nuevo Colaborador</h3>
+                <button onClick={() => setModalNuevoColaborador(false)} className="text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+                  <IconClose size={18} />
                 </button>
               </div>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!user?.tenantId) return;
+                  const fd = new FormData(e.currentTarget);
+                  const username = String(fd.get("username") || "").trim();
+                  const password = String(fd.get("password") || "");
+                  const rol = String(fd.get("rol") || "");
+                  const nombreCompleto = String(fd.get("nombreCompleto") || "").trim() || undefined;
+                  if (!username || !password || !rol) return;
+                  setGuardandoColaborador(true);
+                  setErrorEquipo(null);
+                  try {
+                    await crearUsuarioPropio(user.tenantId, { username, password, rol, nombreCompleto });
+                    setModalNuevoColaborador(false);
+                    cargarEquipo();
+                  } catch (err: any) {
+                    setErrorEquipo(err?.message || "No se pudo crear el colaborador.");
+                  } finally {
+                    setGuardandoColaborador(false);
+                  }
+                }}
+                className="space-y-3 text-sm"
+              >
+                <div>
+                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Nombre completo</label>
+                  <input name="nombreCompleto" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Usuario (para iniciar sesión)</label>
+                  <input required name="username" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-mono" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Contraseña</label>
+                  <input required name="password" type="password" minLength={6} className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-mono" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Rol</label>
+                  <select required name="rol" defaultValue="" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white">
+                    <option value="" disabled>Selecciona un rol…</option>
+                    {Object.entries(ROL_LABEL).filter(([id]) => id !== "DUENO_ADMIN").map(([id, label]) => (
+                      <option key={id} value={id}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-white/40">
+                  Este colaborador no tendrá acceso a Equipo & Roles ni a Auditoría — eso queda reservado al Dueño/Administrador.
+                </p>
+                <div className="pt-2 flex justify-end gap-2">
+                  <button type="button" onClick={() => setModalNuevoColaborador(false)} className="px-4 py-2 rounded-xl bg-slate-200/70 dark:bg-white/10 text-xs font-bold text-slate-800 dark:text-white cursor-pointer">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={guardandoColaborador} className="px-5 py-2 rounded-xl btn-electric-blue text-xs font-bold cursor-pointer disabled:opacity-60">
+                    {guardandoColaborador ? "Creando…" : "Crear Colaborador"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

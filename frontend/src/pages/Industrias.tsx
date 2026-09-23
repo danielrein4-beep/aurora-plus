@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SpecularButton from "../components/SpecularButton";
+import { IconCheck } from "../Icons";
 
 const INDUSTRIES = [
   {

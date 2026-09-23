@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.Optional;
 
 /**
@@ -102,10 +103,47 @@ public class RepuestoConversionService {
         }
     }
 
-    /** Registra el ingreso real en caja (core.financiero), convirtiendo si el cliente paga en otra moneda que la base del tenant. */
-    private void registrarIngresoCaja(Long tenantId, BigDecimal montoBase, String monedaPago, BigDecimal montoRecibido, String concepto) {
+    /**
+     * Registra el ingreso real en caja (core.financiero), convirtiendo si el cliente paga en
+     * otra moneda que la base del tenant. `canalVenta` ("POS" o "WEB") queda como
+     * referenciaTipo del movimiento — es lo que le permite a Vista General y a los reportes
+     * decir de dónde vino cada venta sin adivinar por el texto del concepto.
+     */
+    private void registrarIngresoCaja(Long tenantId, BigDecimal montoBase, String monedaPago, BigDecimal montoRecibido,
+                                       String concepto, String canalVenta, Long movimientoRepuestoId) {
         motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
-            montoBase, monedaPago, montoRecibido, concepto);
+            montoBase, monedaPago, montoRecibido, concepto,
+            "COMERCIO", canalVenta != null ? canalVenta : "POS", movimientoRepuestoId);
+    }
+
+    /**
+     * Registra el cobro de una venta, repartiendo entre lo efectivamente cobrado ahora
+     * (INGRESO real en caja) y, si el cliente no pagó todo, el saldo restante como cuenta
+     * por cobrar (CXC) con trazabilidad hacia la venta que la originó — mismo patrón que
+     * RepuestoCompraService.registrarCompra usa para CXP en la compra a proveedores.
+     */
+    private void registrarCobroVenta(Long tenantId, BigDecimal total, String monedaPago, BigDecimal montoRecibido,
+                                      BigDecimal montoPagadoAhora, Integer diasCredito, Long clienteId, String nombreClienteManual,
+                                      String conceptoBase, Long movimientoRepuestoId, String canalVenta) {
+        BigDecimal montoAPagar = montoPagadoAhora != null ? montoPagadoAhora : total;
+        if (montoAPagar.compareTo(BigDecimal.ZERO) < 0 || montoAPagar.compareTo(total) > 0) {
+            throw new RuntimeException("El monto pagado ahora (" + montoAPagar + ") no puede ser negativo ni mayor al total de la venta (" + total + ")");
+        }
+
+        if (montoAPagar.compareTo(BigDecimal.ZERO) > 0) {
+            registrarIngresoCaja(tenantId, montoAPagar, monedaPago, montoRecibido, conceptoBase, canalVenta, movimientoRepuestoId);
+        }
+
+        BigDecimal saldoPendiente = total.subtract(montoAPagar);
+        if (saldoPendiente.compareTo(BigDecimal.ZERO) > 0) {
+            String nombreCliente = clienteId != null
+                ? clienteRepository.findById(clienteId).map(Cliente::getNombre).orElse("Cliente de mostrador")
+                : (nombreClienteManual != null && !nombreClienteManual.isBlank() ? nombreClienteManual : "Cliente de mostrador");
+            LocalDate fechaVencimiento = (diasCredito != null && diasCredito > 0) ? LocalDate.now().plusDays(diasCredito) : null;
+            motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXC,
+                saldoPendiente, null, null, conceptoBase + " — Cliente: " + nombreCliente,
+                "COMERCIO", "VentaRepuesto", movimientoRepuestoId, fechaVencimiento);
+        }
     }
 
     public PresentacionRepuesto registrarPresentacion(Long repuestoId, Long tenantId, String nombrePresentacion,
@@ -200,7 +238,8 @@ public class RepuestoConversionService {
             "Venta " + cantidadVendida + " " + presentacion.getNombrePresentacion(), clienteId, totalVenta);
 
         registrarIngresoCaja(tenantId, totalVenta, monedaPago, montoRecibido,
-            "Venta repuesto " + repuesto.getCodigoSku() + " (" + cantidadVendida + " " + presentacion.getNombrePresentacion() + ")");
+            "Venta repuesto " + repuesto.getCodigoSku() + " (" + cantidadVendida + " " + presentacion.getNombrePresentacion() + ")",
+            "POS", movimiento.getId());
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "venta_repuestos_presentacion", movimiento.getId());
 
@@ -267,6 +306,38 @@ public class RepuestoConversionService {
     @Transactional
     public ResultadoVenta venderPorVolumen(Long repuestoId, Long tenantId, BigDecimal cantidad, String monedaPago,
                                             BigDecimal montoRecibido, String claveIdempotencia, Long clienteId) {
+        return venderPorVolumen(repuestoId, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, clienteId, null, null, null);
+    }
+
+    /**
+     * @param montoPagadoAhora cuánto pagó el cliente de una vez, en la moneda base — null/igual al total = venta
+     *                         de contado normal (comportamiento previo, sin cambios). Si es menor al total, la
+     *                         diferencia queda como cuenta por cobrar (CXC) — mismo patrón que
+     *                         RepuestoCompraService.registrarCompra usa para CXP en la compra a proveedores.
+     * @param diasCredito      plazo de crédito otorgado al cliente — se guarda como fecha de vencimiento =
+     *                         hoy + diasCredito en la CXC resultante. Null/0 = sin plazo pactado.
+     * @param nombreClienteManual nombre a mostrar en la CXC cuando el cliente vendido no tiene ficha en el CRM
+     *                         backend (ej. cliente de mostrador nuevo, todavía no sincronizado) — clienteId
+     *                         tiene prioridad si ambos vienen informados.
+     */
+    @Transactional
+    public ResultadoVenta venderPorVolumen(Long repuestoId, Long tenantId, BigDecimal cantidad, String monedaPago,
+                                            BigDecimal montoRecibido, String claveIdempotencia, Long clienteId,
+                                            BigDecimal montoPagadoAhora, Integer diasCredito, String nombreClienteManual) {
+        return venderPorVolumen(repuestoId, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, clienteId,
+            montoPagadoAhora, diasCredito, nombreClienteManual, "POS");
+    }
+
+    /**
+     * Mismo método, con `canalVenta` explícito ("POS" o "WEB") para trazabilidad — ver
+     * registrarIngresoCaja. El overload de arriba (sin este parámetro, usado por el POS
+     * mostrador) sigue asumiendo "POS" para no tener que tocar todos sus call-sites.
+     */
+    @Transactional
+    public ResultadoVenta venderPorVolumen(Long repuestoId, Long tenantId, BigDecimal cantidad, String monedaPago,
+                                            BigDecimal montoRecibido, String claveIdempotencia, Long clienteId,
+                                            BigDecimal montoPagadoAhora, Integer diasCredito, String nombreClienteManual,
+                                            String canalVenta) {
         verificarNoDuplicada(tenantId, claveIdempotencia);
 
         if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
@@ -301,8 +372,10 @@ public class RepuestoConversionService {
         MovimientoRepuesto movimiento = registrarMovimientoVenta(repuesto, cantidad, stockAnterior, stockNuevo,
             "Venta directa" + (esMayorista ? " (tarifa Mayorista)" : " (tarifa Detal)"), clienteId, total);
 
-        registrarIngresoCaja(tenantId, total, monedaPago, montoRecibido, "Venta repuesto " + repuesto.getCodigoSku()
-            + " x" + cantidad + (esMayorista ? " (Mayorista)" : " (Detal)"));
+        registrarCobroVenta(tenantId, total, monedaPago, montoRecibido, montoPagadoAhora, diasCredito, clienteId,
+            nombreClienteManual,
+            "Venta repuesto " + repuesto.getCodigoSku() + " x" + cantidad + (esMayorista ? " (Mayorista)" : " (Detal)"),
+            movimiento.getId(), canalVenta);
 
         idempotenciaService.registrar(tenantId, claveIdempotencia, "venta_repuestos_volumen", movimiento.getId());
 

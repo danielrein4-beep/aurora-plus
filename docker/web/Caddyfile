@@ -1,0 +1,22 @@
+# Servidor estático del SPA (React/Vite). Corre DENTRO de la imagen "web";
+# no habla con internet — el Caddy de borde (Caddyfile de la raíz) es quien
+# recibe el tráfico público y reenvía aquí todo lo que no sea /api/*.
+:8080 {
+	root * /srv
+	encode gzip zstd
+
+	# Los archivos de /assets traen hash en el nombre (index-AGehL5TT.js):
+	# cambian de nombre en cada build, así que se pueden cachear para siempre.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# index.html NO se cachea: es el que apunta a los assets nuevos después de
+	# cada despliegue. Si se cachea, el usuario sigue viendo la versión vieja.
+	header /index.html Cache-Control "no-cache"
+
+	# Fallback de SPA: la app usa BrowserRouter, así que rutas como
+	# /catalogo/mi-tienda no existen como archivo — se sirve index.html y el
+	# router del navegador resuelve. Sin esto, recargar cualquier ruta = 404.
+	try_files {path} /index.html
+	file_server
+}

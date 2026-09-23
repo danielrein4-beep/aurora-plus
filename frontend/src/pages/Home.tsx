@@ -1,22 +1,48 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import SpecularButton from "../components/SpecularButton";
 import { useAuth } from "../context/AuthContext";
-import AccordionGallery, { type AccordionGalleryItem } from "../components/AccordionGallery";
 import {
   IconClinic, IconHardware,
   IconRestaurant, IconFarm,
-  IconTooth, IconVet,
+  IconTooth, IconCheck,
 } from "../Icons";
 
-const VERTICAL_GALLERY: AccordionGalleryItem[] = [
-  { image: "/verticales/mediclinic.png", label: "Mediclinic Pro" },
-  { image: "/verticales/odontologia.png", label: "Odontología" },
-  { image: "/verticales/comercio.png", label: "Comercio" },
-  { image: "/verticales/restaurante.png", label: "Restaurantes" },
-  { image: "/verticales/ganaderia.png", label: "Control de Fincas" },
-  { image: "/verticales/veterinaria.png", label: "Veterinaria" },
+const INDUSTRIES = [
+  { Icon: IconClinic,     name: "Mediclinic Pro",    desc: "Historias clínicas, agenda, sala de espera en vivo, cotizador multidivisa.", imgs: ["/industrias/mediclinic.jpg"], placeholder: "" },
+  { Icon: IconTooth,      name: "Odontología",       desc: "Odontograma FDI interactivo, periodontograma de 6 puntos, planes por fases.", imgs: ["/industrias/odontologia.jpg"], placeholder: "linear-gradient(135deg,#0ea5b8,#0d3b3d)" },
+  { Icon: IconHardware,   name: "Comercio",          desc: "POS mostrador, inventario en tiempo real, catálogo con pedidos por WhatsApp.", imgs: ["/industrias/comercio-electronica.jpg", "/industrias/comercio-ferreteria.jpg", "/industrias/comercio-telefonos.jpg"], placeholder: "linear-gradient(135deg,#d97706,#7c2d12)" },
+  { Icon: IconRestaurant, name: "Restaurantes",      desc: "Comandas digitales, mesas, cocina en tiempo real y cierres de caja automáticos.", imgs: ["/industrias/restaurantes.jpg"], placeholder: "linear-gradient(135deg,#e11d48,#4c0519)" },
+  { Icon: IconFarm,       name: "Control de Fincas", desc: "Mapa satelital de potreros, básculas bluetooth y control sanitario.", imgs: ["/industrias/ganaderia.jpg"], placeholder: "linear-gradient(135deg,#16a34a,#052e16)" },
+  // Veterinaria: aún en construcción, no se muestra en esta grilla hasta que tenga foto y esté lista.
 ];
+
+// Comercio sirve muchos rubros (ferretería, farmacia, retail...): la tarjeta
+// rota entre varias fotos si hay más de una en `imgs`, en vez de una sola foto fija.
+function IndustryPhoto({ imgs }: { imgs: string[] }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (imgs.length < 2) return;
+    const id = setInterval(() => setI((n) => (n + 1) % imgs.length), 4000);
+    return () => clearInterval(id);
+  }, [imgs.length]);
+  if (imgs.length === 0) return null;
+  return (
+    <>
+      {imgs.map((src, idx) => (
+        <img
+          key={src}
+          src={src}
+          alt=""
+          className={`absolute inset-0 w-full h-full object-cover transition duration-1000 ease-in-out group-hover:scale-105 ${
+            idx === i ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
+    </>
+  );
+}
 
 const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombre: string; desc: string; Icon: typeof IconClinic }> = {
   restaurante: { ruta: "/restaurante", label: "Aurora Horeca", nombre: "Aurora Horeca", desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos.", Icon: IconRestaurant },
@@ -61,6 +87,7 @@ const STATS = [
 export default function Home() {
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
+  const [activeIndustry, setActiveIndustry] = useState(0);
 
   return (
     <main className="w-full bg-white text-[#1D1D1F] antialiased">
@@ -192,26 +219,31 @@ export default function Home() {
             </p>
           </div>
 
-          <AccordionGallery
-            items={VERTICAL_GALLERY}
-            defaultIndex={0}
-            expandRatio={0.5}
-            trigger="hover"
-            accentColor="#177E89"
-            overlayColor="#0D3B3D"
-            textColor="#ffffff"
-            grayscale
-            showLabels
-            duration={0.6}
-            ease="power3.out"
-            parallax={0.4}
-            tilt={6}
-            stagger={0.06}
-            height={440}
-            gap={10}
-            radius={20}
-            orientation="horizontal"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {INDUSTRIES.map((ind, idx) => {
+              return (
+                <div
+                  key={ind.name}
+                  onClick={() => setActiveIndustry(idx)}
+                  className={`bg-white border rounded-2xl overflow-hidden cursor-pointer shadow-sm transition-all ${
+                    activeIndustry === idx ? "border-[#177E89] ring-1 ring-[#177E89]" : "border-[#E5E5EA] hover:border-[#D1D1D6]"
+                  }`}
+                >
+                  <div className="group relative aspect-[16/10] overflow-hidden" style={ind.imgs.length === 0 ? { background: ind.placeholder } : undefined}>
+                    <IndustryPhoto imgs={ind.imgs} />
+                  </div>
+                  <div className="p-5">
+                    <h3 className="text-base font-bold text-[#1D1D1F] tracking-tight mb-1">
+                      {ind.name}
+                    </h3>
+                    <p className="text-xs text-[#86868B] leading-relaxed">
+                      {ind.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
         </div>
       </section>
@@ -324,7 +356,9 @@ export default function Home() {
                   <ul className="space-y-3 mb-8">
                     {p.features.map((feat) => (
                       <li key={feat} className="text-xs text-[#1D1D1F] flex items-center gap-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#177E89] flex-shrink-0" aria-hidden="true" />
+                        <span className="w-4 h-4 rounded-full bg-[#177E89]/10 text-[#177E89] flex items-center justify-center flex-shrink-0">
+                          <IconCheck size={9} />
+                        </span>
                         <span>{feat}</span>
                       </li>
                     ))}

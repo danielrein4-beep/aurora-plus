@@ -66,6 +66,14 @@ function SvgStore({ className = "w-4 h-4", style }: { className?: string; style?
   );
 }
 
+function SvgUsers({ className = "w-4 h-4", style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 014-4h2a4 4 0 014 4v2H9zm0-8a4 4 0 100-8 4 4 0 000 8zm7-4a3 3 0 110 6" />
+    </svg>
+  );
+}
+
 function SvgUpload({ className = "w-4 h-4", style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <svg className={className} style={style} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -78,9 +86,11 @@ interface Props {
   tenantId: number;
   nombreNegocio?: string;
   onClose: () => void;
+  esDuenoAdmin?: boolean;
+  onIrAEquipoRoles?: () => void;
 }
 
-export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Props) {
+export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose, esDuenoAdmin, onIrAEquipoRoles }: Props) {
   const [tab, setTab] = useState<"qr" | "perfil" | "pago_movil">("qr");
   const [copiado, setCopiado] = useState(false);
 
@@ -91,6 +101,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const [personalizacionTiendaActiva, setPersonalizacionTiendaActiva] = useState(false);
   const [colorAcentoTienda, setColorAcentoTienda] = useState("#0f766e");
   const [bannerBase64, setBannerBase64] = useState("");
+  const [estiloBannerTienda, setEstiloBannerTienda] = useState<"COMPACTO" | "VITRINA">("COMPACTO");
   const [telefonoWhatsapp, setTelefonoWhatsapp] = useState("");
   const [emailContacto, setEmailContacto] = useState("");
   const [slogan, setSlogan] = useState("");
@@ -106,8 +117,24 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const [telefono, setTelefono] = useState("");
   const [documento, setDocumento] = useState("");
   const [titular, setTitular] = useState("");
+  const [pagoMovilActivo, setPagoMovilActivo] = useState(true);
+
+  // Métodos de pago adicionales — cada uno con su propio "activo": el catálogo
+  // público solo muestra los que el dueño de verdad configuró y activó.
+  const [zelleActivo, setZelleActivo] = useState(false);
+  const [zelleCorreo, setZelleCorreo] = useState("");
+  const [zelleTitular, setZelleTitular] = useState("");
+  const [binanceManualActivo, setBinanceManualActivo] = useState(false);
+  const [binancePayId, setBinancePayId] = useState("");
+  const [bancolombiaActivo, setBancolombiaActivo] = useState(false);
+  const [bancolombiaCuenta, setBancolombiaCuenta] = useState("");
+  const [bancolombiaTipoCuenta, setBancolombiaTipoCuenta] = useState("Ahorros");
+  const [bancolombiaTitular, setBancolombiaTitular] = useState("");
+  const [bancolombiaDocumento, setBancolombiaDocumento] = useState("");
+
   const [guardandoPm, setGuardandoPm] = useState(false);
   const [mensajePm, setMensajePm] = useState<string | null>(null);
+  const [errorPm, setErrorPm] = useState(false);
 
   // El catálogo público ya solo resuelve por slug (ver CatalogoPublicoController.
   // resolverLicencia) — un link armado con el tenantId numérico como fallback
@@ -129,6 +156,17 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
         if (data.telefono) setTelefono(data.telefono);
         if (data.documento) setDocumento(data.documento);
         if (data.titular) setTitular(data.titular);
+        if (data.activo != null) setPagoMovilActivo(Boolean(data.activo));
+        setZelleActivo(Boolean(data.zelleActivo));
+        if (data.zelleCorreo) setZelleCorreo(data.zelleCorreo);
+        if (data.zelleTitular) setZelleTitular(data.zelleTitular);
+        setBinanceManualActivo(Boolean(data.binanceManualActivo));
+        if (data.binancePayId) setBinancePayId(data.binancePayId);
+        setBancolombiaActivo(Boolean(data.bancolombiaActivo));
+        if (data.bancolombiaCuenta) setBancolombiaCuenta(data.bancolombiaCuenta);
+        if (data.bancolombiaTipoCuenta) setBancolombiaTipoCuenta(data.bancolombiaTipoCuenta);
+        if (data.bancolombiaTitular) setBancolombiaTitular(data.bancolombiaTitular);
+        if (data.bancolombiaDocumento) setBancolombiaDocumento(data.bancolombiaDocumento);
       })
       .catch(() => {});
 
@@ -144,6 +182,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
         setPersonalizacionTiendaActiva(Boolean(data.personalizacionTiendaActiva));
         if (data.colorAcentoTienda) setColorAcentoTienda(data.colorAcentoTienda);
         if (data.bannerBase64) setBannerBase64(data.bannerBase64);
+        if (data.estiloBannerTienda === "VITRINA") setEstiloBannerTienda("VITRINA");
         if (data.telefonoWhatsapp) setTelefonoWhatsapp(data.telefonoWhatsapp);
         if (data.emailContacto) setEmailContacto(data.emailContacto);
         if (data.domicilioFiscal) setSlogan(data.domicilioFiscal);
@@ -179,6 +218,14 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
   const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // El banner se difumina hacia blanco en los bordes (mismo tratamiento del Hero
+    // de la landing) para fundirse con el fondo del catálogo — eso solo se ve bien
+    // con transparencia real, así que se exige PNG y no cualquier formato.
+    if (file.type !== "image/png") {
+      setErrorPerfil(true);
+      setMensajePerfil("El banner debe ser una imagen PNG.");
+      return;
+    }
     if (file.size > 2 * 1024 * 1024) {
       setErrorPerfil(true);
       setMensajePerfil("El banner no debe superar los 2MB.");
@@ -206,6 +253,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
           logoBase64: logoBase64,
           colorAcentoTienda,
           bannerBase64,
+          estiloBannerTienda,
           telefonoWhatsapp: telefonoWhatsapp.trim(),
           emailContacto: emailContacto.trim(),
           domicilioFiscal: slogan.trim(),
@@ -234,6 +282,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
     e.preventDefault();
     setGuardandoPm(true);
     setMensajePm(null);
+    setErrorPm(false);
     try {
       const res = await fetch(`/api/comercio/catalogo/pago-movil`, {
         method: "POST",
@@ -243,17 +292,28 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
           telefono: telefono.trim(),
           documento: documento.trim(),
           titular: titular.trim(),
-          activo: true
+          activo: pagoMovilActivo,
+          zelleActivo,
+          zelleCorreo: zelleCorreo.trim(),
+          zelleTitular: zelleTitular.trim(),
+          binanceManualActivo,
+          binancePayId: binancePayId.trim(),
+          bancolombiaActivo,
+          bancolombiaCuenta: bancolombiaCuenta.trim(),
+          bancolombiaTipoCuenta,
+          bancolombiaTitular: bancolombiaTitular.trim(),
+          bancolombiaDocumento: bancolombiaDocumento.trim()
         })
       });
       if (res.ok) {
-        setMensajePm("Datos de Pago Móvil actualizados con éxito.");
+        setMensajePm("Métodos de pago actualizados con éxito.");
         setTimeout(() => setMensajePm(null), 4000);
       } else {
         throw new Error("Error al guardar");
       }
     } catch {
-      setMensajePm("No se pudieron guardar los datos de Pago Móvil.");
+      setErrorPm(true);
+      setMensajePm("No se pudieron guardar los métodos de pago.");
     } finally {
       setGuardandoPm(false);
     }
@@ -261,7 +321,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl animate-scale-up">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl animate-scale-up">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -270,7 +330,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
             </div>
             <div>
               <h3 className="font-['Outfit'] font-black text-base sm:text-lg text-slate-900 dark:text-white">
-                {tab === "qr" ? "Catálogo Online & QR" : tab === "perfil" ? "Personalizar Tienda & Logo" : "Configuración de Pago Móvil"}
+                {tab === "qr" ? "Catálogo Online & QR" : tab === "perfil" ? "Personalizar Tienda & Logo" : "Pagos"}
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {nombreEmpresa || nombreNegocio || "Tienda Comercial"}
@@ -319,9 +379,23 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
             }`}
           >
-            Pago Móvil
+            Pagos
           </button>
         </div>
+
+        {/* Equipo & Roles vive a nivel de cuenta (Dashboard.tsx), no dentro de
+            Comercio — sirve igual para cualquier rubro (Horeca, Ganaderia, etc).
+            En vez de duplicar esa logica aqui, este es solo un acceso directo. */}
+        {esDuenoAdmin && onIrAEquipoRoles && (
+          <button
+            type="button"
+            onClick={onIrAEquipoRoles}
+            className="w-full flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <span className="flex items-center gap-2"><SvgUsers className="w-3.5 h-3.5" /> Equipo & Roles</span>
+            <span className="text-slate-400">→</span>
+          </button>
+        )}
 
         {/* TAB 1: QR & Enlace */}
         {tab === "qr" && (
@@ -448,12 +522,48 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Banner de portada</label>
-                  {bannerBase64 && <img src={bannerBase64} alt="Vista previa del banner" className="mb-2 h-24 w-full rounded-lg object-cover" />}
-                  <input ref={bannerInputRef} type="file" accept="image/*" onChange={handleBannerChange} className="hidden" />
+                  {bannerBase64 && (
+                    <div className="relative mb-2 h-24 w-full rounded-lg overflow-hidden bg-white">
+                      <img src={bannerBase64} alt="Vista previa del banner" className="absolute inset-0 h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white" />
+                      <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-white to-transparent" />
+                      <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-white to-transparent" />
+                    </div>
+                  )}
+                  <input ref={bannerInputRef} type="file" accept="image/png" onChange={handleBannerChange} className="hidden" />
                   <button type="button" onClick={() => bannerInputRef.current?.click()} className="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                     {bannerBase64 ? "Cambiar banner" : "Subir banner"}
                   </button>
                   {bannerBase64 && <button type="button" onClick={() => setBannerBase64("")} className="ml-3 text-[11px] text-rose-500 hover:underline">Eliminar banner</button>}
+                  <p className="text-[10px] text-slate-400 mt-1.5">
+                    Solo formato PNG. Medida ideal: 1600 x 400 px (imagen ancha y baja, relación 4:1). Se difumina hacia blanco en los bordes para fundirse con el catálogo. Máx. 2MB.
+                  </p>
+                  {bannerBase64 && (
+                    <div className="mt-3">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Estilo de portada</label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEstiloBannerTienda("COMPACTO")}
+                          className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${estiloBannerTienda === "COMPACTO" ? "bg-slate-900 text-white border-slate-900" : "border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300"}`}
+                        >
+                          Compacto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEstiloBannerTienda("VITRINA")}
+                          className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${estiloBannerTienda === "VITRINA" ? "bg-slate-900 text-white border-slate-900" : "border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300"}`}
+                        >
+                          Vitrina
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {estiloBannerTienda === "VITRINA"
+                          ? "Portada grande a pantalla completa con tu nombre superpuesto, estilo editorial de moda."
+                          : "Banner pequeño arriba del catálogo, con el foco en el producto."}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -555,21 +665,42 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
                 {guardandoPerfil ? "Guardando Cambios..." : "Guardar Perfil de Tienda"}
               </span>
             </button>
+
+            {/* Repetido aquí abajo — el modal ahora tiene scroll propio y este mensaje
+                vive arriba del formulario, así que si el dueño está viendo el botón
+                (al fondo) nunca se enteraba de un error o de que sí guardó. */}
+            {mensajePerfil && (
+              <div className={`p-3 rounded-xl border text-xs font-bold text-center ${
+                errorPerfil
+                  ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              }`}>
+                {mensajePerfil}
+              </div>
+            )}
           </form>
         )}
 
-        {/* TAB 3: Pago Movil */}
+        {/* TAB 3: Pagos — Pago Móvil + métodos adicionales, cada uno con su propio
+            interruptor. El catálogo público solo muestra al cliente los que estén
+            activos Y tengan datos reales guardados (ver CatalogoPublicoController). */}
         {tab === "pago_movil" && (
-          <form onSubmit={handleGuardarPagoMovil} className="space-y-3">
+          <form onSubmit={handleGuardarPagoMovil} className="space-y-4">
             {mensajePm && (
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold text-center">
+              <div className={`p-2.5 rounded-xl border text-xs font-bold text-center ${
+                errorPm
+                  ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              }`}>
                 {mensajePm}
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Banco Receptor
+            {/* Pago Móvil */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 space-y-3">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-xs font-bold text-slate-800 dark:text-white">Pago Móvil</span>
+                <input type="checkbox" checked={pagoMovilActivo} onChange={(e) => setPagoMovilActivo(e.target.checked)} className="w-4 h-4 accent-slate-900" />
               </label>
               <select
                 value={banco}
@@ -586,60 +717,125 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose }: Pr
                 <option value="0163 - Banco del Tesoro">0163 - Banco del Tesoro</option>
                 <option value="0175 - Banco Bicentenario">0175 - Banco Bicentenario</option>
               </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Teléfono Afiliado
-              </label>
               <input
                 type="text"
-                required
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
-                placeholder="Ej: 04141234567"
+                placeholder="Teléfono afiliado. Ej: 04141234567"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono focus:outline-none"
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Cédula o RIF
-              </label>
               <input
                 type="text"
-                required
                 value={documento}
                 onChange={(e) => setDocumento(e.target.value)}
-                placeholder="Ej: V-12345678 o J-12345678-0"
+                placeholder="Cédula o RIF. Ej: V-12345678"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono focus:outline-none"
+              />
+              <input
+                type="text"
+                value={titular}
+                onChange={(e) => setTitular(e.target.value)}
+                placeholder="Nombre del titular"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+              />
+            </div>
+
+            {/* Zelle */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 space-y-3">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-xs font-bold text-slate-800 dark:text-white">Zelle</span>
+                <input type="checkbox" checked={zelleActivo} onChange={(e) => setZelleActivo(e.target.checked)} className="w-4 h-4 accent-slate-900" />
+              </label>
+              <input
+                type="email"
+                value={zelleCorreo}
+                onChange={(e) => setZelleCorreo(e.target.value)}
+                placeholder="Correo registrado en Zelle"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono focus:outline-none"
+              />
+              <input
+                type="text"
+                value={zelleTitular}
+                onChange={(e) => setZelleTitular(e.target.value)}
+                placeholder="Nombre del titular"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+              />
+            </div>
+
+            {/* Binance Pay */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 space-y-3">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-xs font-bold text-slate-800 dark:text-white">Binance Pay (USDT)</span>
+                <input type="checkbox" checked={binanceManualActivo} onChange={(e) => setBinanceManualActivo(e.target.checked)} className="w-4 h-4 accent-slate-900" />
+              </label>
+              <input
+                type="text"
+                value={binancePayId}
+                onChange={(e) => setBinancePayId(e.target.value)}
+                placeholder="Tu Binance Pay ID"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono focus:outline-none"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Nombre del Titular
+            {/* Bancolombia */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3.5 space-y-3">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-xs font-bold text-slate-800 dark:text-white">Bancolombia</span>
+                <input type="checkbox" checked={bancolombiaActivo} onChange={(e) => setBancolombiaActivo(e.target.checked)} className="w-4 h-4 accent-slate-900" />
               </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={bancolombiaCuenta}
+                  onChange={(e) => setBancolombiaCuenta(e.target.value)}
+                  placeholder="Número de cuenta"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono focus:outline-none"
+                />
+                <select
+                  value={bancolombiaTipoCuenta}
+                  onChange={(e) => setBancolombiaTipoCuenta(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-medium focus:outline-none"
+                >
+                  <option value="Ahorros">Ahorros</option>
+                  <option value="Corriente">Corriente</option>
+                </select>
+              </div>
               <input
                 type="text"
-                required
-                value={titular}
-                onChange={(e) => setTitular(e.target.value)}
-                placeholder="Ej: Daniel Reina / Distribuidora C.A."
+                value={bancolombiaTitular}
+                onChange={(e) => setBancolombiaTitular(e.target.value)}
+                placeholder="Nombre del titular"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none"
+              />
+              <input
+                type="text"
+                value={bancolombiaDocumento}
+                onChange={(e) => setBancolombiaDocumento(e.target.value)}
+                placeholder="Cédula o NIT"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono focus:outline-none"
               />
             </div>
 
             <button
               type="submit"
               disabled={guardandoPm}
-              className="w-full py-3 rounded-xl text-xs font-bold transition-all shadow-md active:scale-98 disabled:opacity-50 mt-2"
+              className="w-full py-3 rounded-xl text-xs font-bold transition-all shadow-md active:scale-98 disabled:opacity-50"
               style={{ backgroundColor: "#0f172a", color: "#ffffff" }}
             >
               <span style={{ color: "#ffffff" }}>
-                {guardandoPm ? "Guardando..." : "Guardar Datos de Pago Móvil"}
+                {guardandoPm ? "Guardando..." : "Guardar Métodos de Pago"}
               </span>
             </button>
+
+            {mensajePm && (
+              <div className={`p-2.5 rounded-xl border text-xs font-bold text-center ${
+                errorPm
+                  ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+              }`}>
+                {mensajePm}
+              </div>
+            )}
           </form>
         )}
       </div>

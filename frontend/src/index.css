@@ -253,7 +253,7 @@
   --surface: #F5F5F7;
   --card: #FFFFFF;
   --border: #E5E5EA;
-  --bg-primary: #FFFFFF;
+  --bg-primary: #F5F5F7;
 
   --shadow-apple-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
   --shadow-apple-md: 0 4px 12px 0 rgba(0, 0, 0, 0.05);
@@ -263,7 +263,7 @@
 /* Global Reset & Base Typography */
 html, body, #root {
   min-height: 100%;
-  background-color: #FFFFFF !important;
+  background-color: #F5F5F7 !important;
   color: #1D1D1F !important;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -272,7 +272,7 @@ html, body, #root {
 
 /* Force Light Surfaces & Contrast */
 body {
-  background-color: #FFFFFF !important;
+  background-color: #F5F5F7 !important;
   color: #1D1D1F !important;
 }
 

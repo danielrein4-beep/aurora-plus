@@ -74,6 +74,12 @@ public class LicenciaTenant {
     @Column(name = "banner_base64", columnDefinition = "TEXT")
     private String bannerBase64;
 
+    // "COMPACTO" (banner chico, foco en el producto) o "VITRINA" (hero grande a
+    // pantalla completa con el nombre superpuesto, estilo editorial de moda) —
+    // mismo bannerBase64 en ambos casos, solo cambia cómo se presenta.
+    @Column(name = "estilo_banner_tienda", nullable = false, length = 20)
+    private String estiloBannerTienda = "COMPACTO";
+
     // Hierro/marca de propiedad del ganado (imagen codificada en Base64) — específico de
     // Ganadería, se estampa en la ficha de identificación del animal (ver AnimalQrService).
     @Column(name = "hierro_base64", columnDefinition = "TEXT")
@@ -131,6 +137,40 @@ public class LicenciaTenant {
 
     @Column(name = "pago_movil_activo", nullable = false)
     private boolean pagoMovilActivo = true;
+
+    // Métodos de pago adicionales para el catálogo público — cada uno con su propio
+    // "activo" para que el catálogo solo muestre lo que el dueño de verdad configuró
+    // (antes Zelle aparecía seleccionable sin ninguna instrucción real, y Binance
+    // mostraba un mensaje genérico fijo sin importar si el negocio tenía cuenta).
+    @Column(name = "zelle_activo", nullable = false)
+    private boolean zelleActivo = false;
+
+    @Column(name = "zelle_correo", length = 255)
+    private String zelleCorreo;
+
+    @Column(name = "zelle_titular", length = 255)
+    private String zelleTitular;
+
+    @Column(name = "binance_manual_activo", nullable = false)
+    private boolean binanceManualActivo = false;
+
+    @Column(name = "binance_pay_id", length = 100)
+    private String binancePayId;
+
+    @Column(name = "bancolombia_activo", nullable = false)
+    private boolean bancolombiaActivo = false;
+
+    @Column(name = "bancolombia_cuenta", length = 100)
+    private String bancolombiaCuenta;
+
+    @Column(name = "bancolombia_tipo_cuenta", length = 30)
+    private String bancolombiaTipoCuenta;
+
+    @Column(name = "bancolombia_titular", length = 255)
+    private String bancolombiaTitular;
+
+    @Column(name = "bancolombia_documento", length = 50)
+    private String bancolombiaDocumento;
 
     @Column(name = "whatsapp_ia_activa", nullable = false)
     private boolean whatsappIaActiva = true;
@@ -224,6 +264,8 @@ public class LicenciaTenant {
     public void setColorAcentoTienda(String colorAcentoTienda) { this.colorAcentoTienda = colorAcentoTienda; }
     public String getBannerBase64() { return bannerBase64; }
     public void setBannerBase64(String bannerBase64) { this.bannerBase64 = bannerBase64; }
+    public String getEstiloBannerTienda() { return estiloBannerTienda; }
+    public void setEstiloBannerTienda(String estiloBannerTienda) { this.estiloBannerTienda = estiloBannerTienda; }
     public String getHierroBase64() { return hierroBase64; }
     public void setHierroBase64(String hierroBase64) { this.hierroBase64 = hierroBase64; }
     public String getRif() { return rif; }
@@ -267,6 +309,26 @@ public class LicenciaTenant {
     public void setPagoMovilTitular(String pagoMovilTitular) { this.pagoMovilTitular = pagoMovilTitular; }
     public boolean isPagoMovilActivo() { return pagoMovilActivo; }
     public void setPagoMovilActivo(boolean pagoMovilActivo) { this.pagoMovilActivo = pagoMovilActivo; }
+    public boolean isZelleActivo() { return zelleActivo; }
+    public void setZelleActivo(boolean zelleActivo) { this.zelleActivo = zelleActivo; }
+    public String getZelleCorreo() { return zelleCorreo; }
+    public void setZelleCorreo(String zelleCorreo) { this.zelleCorreo = zelleCorreo; }
+    public String getZelleTitular() { return zelleTitular; }
+    public void setZelleTitular(String zelleTitular) { this.zelleTitular = zelleTitular; }
+    public boolean isBinanceManualActivo() { return binanceManualActivo; }
+    public void setBinanceManualActivo(boolean binanceManualActivo) { this.binanceManualActivo = binanceManualActivo; }
+    public String getBinancePayId() { return binancePayId; }
+    public void setBinancePayId(String binancePayId) { this.binancePayId = binancePayId; }
+    public boolean isBancolombiaActivo() { return bancolombiaActivo; }
+    public void setBancolombiaActivo(boolean bancolombiaActivo) { this.bancolombiaActivo = bancolombiaActivo; }
+    public String getBancolombiaCuenta() { return bancolombiaCuenta; }
+    public void setBancolombiaCuenta(String bancolombiaCuenta) { this.bancolombiaCuenta = bancolombiaCuenta; }
+    public String getBancolombiaTipoCuenta() { return bancolombiaTipoCuenta; }
+    public void setBancolombiaTipoCuenta(String bancolombiaTipoCuenta) { this.bancolombiaTipoCuenta = bancolombiaTipoCuenta; }
+    public String getBancolombiaTitular() { return bancolombiaTitular; }
+    public void setBancolombiaTitular(String bancolombiaTitular) { this.bancolombiaTitular = bancolombiaTitular; }
+    public String getBancolombiaDocumento() { return bancolombiaDocumento; }
+    public void setBancolombiaDocumento(String bancolombiaDocumento) { this.bancolombiaDocumento = bancolombiaDocumento; }
 
     public boolean isWhatsappIaActiva() { return whatsappIaActiva; }
     public void setWhatsappIaActiva(boolean whatsappIaActiva) { this.whatsappIaActiva = whatsappIaActiva; }

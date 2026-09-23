@@ -1,24 +1,63 @@
-# Reverse proxy de Aurora Plus. Caddy detecta solo si {$DOMAIN} es un dominio
-# público (pide y renueva el certificado de Let's Encrypt automáticamente) o
-# "localhost" (sirve en HTTP plano, sin intentar HTTPS — así el docker-compose
-# funciona igual en desarrollo local sin configurar nada extra).
+# Caddy de BORDE — el único contenedor que recibe tráfico de internet (80/443).
+# Pide y renueva solo el certificado de Let's Encrypt mientras {$DOMAIN} apunte
+# por DNS a este servidor. Con DOMAIN=localhost (valor por defecto) sirve en
+# HTTP plano, sin intentar HTTPS, para que el mismo compose funcione en local.
 #
-# En el servidor real: poner DOMAIN=tu-dominio.com en el .env, apuntar el
-# registro A/AAAA de ese dominio a la IP del servidor ANTES de levantar el
-# stack, y confirmar que los puertos 80 y 443 estén abiertos — Caddy necesita
-# el 80 para completar el reto HTTP-01 de Let's Encrypt la primera vez.
-{$DOMAIN} {
-	reverse_proxy app:8080
+# Reparto del tráfico (antes TODO iba al backend, y el frontend React ni
+# siquiera se construía):
+#   /api/*  -> backend Spring Boot   ({$APP_UPSTREAM})
+#   resto   -> SPA React estático    ({$WEB_UPSTREAM})
+# Se verificó que TODOS los @RequestMapping de clase del backend cuelgan de
+# /api, así que no hay ninguna ruta de servidor fuera de ese prefijo.
 
-	encode gzip
+{$DOMAIN} {
+	encode gzip zstd
 
 	header {
-		# Cabeceras de seguridad básicas — no reemplazan nada del backend,
-		# solo endurecen lo que el navegador hace con la respuesta. HSTS no
-		# va aquí a propósito: forzarla también en DOMAIN=localhost dejaría
-		# el navegador exigiendo HTTPS en local incluso sin certificado.
+		# Endurecimiento básico del lado del navegador. HSTS no se pone aquí a
+		# propósito: forzarla también con DOMAIN=localhost dejaría el navegador
+		# exigiendo HTTPS en desarrollo, donde no hay certificado.
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# El portal de laboratorio sube varios PDFs/fotos por carga y el perfil de
+	# tienda manda logo/banner en base64: debe coincidir con los límites de
+	# Spring (spring.servlet.multipart.max-request-size=100MB).
+	request_body {
+		max_size 100MB
+	}
+
+	handle /api/* {
+		reverse_proxy {$APP_UPSTREAM:aurora-prod-app:8080} {
+			# El OCR de facturas (Gemini) y algunos reportes tardan: sin esto
+			# Caddy cortaría la respuesta antes de que el backend termine.
+			transport http {
+				read_timeout 180s
+				write_timeout 180s
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy {$WEB_UPSTREAM:aurora-prod-web:8080}
+	}
+}
+
+# Entorno de PRUEBAS, en el mismo servidor pero con su propia base y su propio
+# backend (stack "staging", ver docs/DESPLIEGUE.md). Si ese stack no está
+# levantado, este dominio simplemente responde 502 — no afecta a producción.
+# Mientras STAGING_DOMAIN no se defina, queda en "staging.localhost", que no es
+# un dominio público y por lo tanto no dispara ningún pedido de certificado.
+{$STAGING_DOMAIN:staging.localhost} {
+	encode gzip zstd
+
+	handle /api/* {
+		reverse_proxy {$STAGING_APP_UPSTREAM:aurora-staging-app:8080}
+	}
+
+	handle {
+		reverse_proxy {$STAGING_WEB_UPSTREAM:aurora-staging-web:8080}
 	}
 }

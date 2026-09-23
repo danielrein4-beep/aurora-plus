@@ -189,4 +189,76 @@ class RepuestoLogicaNegocioTest {
         assertThrows(RuntimeException.class,
             () -> repuestoConversionService.registrarPresentacion(r.getId(), tenantId, "CAJA", BigDecimal.ZERO, new BigDecimal("100.00")));
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // VENTA A CRÉDITO: la CXC debe nacer real en el motor financiero, no
+    // quedar solo en el navegador del cajero (ver ComercioApp.tsx, Día 1 piloto).
+    // ─────────────────────────────────────────────────────────────────
+
+    @Test
+    void ventaSinPagoAhoraQuedaCienPorCientoComoCxcYNoRegistraIngresoDeCaja() {
+        long tenantId = 98010L;
+        RepuestoItem r = crearRepuesto(tenantId, "SKU-98010", new BigDecimal("100"),
+            new BigDecimal("10.00"), null, null);
+
+        repuestoConversionService.venderPorVolumen(r.getId(), tenantId, new BigDecimal("5"),
+            null, null, "clave-98010", null, BigDecimal.ZERO, 15, "Taller Los Andes");
+
+        var movimientos = movimientoCajaRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId);
+        assertEquals(1, movimientos.size(), "Solo debe existir la CXC — nada pagado ahora, ningún INGRESO");
+
+        MovimientoCaja cxc = movimientos.get(0);
+        assertEquals(MovimientoCaja.TipoMovimiento.CXC, cxc.getTipo());
+        assertEquals(0, new BigDecimal("50.00").compareTo(cxc.getSaldoPendiente()), "5 x $10.00 = $50.00 pendiente");
+        assertEquals("PENDIENTE", cxc.getEstado());
+        assertNotNull(cxc.getFechaVencimiento());
+        assertTrue(cxc.getConcepto().contains("Taller Los Andes"), "La CXC debe quedar atribuida al cliente: " + cxc.getConcepto());
+        assertEquals("COMERCIO", cxc.getModuloOrigen());
+    }
+
+    @Test
+    void ventaConPagoParcialRepartelIngresoRealYLaCxcPorLaDiferencia() {
+        long tenantId = 98011L;
+        RepuestoItem r = crearRepuesto(tenantId, "SKU-98011", new BigDecimal("100"),
+            new BigDecimal("10.00"), null, null);
+
+        // Total = 10 x $10.00 = $100.00, paga $40.00 ahora, resto a crédito
+        repuestoConversionService.venderPorVolumen(r.getId(), tenantId, new BigDecimal("10"),
+            null, null, "clave-98011", null, new BigDecimal("40.00"), 15, "Ferretería Don José");
+
+        var movimientos = movimientoCajaRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId);
+        assertEquals(2, movimientos.size(), "Debe existir el INGRESO parcial y la CXC por el resto");
+
+        MovimientoCaja ingreso = movimientos.stream().filter(m -> m.getTipo() == MovimientoCaja.TipoMovimiento.INGRESO).findFirst().orElseThrow();
+        MovimientoCaja cxc = movimientos.stream().filter(m -> m.getTipo() == MovimientoCaja.TipoMovimiento.CXC).findFirst().orElseThrow();
+
+        assertEquals(0, new BigDecimal("40.00").compareTo(ingreso.getMonto()), "Lo cobrado de una vez debe entrar real a caja");
+        assertEquals(0, new BigDecimal("60.00").compareTo(cxc.getSaldoPendiente()), "$100 - $40 pagado = $60 pendiente");
+    }
+
+    @Test
+    void noSePuedePagarAhoraMasDelTotalDeLaVenta() {
+        long tenantId = 98012L;
+        RepuestoItem r = crearRepuesto(tenantId, "SKU-98012", new BigDecimal("100"),
+            new BigDecimal("10.00"), null, null);
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+            () -> repuestoConversionService.venderPorVolumen(r.getId(), tenantId, new BigDecimal("5"),
+                null, null, "clave-98012", null, new BigDecimal("999.00"), null, null));
+        assertTrue(ex.getMessage().contains("no puede ser negativo ni mayor al total"), "Debe rechazar: " + ex.getMessage());
+    }
+
+    @Test
+    void ventaDeContadoTradicionalSigueSinGenerarNingunaCxc() {
+        long tenantId = 98013L;
+        RepuestoItem r = crearRepuesto(tenantId, "SKU-98013", new BigDecimal("100"),
+            new BigDecimal("10.00"), null, null);
+
+        // Overload de siempre, sin tocar crédito — comportamiento previo intacto
+        repuestoConversionService.venderPorVolumen(r.getId(), tenantId, new BigDecimal("5"));
+
+        var movimientos = movimientoCajaRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId);
+        assertEquals(1, movimientos.size());
+        assertEquals(MovimientoCaja.TipoMovimiento.INGRESO, movimientos.get(0).getTipo());
+    }
 }
