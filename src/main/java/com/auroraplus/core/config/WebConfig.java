@@ -46,7 +46,10 @@ public class WebConfig implements WebMvcConfigurer {
                 "/api/public/contacto",
                 // Portal público de recepción de laboratorio (sin login, como los de
                 // arriba) — sin límite, cualquiera podría martillarlo con cargas falsas.
-                "/api/public/laboratorio/portal/*/subir"
+                "/api/public/laboratorio/portal/*/subir",
+                // Portal del paciente odontologico: confirmacion de identidad y subida de radiografias sin login.
+                "/api/public/odontologia/portal/*/verificar",
+                "/api/public/odontologia/portal/*/radiografias"
             );
         registry.addInterceptor(tenantInterceptor)
             .addPathPatterns("/api/**")

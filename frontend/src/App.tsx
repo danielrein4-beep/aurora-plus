@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import SuperAdminPortal from "./components/SuperAdminPortal";
 import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
 import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
+import PortalOdontologiaPaciente from "./pages/PortalOdontologiaPaciente";
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from "react-router-dom";
 import Layout from "./Layout";
 import Home from "./pages/Home";
@@ -155,6 +156,8 @@ export default function App() {
             <Route path="/lab/:token" element={<PortalPublicoBioanalista />} />
             {/* Portal público donde el PACIENTE sube sus resultados de laboratorio (QR fijo del consultorio) */}
             <Route path="/lab-paciente/:token" element={<PortalLaboratorioPaciente />} />
+            <Route path="/odonto-paciente/:token" element={<PortalOdontologiaPaciente />} />
+            <Route path="/odonto-paciente" element={<PortalOdontologiaPaciente />} />
             {/* Catalogo digital publico para Retail / Comercio */}
             <Route path="/catalogo/:tenantId" element={<CatalogoPublico />} />
             <Route path="/tienda/:tenantId" element={<CatalogoPublico />} />

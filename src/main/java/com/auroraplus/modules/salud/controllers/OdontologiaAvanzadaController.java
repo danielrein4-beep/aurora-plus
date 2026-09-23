@@ -476,7 +476,8 @@ public class OdontologiaAvanzadaController {
         Long tenantId = TenantContext.getCurrentTenant();
 
         List<Map<String, Object>> filas = jdbcTemplate.queryForList(
-            "SELECT * FROM salud_odontologia_plan_items WHERE tenant_id = ? AND id = ?",
+            // FOR UPDATE: un doble clic en "realizado" no debe descontar el kit dos veces.
+            "SELECT * FROM salud_odontologia_plan_items WHERE tenant_id = ? AND id = ? FOR UPDATE",
             tenantId, itemId
         );
         if (filas.isEmpty()) {
@@ -593,6 +594,14 @@ public class OdontologiaAvanzadaController {
             req.sillonBox = "SILLON_1";
         }
         req.odontologo = nombreOdontologo(req.odontologo);
+
+        // Sin esto, dos recepcionistas agendando a la vez pasaban ambas la revision de
+        // colision y reservaban el mismo sillon (la prueba de estres creo 6 de 20).
+        // El candado dura hasta el fin de la transaccion y es por sillon y por odontologo del dia.
+        jdbcTemplate.queryForList("SELECT pg_advisory_xact_lock(hashtext(?))",
+            "odonto-sillon:" + tenantId + ":" + req.fechaCita + ":" + req.sillonBox);
+        jdbcTemplate.queryForList("SELECT pg_advisory_xact_lock(hashtext(?))",
+            "odonto-doctor:" + tenantId + ":" + req.fechaCita + ":" + req.odontologo.toLowerCase());
 
         // Dos rangos se solapan si cada uno empieza antes de que termine el otro.
         Integer colisionesSillon = jdbcTemplate.queryForObject(

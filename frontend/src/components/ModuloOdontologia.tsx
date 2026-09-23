@@ -21,6 +21,7 @@ import RecetasOdontologicas from "./RecetasOdontologicas";
 import ConsentimientosOdontologicos from "./ConsentimientosOdontologicos";
 import PanelClinicaOdontologia from "./PanelClinicaOdontologia";
 import KitsInsumosOdontologia from "./KitsInsumosOdontologia";
+import PortalPacienteOdontoModal from "./PortalPacienteOdontoModal";
 
 interface ModuloOdontologiaProps {
   pacientes: Paciente[] | null;
@@ -60,6 +61,7 @@ export default function ModuloOdontologia({
 
   const [pestanaActiva, setPestanaActiva] = useState<PestanaOdonto>("hoy");
   const [busqueda, setBusqueda] = useState("");
+  const [portalAbierto, setPortalAbierto] = useState(false);
 
   const pacienteSeleccionado = useMemo(() => {
     if (!pacientes || !pacienteId) return null;
@@ -92,6 +94,13 @@ export default function ModuloOdontologia({
 
   return (
     <div className="space-y-6">
+      {portalAbierto && pacienteSeleccionado && (
+        <PortalPacienteOdontoModal
+          paciente={pacienteSeleccionado}
+          clinicaNombre={config?.clinicaNombre}
+          onCerrar={() => setPortalAbierto(false)}
+        />
+      )}
       {/* Cabecera Principal del Modulo Dental */}
       <div className="apple-glass rounded-3xl p-6 border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-[#071322]/70 text-left shadow-sm">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -204,6 +213,14 @@ export default function ModuloOdontologia({
 
             {/* Accesos directos a Historia y Procedimientos */}
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPortalAbierto(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/5 text-xs font-semibold transition-all"
+                title="QR y enlace para que el paciente vea su historia y envie sus radiografias"
+              >
+                <span>Portal del paciente</span>
+              </button>
               {onIrAHistorias && (
                 <button
                   type="button"

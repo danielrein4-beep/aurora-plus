@@ -26,6 +26,9 @@ interface RadiografiaItem {
   hallazgos: string | null;
   diente_asociado: number | null;
   fecha_toma: string;
+  // PACIENTE = lo subio el propio paciente desde su portal; queda sin revisar hasta que el odontologo lo vea.
+  origen?: string;
+  revisada?: boolean;
 }
 
 export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = ({
@@ -76,6 +79,20 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
   useEffect(() => {
     cargarEstudios();
   }, [pacienteId]);
+
+  const marcarRevisada = async (id: number) => {
+    try {
+      const res = await fetch(`/api/salud/odontologia/radiografias/${id}/revisada`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
+      });
+      if (!res.ok) throw new Error(`error ${res.status}`);
+      setEstudios((prev) => prev.map((e) => (e.id === id ? { ...e, revisada: true } : e)));
+      setSeleccionado((prev) => (prev && prev.id === id ? { ...prev, revisada: true } : prev));
+    } catch {
+      setMensaje("No se pudo marcar el estudio como revisado.");
+    }
+  };
 
   const cargarEstudios = async () => {
     setCargando(true);
@@ -218,6 +235,15 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     {est.diente_asociado && (
                       <div className="text-[10px] text-slate-500 dark:text-slate-400">Pieza FDI: {est.diente_asociado}</div>
                     )}
+                    {est.origen === "PACIENTE" && (
+                      <div
+                        className={`text-[10px] font-bold ${
+                          est.revisada ? "text-slate-500 dark:text-slate-400" : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        {est.revisada ? "Enviado por el paciente" : "Enviado por el paciente - sin revisar"}
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -236,6 +262,15 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                       Tipo: {seleccionado.tipo_estudio} &bull; Fecha: {seleccionado.fecha_toma}
                       {seleccionado.diente_asociado && ` • Pieza FDI: ${seleccionado.diente_asociado}`}
                     </span>
+                    {seleccionado.origen === "PACIENTE" && !seleccionado.revisada && (
+                      <button
+                        type="button"
+                        onClick={() => marcarRevisada(seleccionado.id)}
+                        className="mt-2 block px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 text-xs font-bold"
+                      >
+                        Enviado por el paciente: marcar como revisado
+                      </button>
+                    )}
                   </div>
 
                   {/* Controles de Filtros */}

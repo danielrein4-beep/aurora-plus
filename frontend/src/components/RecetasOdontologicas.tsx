@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { leerSesion, type Paciente } from "../api";
+import { enviarEmailDocumento, leerSesion, type Paciente } from "../api";
 import { VademecumPrescriptor, type ItemRecipePrescrito } from "./VademecumPrescriptor";
-import { generarPdfRecipeMedico, type RecipeReportData, type RecipeItemData } from "../utils/pdfReports";
+import { construirDocRecipeMedico, type RecipeReportData, type RecipeItemData } from "../utils/pdfReports";
 
 interface RecetasOdontologicasProps {
   paciente: Paciente;
@@ -32,6 +32,42 @@ function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${leerSesion()?.token || ""}` };
 }
 
+// Enlace personal del paciente a su portal; se crea una vez por visita de esta pantalla.
+async function crearEnlacePortal(pacienteId: number): Promise<{ url: string; qrPng: string }> {
+  const res = await fetch("/api/salud/odontologia/portal/enlaces", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ pacienteId, origen: window.location.origin }),
+  });
+  if (!res.ok) throw new Error(`error ${res.status}`);
+  return res.json();
+}
+
+// El QR va en el centro del pie, entre el recuadro del sello y la firma.
+function recipeConQr(data: RecipeReportData, qrPng: string | null) {
+  const doc = construirDocRecipeMedico(data);
+  if (qrPng) {
+    const ancho = doc.internal.pageSize.getWidth();
+    const alto = doc.internal.pageSize.getHeight();
+    const lado = 24;
+    const x = ancho / 2 - lado / 2 - 6;
+    const y = alto - 42 - 8;
+    doc.addImage(qrPng, "PNG", x, y, lado, lado);
+    doc.setFontSize(6.5);
+    doc.setTextColor(90, 90, 90);
+    doc.text("Escanee para ver su historia dental", x + lado / 2, y + lado + 3, { align: "center" });
+  }
+  return doc;
+}
+
+function escaparHtml(texto: string) {
+  return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function nombreArchivo(data: RecipeReportData) {
+  return `Receta_${data.paciente.nombre.replace(/[^a-zA-Z0-9]/g, "_")}_${Date.now() % 100000}.pdf`;
+}
+
 function edadDesde(fechaNac?: string | null): number | undefined {
   if (!fechaNac) return undefined;
   const n = new Date(fechaNac);
@@ -51,6 +87,51 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
   const [alergiasAnamnesis, setAlergiasAnamnesis] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+  const [enlacePortal, setEnlacePortal] = useState<{ url: string; qrPng: string } | null>(null);
+  const [enviando, setEnviando] = useState<number | "nueva" | null>(null);
+
+  // Si el enlace no se puede crear, la receta sale igual, solo que sin QR.
+  const obtenerEnlace = async (): Promise<{ url: string; qrPng: string } | null> => {
+    if (enlacePortal) return enlacePortal;
+    try {
+      const e = await crearEnlacePortal(paciente.id);
+      setEnlacePortal(e);
+      return e;
+    } catch {
+      return null;
+    }
+  };
+
+  const obtenerQr = async () => (await obtenerEnlace())?.qrPng ?? null;
+
+  const enviarPorCorreo = async (data: RecipeReportData, clave: number | "nueva") => {
+    if (!paciente.email) {
+      setMensaje({ tipo: "error", texto: "El paciente no tiene correo registrado. Agregalo en su ficha para poder enviarle la receta." });
+      return;
+    }
+    setEnviando(clave);
+    try {
+      const enlace = await obtenerEnlace();
+      const doc = recipeConQr(data, enlace?.qrPng ?? null);
+      const base64 = (doc.output("datauristring") as string).split(",")[1];
+      const clinica = escaparHtml(data.clinicaNombre || "su clinica odontologica");
+      await enviarEmailDocumento({
+        destinatario: paciente.email,
+        asunto: `Su receta de ${data.clinicaNombre || "su clinica odontologica"}`,
+        cuerpo:
+          `<p>Hola ${escaparHtml(paciente.nombreCompleto)},</p><p>Le enviamos adjunta la receta de su consulta del ${escaparHtml(data.paciente.fechaConsulta)}.</p>` +
+          (enlace ? `<p>Puede ver su historia dental, su plan y sus citas aqui: <a href="${enlace.url}">${enlace.url}</a></p>` : "") +
+          `<p>${clinica}</p>`,
+        pdfBase64: base64,
+        nombreArchivo: nombreArchivo(data),
+      });
+      setMensaje({ tipo: "ok", texto: `Receta enviada a ${paciente.email}.` });
+    } catch (e) {
+      setMensaje({ tipo: "error", texto: `La receta NO se envio: ${e instanceof Error ? e.message : "fallo de conexion"}.` });
+    } finally {
+      setEnviando(null);
+    }
+  };
 
   const cargarRecetas = async () => {
     try {
@@ -62,6 +143,7 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
   };
 
   useEffect(() => {
+    setEnlacePortal(null);
     setItems([]);
     setDiagnostico("");
     setIndicaciones("");
@@ -105,6 +187,8 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
     indicacionesGenerales: indic || undefined,
   });
 
+  const [ultimaGuardada, setUltimaGuardada] = useState<RecipeReportData | null>(null);
+
   const guardarEImprimir = async () => {
     if (items.length === 0) {
       setMensaje({ tipo: "error", texto: "Agrega al menos un medicamento a la receta." });
@@ -130,7 +214,9 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
         const cuerpo = await res.json().catch(() => null);
         throw new Error(cuerpo?.message || `error ${res.status}`);
       }
-      generarPdfRecipeMedico(construirPdf(medicamentos, diagnostico, indicaciones, new Date().toLocaleDateString("es-VE")));
+      const pdf = construirPdf(medicamentos, diagnostico, indicaciones, new Date().toLocaleDateString("es-VE"));
+      recipeConQr(pdf, await obtenerQr()).save(nombreArchivo(pdf));
+      setUltimaGuardada(pdf);
       setItems([]);
       setDiagnostico("");
       setIndicaciones("");
@@ -143,16 +229,19 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
     }
   };
 
-  const reimprimir = (r: RecetaGuardada) => {
+  const datosDeGuardada = (r: RecetaGuardada): RecipeReportData => {
     let meds: RecipeItemData[] = [];
     try {
       meds = JSON.parse(r.items_json);
     } catch {
       meds = [];
     }
-    generarPdfRecipeMedico(
-      construirPdf(meds, r.diagnostico || "", r.indicaciones || "", new Date(r.fecha_registro).toLocaleDateString("es-VE"))
-    );
+    return construirPdf(meds, r.diagnostico || "", r.indicaciones || "", new Date(r.fecha_registro).toLocaleDateString("es-VE"));
+  };
+
+  const reimprimir = async (r: RecetaGuardada) => {
+    const pdf = datosDeGuardada(r);
+    recipeConQr(pdf, await obtenerQr()).save(nombreArchivo(pdf));
   };
 
   return (
@@ -214,7 +303,17 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
           </div>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
+          {ultimaGuardada && (
+            <button
+              type="button"
+              onClick={() => enviarPorCorreo(ultimaGuardada, "nueva")}
+              disabled={enviando !== null}
+              className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 font-bold text-xs disabled:opacity-50"
+            >
+              {enviando === "nueva" ? "Enviando..." : "Enviar la receta por correo"}
+            </button>
+          )}
           <button
             type="button"
             onClick={guardarEImprimir}
@@ -253,13 +352,23 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
                       {r.diagnostico ? ` - ${r.diagnostico}` : ""}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => reimprimir(r)}
-                    className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 font-semibold hover:bg-slate-200 dark:hover:bg-white/10"
-                  >
-                    Descargar PDF
-                  </button>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => enviarPorCorreo(datosDeGuardada(r), r.id)}
+                      disabled={enviando !== null}
+                      className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 font-semibold hover:bg-slate-200 dark:hover:bg-white/10 disabled:opacity-50"
+                    >
+                      {enviando === r.id ? "Enviando..." : "Correo"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => reimprimir(r)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 font-semibold hover:bg-slate-200 dark:hover:bg-white/10"
+                    >
+                      Descargar PDF
+                    </button>
+                  </div>
                 </li>
               );
             })}
