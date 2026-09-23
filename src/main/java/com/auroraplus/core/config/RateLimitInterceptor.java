@@ -98,14 +98,39 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         contadores.entrySet().removeIf(entry -> entry.getValue().inicioVentana < limite);
     }
 
-    // Detrás de Caddy (ver Caddyfile) la IP real del cliente llega en
-    // X-Forwarded-For; sin proxy (desarrollo local) se usa la IP directa de
-    // la conexión.
     private String ipCliente(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        return ipCliente(request.getRemoteAddr(), request.getHeader("X-Forwarded-For"));
+    }
+
+    // Detrás de Caddy (ver Caddyfile) la IP real del cliente llega en
+    // X-Forwarded-For. Ese encabezado lo puede escribir cualquiera, así que solo
+    // se cree cuando la conexión viene de un proxy nuestro (red interna de Docker
+    // o la misma máquina), y se toma la ÚLTIMA IP de la lista: la que agregó ese
+    // proxy, no la que inventó el cliente. Antes se tomaba la primera y cualquiera
+    // que llegara directo al backend esquivaba el límite cambiando el encabezado.
+    static String ipCliente(String remoteAddr, String forwarded) {
+        if (forwarded == null || forwarded.isBlank() || !esProxyInterno(remoteAddr)) {
+            return remoteAddr;
         }
-        return request.getRemoteAddr();
+        String[] ips = forwarded.split(",");
+        for (int i = ips.length - 1; i >= 0; i--) {
+            String ip = ips[i].trim();
+            if (!ip.isEmpty()) return ip;
+        }
+        return remoteAddr;
+    }
+
+    // Loopback, redes privadas (10/8, 172.16/12, 192.168/16), link-local y
+    // IPv6 privadas (fc00::/7). remoteAddr siempre es una IP literal, así que
+    // getByName no consulta DNS.
+    private static boolean esProxyInterno(String remoteAddr) {
+        if (remoteAddr == null || remoteAddr.isBlank()) return false;
+        try {
+            java.net.InetAddress ip = java.net.InetAddress.getByName(remoteAddr);
+            if (ip.isLoopbackAddress() || ip.isSiteLocalAddress() || ip.isLinkLocalAddress()) return true;
+            return ip instanceof java.net.Inet6Address && (ip.getAddress()[0] & 0xfe) == 0xfc;
+        } catch (java.net.UnknownHostException e) {
+            return false;
+        }
     }
 }
