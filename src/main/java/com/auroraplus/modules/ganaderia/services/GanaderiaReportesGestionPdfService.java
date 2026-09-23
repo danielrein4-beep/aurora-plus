@@ -147,7 +147,7 @@ public class GanaderiaReportesGestionPdfService {
             long estancados = filas.stream().filter(f -> f.gdpUltimoPeriodoKgDia != null && f.gdpUltimoPeriodoKgDia.compareTo(GDP_BAJA) < 0).count();
             BigDecimal ganancia = conGdp.stream().map(f -> f.gananciaTotalKg).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
             pdf.indicadores(List.of(
-                new String[]{"GDP promedio", gdpProm != null ? gdpProm.toPlainString() + " kg/día" : "—"},
+                new String[]{"GDP promedio", gdpProm != null ? gdp(gdpProm) + " kg/día" : "—"},
                 new String[]{"Animales con GDP", conGdp.size() + " de " + filas.size()},
                 new String[]{"Estancados (< 0,3 kg/día)", String.valueOf(estancados)},
                 new String[]{"Kilos ganados (con GDP)", kg(ganancia, 0)},
@@ -177,7 +177,7 @@ public class GanaderiaReportesGestionPdfService {
                 new float[]{1.1f, 2.1f, 2.2f, 1.5f, 1.5f, 0.8f, 1.2f, 1f, 1f, 0.9f},
                 new boolean[]{false, false, false, true, true, true, true, true, true, true},
                 orden.stream().map(f -> new String[]{
-                    f.arete, nombreOTipo(f), texto(f.potrero, "—") + (f.lote != null ? " · " + f.lote : ""),
+                    f.arete, nombreOTipo(f), potreroYLote(f.potrero, f.lote),
                     kg(f.pesoInicial, 1) + " " + fecha(f.fechaInicial), kg(f.pesoUltimo, 1) + " " + fecha(f.fechaUltimo),
                     f.dias != null ? String.valueOf(f.dias) : "—", signo(f.gananciaTotalKg) + " kg", gdp(f.gdpKgDia),
                     gdp(f.gdpUltimoPeriodoKgDia), String.valueOf(f.cantidadPesajes)
@@ -206,10 +206,10 @@ public class GanaderiaReportesGestionPdfService {
             long ubicados = activos.size() - sinPotrero;
             pdf.indicadores(List.of(
                 new String[]{"Potreros", String.valueOf(potreros.size())},
-                new String[]{"Área total", haTotal.stripTrailingZeros().toPlainString() + " ha"},
+                new String[]{"Área total", n(haTotal, haTotal.stripTrailingZeros().scale() > 0 ? 1 : 0) + " ha"},
                 new String[]{"En uso / descanso", (potreros.size() - enDescanso) + " / " + enDescanso},
                 new String[]{"Animales ubicados", ubicados + " de " + activos.size()},
-                new String[]{"Carga promedio", haTotal.signum() > 0 ? BigDecimal.valueOf(ubicados).divide(haTotal, 2, RoundingMode.HALF_UP) + " cab/ha" : "—"}
+                new String[]{"Carga promedio", haTotal.signum() > 0 ? n(BigDecimal.valueOf(ubicados).divide(haTotal, 2, RoundingMode.HALF_UP), 2) + " cab/ha" : "—"}
             ));
             if (potreros.isEmpty()) {
                 pdf.parrafo("No hay potreros registrados.");
@@ -226,11 +226,11 @@ public class GanaderiaReportesGestionPdfService {
                 String estado = descanso ? "En descanso" : "EN_MANTENIMIENTO".equals(p.getEstado()) ? "Mantenimiento" : "En uso";
                 if (descanso && dias != null && p.getDiasDescansoMinimo() != null && dias >= p.getDiasDescansoMinimo()) estado += " (listo)";
                 filas.add(new String[]{
-                    p.getNombre(), texto(p.getCodigo(), "—"), area != null ? area.stripTrailingZeros().toPlainString() + " ha" : "—",
+                    p.getNombre(), texto(p.getCodigo(), "—"), area != null ? n(area, area.stripTrailingZeros().scale() > 0 ? 1 : 0) + " ha" : "—",
                     texto(p.getTipoPasto(), "Sin definir"), estado,
                     dias != null ? dias + " d" + (descanso && p.getDiasDescansoMinimo() != null ? " / " + p.getDiasDescansoMinimo() : "") : "—",
                     String.valueOf(n), p.getCapacidadAnimales() != null ? String.valueOf(p.getCapacidadAnimales()) : "—",
-                    area != null && area.signum() > 0 ? BigDecimal.valueOf(n).divide(area, 2, RoundingMode.HALF_UP) + " cab/ha" : "—"
+                    area != null && area.signum() > 0 ? n(BigDecimal.valueOf(n).divide(area, 2, RoundingMode.HALF_UP), 2) + " cab/ha" : "—"
                 });
             }
             pdf.seccion("Detalle por potrero");
@@ -337,22 +337,36 @@ public class GanaderiaReportesGestionPdfService {
         return f.nombre != null && !f.nombre.isBlank() ? f.nombre + (f.tipoAnimal != null ? " · " + capital(f.tipoAnimal) : "") : capital(texto(f.tipoAnimal, ""));
     }
 
+    /** Formato venezolano (como en pantalla): miles con punto, decimales con coma. */
+    private static String n(BigDecimal v, int dec) {
+        java.text.DecimalFormatSymbols sym = new java.text.DecimalFormatSymbols(Locale.forLanguageTag("es-VE"));
+        sym.setGroupingSeparator('.');
+        sym.setDecimalSeparator(',');
+        java.text.DecimalFormat f = new java.text.DecimalFormat(dec == 0 ? "#,##0" : "#,##0." + "0".repeat(dec), sym);
+        return f.format(v.setScale(dec, RoundingMode.HALF_UP));
+    }
+
+    private static String potreroYLote(String potrero, String lote) {
+        boolean hayPotrero = potrero != null && !potrero.isBlank(), hayLote = lote != null && !lote.isBlank();
+        if (hayPotrero && hayLote) return potrero + " · " + lote;
+        return hayPotrero ? potrero : hayLote ? lote : "—";
+    }
+
     private static String kg(BigDecimal v, int dec) {
-        return v == null ? "—" : v.setScale(dec, RoundingMode.HALF_UP).toPlainString() + " kg";
+        return v == null ? "—" : n(v, dec) + " kg";
     }
 
     private static String signo(BigDecimal v) {
         if (v == null) return "—";
-        String s = v.setScale(1, RoundingMode.HALF_UP).toPlainString();
-        return v.signum() > 0 ? "+" + s : s;
+        return (v.signum() > 0 ? "+" : "") + n(v, 1);
     }
 
     private static String gdp(BigDecimal v) {
-        return v == null ? "—" : v.setScale(3, RoundingMode.HALF_UP).toPlainString();
+        return v == null ? "—" : n(v, 3);
     }
 
     private static String usd(BigDecimal v) {
-        return v == null ? "—" : "$" + v.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        return v == null ? "—" : "$" + n(v, 2);
     }
 
     private static String num(BigDecimal v) {

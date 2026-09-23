@@ -95,7 +95,7 @@ class GanaderiaReportesGestionPdfTest {
         assertTrue(s.contains("Vaca") && s.contains("Toro"));
         assertTrue(s.contains("Gyr") && s.contains("Brahman"));
         assertTrue(s.contains("Potrero Grande") && s.contains("Sin potrero asignado"));
-        assertTrue(s.contains("1670 kg"), "peso vivo total 450+470+750\n" + s);
+        assertTrue(s.contains("1.670 kg"), "peso vivo total 450+470+750\n" + s);
     }
 
     @Test
@@ -113,7 +113,7 @@ class GanaderiaReportesGestionPdfTest {
         String s = texto(reportes.engorde(t, null, null));
         assertTrue(s.contains("REPORTE DE ENGORDE"), s);
         assertTrue(s.contains("Animales estancados"));
-        assertTrue(s.contains("1.000") && s.contains("0.067"), s);
+        assertTrue(s.contains("1,000") && s.contains("0,067"), s);
     }
 
     @Test
@@ -126,7 +126,7 @@ class GanaderiaReportesGestionPdfTest {
         String s = texto(reportes.potreros(t));
         assertTrue(s.contains("REPORTE DE POTREROS"), s);
         assertTrue(s.contains("La Vega") && s.contains("Brachiaria"));
-        assertTrue(s.contains("0.20 cab/ha"), "2 animales en 10 ha\n" + s);
+        assertTrue(s.contains("0,20 cab/ha"), "2 animales en 10 ha\n" + s);
         assertTrue(s.contains("2 / 20 (10%)"), s);
     }
 
@@ -147,8 +147,8 @@ class GanaderiaReportesGestionPdfTest {
         String txt = texto(reportes.liquidacionSociedad(t, s.getId()));
         assertTrue(txt.contains("LIQUIDACIÓN DE CEBA EN SOCIEDAD"), txt);
         assertTrue(txt.contains("Hacienda Los Mangos") && txt.contains("J-40123456-7"));
-        assertTrue(txt.contains("+100.0 kg"), "ganó 100 kg\n" + txt);
-        assertTrue(txt.contains("350.0 kg"), "total socio = 300 entrada + 50\n" + txt);
+        assertTrue(txt.contains("+100,0 kg"), "ganó 100 kg\n" + txt);
+        assertTrue(txt.contains("350,0 kg"), "total socio = 300 entrada + 50\n" + txt);
         assertTrue(txt.contains("Por la finca"));
     }
 
