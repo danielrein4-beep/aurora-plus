@@ -44,12 +44,12 @@ interface Portal {
 }
 
 const ESTADO_PIEZA: Record<string, { texto: string; clase: string }> = {
-  CARIES: { texto: "Caries por tratar", clase: "bg-rose-500 text-white" },
-  EXTRACCION_INDICADA: { texto: "Extraccion indicada", clase: "bg-orange-500 text-white" },
-  ENDODONCIA: { texto: "Tratamiento de conducto", clase: "bg-violet-500 text-white" },
-  OBTURADO: { texto: "Restaurada", clase: "bg-sky-500 text-white" },
+  CARIES: { texto: "Caries por tratar", clase: "bg-rose-500 text-[#FFFFFF]" },
+  EXTRACCION_INDICADA: { texto: "Extracción indicada", clase: "bg-orange-500 text-[#FFFFFF]" },
+  ENDODONCIA: { texto: "Tratamiento de conducto", clase: "bg-violet-500 text-[#FFFFFF]" },
+  OBTURADO: { texto: "Restaurada", clase: "bg-sky-500 text-[#FFFFFF]" },
   CORONA: { texto: "Corona", clase: "bg-amber-400 text-slate-900" },
-  IMPLANTE: { texto: "Implante", clase: "bg-aurora-primary text-white" },
+  IMPLANTE: { texto: "Implante", clase: "bg-aurora-primary text-[#FFFFFF]" },
   AUSENTE: { texto: "Ausente", clase: "bg-slate-300 text-slate-600" },
 };
 
@@ -61,15 +61,15 @@ const ESTADO_PLAN: Record<string, string> = {
 };
 
 const FASE: Record<string, string> = {
-  FASE_1_HIGIENE: "Limpieza y control de infeccion",
-  FASE_2_QUIRURGICA: "Conductos y cirugias",
-  FASE_3_REHABILITACION: "Rehabilitacion",
+  FASE_1_HIGIENE: "Limpieza y control de infección",
+  FASE_2_QUIRURGICA: "Conductos y cirugías",
+  FASE_3_REHABILITACION: "Rehabilitación",
 };
 
 const ESTUDIOS = [
-  { id: "PANORAMICA", nombre: "Radiografia panoramica" },
-  { id: "PERIAPICAL", nombre: "Radiografia de una pieza" },
-  { id: "TOMOGRAFIA", nombre: "Tomografia" },
+  { id: "PANORAMICA", nombre: "Radiografía panorámica" },
+  { id: "PERIAPICAL", nombre: "Radiografía de una pieza" },
+  { id: "TOMOGRAFIA", nombre: "Tomografía" },
   { id: "FOTOGRAFIA_CLINICA", nombre: "Foto de mi boca" },
   { id: "OTRO", nombre: "Otro estudio" },
 ];
@@ -153,7 +153,7 @@ function MapaDental({ hallazgos }: { hallazgos: Hallazgo[] }) {
             key={n}
             title={estado ? `Pieza ${n}: ${ESTADO_PIEZA[estado]?.texto || estado}` : `Pieza ${n}: sana`}
             className={`aspect-[3/4] rounded-md flex items-center justify-center text-[9px] font-semibold tabular-nums ${
-              estado ? ESTADO_PIEZA[estado]?.clase || "bg-slate-400 text-white" : "bg-teal-50 text-aurora-dark/50 border border-teal-100"
+              estado ? ESTADO_PIEZA[estado]?.clase || "bg-slate-400 text-[#FFFFFF]" : "bg-teal-50 text-aurora-dark/50 border border-teal-100"
             }`}
           >
             {n}
@@ -201,6 +201,8 @@ export default function PortalOdontologiaPaciente() {
   const [imagen, setImagen] = useState<{ titulo: string; archivo: string } | null>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
   const [tipo, setTipo] = useState("PANORAMICA");
+  // Si elige "Otro estudio", el paciente escribe cual es y ese nombre queda como titulo.
+  const [otroEstudio, setOtroEstudio] = useState("");
   const [subiendo, setSubiendo] = useState(false);
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
 
@@ -233,13 +235,13 @@ export default function PortalOdontologiaPaciente() {
 
   useEffect(() => {
     if (!token) {
-      setError("Para ver su historia dental escanee el codigo QR de su receta.");
+      setError("Para ver su historia dental, escanee el código QR de su receta.");
       return;
     }
     fetch(`/api/public/odontologia/portal/${token}/inicio`)
       .then(async (r) => {
         const d = await r.json().catch(() => null);
-        if (!r.ok) throw new Error(d?.message || "Este enlace no es valido o ya vencio. Pidale uno nuevo a su clinica.");
+        if (!r.ok) throw new Error(d?.message || "Este enlace no es válido o ya venció. Pídale uno nuevo a su clínica.");
         setInicio(d);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "No se pudo abrir el portal."));
@@ -247,8 +249,8 @@ export default function PortalOdontologiaPaciente() {
 
   const cargar = async (s: string) => {
     const r = await fetch(`/api/public/odontologia/portal/${token}`, { headers: cabeceras(s) });
-    if (r.status === 401) return cerrarSesion("Su sesion vencio. Confirme su identidad de nuevo.");
-    if (!r.ok) return setError("Este enlace no es valido o ya vencio. Pidale uno nuevo a su clinica.");
+    if (r.status === 401) return cerrarSesion("Su sesión venció. Confirme su identidad de nuevo.");
+    if (!r.ok) return setError("Este enlace no es válido o ya venció. Pídale uno nuevo a su clínica.");
     setDatos(await r.json());
   };
 
@@ -280,7 +282,7 @@ export default function PortalOdontologiaPaciente() {
 
   const verImagen = async (id: number, titulo: string) => {
     const r = await fetch(`/api/public/odontologia/portal/${token}/radiografias/${id}`, { headers: cabeceras(sesion) });
-    if (r.status === 401) return cerrarSesion("Su sesion vencio. Confirme su identidad de nuevo.");
+    if (r.status === 401) return cerrarSesion("Su sesión venció. Confirme su identidad de nuevo.");
     if (!r.ok) return setAviso({ ok: false, texto: "No se pudo abrir el estudio. Intente de nuevo." });
     const d = await r.json();
     setImagen({ titulo, archivo: d.archivo });
@@ -296,13 +298,18 @@ export default function PortalOdontologiaPaciente() {
       const r = await fetch(`/api/public/odontologia/portal/${token}/radiografias`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...cabeceras(sesion) },
-        body: JSON.stringify({ titulo: ESTUDIOS.find((x) => x.id === tipo)?.nombre, tipoEstudio: tipo, archivo: contenido }),
+        body: JSON.stringify({
+          titulo: tipo === "OTRO" ? otroEstudio.trim() : ESTUDIOS.find((x) => x.id === tipo)?.nombre,
+          tipoEstudio: tipo,
+          archivo: contenido,
+        }),
       });
-      if (r.status === 401) return cerrarSesion("Su sesion vencio. Confirme su identidad de nuevo.");
+      if (r.status === 401) return cerrarSesion("Su sesión venció. Confirme su identidad de nuevo.");
       const d = await r.json().catch(() => null);
       if (!r.ok) throw new Error(d?.message || "No se pudo enviar el archivo.");
       setAviso({ ok: true, texto: d?.mensaje || "Recibimos su estudio." });
       setArchivo(null);
+      setOtroEstudio("");
       if (sesion) cargar(sesion);
     } catch (err) {
       setAviso({ ok: false, texto: err instanceof Error ? err.message : "No se pudo enviar el archivo." });
@@ -337,7 +344,7 @@ export default function PortalOdontologiaPaciente() {
       <main className={`${fondo} flex items-center justify-center p-5`}>
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center space-y-3">
-            <div className="w-16 h-16 mx-auto rounded-[22px] bg-gradient-to-br from-aurora-primary to-aurora-dark text-white flex items-center justify-center shadow-lg shadow-teal-900/20">
+            <div className="w-16 h-16 mx-auto rounded-[22px] bg-gradient-to-br from-aurora-primary to-aurora-dark text-[#FFFFFF] flex items-center justify-center shadow-lg shadow-teal-900/20">
               <IconTooth size={30} />
             </div>
             <div>
@@ -355,8 +362,8 @@ export default function PortalOdontologiaPaciente() {
                   <IconLock size={18} />
                 </span>
                 <p className="text-sm text-slate-600">
-                  Para proteger su informacion, confirme que es usted.
-                  {esCedula ? " Escriba los ultimos 4 digitos de su cedula." : " Escriba su ano de nacimiento."}
+                  Para proteger su información, confirme que es usted.
+                  {esCedula ? " Escriba los últimos 4 dígitos de su cédula." : " Escriba su año de nacimiento."}
                 </p>
               </div>
               <input
@@ -366,15 +373,15 @@ export default function PortalOdontologiaPaciente() {
                 maxLength={4}
                 value={respuesta}
                 onChange={(e) => setRespuesta(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                aria-label={esCedula ? "Ultimos 4 digitos de su cedula" : "Ano de nacimiento"}
-                placeholder="0000"
-                className="w-full text-center text-3xl tracking-[0.5em] font-semibold tabular-nums py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-aurora-primary/40 focus:border-aurora-primary text-aurora-dark"
+                aria-label={esCedula ? "Últimos 4 dígitos de su cédula" : "Año de nacimiento"}
+                placeholder="· · · ·"
+                className="w-full text-center text-3xl tracking-[0.5em] font-semibold tabular-nums py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-aurora-primary/40 focus:border-aurora-primary text-aurora-dark placeholder:text-slate-300"
               />
               {errorVerif && <p className="text-sm text-rose-600 font-medium">{errorVerif}</p>}
               <button
                 type="submit"
                 disabled={respuesta.length !== 4 || verificando}
-                className="w-full py-3.5 rounded-2xl bg-aurora-primary hover:bg-teal-600 text-white font-semibold transition disabled:opacity-40"
+                className="w-full py-3.5 rounded-2xl bg-aurora-primary hover:bg-teal-600 text-[#FFFFFF] font-semibold transition disabled:opacity-40"
               >
                 {verificando ? "Verificando..." : "Entrar"}
               </button>
@@ -393,11 +400,11 @@ export default function PortalOdontologiaPaciente() {
 
   return (
     <main className={fondo}>
-      <header className="bg-gradient-to-br from-aurora-dark via-teal-800 to-aurora-primary text-white">
+      <header className="bg-gradient-to-br from-aurora-dark via-teal-800 to-aurora-primary text-[#FFFFFF]">
         <div className="max-w-xl mx-auto px-5 pt-8 pb-16">
           <div className="flex items-center justify-between">
             <p className="text-[11px] uppercase tracking-[0.18em] text-teal-100/90 font-semibold">{datos.clinica}</p>
-            <button type="button" onClick={() => cerrarSesion()} className="text-xs text-teal-100/90 hover:text-white underline-offset-2 hover:underline">
+            <button type="button" onClick={() => cerrarSesion()} className="text-xs text-teal-100/90 hover:text-[#FFFFFF] underline-offset-2 hover:underline">
               Salir
             </button>
           </div>
@@ -416,7 +423,7 @@ export default function PortalOdontologiaPaciente() {
               </span>
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Proxima cita</p>
+              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Próxima cita</p>
               <p className="font-semibold text-aurora-dark">
                 {fecha(proxima.fecha_cita)}, {proxima.hora_inicio.substring(0, 5)}
               </p>
@@ -427,7 +434,7 @@ export default function PortalOdontologiaPaciente() {
           </section>
         )}
 
-        <Tarjeta icono={<IconTooth size={16} />} titulo="Su diagnostico">
+        <Tarjeta icono={<IconTooth size={16} />} titulo="Su diagnóstico">
           <MapaDental hallazgos={datos.hallazgos} />
         </Tarjeta>
 
@@ -529,7 +536,7 @@ export default function PortalOdontologiaPaciente() {
                       {meds.map((m, k) => (
                         <li key={k} className="text-sm text-slate-700">
                           <span className="font-semibold">{m.medicamento}</span> · {m.posologia}
-                          {m.duracionDias ? ` por ${m.duracionDias} dias` : ""}
+                          {m.duracionDias ? ` por ${m.duracionDias} días` : ""}
                         </li>
                       ))}
                     </ul>
@@ -541,9 +548,9 @@ export default function PortalOdontologiaPaciente() {
           </Tarjeta>
         )}
 
-        <Tarjeta icono={<IconCalendar size={16} />} titulo="Sus radiografias y estudios">
+        <Tarjeta icono={<IconCalendar size={16} />} titulo="Sus radiografías y estudios">
           {datos.radiografias.length === 0 ? (
-            <p className="text-sm text-slate-500">Aun no hay estudios en su historia.</p>
+            <p className="text-sm text-slate-500">Aún no hay estudios en su historia.</p>
           ) : (
             <ul>
               {datos.radiografias.map((rx) => (
@@ -551,7 +558,7 @@ export default function PortalOdontologiaPaciente() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-700 truncate">{rx.titulo}</p>
                     <p className="text-xs text-slate-400">
-                      {fecha(rx.fecha_toma)} · {rx.origen === "PACIENTE" ? "Enviado por usted" : "Tomado en la clinica"}
+                      {fecha(rx.fecha_toma)} · {rx.origen === "PACIENTE" ? "Enviado por usted" : "Tomado en la clínica"}
                     </p>
                   </div>
                   <button
@@ -568,8 +575,8 @@ export default function PortalOdontologiaPaciente() {
 
           <form onSubmit={subir} className="rounded-2xl border border-dashed border-teal-200 bg-teal-50/40 p-4 space-y-3">
             <div>
-              <p className="text-sm font-semibold text-aurora-dark">Enviar un estudio a su odontologo</p>
-              <p className="text-xs text-slate-500 mt-0.5">Si se hizo una radiografia en otro lugar, tomele una foto o suba el PDF.</p>
+              <p className="text-sm font-semibold text-aurora-dark">Enviar un estudio a su odontólogo</p>
+              <p className="text-xs text-slate-500 mt-0.5">Si se hizo una radiografía en otro lugar, tómele una foto o suba el PDF.</p>
             </div>
             <select
               value={tipo}
@@ -583,6 +590,16 @@ export default function PortalOdontologiaPaciente() {
                 </option>
               ))}
             </select>
+            {tipo === "OTRO" && (
+              <input
+                type="text"
+                value={otroEstudio}
+                onChange={(e) => setOtroEstudio(e.target.value.slice(0, 120))}
+                placeholder="¿Qué estudio es? Ej: Resonancia de ATM"
+                aria-label="Nombre del estudio"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-aurora-primary/30"
+              />
+            )}
             <label className="flex items-center justify-center gap-2 w-full px-3 py-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 cursor-pointer hover:border-aurora-primary/50 transition">
               <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
               <span className="truncate">{archivo ? archivo.name : "Elegir foto o PDF"}</span>
@@ -590,8 +607,8 @@ export default function PortalOdontologiaPaciente() {
             {aviso && <p className={`text-sm font-medium ${aviso.ok ? "text-aurora-primary" : "text-rose-600"}`}>{aviso.texto}</p>}
             <button
               type="submit"
-              disabled={!archivo || subiendo}
-              className="w-full py-3 rounded-xl bg-aurora-primary hover:bg-teal-600 text-white text-sm font-semibold transition disabled:opacity-40"
+              disabled={!archivo || subiendo || (tipo === "OTRO" && !otroEstudio.trim())}
+              className="w-full py-3 rounded-xl bg-aurora-primary hover:bg-teal-600 text-[#FFFFFF] text-sm font-semibold transition disabled:opacity-40"
             >
               {subiendo ? "Enviando..." : "Enviar estudio"}
             </button>
@@ -605,7 +622,7 @@ export default function PortalOdontologiaPaciente() {
 
       {imagen && (
         <div className="fixed inset-0 z-50 bg-aurora-dark/95 backdrop-blur-sm flex flex-col" onClick={() => setImagen(null)}>
-          <div className="flex justify-between items-center gap-3 p-4 text-white">
+          <div className="flex justify-between items-center gap-3 p-4 text-[#FFFFFF]">
             <span className="font-medium truncate">{imagen.titulo}</span>
             <button type="button" className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-sm">
               Cerrar

@@ -38,7 +38,7 @@ export default function PortalPacienteOdontoModal({ paciente, clinicaNombre, onC
       await navigator.clipboard.writeText(enlace.url);
       setAviso("Enlace copiado.");
     } catch {
-      setAviso("No se pudo copiar; seleccionalo a mano.");
+      setAviso("No se pudo copiar; selecciónalo a mano.");
     }
   };
 
@@ -61,9 +61,9 @@ export default function PortalPacienteOdontoModal({ paciente, clinicaNombre, onC
         onClick={(e) => e.stopPropagation()}
       >
         <div>
-          <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Portal del paciente</h4>
+          <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-[#FFFFFF]">Portal del paciente</h4>
           <p className="text-slate-500 dark:text-slate-400">
-            {paciente.nombreCompleto} vera su diagnostico, plan, citas y recetas, y podra enviarte sus radiografias.
+            {paciente.nombreCompleto} verá su diagnóstico, plan, citas y recetas, y podrá enviarte sus radiografías.
           </p>
         </div>
 
@@ -71,9 +71,9 @@ export default function PortalPacienteOdontoModal({ paciente, clinicaNombre, onC
 
         {enlace && (
           <>
-            <img src={enlace.qrPng} alt="Codigo QR del portal del paciente" className="w-48 h-48 mx-auto bg-white p-2 rounded-xl" />
+            <img src={enlace.qrPng} alt="Código QR del portal del paciente" className="w-48 h-48 mx-auto bg-white p-2 rounded-xl" />
             <p className="text-center text-slate-500 dark:text-slate-400">
-              Valido hasta el {new Date(enlace.expira).toLocaleDateString("es-VE")}
+              Válido hasta el {new Date(enlace.expira).toLocaleDateString("es-VE")}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={copiar} className="p-2 rounded-xl border border-slate-300 dark:border-white/15 font-semibold">
@@ -85,10 +85,10 @@ export default function PortalPacienteOdontoModal({ paciente, clinicaNombre, onC
                 onClick={() =>
                   abrirWhatsAppDirecto(
                     paciente.telefono || "",
-                    `Hola ${paciente.nombreCompleto}, desde ${clinicaNombre || "su clinica"} le compartimos su historia dental: ${enlace.url}`
+                    `Hola ${paciente.nombreCompleto}, desde ${clinicaNombre || "su clínica"} le compartimos su historia dental: ${enlace.url}`
                   )
                 }
-                className="p-2 rounded-xl bg-emerald-600 text-white font-bold disabled:opacity-50"
+                className="p-2 rounded-xl bg-emerald-600 text-[#FFFFFF] font-bold disabled:opacity-50"
               >
                 Enviar por WhatsApp
               </button>
