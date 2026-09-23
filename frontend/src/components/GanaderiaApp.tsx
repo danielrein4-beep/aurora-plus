@@ -4,6 +4,8 @@ import ModalImportarHato from "./ModalImportarHato";
 import TenantSoporteWidget from "./TenantSoporteWidget";
 import EngordeGanadero from "./EngordeGanadero";
 import SociedadesCeba from "./SociedadesCeba";
+import ModalVentaAnimales, { type ModoVenta } from "./ganaderia/ModalVentaAnimales";
+import ModalJornadaOrdeno, { vacasDeOrdeno } from "./ganaderia/ModalJornadaOrdeno";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
@@ -197,7 +199,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const guardarPrecioLeche = (nuevoPrecio: number) => {
     setPrecioLecheUSD(nuevoPrecio);
     setFormOrdeno(prev => ({ ...prev, precioVentaLitro: nuevoPrecio }));
-    setVaqueraPrecioUSD(nuevoPrecio);
     try {
       localStorage.setItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`, String(nuevoPrecio));
     } catch {}
@@ -210,7 +211,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const guardarTasas = (nuevaBcv: number, nuevaCop: number, vesActivo?: boolean, copActivo?: boolean) => {
     setTasaBCV(nuevaBcv);
     setTasaCOP(nuevaCop);
-    setVaqueraTasaVES(nuevaBcv);
     if (vesActivo !== undefined && copActivo !== undefined) {
       guardarMonedasConfig(vesActivo, copActivo);
     }
@@ -242,7 +242,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [ventasLeche, setVentasLeche] = useState<VentaLecheTanque[]>([]);
   const [modalVentaLeche, setModalVentaLeche] = useState(false);
   const [modalAjusteTanque, setModalAjusteTanque] = useState(false);
-  const [vaqueraDestino, setVaqueraDestino] = useState<"TANQUE" | "VENTA_DIRECTA">("TANQUE");
 
   const [formVentaLeche, setFormVentaLeche] = useState({
     fecha: fechaLocalISO(),
@@ -320,7 +319,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [modalCelo, setModalCelo] = useState(false);
   const [modalMastitis, setModalMastitis] = useState(false);
   const [modalFichaAnimal, setModalFichaAnimal] = useState<AnimalGanaderia | null>(null);
-  const [modalVentaAnimal, setModalVentaAnimal] = useState(false);
+  const [ventaAbierta, setVentaAbierta] = useState<ModoVenta | null>(null);
   const [modalEditarAnimal, setModalEditarAnimal] = useState<AnimalGanaderia | null>(null);
   const [modalDatosFiscales, setModalDatosFiscales] = useState(false);
   const [formDatosFiscales, setFormDatosFiscales] = useState({ rif: "", razonSocial: "", domicilioFiscal: "" });
@@ -380,26 +379,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     notas: "Cuarto posterior derecho caliente y reactivo al reactivo California Mastitis Test (CMT).",
   });
 
-  // Formulario de Venta / Beneficio
-  const [formVenta, setFormVenta] = useState({
-    animalId: 0,
-    comprador: "",
-    precioUSD: 0,
-    precioPorKg: 0,
-    pesoSalida: 0,
-    motivo: "BENEFICIO",
-  });
-  const [ventaModo, setVentaModo] = useState<"INDIVIDUAL" | "MULTIPLE">("INDIVIDUAL");
-  const [animalesVentaSeleccionados, setAnimalesVentaSeleccionados] = useState<number[]>([]);
-  // Venta en lote: filtro por arete/nombre y peso de báscula por animal (precargado con el del sistema).
-  const [busquedaVenta, setBusquedaVenta] = useState("");
-  const [pesosVenta, setPesosVenta] = useState<Record<number, string>>({});
-  /** Peso con el que se vende: el de báscula si se escribió, si no el del sistema. */
-  const pesoVentaDe = (id: number) => {
-    const escrito = Number(String(pesosVenta[id] ?? "").replace(",", "."));
-    return escrito > 0 ? escrito : (animales.find(a => a.id === id)?.pesoActual || 0);
-  };
-  const [ultimaVentaId, setUltimaVentaId] = useState<number | null>(null);
   const [ultimoDespachoLecheId, setUltimoDespachoLecheId] = useState<number | null>(null);
 
   // Formulario nuevo potrero con color distintivo (estilo GanSoft)
@@ -417,22 +396,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Si tiene valor, el modal de "Agregar Potrero" edita ese potrero en vez de crear uno nuevo.
   const [potreroEditandoId, setPotreroEditandoId] = useState<number | null>(null);
 
-  // Estados para Modo Vaquera Rápida (Bulk Entry de Ordeño Diario)
-  const [modalVaqueraRapida, setModalVaqueraRapida] = useState(false);
-  const [busquedaVaquera, setBusquedaVaquera] = useState("");
-  const [vaqueraFecha, setVaqueraFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [vaqueraTurno, setVaqueraTurno] = useState<"MANANA" | "TARDE" | "DOBLE">("MANANA");
-  const [vaqueraPrecioUSD, setVaqueraPrecioUSD] = useState<number>(0.45);
-  const [vaqueraTasaVES, setVaqueraTasaVES] = useState<number>(tasaBCV);
-  const [vaqueraFilas, setVaqueraFilas] = useState<Array<{
-    animalId: number;
-    arete: string;
-    nombre: string;
-    litrosManana: number | string;
-    litrosTarde: number | string;
-    estado: "NORMAL" | "MASTITIS" | "CALOSTRO" | "SECA";
-    notas: string;
-  }>>([]);
+  // Modo vaquera rápida (jornada de ordeño de todo el rebaño): ver ganaderia/ModalJornadaOrdeno
+  const [vaqueraAbierta, setVaqueraAbierta] = useState(false);
 
   // Formulario rotación
   const [potreroDestinoId, setPotreroDestinoId] = useState<number>(0);
@@ -878,105 +843,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   };
 
   // Abre la venta de animales; "MULTIPLE" = vender un lote seleccionando varios animales.
-  const abrirVentaAnimales = (modo: "INDIVIDUAL" | "MULTIPLE") => {
-    const activos = animales.filter(a => a.estado === "ACTIVO" || !a.estado);
-    if (activos.length > 0) {
-      setFormVenta({
-        animalId: activos[0].id,
-        comprador: "",
-        precioUSD: 0,
-        precioPorKg: 0,
-        pesoSalida: activos[0].pesoActual || 0,
-        motivo: "BENEFICIO",
-      });
-    }
-    setVentaModo(modo);
-    setAnimalesVentaSeleccionados([]);
-    setBusquedaVenta("");
-    setPesosVenta({});
-    setUltimaVentaId(null);
-    setModalVentaAnimal(true);
-  };
-
-  // Manejador: Despacho por Venta / Beneficio (POST /api/ganaderia/ventas a través de VentaAnimalController)
-  const handleRegistrarVentaAnimal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const idsVenta = ventaModo === "INDIVIDUAL"
-      ? (formVenta.animalId ? [Number(formVenta.animalId)] : [])
-      : animalesVentaSeleccionados;
-
-    if (idsVenta.length === 0 || !formVenta.comprador.trim()) return;
-
-    const animalesAVender = idsVenta.map(id => animales.find(a => a.id === id)).filter(Boolean) as AnimalGanaderia[];
-
-    // Precio por animal: si se indicó precio/kg, se calcula peso propio × precio/kg
-    // (así se vende "por kilo" real, cada uno con su peso); si no, en modo individual
-    // se usa el precio total tal cual, y en lote se reparte el precio total en partes iguales.
-    const precioPorAnimal = (id: number): number => {
-      const peso = ventaModo === "INDIVIDUAL" ? (Number(formVenta.pesoSalida) || animales.find(a => a.id === id)?.pesoActual || 0) : pesoVentaDe(id);
-      if (formVenta.precioPorKg > 0 && peso > 0) {
-        return Number((peso * formVenta.precioPorKg).toFixed(2));
-      }
-      if (ventaModo === "INDIVIDUAL") return Number(formVenta.precioUSD) || 0;
-      return Number((Number(formVenta.precioUSD) / idsVenta.length).toFixed(2));
-    };
-
-    if (!formVenta.precioPorKg && !formVenta.precioUSD) {
-      notificar("Indica un precio total o un precio por kilo para calcular la venta.");
-      return;
-    }
-
-    try {
-      // 1. Si se registró nuevo peso en báscula antes del despacho (solo modo individual), actualizar peso del animal
-      // El peso de báscula al vender se guarda como pesaje: cierra la curva de engorde del animal.
-      const fechaVenta = fechaLocalISO();
-      if (ventaModo === "INDIVIDUAL" && formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0
-          && Number(formVenta.pesoSalida) !== animales.find(a => a.id === formVenta.animalId)?.pesoActual) {
-        await registrarPesoGanaderia(tenantId, formVenta.animalId, Number(formVenta.pesoSalida), fechaVenta);
-      }
-      if (ventaModo === "MULTIPLE") {
-        for (const id of idsVenta) {
-          const peso = pesoVentaDe(id);
-          if (peso > 0 && peso !== animales.find(a => a.id === id)?.pesoActual) {
-            await registrarPesoGanaderia(tenantId, id, peso, fechaVenta);
-          }
-        }
-      }
-
-      // 2. Registrar la venta oficial en el backend con VentaAnimalController (guarda comprador, precio,
-      // ticket y marca cada animal como VENDIDO en un solo servicio transaccional — soporta lote completo)
-      const ticket = `VTA-${Date.now().toString().slice(-6)}`;
-      const ventaCreada = await registrarVentaGanaderia({
-        numeroTicket: ticket,
-        comprador: `${formVenta.comprador.trim()} [${formVenta.motivo}]`,
-        items: idsVenta.map(id => ({
-          animalId: id,
-          precioVenta: precioPorAnimal(id),
-        })),
-      });
-
-      // 3. Reflejar inmediatamente en el estado local: animales marcados como VENDIDO y sin potrero asignado
-      setAnimales(prev => prev.map(a => idsVenta.includes(a.id) ? { ...a, estado: "VENDIDO", potrero: undefined } : a));
-      notificar(`Venta registrada exitosamente (Ticket ${ticket}). ${animalesAVender.length} animal(es) despachado(s) y liquidado(s).`);
-      setUltimaVentaId(ventaCreada?.id ?? null);
-    } catch (err: any) {
-      const msg = err?.message || "Revisa tu conexión e inténtalo de nuevo";
-      notificar(`No se pudo procesar la venta: ${msg}`);
-      return;
-    }
-
-    setFormVenta({
-      animalId: 0,
-      comprador: "",
-      precioUSD: 0,
-      precioPorKg: 0,
-      pesoSalida: 0,
-      motivo: "BENEFICIO",
-    });
-    setAnimalesVentaSeleccionados([]);
-    setPesosVenta({});
-  };
-
+  const abrirVentaAnimales = (modo: ModoVenta) => setVentaAbierta(modo);
   // Manejador: Registrar Celo (Evento Reproductivo dedicado)
   const handleGuardarCelo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1131,92 +998,27 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Abrir Modo Vaquera Rápida (Bulk Entry de Ordeño)
   const abrirVaqueraRapida = () => {
-    const vacas = animalesActivos.filter(a => a.sexo === "HEMBRA" && (a.tipoAnimal === "VACA" || a.tipoAnimal === "NOVILLA"));
-    if (vacas.length === 0) {
+    if (vacasDeOrdeno(animalesActivos).length === 0) {
       notificar("No hay vacas u novillas registradas en el hato todavía. Da de alta tus animales antes de usar Vaquera Rápida.");
       return;
     }
-
-    const filas = vacas.map((v) => ({
-      animalId: v.id,
-      arete: v.arete,
-      nombre: v.nombre || `Vaca ${v.arete}`,
-      litrosManana: "",
-      litrosTarde: "",
-      estado: "NORMAL" as const,
-      notas: "",
-    }));
-
-    setVaqueraFilas(filas);
-    setBusquedaVaquera("");
-    setModalVaqueraRapida(true);
+    setVaqueraAbierta(true);
   };
 
-  // Guardar Jornada de Ordeño en Lote desde Modo Vaquera Rápida
-  const guardarJornadaVaquera = async () => {
-    const filasValidas = vaqueraFilas.filter(f => Number(f.litrosManana) > 0 || Number(f.litrosTarde) > 0);
-    if (filasValidas.length === 0) {
-      notificar("No se ingresaron litros en ninguna vaca.");
-      return;
-    }
-
-    let mastitisCount = 0;
-    let litrosComercialesTotal = 0;
-    const nuevosOrdenos: RegistroOrdenoGanaderia[] = [];
-    const fallidas: string[] = [];
-
-    for (const f of filasValidas) {
-      const litrosTotales = (Number(f.litrosManana) || 0) + (Number(f.litrosTarde) || 0);
-      const esComercial = f.estado !== "MASTITIS";
-
-      try {
-        const reg = await registrarOrdenoGanaderia(tenantId, {
-          animalId: f.animalId,
-          fecha: vaqueraFecha,
-          turno: vaqueraTurno === "DOBLE" ? "MANANA" : vaqueraTurno,
-          cantidadLitros: litrosTotales,
-          precioVentaLitro: vaqueraPrecioUSD,
-          porcentajeGrasa: 3.8,
-          porcentajeProteina: 3.2,
-          destino: vaqueraDestino,
-        });
-        nuevosOrdenos.push(reg);
-        if (f.estado === "MASTITIS") {
-          mastitisCount++;
-        } else {
-          litrosComercialesTotal += litrosTotales;
-        }
-      } catch {
-        fallidas.push(f.arete);
-      }
-    }
-
+  // Jornada guardada: suma los ordeños a la lista y los litros comerciales al tanque.
+  const alGuardarJornada = (nuevosOrdenos: RegistroOrdenoGanaderia[], litrosAlTanque: number) => {
     setOrdenos(prev => [...nuevosOrdenos, ...prev]);
-
-    if (vaqueraDestino === "TANQUE") {
+    if (litrosAlTanque > 0) {
       setTanqueLeche(prev => prev ? {
         ...prev,
-        stockActualLitros: (Number(prev.stockActualLitros) || 0) + litrosComercialesTotal
+        stockActualLitros: (Number(prev.stockActualLitros) || 0) + litrosAlTanque
       } : {
         id: 1,
         tenantId,
-        stockActualLitros: litrosComercialesTotal,
+        stockActualLitros: litrosAlTanque,
         capacidadLitros: 2000,
         temperaturaCelsius: 4.0
       });
-    }
-
-    setModalVaqueraRapida(false);
-
-    const ingresoUSD = (litrosComercialesTotal * vaqueraPrecioUSD).toFixed(2);
-    const destinoLabel = vaqueraDestino === "TANQUE" ? "almacenados en tanque" : "venta directa";
-
-    if (fallidas.length > 0) {
-      notificar(`Se guardaron ${nuevosOrdenos.length} de ${filasValidas.length} registros. No se pudo registrar: ${fallidas.join(", ")} — revisa tu conexión e inténtalo de nuevo con esas vacas.`);
-    } else if (mastitisCount > 0) {
-      notificar(`Jornada guardada: ${litrosComercialesTotal.toFixed(1)} L comerciales (${destinoLabel}). ¡Atención! ${mastitisCount} vaca(s) aislada(s) con Mastitis.`);
-    } else {
-      notificar(`Jornada registrada: ${litrosComercialesTotal.toFixed(1)} L recolectados (${destinoLabel}) por $${ingresoUSD} USD.`);
     }
   };
 
@@ -6780,692 +6582,33 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* MODAL: REGISTRO DE VENTA / DESPACHO DE ANIMAL (individual o lote, por precio total o por kilo) */}
-      {modalVentaAnimal && (() => {
-        const animalesActivosVenta = animales.filter(a => a.estado === "ACTIVO");
-        const idsSeleccionados = ventaModo === "INDIVIDUAL"
-          ? (formVenta.animalId ? [formVenta.animalId] : [])
-          : animalesVentaSeleccionados;
-        const pesoTotalSeleccion = ventaModo === "INDIVIDUAL"
-          ? (Number(formVenta.pesoSalida) || animales.find(a => a.id === formVenta.animalId)?.pesoActual || 0)
-          : idsSeleccionados.reduce((sum, id) => sum + pesoVentaDe(id), 0);
-        const termino = busquedaVenta.trim().toLowerCase();
-        const animalesVentaFiltrados = termino
-          ? animalesActivosVenta.filter(a =>
-              a.arete.toLowerCase().includes(termino) ||
-              (a.nombre || "").toLowerCase().includes(termino) ||
-              (a.raza || "").toLowerCase().includes(termino) ||
-              (a.tipoAnimal || "").toLowerCase().includes(termino))
-          : animalesActivosVenta;
-        const totalEstimado = formVenta.precioPorKg > 0
-          ? pesoTotalSeleccion * formVenta.precioPorKg
-          : Number(formVenta.precioUSD) || 0;
-
-        return (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/30 text-left space-y-4 my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div>
-                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
-                  <IconTag size={16} />
-                  <span>Despacho por Venta / Beneficio</span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-white/60 mt-1">
-                  Registra la salida formal (uno o varios animales) y márcalos como vendidos en el hato.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setModalVentaAnimal(false); setUltimaVentaId(null); }}
-                className="text-slate-400 hover:text-white cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            {ultimaVentaId ? (
-              <div className="space-y-4 text-xs text-center py-4">
-                <div className="text-emerald-400 flex flex-col items-center gap-2">
-                  <IconCheckCircle size={36} />
-                  <span className="font-bold text-sm text-white">Venta registrada correctamente</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const blob = await descargarNotaEntregaVentaAnimalPdf(tenantId, ultimaVentaId);
-                      const url = URL.createObjectURL(blob);
-                      window.open(url, "_blank");
-                      setTimeout(() => URL.revokeObjectURL(url), 30000);
-                    } catch (e) {
-                      notificar("No se pudo descargar la nota de entrega");
-                    }
-                  }}
-                  className="btn-cyber-neon text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer inline-flex items-center gap-2">
-                  <IconDownload size={14} />
-                  Descargar Nota de Entrega (PDF)
-                </button>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => { setModalVentaAnimal(false); setUltimaVentaId(null); }}
-                    className="text-slate-400 hover:text-white text-[11px] underline cursor-pointer">
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            ) : (
-            <form onSubmit={handleRegistrarVentaAnimal} className="space-y-3 text-xs">
-              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10 w-fit">
-                <button
-                  type="button"
-                  onClick={() => setVentaModo("INDIVIDUAL")}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                    ventaModo === "INDIVIDUAL" ? "bg-teal-700 !text-white shadow-sm" : "text-slate-400 hover:text-white"
-                  }`}>
-                  Individual
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVentaModo("MULTIPLE")}
-                  className={`px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
-                    ventaModo === "MULTIPLE" ? "bg-teal-700 !text-white shadow-sm" : "text-slate-400 hover:text-white"
-                  }`}>
-                  Lote / Varios Animales
-                </button>
-              </div>
-
-              {ventaModo === "INDIVIDUAL" ? (
-                <div>
-                  <label className="text-slate-400 block mb-1">Animal a Despachar *</label>
-                  <select
-                    required
-                    value={formVenta.animalId}
-                    onChange={e => {
-                      const selId = Number(e.target.value);
-                      const animalObj = animales.find(a => a.id === selId);
-                      setFormVenta({
-                        ...formVenta,
-                        animalId: selId,
-                        pesoSalida: animalObj?.pesoActual || formVenta.pesoSalida,
-                      });
-                    }}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold"
-                  >
-                    <option value="">Selecciona un animal activo...</option>
-                    {animalesActivosVenta.map(a => (
-                      <option key={a.id} value={a.id}>
-                        {a.arete} - {a.nombre || a.tipoAnimal} ({a.pesoActual || 0} kg)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-slate-400 block">Animales a Despachar *</label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const idsFiltro = animalesVentaFiltrados.map(a => a.id);
-                        const todosMarcados = idsFiltro.length > 0 && idsFiltro.every(id => animalesVentaSeleccionados.includes(id));
-                        setAnimalesVentaSeleccionados(prev => todosMarcados
-                          ? prev.filter(id => !idsFiltro.includes(id))
-                          : [...new Set([...prev, ...idsFiltro])]);
-                      }}
-                      className="text-[11px] font-bold text-teal-700 hover:text-teal-900 cursor-pointer">
-                      {animalesVentaFiltrados.length > 0 && animalesVentaFiltrados.every(a => animalesVentaSeleccionados.includes(a.id))
-                        ? "Desmarcar los mostrados"
-                        : `Marcar los mostrados (${animalesVentaFiltrados.length})`}
-                    </button>
-                  </div>
-                  <input
-                    type="search"
-                    value={busquedaVenta}
-                    onChange={e => setBusquedaVenta(e.target.value)}
-                    placeholder="Buscar por número de arete, nombre, raza o tipo..."
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:border-teal-600 focus:outline-none"
-                  />
-                  <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 space-y-0.5">
-                    {animalesVentaFiltrados.length === 0 && (
-                      <div className="p-3 text-center text-[11px] text-slate-500">Ningún animal coincide con “{busquedaVenta}”.</div>
-                    )}
-                    {animalesVentaFiltrados.map(a => {
-                      const isSel = animalesVentaSeleccionados.includes(a.id);
-                      return (
-                        <div key={a.id} className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-[11px] transition-colors ${
-                          isSel ? "bg-teal-50 text-slate-900 font-semibold" : "hover:bg-slate-50 text-slate-700"
-                        }`}>
-                          <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={isSel}
-                              onChange={e => setAnimalesVentaSeleccionados(prev =>
-                                e.target.checked ? [...prev, a.id] : prev.filter(id => id !== a.id)
-                              )}
-                              className="rounded accent-teal-700 focus:ring-0"
-                            />
-                            <span className="font-mono text-teal-800">{a.arete}</span>
-                            <span className="truncate">{a.nombre || a.tipoAnimal}{a.raza ? ` · ${a.raza}` : ""}</span>
-                          </label>
-                          {isSel ? (
-                            <div className="flex items-center gap-1 flex-shrink-0" title="Peso en báscula al momento de la venta">
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={pesosVenta[a.id] ?? String(a.pesoActual || "")}
-                                onFocus={e => e.target.select()}
-                                onChange={e => setPesosVenta(prev => ({ ...prev, [a.id]: e.target.value }))}
-                                className="w-20 px-2 py-1 rounded-md border border-slate-300 bg-white text-right font-mono text-[11px] text-slate-900 focus:border-teal-600 focus:outline-none"
-                              />
-                              <span className="text-[10px] text-slate-500">kg</span>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 flex-shrink-0">{a.pesoActual || 0} kg</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    Al marcar un animal se muestra su peso del sistema; cámbielo si lo pesó en báscula al vender. El nuevo peso queda guardado en su ficha.
-                  </div>
-                  <div className="text-[11px] text-right font-bold text-teal-800">
-                    {animalesVentaSeleccionados.length} animal(es) · {pesoTotalSeleccion} kg total
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="text-slate-400 block mb-1">Comprador / Frigorífico / Destino *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Matadero Frigorífico Central / Ganadería La Gloria"
-                  value={formVenta.comprador}
-                  onChange={e => setFormVenta({ ...formVenta, comprador: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-medium"
-                />
-              </div>
-
-              {ventaModo === "INDIVIDUAL" && (
-                <div>
-                  <label className="text-slate-400 block mb-1">Peso en Báscula (kg)</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="1"
-                    min="0"
-                    placeholder="Ej. 480"
-                    value={formVenta.pesoSalida || ""}
-                    onChange={e => setFormVenta({ ...formVenta, pesoSalida: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
-                  />
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Precio por Kilo (USD)</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.01"
-                    min="0"
-                    placeholder="Ej. 2.20"
-                    value={formVenta.precioPorKg || ""}
-                    onChange={e => setFormVenta({ ...formVenta, precioPorKg: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-emerald-300 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">
-                    Precio Total (USD) {formVenta.precioPorKg > 0 ? "(calculado)" : "*"}
-                  </label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.01"
-                    min="0"
-                    required={!formVenta.precioPorKg}
-                    disabled={formVenta.precioPorKg > 0}
-                    placeholder="Ej. 1100"
-                    value={formVenta.precioPorKg > 0 ? totalEstimado.toFixed(2) : (formVenta.precioUSD || "")}
-                    onChange={e => setFormVenta({ ...formVenta, precioUSD: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono disabled:opacity-60"
-                  />
-                </div>
-              </div>
-              {formVenta.precioPorKg > 0 && (
-                <p className="text-[10px] text-emerald-400 -mt-1">
-                  {pesoTotalSeleccion} kg × ${formVenta.precioPorKg}/kg = ${totalEstimado.toFixed(2)} USD
-                  {ventaModo === "MULTIPLE" ? " (repartido por el peso real de cada animal)" : ""}
-                </p>
-              )}
-
-              <div>
-                <label className="text-slate-400 block mb-1">Motivo / Tipo de Salida</label>
-                <select
-                  value={formVenta.motivo}
-                  onChange={e => setFormVenta({ ...formVenta, motivo: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
-                >
-                  <option value="BENEFICIO">Venta para Beneficio / Matadero (Carne)</option>
-                  <option value="CRIA">Venta para Cría / Hato Comercial</option>
-                  <option value="SUBASTA">Subasta Ganadera</option>
-                </select>
-              </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModalVentaAnimal(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 !text-white font-bold cursor-pointer transition-colors shadow-sm">
-                  Confirmar Salida por Venta
-                </button>
-              </div>
-            </form>
-            )}
-          </div>
-        </div>
-        );
-      })()}
+      {ventaAbierta && (
+        <ModalVentaAnimales
+          modoInicial={ventaAbierta}
+          animales={animales}
+          tenantId={tenantId}
+          notificar={notificar}
+          onVendidos={ids => setAnimales(prev => prev.map(a => ids.includes(a.id) ? { ...a, estado: "VENDIDO", potrero: undefined } : a))}
+          onCerrar={() => setVentaAbierta(null)}
+        />
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           MODAL: MODO VAQUERA RÁPIDA (BULK ENTRY DE ORDEÑO DIARIO)
       ───────────────────────────────────────────────────────────── */}
-      {modalVaqueraRapida && (() => {
-        const totalVacasFila = vaqueraFilas.length;
-        const vacasConLitros = vaqueraFilas.filter(f => Number(f.litrosManana) > 0 || Number(f.litrosTarde) > 0).length;
-        const totalLitrosTodos = vaqueraFilas.reduce((s, f) => s + (Number(f.litrosManana) || 0) + (Number(f.litrosTarde) || 0), 0);
-        const litrosMastitis = vaqueraFilas
-          .filter(f => f.estado === "MASTITIS")
-          .reduce((s, f) => s + (Number(f.litrosManana) || 0) + (Number(f.litrosTarde) || 0), 0);
-        const litrosComerciales = Math.max(0, totalLitrosTodos - litrosMastitis);
-        const promedioPorVaca = vacasConLitros > 0 ? (totalLitrosTodos / vacasConLitros) : 0;
-        const ingresoUSD = (litrosComerciales * vaqueraPrecioUSD).toFixed(2);
-        const ingresoVES = (litrosComerciales * vaqueraPrecioUSD * vaqueraTasaVES).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-        return (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto">
-            <div className="apple-glass rounded-3xl p-5 sm:p-7 max-w-5xl w-full border border-emerald-500/40 bg-slate-950/95 shadow-2xl text-left space-y-5 my-auto max-h-[92vh] flex flex-col font-['Inter']">
-              
-              {/* Cabecera del Modal */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-extrabold uppercase">
-                    <span>Modo Vaquera Rápida • Carga Masiva</span>
-                  </div>
-                  <h3 className="font-['Outfit'] font-black text-xl sm:text-2xl text-white mt-1">
-                    Pesaje Diario de Leche
-                  </h3>
-                  <p className="text-slate-400 text-xs mt-0.5">
-                    Usa las teclas <strong>ENTER</strong> o <strong>TAB</strong> para registrar vaca tras vaca sin despegar las manos del teclado.
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setModalVaqueraRapida(false)}
-                  className="w-8 h-8 rounded-full apple-glass border border-white/10 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer">
-                  ✕
-                </button>
-              </div>
-
-              {/* Barra Superior de Parámetros Económicos y de Jornada */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 text-xs">
-                <div>
-                  <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Fecha</label>
-                  <input
-                    type="date"
-                    value={vaqueraFecha}
-                    onChange={e => setVaqueraFecha(e.target.value)}
-                    className="w-full p-2 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Turno</label>
-                  <div className="flex gap-1">
-                    {(["MANANA", "TARDE", "DOBLE"] as const).map(t => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setVaqueraTurno(t)}
-                        className={`flex-1 py-2 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                          vaqueraTurno === t ? "bg-emerald-500 text-slate-950 font-black shadow-md" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                        }`}>
-                        {t === "MANANA" ? "AM" : t === "TARDE" ? "PM" : "Doble"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Destino Leche</label>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setVaqueraDestino("TANQUE")}
-                      className={`flex-1 py-2 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                        vaqueraDestino === "TANQUE" ? "bg-sky-500 text-slate-950 font-black shadow-md" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                      }`}>
-                      <span className="inline-flex items-center gap-1"><IconMilk size={11} /> Tanque</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setVaqueraDestino("VENTA_DIRECTA")}
-                      className={`flex-1 py-2 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                        vaqueraDestino === "VENTA_DIRECTA" ? "bg-amber-500 text-slate-950 font-black shadow-md" : "bg-white/5 text-slate-300 hover:bg-white/10"
-                      }`}>
-                      <span className="inline-flex items-center gap-1"><IconBolt size={11} /> Directa</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Precio Leche ($/L)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-emerald-400 font-bold">$</span>
-                    <input
-                      type="number"
-                      onFocus={e => e.target.select()}
-                      step="0.01"
-                      value={vaqueraPrecioUSD}
-                      onChange={e => setVaqueraPrecioUSD(Math.max(0, Number(e.target.value)))}
-                      className="w-full p-2 pl-7 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-slate-400 block text-[10px] uppercase font-bold mb-1">
-                    {monedasConfig.VES ? "Tasa Cambio (Bs.)" : monedasConfig.COP ? "Tasa Cambio (COP)" : "Moneda Base"}
-                  </label>
-                  {monedasConfig.VES ? (
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-purple-400 font-bold">Bs.</span>
-                      <input
-                        type="number"
-                        onFocus={e => e.target.select()}
-                        step="0.5"
-                        value={vaqueraTasaVES}
-                        onChange={e => setVaqueraTasaVES(Math.max(1, Number(e.target.value)))}
-                        className="w-full p-2 pl-9 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
-                      />
-                    </div>
-                  ) : monedasConfig.COP ? (
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-sky-400 font-bold text-[10px]">COP</span>
-                      <input
-                        type="number"
-                        onFocus={e => e.target.select()}
-                        step="10"
-                        value={tasaCOP}
-                        readOnly
-                        className="w-full p-2 pl-11 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
-                      />
-                    </div>
-                  ) : (
-                    <div className="p-2 rounded-xl bg-slate-900 border border-white/15 text-slate-400 font-mono text-xs">
-                      USD ($) Fijo
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Tarjetas de Totales en Tiempo Real (Apple Liquid Glass) */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-0.5">
-                  <span className="text-slate-400 text-[10px] uppercase block">Vacas Ordeñadas</span>
-                  <div className="font-['Outfit'] font-bold text-xl text-white">
-                    {vacasConLitros} <span className="text-slate-500 text-xs font-normal">/ {totalVacasFila}</span>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-sky-500/30 space-y-0.5">
-                  <span className="text-sky-400 text-[10px] uppercase block font-bold">Litros Comerciales</span>
-                  <div className="font-['Outfit'] font-black text-xl text-sky-400">
-                    {litrosComerciales.toFixed(1)} L
-                  </div>
-                  {litrosMastitis > 0 && (
-                    <span className="text-[10px] text-red-400 font-bold block">
-                      −{litrosMastitis.toFixed(1)} L descarte (Mastitis)
-                    </span>
-                  )}
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-0.5">
-                  <span className="text-slate-400 text-[10px] uppercase block">Destino Asignado</span>
-                  <div className="font-['Outfit'] font-bold text-lg text-white">
-                    {vaqueraDestino === "TANQUE" ? "Al Tanque" : "Venta Directa"}
-                  </div>
-                  <span className="text-[10px] text-slate-400 block">
-                    Prom. {promedioPorVaca.toFixed(1)} L/vaca
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-0.5">
-                  <span className="text-emerald-400 text-[10px] uppercase block font-bold">Ingreso Proyectado</span>
-                  <div className="font-['Outfit'] font-black text-xl text-emerald-400">
-                    ${ingresoUSD}
-                  </div>
-                  {monedasConfig.VES && (
-                    <span className="text-[10px] text-emerald-300/80 font-mono block">
-                      Bs. {ingresoVES}
-                    </span>
-                  )}
-                  {monedasConfig.COP && (
-                    <span className="text-[10px] text-sky-300/80 font-mono block">
-                      COP ${Math.round(Number(ingresoUSD) * tasaCOP).toLocaleString()}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Buscador de vaca: filtra filas sin perder lo ya digitado en las demás */}
-              <input
-                type="search"
-                value={busquedaVaquera}
-                onChange={e => setBusquedaVaquera(e.target.value)}
-                placeholder="Buscar vaca por número de arete o nombre..."
-                className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-sm focus:border-teal-600 focus:outline-none"
-              />
-
-              {/* Tabla de Entrada Ultrarrápida por Teclado */}
-              <div className="flex-1 overflow-y-auto max-h-72 rounded-2xl border border-slate-200 bg-white">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] uppercase font-bold z-10">
-                    <tr>
-                      <th className="p-3 w-12 text-center">#</th>
-                      <th className="p-3">Arete / Vaca</th>
-                      {(vaqueraTurno === "MANANA" || vaqueraTurno === "DOBLE") && (
-                        <th className="p-3 w-28">Litros AM</th>
-                      )}
-                      {(vaqueraTurno === "TARDE" || vaqueraTurno === "DOBLE") && (
-                        <th className="p-3 w-28">Litros PM</th>
-                      )}
-                      <th className="p-3 w-24">Total</th>
-                      <th className="p-3 w-36">Estatus de Ubre</th>
-                      <th className="p-3">Observaciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {vaqueraFilas.map((fila, idx) => {
-                      const q = busquedaVaquera.trim().toLowerCase();
-                      if (q && !String(fila.arete || "").toLowerCase().includes(q) && !String(fila.nombre || "").toLowerCase().includes(q)) {
-                        return null;
-                      }
-                      const totalFila = (Number(fila.litrosManana) || 0) + (Number(fila.litrosTarde) || 0);
-                      const esMastitis = fila.estado === "MASTITIS";
-                      const esCalostro = fila.estado === "CALOSTRO";
-
-                      return (
-                        <tr
-                          key={fila.animalId || idx}
-                          className={`transition-colors ${
-                            esMastitis
-                              ? "bg-red-500/10 hover:bg-red-500/15"
-                              : esCalostro
-                              ? "bg-amber-500/10 hover:bg-amber-500/15"
-                              : "hover:bg-white/5"
-                          }`}>
-                          <td className="p-3 text-center text-slate-500 font-mono">{idx + 1}</td>
-                          
-                          <td className="p-3">
-                            <div className="font-bold text-white flex items-center gap-2">
-                              <span className="font-mono text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30">
-                                {fila.arete}
-                              </span>
-                              <span>{fila.nombre}</span>
-                            </div>
-                          </td>
-
-                          {(vaqueraTurno === "MANANA" || vaqueraTurno === "DOBLE") && (
-                            <td className="p-2">
-                              <input
-                                id={`vaquera-input-am-${idx}`}
-                                type="number"
-                                onFocus={e => e.target.select()}
-                                step="0.1"
-                                placeholder="0.0"
-                                value={fila.litrosManana}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setVaqueraFilas(prev => prev.map((f, i) => i === idx ? { ...f, litrosManana: val } : f));
-                                }}
-                                onKeyDown={e => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    const nextInput = document.getElementById(
-                                      vaqueraTurno === "DOBLE"
-                                        ? `vaquera-input-pm-${idx}`
-                                        : `vaquera-input-am-${idx + 1}`
-                                    );
-                                    if (nextInput) nextInput.focus();
-                                  }
-                                }}
-                                className="w-full p-2 rounded-xl bg-slate-950 border border-white/20 focus:border-emerald-400 focus:bg-emerald-950/20 text-white font-mono font-bold text-sm text-center outline-none transition-all shadow-inner"
-                              />
-                            </td>
-                          )}
-
-                          {(vaqueraTurno === "TARDE" || vaqueraTurno === "DOBLE") && (
-                            <td className="p-2">
-                              <input
-                                id={`vaquera-input-pm-${idx}`}
-                                type="number"
-                                onFocus={e => e.target.select()}
-                                step="0.1"
-                                placeholder="0.0"
-                                value={fila.litrosTarde}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setVaqueraFilas(prev => prev.map((f, i) => i === idx ? { ...f, litrosTarde: val } : f));
-                                }}
-                                onKeyDown={e => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    const nextInput = document.getElementById(`vaquera-input-am-${idx + 1}`);
-                                    if (nextInput) nextInput.focus();
-                                  }
-                                }}
-                                className="w-full p-2 rounded-xl bg-slate-950 border border-white/20 focus:border-emerald-400 focus:bg-emerald-950/20 text-white font-mono font-bold text-sm text-center outline-none transition-all shadow-inner"
-                              />
-                            </td>
-                          )}
-
-                          <td className="p-3 font-mono font-black text-sm text-white">
-                            {totalFila > 0 ? `${totalFila.toFixed(1)} L` : "-"}
-                          </td>
-
-                          <td className="p-2">
-                            <select
-                              value={fila.estado}
-                              onChange={e => {
-                                const nuevoEstado = e.target.value as any;
-                                setVaqueraFilas(prev => prev.map((f, i) => i === idx ? { ...f, estado: nuevoEstado } : f));
-                              }}
-                              className={`w-full p-1.5 rounded-xl border text-xs font-bold ${
-                                esMastitis
-                                  ? "bg-red-500/20 border-red-500 text-red-400"
-                                  : esCalostro
-                                  ? "bg-amber-500/20 border-amber-500 text-amber-400"
-                                  : "bg-slate-900 border-white/15 text-slate-300"
-                              }`}>
-                              <option value="NORMAL">Normal</option>
-                              <option value="MASTITIS">Mastitis (Descarte)</option>
-                              <option value="CALOSTRO">Calostro (Cría)</option>
-                              <option value="SECA">Vaca Seca</option>
-                            </select>
-                          </td>
-
-                          <td className="p-2">
-                            <input
-                              type="text"
-                              placeholder="Observación..."
-                              value={fila.notas}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setVaqueraFilas(prev => prev.map((f, i) => i === idx ? { ...f, notas: val } : f));
-                              }}
-                              className="w-full p-1.5 rounded-xl bg-slate-900 border border-white/10 text-white text-xs"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Barra de Acciones del Modal */}
-              <div className="pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const idNuevo = Date.now();
-                    setVaqueraFilas(prev => [
-                      ...prev,
-                      {
-                        animalId: idNuevo,
-                        arete: `V-${prev.length + 101}`,
-                        nombre: `Vaca ${prev.length + 1}`,
-                        litrosManana: "",
-                        litrosTarde: "",
-                        estado: "NORMAL",
-                        notas: "",
-                      }
-                    ]);
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-bold cursor-pointer">
-                  + Agregar Fila de Vaca
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setModalVaqueraRapida(false)}
-                    className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-bold cursor-pointer">
-                    Cancelar
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={guardarJornadaVaquera}
-                    className="btn-cyber-neon text-white font-black text-xs px-6 py-2.5 rounded-xl shadow-lg hover:scale-105 cursor-pointer transition-all">
-                    Guardar Jornada ({litrosComerciales.toFixed(1)} L • ${ingresoUSD})
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
+      {vaqueraAbierta && (
+        <ModalJornadaOrdeno
+          animalesActivos={animalesActivos}
+          tenantId={tenantId}
+          precioLecheUSD={precioLecheUSD}
+          tasaBCV={tasaBCV}
+          tasaCOP={tasaCOP}
+          monedasConfig={monedasConfig}
+          notificar={notificar}
+          onJornadaGuardada={alGuardarJornada}
+          onCerrar={() => setVaqueraAbierta(false)}
+        />
+      )}
 
       {/* ── MODAL: REGISTRAR GASTO OPERATIVO DEL HATO ── */}
       {modalGasto && (
