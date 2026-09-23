@@ -1,5 +1,7 @@
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
+import ModalImportarHato from "./ModalImportarHato";
+import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
   contarPendientesGanaderia,
@@ -7,8 +9,7 @@ import {
   esFalloDeConexion,
   generarClaveIdempotencia,
 } from "../offlineQueueGanaderia";
-import { useState, useEffect } from "react";
-import AuroraLogo from "../AuroraLogo";
+import { Fragment, useState, useEffect } from "react";
 import { AuroraGradientDef } from "../Icons";
 import ThemeToggle from "./ThemeToggle";
 import {
@@ -18,7 +19,7 @@ import {
   IconWheat, IconSyringe, IconWrench, IconTractor, IconTruck, IconBolt, IconBox,
   IconWarning, IconFire, IconMilk, IconEdit, IconSettings, IconPin, IconCow,
   IconSnowflake, IconTag, IconShield, IconDna, IconScale, IconSprout, IconCart,
-  IconMeat, IconRefresh, IconBulb, IconCoins
+  IconMeat, IconRefresh, IconBulb, IconCoins, IconDashboardGrid, IconUpload
 } from "../Icons";
 import GanaderiaMapa from "./GanaderiaMapa";
 import { useAuth } from "../context/AuthContext";
@@ -44,7 +45,8 @@ import {
   type EventoReproductivoGanaderia, type RegistroPesoGanaderia,
   type GdpGanaderiaResponse,
   type TanqueLeche, type VentaLecheTanque,
-  type GastoGanaderia, type VentaGanaderiaResumen
+  type GastoGanaderia, type VentaGanaderiaResumen,
+  listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
 } from "../api";
 
 interface Props {
@@ -244,6 +246,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Pestaña principal activa
   const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
+  const [sidebarAbierto, setSidebarAbierto] = useState(false);
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
@@ -275,6 +278,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Modales
   const [modalNuevoAnimal, setModalNuevoAnimal] = useState(false);
+  const [modalImportarHato, setModalImportarHato] = useState(false);
+  // Última jornada de vacunación registrada: ofrece descargar su constancia PDF.
+  const [ultimaVacunacion, setUltimaVacunacion] = useState<{ fecha: string; vacunaId: number; nombre: string; cantidad: number } | null>(null);
+  const [prenezActual, setPrenezActual] = useState<PrenezActualGanaderia[]>([]);
+  const [categoriaExpandida, setCategoriaExpandida] = useState<string | null>(null);
+  const puedeImportarHato = user?.rol === "DUENO_ADMIN" || user?.rol === "ADMINISTRADOR_FINCA";
   const [modalNuevoPotrero, setModalNuevoPotrero] = useState(false);
   const [modalRotar, setModalRotar] = useState<PotreroGanaderia | null>(null);
   const [modalOrdeno, setModalOrdeno] = useState(false);
@@ -556,12 +565,17 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   const cargarDatos = async () => {
     try {
-      const [resAnimales, resPotreros, resVacunas, resAlertas] = await Promise.allSettled([
+      const [resAnimales, resPotreros, resVacunas, resAlertas, resPrenez] = await Promise.allSettled([
         listarAnimalesGanaderia(),
         listarPotrerosGanaderia(),
         listarVacunasGanaderia(),
         obtenerAlertasGanaderia(tenantId, 30),
+        listarPrenezActualGanaderia(),
       ]);
+
+      if (resPrenez.status === "fulfilled") {
+        setPrenezActual(resPrenez.value ?? []);
+      }
 
       if (resAnimales.status === "fulfilled") {
         setAnimales(resAnimales.value ?? []);
@@ -649,6 +663,46 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       Math.max(1, animalesActivos.filter(cat.filter).length)
     ),
   }));
+
+  // Desglose del hato: dentro de cada categoría, cuántos por raza y, de las
+  // hembras, cuántas preñadas y de qué padrote (último servicio/diagnóstico).
+  const SIN_PADROTE = "Sin padrote registrado";
+  const prenezPorHembra = new Map(prenezActual.map(p => [p.hembraId, p]));
+  const padroteDe = (a: AnimalGanaderia) => {
+    const p = prenezPorHembra.get(a.id);
+    return p ? (p.padrote || SIN_PADROTE) : null;
+  };
+  const desglosePorRaza = (lista: AnimalGanaderia[]) => {
+    const grupos = new Map<string, { raza: string; cabezas: number; prenadas: number; porPadrote: Map<string, number> }>();
+    for (const a of lista) {
+      const raza = a.raza?.trim() || "Sin raza";
+      const g = grupos.get(raza) ?? { raza, cabezas: 0, prenadas: 0, porPadrote: new Map<string, number>() };
+      g.cabezas++;
+      const padrote = padroteDe(a);
+      if (padrote) {
+        g.prenadas++;
+        g.porPadrote.set(padrote, (g.porPadrote.get(padrote) ?? 0) + 1);
+      }
+      grupos.set(raza, g);
+    }
+    return [...grupos.values()].sort((x, y) => y.cabezas - x.cabezas);
+  };
+  const prenezPorPadrote = (() => {
+    const grupos = new Map<string, { padrote: string; prenadas: number; porRaza: Map<string, number> }>();
+    for (const a of animalesActivos) {
+      const padrote = padroteDe(a);
+      if (!padrote) continue;
+      const g = grupos.get(padrote) ?? { padrote, prenadas: 0, porRaza: new Map<string, number>() };
+      g.prenadas++;
+      const raza = a.raza?.trim() || "Sin raza";
+      g.porRaza.set(raza, (g.porRaza.get(raza) ?? 0) + 1);
+      grupos.set(padrote, g);
+    }
+    // "Sin padrote registrado" siempre al final
+    return [...grupos.values()].sort((x, y) =>
+      (x.padrote === SIN_PADROTE ? 1 : 0) - (y.padrote === SIN_PADROTE ? 1 : 0) || y.prenadas - x.prenadas);
+  })();
+  const totalPrenadas = prenezPorPadrote.reduce((s, g) => s + g.prenadas, 0);
 
   // Filtrado de animales
   const animalesFiltrados = animales.filter(a => {
@@ -1398,10 +1452,11 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     const vacunaSeleccionada = vacunas.find(v => v.id === Number(formVacuna.vacunaId));
 
     try {
+      const fechaAplicacion = fechaLocalISO();
       await aplicarVacunaLoteGanaderia(tenantId, {
         animalIds: idsParaAplicar,
         vacunaId: Number(formVacuna.vacunaId),
-        fechaAplicacion: new Date().toISOString().slice(0, 10),
+        fechaAplicacion,
         lote: formVacuna.lote,
         veterinarioResponsable: formVacuna.veterinario,
         costo: Number(formVacuna.costo),
@@ -1417,6 +1472,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       const detalleRetiro = retiroMsg.length > 0 ? ` (${retiroMsg.join(" • ")})` : " (Sin tiempo de retiro obligatorio)";
 
       notificar(`Vacuna '${vacunaSeleccionada?.nombre || "aplicada"}' aplicada a ${idsParaAplicar.length} animal(es)${detalleRetiro}. Alertas sanitarias actualizadas.`);
+      setUltimaVacunacion({
+        fecha: fechaAplicacion,
+        vacunaId: Number(formVacuna.vacunaId),
+        nombre: vacunaSeleccionada?.nombre || "Vacuna",
+        cantidad: idsParaAplicar.length,
+      });
 
       // Recargar alertas sanitarias para reflejar inmediatamente los bloqueos de leche y carne
       obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
@@ -1528,7 +1589,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 relative flex flex-col font-['Inter']">
+    <div className="h-screen flex overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 font-['Inter']">
       <AuroraGradientDef />
 
       {/* Notificación Flotante */}
@@ -1539,27 +1600,149 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         </div>
       )}
 
-      {/* ── HEADER SUPERIOR DEL CENTRO AGROPECUARIO: APPLE GLASS ── */}
-      <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40 backdrop-blur-2xl">
-        <div className="flex items-center gap-3.5">
-          <div className="p-1.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-            <AuroraLogo size={26} />
-          </div>
-          <div className="text-left">
-            <div className="font-['Outfit'] font-black text-lg sm:text-xl text-aurora leading-none flex items-center gap-2">
-              <span>Aurora Agro & Finca</span>
-              <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-bold">
-                Cattle Pro
-              </span>
+      {/* ══════════════════════ SIDEBAR (drawer en móvil, fijo en desktop) — mismo patrón institucional que Comercio/Horeca ══════════════════════ */}
+      {sidebarAbierto && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarAbierto(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#0D3B3D] border-r border-white/10 shadow-lg fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+          sidebarAbierto ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <button
+          onClick={onSalir}
+          className="flex items-center gap-2.5 text-left group cursor-pointer p-4 border-b border-white/10"
+          title="Volver al Hub General"
+        >
+          <div className="w-9 h-9 rounded-xl bg-[#177E89] p-0.5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform flex-shrink-0">
+            <div className="w-full h-full bg-[#0D3B3D] rounded-[10px] flex items-center justify-center">
+              <IconCow size={18} className="text-[#5BC0BE]" />
             </div>
-            <div className="text-slate-500 dark:text-white/45 text-[11px] font-medium mt-0.5">
-              Hato, Potreros, Leche, GDP & Sanidad • {user?.empresa || "Finca Santa Elena"}
+          </div>
+          <div className="min-w-0">
+            <div className="font-['Outfit'] font-black text-sm !text-white leading-tight truncate">
+              {user?.empresa || "Mi Finca"}
+            </div>
+            <div className="text-[9px] !text-[#8FD8D2] tracking-wider uppercase truncate font-semibold">
+              Aurora Ganadería
             </div>
           </div>
+        </button>
+
+        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
+          {([
+            {
+              titulo: "Operación",
+              items: [
+                { id: "resumen" as const, Icon: IconDashboardGrid, etiqueta: "Panel General", badge: 0 },
+                { id: "inventario" as const, Icon: IconCow, etiqueta: "Hato & Inventario", badge: 0 },
+                { id: "potreros" as const, Icon: IconPin, etiqueta: "Mapa & Potreros", badge: 0 },
+                { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción & Pesajes", badge: 0 },
+              ],
+            },
+            {
+              titulo: "Control",
+              items: [
+                { id: "sanidad" as const, Icon: IconSyringe, etiqueta: "Sanidad & Trazabilidad", badge: alertasSanitarias.length },
+                { id: "eventos" as const, Icon: IconCalendar, etiqueta: "Centro de Eventos", badge: 0 },
+                { id: "reportes" as const, Icon: IconChart, etiqueta: "Centro de Reportes", badge: 0 },
+                ...(user?.rol === "DUENO_ADMIN" ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría", badge: 0 }] : []),
+              ],
+            },
+          ]).map((grupo) => (
+            <div key={grupo.titulo} className="space-y-1">
+              <div className="px-3.5 text-[10px] font-black uppercase tracking-wider !text-[#5BA8A2]">
+                {grupo.titulo}
+              </div>
+              {grupo.items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
+                  className={`sidebar-glare w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                    tab === item.id
+                      ? "sidebar-glare--active bg-white/10 !text-white"
+                      : "!text-[#B9DEDA] hover:bg-white/5 hover:!text-white"
+                  }`}
+                >
+                  <item.Icon size={16} />
+                  <span className="flex-1 text-left">{item.etiqueta}</span>
+                  {item.badge > 0 && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500 text-slate-950">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ))}
+
+          {/* Acciones rápidas de campo */}
+          <div className="pt-3 border-t border-white/10 space-y-1">
+            <div className="px-3.5 text-[10px] font-black uppercase tracking-wider !text-[#5BA8A2]">
+              Acciones rápidas
+            </div>
+            <button
+              type="button"
+              onClick={() => { abrirVaqueraRapida(); setSidebarAbierto(false); }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer !text-white bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <IconMilk size={16} className="text-[#5BC0BE]" />
+              <span className="flex-1 text-left">Ordeño rápido</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setModalNuevoAnimal(true); setSidebarAbierto(false); }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer !text-[#B9DEDA] hover:bg-white/5 hover:!text-white transition-colors"
+            >
+              <IconTag size={16} />
+              <span className="flex-1 text-left">Alta de animal</span>
+            </button>
+            {puedeImportarHato && (
+              <button
+                type="button"
+                onClick={() => { setModalImportarHato(true); setSidebarAbierto(false); }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl font-bold text-sm cursor-pointer !text-[#B9DEDA] hover:bg-white/5 hover:!text-white transition-colors"
+              >
+                <IconUpload size={16} />
+                <span className="flex-1 text-left">Importar hato</span>
+              </button>
+            )}
+          </div>
+        </nav>
+
+        <div className="p-3 border-t border-white/10">
+          <button
+            onClick={onSalir}
+            className="w-full text-xs font-semibold px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 !text-[#B9DEDA] hover:!text-white transition-colors cursor-pointer"
+          >
+            ← Salir al Hub
+          </button>
         </div>
+      </aside>
+
+      {/* ══════════════════════ COLUMNA DERECHA: TOPBAR + CONTENIDO ══════════════════════ */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+
+      {/* ── TOPBAR: SINCRONIZACIÓN, MONEDAS, LECHE, FISCAL Y TEMA ── */}
+      <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between lg:justify-end gap-3 sticky top-0 z-30 backdrop-blur-2xl">
+        <button
+          onClick={() => setSidebarAbierto(true)}
+          className="lg:hidden p-2 -ml-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+          aria-label="Abrir menú"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
 
                 {/* Barra de Tasas Multi-Moneda & Precio Leche Centralizado */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           {/* Badge Modo Campo / Sincronizacion Offline */}
           <button
             type="button"
@@ -1642,123 +1825,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           </button>
         </div>
 
-        {/* Acciones de Cabecera */}
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={abrirVaqueraRapida}
-            className="btn-cyber-neon text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-md hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer">
-            <span>Ordeño Rápido</span>
-          </button>
-
-          <button
-            onClick={() => setModalNuevoAnimal(true)}
-            className="apple-glass px-3.5 py-2 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2 cursor-pointer">
-            <span>+ Alta Animal</span>
-          </button>
-
-          <ThemeToggle className="scale-[0.72] origin-right" />
-
-          <button
-            onClick={onSalir}
-            className="apple-glass-btn text-xs font-semibold px-4 py-2 rounded-xl text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer">
-            ← Volver al Hub
-          </button>
-        </div>
+        <ThemeToggle className="scale-[0.72] origin-right" />
       </header>
-
-      {/* ── NAVEGACIÓN INTELIGENTE Y ORDENADA (SEGMENTED PILLS) ── */}
-      <div className="border-b border-slate-300/50 dark:border-white/10 px-4 sm:px-8 py-2.5 bg-slate-100/60 dark:bg-white/[0.02] backdrop-blur-md overflow-x-auto">
-        <div className="max-w-7xl mx-auto flex items-center gap-1.5 text-xs whitespace-nowrap">
-          
-          <button
-            onClick={() => setTab("resumen")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "resumen"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Panel General</span>
-          </button>
-
-          <button
-            onClick={() => setTab("potreros")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "potreros"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Mapa & Potreros</span>
-          </button>
-
-          <button
-            onClick={() => setTab("inventario")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "inventario"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Hato & Inventario</span>
-          </button>
-
-          <button
-            onClick={() => setTab("sanidad")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "sanidad"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Sanidad & Trazabilidad</span>
-            {alertasSanitarias.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500 text-slate-950">
-                {alertasSanitarias.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setTab("eventos")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "eventos"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Centro de Eventos</span>
-          </button>
-
-          <button
-            onClick={() => setTab("produccion")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "produccion"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Producción & Pesajes</span>
-          </button>
-
-          <button
-            onClick={() => setTab("reportes")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "reportes"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
-            <span>Centro de Reportes</span>
-          </button>
-
-          {user?.rol === "DUENO_ADMIN" && (
-            <button
-              onClick={() => setTab("auditoria")}
-              className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                tab === "auditoria"
-                  ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                  : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-              }`}>
-              <span>Bitácora de Auditoría</span>
-            </button>
-          )}
-
-        </div>
-      </div>
 
       {/* ── CUERPO PRINCIPAL ── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
@@ -2321,6 +2389,15 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   </button>
                 </div>
 
+                {puedeImportarHato && (
+                  <button
+                    onClick={() => setModalImportarHato(true)}
+                    className="apple-glass-btn text-xs font-bold px-3.5 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                    <IconUpload size={13} />
+                    <span>Importar hato</span>
+                  </button>
+                )}
+
                 <button
                   onClick={exportarInventarioXLSX}
                   className="apple-glass-btn text-xs font-bold px-3.5 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer">
@@ -2347,10 +2424,20 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
                       {matrizConteos.map(cat => {
                         const pct = totalAnimales > 0 ? ((cat.count / totalAnimales) * 100).toFixed(1) : "0.0";
+                        const expandida = categoriaExpandida === cat.key && cat.count > 0;
                         return (
-                          <tr key={cat.key} className="hover:bg-white/5 transition-colors">
+                          <Fragment key={cat.key}>
+                          <tr className="hover:bg-white/5 transition-colors">
                             <td className="p-4 font-bold text-slate-900 dark:text-white">
-                              {cat.label}
+                              <button
+                                type="button"
+                                disabled={cat.count === 0}
+                                onClick={() => setCategoriaExpandida(expandida ? null : cat.key)}
+                                className="flex items-center gap-2 cursor-pointer disabled:cursor-default"
+                                title={cat.count > 0 ? "Ver desglose por raza" : undefined}>
+                                <span className={`inline-block w-3 text-slate-400 transition-transform ${expandida ? "rotate-90" : ""} ${cat.count === 0 ? "opacity-0" : ""}`}>›</span>
+                                <span>{cat.label}</span>
+                              </button>
                             </td>
                             <td className="p-4 text-center font-mono font-black text-emerald-500 dark:text-emerald-400 text-sm">
                               {cat.count}
@@ -2374,13 +2461,31 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                               </button>
                             </td>
                           </tr>
+                          {expandida && desglosePorRaza(animalesActivos.filter(cat.filter)).map(g => (
+                            <tr key={`${cat.key}-${g.raza}`} className="bg-slate-50/70 dark:bg-white/[0.02]">
+                              <td className="py-2.5 pl-11 pr-4 text-slate-700 dark:text-white/80">{g.raza}</td>
+                              <td className="py-2.5 px-4 text-center font-mono font-bold text-slate-900 dark:text-white">{g.cabezas}</td>
+                              <td colSpan={3} className="py-2.5 px-4 text-slate-600 dark:text-white/60">
+                                {g.prenadas > 0 ? (
+                                  <span>
+                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{g.prenadas} preñadas</span>
+                                    {" · "}
+                                    {[...g.porPadrote.entries()].map(([padrote, n]) => `${n} de ${padrote}`).join(" · ")}
+                                  </span>
+                                ) : cat.key === "VACA" || cat.key === "NOVILLA" ? (
+                                  <span className="text-slate-400 dark:text-white/40">Ninguna preñada</span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
+                          </Fragment>
                         );
                       })}
                       <tr className="bg-emerald-500/5 font-bold">
                         <td className="p-4 text-slate-900 dark:text-white">TOTAL ACTIVOS</td>
                         <td className="p-4 text-center font-mono text-emerald-500 dark:text-emerald-400 text-base">{totalAnimales}</td>
                         <td className="p-4 text-center font-mono text-slate-600 dark:text-white/70">
-                          {Math.round(animales.reduce((sum, a) => sum + (a.pesoActual || 0), 0) / Math.max(1, totalAnimales))} kg
+                          {Math.round(animalesActivos.reduce((sum, a) => sum + (a.pesoActual || 0), 0) / Math.max(1, totalAnimales))} kg
                         </td>
                         <td className="p-4 text-center font-mono text-slate-400">100%</td>
                         <td className="p-4 text-right">
@@ -2393,6 +2498,37 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                       </tr>
                     </tbody>
                   </table>
+                </div>
+
+                {/* Preñez por padrote */}
+                <div className="rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass p-5 space-y-3">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">Preñez por padrote</h4>
+                    <span className="text-xs text-slate-500 dark:text-white/50">
+                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">{totalPrenadas}</span> hembras preñadas
+                    </span>
+                  </div>
+                  {prenezPorPadrote.length === 0 ? (
+                    <p className="text-xs text-slate-500 dark:text-white/50">
+                      No hay hembras preñadas registradas. Registre el diagnóstico en Centro de Eventos o impórtelas con su padrote.
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-slate-200/60 dark:divide-white/5">
+                      {prenezPorPadrote.map(g => (
+                        <div key={g.padrote} className="py-2.5 flex items-center justify-between gap-4 text-xs">
+                          <div className="min-w-0">
+                            <div className={`font-bold truncate ${g.padrote === SIN_PADROTE ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>
+                              {g.padrote}
+                            </div>
+                            <div className="text-slate-500 dark:text-white/50 truncate">
+                              {[...g.porRaza.entries()].map(([raza, n]) => `${n} ${raza}`).join(" · ")}
+                            </div>
+                          </div>
+                          <div className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400 flex-shrink-0">{g.prenadas}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -3851,6 +3987,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
               </div>
 
+              <ReportesCampoGanaderia vacunas={vacunas} notificar={notificar} />
+
               {/* 3 Tarjetas de Resumen Financiero Semanal (Semana Actual) */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Tarjeta 1: Ingresos de la Semana */}
@@ -4190,6 +4328,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         )}
 
       </main>
+      </div>
 
       {/* ── MODAL: ACTUALIZAR TASAS A MANO ── */}
       {modalEditarTasas && (
@@ -4789,6 +4928,45 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       ───────────────────────────────────────────────────────────── */}
 
       {/* MODAL: ALTA DE ANIMAL */}
+      {ultimaVacunacion && (
+        <div className="fixed bottom-5 right-5 z-30 apple-glass rounded-2xl border border-emerald-500/40 shadow-2xl p-4 max-w-sm text-left space-y-2.5 animate-fade-in">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-xs">
+              <div className="font-bold text-slate-900 dark:text-white">Vacunación registrada</div>
+              <div className="text-slate-500 dark:text-white/60">
+                {ultimaVacunacion.nombre} · {ultimaVacunacion.cantidad} animal(es)
+              </div>
+            </div>
+            <button onClick={() => setUltimaVacunacion(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer" aria-label="Cerrar">
+              <IconClose size={16} />
+            </button>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                abrirPdf(await descargarConstanciaVacunacionPdf(ultimaVacunacion.fecha, ultimaVacunacion.fecha, ultimaVacunacion.vacunaId));
+              } catch (e) {
+                notificar(`No se pudo generar la constancia: ${e instanceof Error ? e.message : "intente de nuevo"}`);
+              }
+            }}
+            className="w-full btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer flex items-center justify-center gap-1.5">
+            <IconDownload size={13} />
+            <span>Descargar constancia PDF</span>
+          </button>
+        </div>
+      )}
+
+      {modalImportarHato && (
+        <ModalImportarHato
+          onCerrar={() => setModalImportarHato(false)}
+          onImportado={(cantidad) => {
+            setModalImportarHato(false);
+            notificar(`${cantidad} animales importados al hato.`);
+            cargarDatos();
+          }}
+        />
+      )}
+
       {modalNuevoAnimal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">

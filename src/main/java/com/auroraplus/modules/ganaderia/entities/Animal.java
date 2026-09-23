@@ -14,7 +14,7 @@ import java.time.Period;
  * reproducción a lo largo de su vida productiva.
  */
 @Entity
-@Table(name = "animales", indexes = {
+@Table(name = "animales", uniqueConstraints = @UniqueConstraint(name = "uk_animales_tenant_arete", columnNames = {"tenant_id", "arete"}), indexes = {
     @Index(name = "idx_animal_tenant_arete", columnList = "tenant_id, arete")
 })
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
@@ -27,7 +27,7 @@ public class Animal {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    @Column(nullable = false, unique = true, length = 30)
+    @Column(nullable = false, length = 30) // único por finca (uk_animales_tenant_arete), no global
     private String arete;
 
     private String nombre;

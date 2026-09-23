@@ -35,6 +35,20 @@ public class RegistroOrdenoController {
     private RegistroOrdenoRepository registroOrdenoRepository;
 
     @Autowired
+    private com.auroraplus.modules.ganaderia.services.GanaderiaReportesPdfService reportesPdfService;
+
+    /** Reporte PDF de ordeño: diario (desde = hasta), semanal (7 días) o cualquier rango hasta 93 días. */
+    @GetMapping(value = "/reporte/pdf", produces = org.springframework.http.MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> reportePdf(@RequestParam LocalDate desde, @RequestParam LocalDate hasta) throws Exception {
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        byte[] pdf = reportesPdfService.reporteOrdeno(tenantId, desde, hasta);
+        return ResponseEntity.ok()
+            .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"reporte-ordeno-" + desde + "_" + hasta + ".pdf\"")
+            .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+            .body(pdf);
+    }
+
+    @Autowired
     private AnimalRepository animalRepository;
 
     @Autowired

@@ -3597,6 +3597,85 @@ export function crearAnimalGanaderia(tenantId: number, datos: {
   });
 }
 
+/** Fila del Excel de carga inicial del hato — todo texto, el backend valida y normaliza. */
+export interface FilaImportacionHato {
+  arete?: string;
+  tipoIdentificador?: string;
+  nombre?: string;
+  especie?: string;
+  raza?: string;
+  sexo?: string;
+  tipoAnimal?: string;
+  fechaNacimiento?: string;
+  pesoActual?: string;
+  valorEstimado?: string;
+  potrero?: string;
+  lote?: string;
+  areteMadre?: string;
+  aretePadre?: string;
+  estadoReproductivo?: string;
+  estadoProductivo?: string;
+  padrotePrenez?: string;
+  fechaProbableParto?: string;
+}
+
+export interface ResultadoImportacionHato {
+  confirmado: boolean;
+  totalFilas: number;
+  animalesImportados: number;
+  preneces: number;
+  errores: Array<{ fila: number; campo: string | null; mensaje: string }>;
+  porTipo: Record<string, number>;
+  porRaza: Record<string, number>;
+}
+
+/** confirmar=false: solo vista previa. confirmar=true: guarda todo o nada. */
+export function importarHatoGanaderia(filas: FilaImportacionHato[], confirmar: boolean): Promise<ResultadoImportacionHato> {
+  return request(`/api/ganaderia/animales/importar?confirmar=${confirmar}`, {
+    method: "POST",
+    body: JSON.stringify({ filas }),
+  });
+}
+
+export interface PrenezActualGanaderia {
+  hembraId: number;
+  sementalId: number | null;
+  padrote: string | null;
+  fechaProbableParto: string | null;
+}
+
+export function listarPrenezActualGanaderia(): Promise<PrenezActualGanaderia[]> {
+  return request(`/api/ganaderia/animales/prenez-actual`);
+}
+
+async function descargarPdfGanaderia(ruta: string): Promise<Blob> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const res = await fetch(ruta, { headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) {
+    // El backend devuelve el motivo (p. ej. "admite hasta 93 días") en el cuerpo
+    const cuerpo = await res.json().catch(() => null);
+    throw new ApiError(cuerpo?.message || cuerpo?.error || `Error ${res.status}`);
+  }
+  return res.blob();
+}
+
+/** Reporte PDF de ordeño: diario (desde = hasta) o semanal/rango. Fechas YYYY-MM-DD. */
+export function descargarReporteOrdenoPdf(desde: string, hasta: string): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/ordeno/reporte/pdf?desde=${desde}&hasta=${hasta}`);
+}
+
+/** Constancia PDF de vacunación de una jornada (o rango), opcionalmente de una sola vacuna. */
+export function descargarConstanciaVacunacionPdf(desde: string, hasta: string, vacunaId?: number): Promise<Blob> {
+  const q = vacunaId ? `&vacunaId=${vacunaId}` : "";
+  return descargarPdfGanaderia(`/api/ganaderia/vacunas/constancia/pdf?desde=${desde}&hasta=${hasta}${q}`);
+}
+
 export function actualizarAnimalGanaderia(id: number, datos: Partial<AnimalGanaderia>): Promise<AnimalGanaderia> {
   return request(`/api/ganaderia/animales/${id}`, {
     method: "PUT",

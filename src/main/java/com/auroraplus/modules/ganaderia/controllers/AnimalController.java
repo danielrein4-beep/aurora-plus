@@ -11,6 +11,7 @@ import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.MovimientoPotreroRepository;
 import com.auroraplus.modules.ganaderia.repositories.PotreroRepository;
 import com.auroraplus.modules.ganaderia.services.AnimalQrService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaImportacionService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaMovimientoService;
 import com.auroraplus.modules.ganaderia.services.RentabilidadAnimalService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
@@ -55,6 +56,9 @@ public class AnimalController {
 
     @Autowired
     private RegistroAuditoriaService auditoriaService;
+
+    @Autowired
+    private GanaderiaImportacionService importacionService;
 
     // ── P0: tenant NUNCA viene por query/body/header — siempre de TenantContext/JWT ──
 
@@ -146,6 +150,29 @@ public class AnimalController {
         auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "Animal", guardado.getId(),
             "Dio de alta el animal " + guardado.getArete() + (guardado.getPotrero() == null ? " sin potrero asignado" : " en el potrero " + guardado.getPotrero().getNombre()));
         return ResponseEntity.ok(guardado);
+    }
+
+    public static class ImportacionRequest {
+        public List<GanaderiaImportacionService.FilaImportacion> filas;
+    }
+
+    /**
+     * Carga inicial del hato desde Excel/CSV (el navegador lee el archivo y envía las filas).
+     * confirmar=false solo valida y devuelve la vista previa; confirmar=true guarda todo o nada.
+     */
+    @PostMapping("/importar")
+    public ResponseEntity<GanaderiaImportacionService.ResultadoImportacion> importar(
+            @RequestBody ImportacionRequest request,
+            @RequestParam(defaultValue = "false") boolean confirmar) {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        Long tenantId = GanaderiaTenantAccess.requireTenant();
+        return ResponseEntity.ok(importacionService.importar(tenantId, request != null ? request.filas : null, confirmar));
+    }
+
+    /** Hembras preñadas activas con su padrote, para el desglose del hato. */
+    @GetMapping("/prenez-actual")
+    public List<GanaderiaImportacionService.PrenezActual> prenezActual() {
+        return importacionService.prenezActual(GanaderiaTenantAccess.requireTenant());
     }
 
     @GetMapping("/export-excel")
