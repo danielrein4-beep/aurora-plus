@@ -34,6 +34,12 @@ public class PedidoWebComercio {
     @Column(name = "cliente_telefono", nullable = false, length = 40)
     private String clienteTelefono;
 
+    // Opcional — si el cliente lo deja, se le manda el comprobante por correo
+    // automáticamente en el momento en que el dueño confirma el pedido (ver
+    // ConfirmacionPedidoWebService), no antes.
+    @Column(name = "cliente_email", length = 255)
+    private String clienteEmail;
+
     @Column(name = "tipo_entrega", nullable = false, length = 30)
     private String tipoEntrega = "DELIVERY"; // DELIVERY o PICKUP
 
@@ -58,11 +64,29 @@ public class PedidoWebComercio {
     @Column(name = "items_json", nullable = false, columnDefinition = "TEXT")
     private String itemsJson;
 
+    // JSON real (productoId/cantidad), a diferencia de itemsJson (texto de despliegue para
+    // el humano) — lo usa ConfirmacionPedidoWebService para reproducir la venta contra el
+    // inventario real al confirmar. Null en pedidos creados antes de esta columna.
+    @Column(name = "items_estructurados_json", columnDefinition = "TEXT")
+    private String itemsEstructuradosJson;
+
     @Column(columnDefinition = "TEXT")
     private String notas;
 
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
+
+    // Token aleatorio devuelto SOLO al cliente que crea el pedido — es la única
+    // credencial que puede adjuntar el comprobante de pago después (ver
+    // subirComprobantePago en CatalogoPublicoController). Sin esto, cualquiera
+    // podría adivinar el id numérico del pedido y subir/pisar el comprobante de
+    // otra persona — numeroPedido ("PED-XXXX") no sirve para esto porque solo
+    // tiene 9000 combinaciones y es adivinable por fuerza bruta.
+    @Column(name = "access_token", length = 64)
+    private String accessToken;
+
+    @Column(name = "captura_pago_base64", columnDefinition = "TEXT")
+    private String capturaPagoBase64;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -74,6 +98,8 @@ public class PedidoWebComercio {
     public void setClienteNombre(String clienteNombre) { this.clienteNombre = clienteNombre; }
     public String getClienteTelefono() { return clienteTelefono; }
     public void setClienteTelefono(String clienteTelefono) { this.clienteTelefono = clienteTelefono; }
+    public String getClienteEmail() { return clienteEmail; }
+    public void setClienteEmail(String clienteEmail) { this.clienteEmail = clienteEmail; }
     public String getTipoEntrega() { return tipoEntrega; }
     public void setTipoEntrega(String tipoEntrega) { this.tipoEntrega = tipoEntrega; }
     public String getDireccionEntrega() { return direccionEntrega; }
@@ -90,8 +116,14 @@ public class PedidoWebComercio {
     public void setTasaCambio(BigDecimal tasaCambio) { this.tasaCambio = tasaCambio; }
     public String getItemsJson() { return itemsJson; }
     public void setItemsJson(String itemsJson) { this.itemsJson = itemsJson; }
+    public String getItemsEstructuradosJson() { return itemsEstructuradosJson; }
+    public void setItemsEstructuradosJson(String itemsEstructuradosJson) { this.itemsEstructuradosJson = itemsEstructuradosJson; }
     public String getNotas() { return notas; }
     public void setNotas(String notas) { this.notas = notas; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
+    public String getAccessToken() { return accessToken; }
+    public void setAccessToken(String accessToken) { this.accessToken = accessToken; }
+    public String getCapturaPagoBase64() { return capturaPagoBase64; }
+    public void setCapturaPagoBase64(String capturaPagoBase64) { this.capturaPagoBase64 = capturaPagoBase64; }
 }

@@ -1,9 +1,11 @@
 import AsistenteIaModal from "./AsistenteIaModal";
+import jsPDF from "jspdf";
 import ModalCatalogoQR from "./ModalCatalogoQR";
-import PedidosWebPanel, { type PedidoWeb } from "./PedidosWebPanel";
+import PedidosWebPanel from "./PedidosWebPanel";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import { useState, useMemo, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
 import {
   IconHardware, IconPrescription, IconRetail, IconCard, IconSearch, IconTrash,
   IconCheck, IconWarning, IconClose, IconUsers, IconFileText, IconHourglass,
@@ -36,7 +38,7 @@ import {
   type UtilidadPeriodoRepuesto,
   extraerFacturaOcr,
   crearCliente,
-  listarMovimientos, registrarMovimiento, abonarMovimiento,
+  listarMovimientos, registrarMovimiento, abonarMovimiento, registrarCuentaManual,
   abrirTurno,
   turnoAbierto,
   historialTurnos,
@@ -57,7 +59,30 @@ import {
   type ItemImportacionRepuesto,
   type ResultadoImportacionRepuestos,
   obtenerMiNegocio,
+  subirComprobanteMovimientoCaja,
+  listarCuentasBancarias, crearCuentaBancaria, actualizarCuentaBancaria,
+  ingresarSaldoCuentaBancaria, retirarSaldoCuentaBancaria, transferirEntreCuentasBancarias,
+  eliminarCuentaBancaria,
+  type CuentaBancaria, type TipoCuentaBancaria,
 } from "../api";
+
+// Días restantes hasta la fecha de vencimiento (negativo = ya venció). Mismo
+// cálculo que RestauranteApp.diasParaVencer — se compara a medianoche local
+// para no contar "hoy" como vencido por la hora del día.
+function diasParaVencerComercio(fechaVencimiento: string): number {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const venc = new Date(fechaVencimiento + "T00:00:00");
+  return Math.round((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function textoVencimientoComercio(fechaVencimiento: string): { texto: string; color: string } {
+  const d = diasParaVencerComercio(fechaVencimiento);
+  if (d < 0) return { texto: `Vencido hace ${Math.abs(d)} día${Math.abs(d) === 1 ? "" : "s"}`, color: "text-rose-600 dark:text-rose-400" };
+  if (d === 0) return { texto: "Vence hoy", color: "text-rose-600 dark:text-rose-400" };
+  if (d <= 7) return { texto: `Vence en ${d} día${d === 1 ? "" : "s"}`, color: "text-amber-600 dark:text-amber-400" };
+  if (d <= 30) return { texto: `Vence en ${d} días`, color: "text-amber-500 dark:text-amber-300" };
+  return { texto: `Vence el ${new Date(fechaVencimiento + "T00:00:00").toLocaleDateString("es-VE")}`, color: "text-slate-500 dark:text-slate-400" };
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 // TIPOS Y MODELOS
@@ -94,6 +119,13 @@ export interface ProductoComercio {
   precioMayorista?: number;
   cantidadMinimaMayorista?: number;
   presentaciones?: PresentacionRepuesto[];
+  visible?: boolean; // false = oculto del catálogo público (no del inventario/POS)
+  ordenVisualizacion?: number; // menor = aparece primero en el catálogo público
+  descripcionLarga?: string; // descripción de venta para el catálogo público
+  imagenBase64?: string; // foto del producto (data-URI)
+  grupoVariante?: string; // junta este SKU con otros (mismo zapato, otra talla) en una sola tarjeta pública
+  atributoVariante?: string; // etiqueta de este SKU dentro del grupo (ej. "Talla 38")
+  colorVariante?: string; // segunda faceta de variante (ej. "Rojo") — selector de color, luego talla
 }
 
 export interface LineaCarritoComercio {
@@ -149,6 +181,15 @@ export interface ClienteComercio {
   ultimaCompra?: string;
 }
 
+export interface PagoMixtoItem {
+  id: string;
+  metodo: string;
+  moneda: "USD" | "VES" | "COP";
+  montoOriginal: number;
+  montoUSD: number;
+  referencia?: string;
+}
+
 export interface VentaComercio {
   id: string;
   numero: string;
@@ -167,6 +208,8 @@ export interface VentaComercio {
   vuelto?: number;
   monedaVuelto?: string;
   desglosePagos?: Array<{ moneda: string; monto: number; label?: string }>;
+  pagosMixtos?: PagoMixtoItem[];
+  emailCliente?: string;
 }
 
 export interface CotizacionComercio {
@@ -396,8 +439,302 @@ export const CUENTAS_INICIALES_COMERCIO: CuentaComercio[] = [
 
 
 // ══════════════════════════════════════════════════════════════════════════
+// NOTA DE ENTREGA PDF — NORMATIVA SENIAT (Providencias 00071 / 0102)
+// ══════════════════════════════════════════════════════════════════════════
+function generarNotaEntregaPDF(
+  venta: VentaComercio,
+  nombreLocal: string,
+  tasaActivaBs: number,
+  tasaCop: number,
+  descargar = true
+): jsPDF {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = 210;
+  const margin = 14;
+  const colRight = W - margin;
+  let y = 15;
+
+  // ─── Encabezado Corporativo ───────────────────────────────────────────
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(20, 20, 20);
+  doc.text(nombreLocal, margin, y);
+
+  // Recuadro NOTA DE ENTREGA (esquina superior derecha)
+  const ndX = W - 72;
+  doc.setDrawColor(30, 150, 130);
+  doc.setLineWidth(0.6);
+  doc.rect(ndX, y - 8, 58, 24, "S");
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 150, 130);
+  doc.text("NOTA DE ENTREGA", ndX + 29, y - 2, { align: "center" });
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Control N°: ND-${venta.numero}`, ndX + 29, y + 4, { align: "center" });
+  doc.text(`Fecha: ${new Date().toLocaleDateString("es-VE")}`, ndX + 29, y + 9, { align: "center" });
+  doc.text(`Hora: ${new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })}`, ndX + 29, y + 14, { align: "center" });
+  doc.text(`Condición: ${venta.esCredito ? "A CRÉDITO (CXC)" : "CONTADO"}`, ndX + 29, y + 19, { align: "center" });
+
+  y += 28;
+
+  // ─── Datos del Cliente ──────────────────────────────────────────────
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(20, 20, 20);
+  doc.text("RECEPTOR:", margin, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(venta.cliente.nombre || "CONSUMIDOR FINAL", margin + 20, y);
+  y += 5;
+  doc.text(`C.I./RIF: ${venta.cliente.documento || "-"}`, margin, y);
+  if (venta.cliente.telefono && venta.cliente.telefono !== "-") {
+    doc.text(`Tel: ${venta.cliente.telefono}`, margin + 70, y);
+  }
+  if (venta.emailCliente) {
+    doc.text(`Email: ${venta.emailCliente}`, margin + 120, y);
+  }
+  y += 7;
+
+  // ─── Línea separadora ──────────────────────────────────────────────
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y, colRight, y);
+  y += 5;
+
+  // ─── Encabezado tabla de renglones ─────────────────────────────────
+  doc.setFillColor(240, 250, 248);
+  doc.rect(margin, y - 4, colRight - margin, 7, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(30, 120, 110);
+  doc.text("Cant.", margin + 2, y);
+  doc.text("Código", margin + 14, y);
+  doc.text("Descripción", margin + 35, y);
+  doc.text("P. Unit. (USD)", margin + 110, y, { align: "right" });
+  doc.text("Subtotal USD", margin + 145, y, { align: "right" });
+  doc.text("Subtotal Bs.", colRight - 2, y, { align: "right" });
+  y += 3;
+  doc.setDrawColor(180, 220, 215);
+  doc.line(margin, y, colRight, y);
+  y += 4;
+
+  // ─── Renglones ─────────────────────────────────────────────────────
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(8);
+  venta.lineas.forEach((item) => {
+    const subtotalUSD = item.precio * item.cantidad;
+    const subtotalBs = subtotalUSD * tasaActivaBs;
+    const nombre = item.nombre.length > 38 ? item.nombre.substring(0, 35) + "..." : item.nombre;
+    doc.text(String(item.cantidad), margin + 2, y);
+    doc.text(item.productoId || "-", margin + 14, y);
+    doc.text(nombre, margin + 35, y);
+    doc.text(`$${item.precio.toFixed(2)}`, margin + 110, y, { align: "right" });
+    doc.text(`$${subtotalUSD.toFixed(2)}`, margin + 145, y, { align: "right" });
+    doc.text(`Bs.${subtotalBs.toFixed(2)}`, colRight - 2, y, { align: "right" });
+    y += 6;
+    if (y > 240) {
+      doc.addPage();
+      y = 20;
+    }
+  });
+
+  y += 3;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, y, colRight, y);
+  y += 6;
+
+  // ─── Bloque de Totales ─────────────────────────────────────────────
+  const totalBs = venta.total * tasaActivaBs;
+  const totalCop = venta.total * tasaCop;
+  const totX = colRight - 60;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(80, 80, 80);
+  doc.text("Subtotal USD:", totX, y);
+  doc.text(`$${venta.total.toFixed(2)}`, colRight - 2, y, { align: "right" });
+  y += 5;
+  doc.text(`Tasa BCV aplicada:`, totX, y);
+  doc.text(`Bs.${tasaActivaBs.toFixed(2)}/USD`, colRight - 2, y, { align: "right" });
+  y += 5;
+  doc.text("Total en Bolívares:", totX, y);
+  doc.text(`Bs.${totalBs.toFixed(2)}`, colRight - 2, y, { align: "right" });
+  y += 5;
+  if (tasaCop > 0) {
+    doc.text("Equivalente COP:", totX, y);
+    doc.text(`COP ${Math.round(totalCop).toLocaleString("en-US")}`, colRight - 2, y, { align: "right" });
+    y += 5;
+  }
+
+  // TOTAL resaltado
+  doc.setFillColor(30, 150, 130);
+  doc.rect(totX - 2, y - 4, colRight - totX + 4, 8, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(9);
+  doc.text("TOTAL A PAGAR:", totX, y + 1);
+  doc.text(`$${venta.total.toFixed(2)} USD`, colRight - 2, y + 1, { align: "right" });
+  y += 12;
+
+  // ─── Detalle de Formas de Pago ─────────────────────────────────────
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(20, 20, 20);
+  doc.text("FORMAS DE PAGO RECIBIDAS:", margin, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(60, 60, 60);
+
+  if (venta.pagosMixtos && venta.pagosMixtos.length > 0) {
+    venta.pagosMixtos.forEach((p) => {
+      const ref = p.referencia ? ` (Ref: ${p.referencia})` : "";
+      const montoFmt = p.moneda === "USD" ? `$${p.montoOriginal.toFixed(2)} USD` :
+        p.moneda === "VES" ? `Bs.${p.montoOriginal.toFixed(2)}` :
+        `COP ${Math.round(p.montoOriginal).toLocaleString("en-US")}`;
+      doc.text(`• ${p.metodo}${ref}: ${montoFmt} → $${p.montoUSD.toFixed(2)} USD`, margin + 3, y);
+      y += 5;
+    });
+  } else {
+    const metLabel: Record<string,string> = {
+      EFECTIVO_USD: "Efectivo USD", EFECTIVO_BS: "Efectivo Bs.", PAGO_MOVIL: "Pago Móvil",
+      PUNTO_VENTA: "Punto Débito", ZELLE: "Zelle / USDT", COP_EFECTIVO: "Pesos COP",
+      CREDITO_CUENTA: "Crédito (CXC)"
+    };
+    doc.text(`• ${metLabel[venta.metodoPago] || venta.metodoPago}: $${venta.total.toFixed(2)} USD`, margin + 3, y);
+    y += 5;
+  }
+
+  if (venta.esCredito) {
+    doc.setTextColor(180, 100, 0);
+    doc.setFont("helvetica", "bold");
+    doc.text(`⚠ PENDIENTE CXC: $${venta.total.toFixed(2)} USD — Cliente: ${venta.cliente.nombre}`, margin, y);
+    doc.setTextColor(60, 60, 60);
+    doc.setFont("helvetica", "normal");
+    y += 6;
+  }
+
+  y += 4;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, y, colRight, y);
+  y += 8;
+
+  // ─── Leyenda SENIAT ────────────────────────────────────────────────
+  // (El bloque de firmas "Entregado/Recibido Conforme" se quitó a pedido del
+  // dueño — muchos comercios entregan la nota sin exigir firma física.)
+  doc.setFontSize(6.5);
+  doc.setTextColor(90, 90, 90);
+  doc.setFont("helvetica", "italic");
+  const leyenda = "Documento no sujeto a retención ni constituye Factura Fiscal conforme a las normativas del SENIAT (Providencias 00071 y 0102). Comprobante para soporte de entrega, inventario y recepción de mercancía. Reclamos dentro de las 48 horas siguientes a la recepción.";
+  const lines = doc.splitTextToSize(leyenda, colRight - margin);
+  doc.text(lines, margin, y);
+
+  if (descargar) {
+    doc.save(`NotaEntrega_ND-${venta.numero}_${venta.cliente.nombre.replace(/\s+/g, "_")}.pdf`);
+  }
+  return doc;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ENVÍO POR CORREO — mailto: 1-clic con adjunto de datos
+// ══════════════════════════════════════════════════════════════════════════
+function enviarNotaEntregaPorCorreo(
+  venta: VentaComercio,
+  nombreLocal: string,
+  tasaActivaBs: number,
+  tasaCop: number
+) {
+  // Generar y descargar el PDF primero
+  generarNotaEntregaPDF(venta, nombreLocal, tasaActivaBs, tasaCop, true);
+
+  const email = venta.emailCliente || "";
+  const asunto = encodeURIComponent(`Nota de Entrega ND-${venta.numero} — ${nombreLocal}`);
+
+  const pagoStr = venta.pagosMixtos && venta.pagosMixtos.length > 0
+    ? venta.pagosMixtos.map(p => {
+        const ref = p.referencia ? ` (Ref: ${p.referencia})` : "";
+        const m = p.moneda === "USD" ? `$${p.montoOriginal.toFixed(2)} USD` :
+          p.moneda === "VES" ? `Bs.${p.montoOriginal.toFixed(2)}` :
+          `COP ${Math.round(p.montoOriginal).toLocaleString("en-US")}`;
+        return `  - ${p.metodo}${ref}: ${m} → $${p.montoUSD.toFixed(2)} USD`;
+      }).join("\n")
+    : `  - ${venta.metodoPago}: $${venta.total.toFixed(2)} USD`;
+
+  const lineasStr = venta.lineas.map(l =>
+    `  ${l.cantidad}x ${l.nombre} @ $${l.precio.toFixed(2)} = $${(l.precio * l.cantidad).toFixed(2)} USD`
+  ).join("\n");
+
+  const cuerpo = encodeURIComponent(
+`Estimado/a ${venta.cliente.nombre},
+
+Adjunto encontrará (o puede descargar a continuación) su Nota de Entrega N° ND-${venta.numero} emitida el ${new Date().toLocaleDateString("es-VE")} por ${nombreLocal}.
+
+═══════════════════════════════════════
+  NOTA DE ENTREGA — ND-${venta.numero}
+  Fecha: ${venta.fecha}
+  Cond.: ${venta.esCredito ? "A CRÉDITO" : "CONTADO"}
+═══════════════════════════════════════
+
+PRODUCTOS:
+${lineasStr}
+
+──────────────────────────────────────
+TOTAL:          $${venta.total.toFixed(2)} USD
+En Bolívares:   Bs.${(venta.total * tasaActivaBs).toFixed(2)} (Tasa: ${tasaActivaBs.toFixed(2)})
+${tasaCop > 0 ? `En Pesos COP:   COP ${Math.round(venta.total * tasaCop).toLocaleString("en-US")}\n` : ""}
+FORMAS DE PAGO:
+${pagoStr}
+──────────────────────────────────────
+
+Si tiene alguna consulta o reclamo, comuníquese dentro de las 48 horas.
+
+Atentamente,
+${nombreLocal}
+
+──────────────────────────────────────
+NOTA LEGAL: Este correo y su documento adjunto no constituyen Factura Fiscal conforme a las normativas del SENIAT. Son documentos internos de entrega y recepción de mercancía.`
+  );
+
+  window.location.href = `mailto:${email}?subject=${asunto}&body=${cuerpo}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // IMPRESIÓN TÉRMICA UNIVERSAL PARA COMERCIO (80mm / 58mm)
 // ══════════════════════════════════════════════════════════════════════════
+// Sugerencia de qué pedir como "atributo" de variante según palabras clave en la
+// categoría escrita — no reemplaza un sistema de categorías configurable, solo evita
+// que el dueño tenga que adivinar si acá va una talla, un modelo o un color.
+// Fecha LOCAL en formato YYYY-MM-DD — nunca usar Date.toISOString().slice(0,10)
+// para "hoy": toISOString() convierte a UTC primero, así que en Venezuela
+// (UTC-4) cualquier venta hecha después de las 8pm local cae en el día
+// SIGUIENTE en UTC. Reportes que piden "hoy" con la fecha UTC (Utilidad Real,
+// Costo Real) terminaban pidiéndole al backend un día que todavía no
+// arrancaba en su zona horaria, y como no había ventas registradas ahí,
+// mostraban "—" aunque sí hubiera ventas reales esa noche.
+function fechaLocalISO(fecha: Date = new Date()): string {
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth() + 1).padStart(2, "0");
+  const d = String(fecha.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+const SUGERENCIAS_ATRIBUTO_POR_CATEGORIA: { patrones: string[]; etiqueta: string; placeholder: string }[] = [
+  { patrones: ["zapato", "calzado", "tenis", "bota", "sandalia"], etiqueta: "Talla del calzado", placeholder: "Ej. 38, 39, 40…" },
+  { patrones: ["celular", "telefono", "teléfono", "smartphone"], etiqueta: "Modelo del teléfono", placeholder: "Ej. iPhone 13, Galaxy A54…" },
+  { patrones: ["ropa", "camisa", "camiseta", "chaqueta", "pantalon", "pantalón", "blusa", "vestido", "franela"], etiqueta: "Talla de la prenda", placeholder: "Ej. S, M, L, XL…" },
+  { patrones: ["perfume", "fragancia", "colonia"], etiqueta: "Presentación", placeholder: "Ej. 50ml, 100ml…" },
+];
+
+function sugerirAtributoPorCategoria(categoria: string): { etiqueta: string; placeholder: string } {
+  const c = categoria.trim().toLowerCase();
+  if (c) {
+    for (const s of SUGERENCIAS_ATRIBUTO_POR_CATEGORIA) {
+      if (s.patrones.some((p) => c.includes(p))) return { etiqueta: s.etiqueta, placeholder: s.placeholder };
+    }
+  }
+  return { etiqueta: "Esta variante es…", placeholder: "Ej. Talla 38, Rojo, Modelo X…" };
+}
+
 function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaActivaBs: number, tasaCop: number) {
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
@@ -513,26 +850,32 @@ function DashboardGeneralComercio({
   productos,
   ingresosCaja,
   ventas,
+  cuentas,
   tasaActivaBs,
   tasaCop,
   esAdmin,
   nombreNegocio,
+  tenantId,
   onIrAInventario,
   onIrAPos,
   onIrAProveedores,
   onIrAUtilidad,
+  onIrACuentas,
 }: {
   productos: ProductoComercio[];
   ingresosCaja: MovimientoCaja[];
   ventas: VentaComercio[];
+  cuentas: CuentaComercio[];
   tasaActivaBs: number;
   tasaCop: number;
   esAdmin: boolean;
   nombreNegocio: string;
+  tenantId?: number;
   onIrAInventario: () => void;
   onIrAPos: () => void;
   onIrAProveedores: () => void;
   onIrAUtilidad: () => void;
+  onIrACuentas: () => void;
 }) {
   const sumarPorMoneda = (movimientos: MovimientoCaja[]) => {
     const acc: Record<string, number> = {};
@@ -540,16 +883,41 @@ function DashboardGeneralComercio({
     return acc;
   };
 
-  const { ventasHoy, ventasSemana } = useMemo(() => {
+  const { ventasHoy, ventasSemana, cambioSemanaPct } = useMemo(() => {
     const ahora = new Date();
     const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
     const inicioSemana = new Date(inicioHoy);
     inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
+    const inicioSemanaPasada = new Date(inicioSemana);
+    inicioSemanaPasada.setDate(inicioSemanaPasada.getDate() - 7);
+
+    // Todo convertido a USD solo para este comparativo (el desglose por moneda que
+    // se muestra en la tarjeta sigue intacto) — comparar "semana pasada vs esta
+    // semana" necesita un solo número, no un mapa de monedas distintas.
+    const aUSD = (m: MovimientoCaja) => {
+      const monto = Number(m.monto) || 0;
+      if (m.moneda === "USD") return monto;
+      if (m.moneda === "VES") return tasaActivaBs > 0 ? monto / tasaActivaBs : 0;
+      if (m.moneda === "COP") return tasaCop > 0 ? monto / tasaCop : 0;
+      return 0;
+    };
+    const totalSemanaUSD = ingresosCaja
+      .filter((m) => new Date(m.fechaRegistro) >= inicioSemana)
+      .reduce((acc, m) => acc + aUSD(m), 0);
+    const totalSemanaPasadaUSD = ingresosCaja
+      .filter((m) => { const f = new Date(m.fechaRegistro); return f >= inicioSemanaPasada && f < inicioSemana; })
+      .reduce((acc, m) => acc + aUSD(m), 0);
+    // null = sin base de comparación real (nunca se inventa un "+100%" contra cero).
+    const cambioSemanaPct = totalSemanaPasadaUSD > 0
+      ? ((totalSemanaUSD - totalSemanaPasadaUSD) / totalSemanaPasadaUSD) * 100
+      : null;
+
     return {
       ventasHoy: sumarPorMoneda(ingresosCaja.filter((m) => new Date(m.fechaRegistro) >= inicioHoy)),
       ventasSemana: sumarPorMoneda(ingresosCaja.filter((m) => new Date(m.fechaRegistro) >= inicioSemana)),
+      cambioSemanaPct,
     };
-  }, [ingresosCaja]);
+  }, [ingresosCaja, tasaActivaBs, tasaCop]);
 
   // Función robusta para determinar si una venta fue realizada el día de hoy
   const esFechaDeHoy = (fechaStr?: string): boolean => {
@@ -639,7 +1007,65 @@ function DashboardGeneralComercio({
     () => productos.filter((p) => p.stock <= p.stockMinimo).sort((a, b) => a.stock / Math.max(a.stockMinimo, 1) - b.stock / Math.max(b.stockMinimo, 1)),
     [productos]
   );
+  // Agotado (stock 0) es una urgencia distinta de "bajo mínimo" (todavía queda
+  // algo) — separados para que el dueño vea de un vistazo cuántos ya no puede
+  // vender en absoluto, no solo cuántos están por debajo del umbral.
+  const productosAgotados = useMemo(() => productosBajoStock.filter((p) => p.stock <= 0), [productosBajoStock]);
   const productosSinCosto = useMemo(() => productos.filter((p) => !p.costo || p.costo <= 0).length, [productos]);
+
+  // Cuentas por pagar pendientes, más próximas a vencer primero (sin fecha = al
+  // final) — resumen rápido en el dashboard; el detalle completo y "Pagar/Abonar"
+  // real siguen viviendo solo en Administración > Cuentas por Cobrar & Pagar.
+  const cuentasPorPagarProximas = useMemo(
+    () => cuentas
+      .filter((c) => c.tipo === "CXP" && c.estado !== "PAGADO" && c.saldoPendiente > 0)
+      .sort((a, b) => {
+        if (!a.fechaVencimiento && !b.fechaVencimiento) return 0;
+        if (!a.fechaVencimiento) return 1;
+        if (!b.fechaVencimiento) return -1;
+        return new Date(a.fechaVencimiento).getTime() - new Date(b.fechaVencimiento).getTime();
+      })
+      .slice(0, 5),
+    [cuentas]
+  );
+  const diasParaVencerCuenta = (fecha: string): number => {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const venc = new Date(fecha + "T00:00:00");
+    return Math.round((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Ventas de hoy, más reciente primero — antes solo se veía el total consolidado
+  // en la tarjeta de arriba, sin ningún detalle de "qué se vendió y cuándo", así
+  // que después de cobrar no había dónde confirmarlo de un vistazo en Vista General.
+  // Mismo criterio de respaldo que ya usa el total consolidado (arriba): si no hay
+  // ventas locales (`ventas`) pero SÍ hay ingresos de caja de hoy —caso típico
+  // justo después de recargar la página, antes de que el historial de ventas
+  // termine de cargar—, se muestra el detalle desde ahí para que ambos coincidan.
+  const ventasHoyOrdenadas = useMemo(
+    () => (ventas || []).filter((v) => esFechaDeHoy(v.fecha)).sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()),
+    [ventas]
+  );
+  // Fila expandida en "Ventas de Hoy" — clic para ver el detalle (productos,
+  // cliente, desglose de pago) sin salir de Vista General ni ir al POS.
+  const [ventaHoyExpandidaId, setVentaHoyExpandidaId] = useState<string | number | null>(null);
+  // Capturas de pago que se acaban de subir en esta sesión — el prop
+  // `ingresosCaja` no se vuelve a pedir al backend después de subir, así que
+  // sin esto la miniatura no aparecería hasta refrescar la página.
+  const [capturasPagoSubidas, setCapturasPagoSubidas] = useState<Record<number, string>>({});
+  const [subiendoComprobanteId, setSubiendoComprobanteId] = useState<number | null>(null);
+  const [errorComprobanteId, setErrorComprobanteId] = useState<number | null>(null);
+  // Visor propio en vez de <a target="_blank"> — Chrome bloquea navegar una
+  // pestaña nueva directo a una imagen "data:" (protección anti-phishing), así
+  // que el link se quedaba abriendo una pestaña que nunca cargaba nada.
+  const [comprobanteAmpliado, setComprobanteAmpliado] = useState<string | null>(null);
+
+  const ingresosHoyOrdenados = useMemo(() => {
+    const ahora = new Date();
+    const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    return (ingresosCaja || [])
+      .filter((m) => new Date(m.fechaRegistro) >= inicioHoy)
+      .sort((a, b) => new Date(b.fechaRegistro).getTime() - new Date(a.fechaRegistro).getTime());
+  }, [ingresosCaja]);
 
   const fmtMonedas = (obj: Record<string, number>) => {
     const entradas = Object.entries(obj);
@@ -654,21 +1080,12 @@ function DashboardGeneralComercio({
   const [cargandoUtilidad, setCargandoUtilidad] = useState(esAdmin);
   useEffect(() => {
     if (!esAdmin) { setCargandoUtilidad(false); return; }
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = fechaLocalISO();
     obtenerUtilidadRepuestos(hoy, hoy)
       .then(setUtilidadHoy)
       .catch(() => setUtilidadHoy(null))
       .finally(() => setCargandoUtilidad(false));
   }, [esAdmin]);
-
-  const saludo = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return "Buenos días";
-    if (h < 19) return "Buenas tardes";
-    return "Buenas noches";
-  })();
-
-  const fechaHoyLarga = new Date().toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
 
   // Checklist de primeros pasos — solo se muestra mientras falte alguno. Un
   // negocio recién creado con todo en cero no debe sentirse "vacío" sino
@@ -681,19 +1098,6 @@ function DashboardGeneralComercio({
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* ── ENCABEZADO ── */}
-      <div className="rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-teal-50 via-white to-white dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider bg-teal-500/10 border border-teal-500/20 rounded-full px-2.5 py-1">
-              {fechaHoyLarga}
-            </span>
-            <h2 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{saludo} — {nombreNegocio}</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Así está tu negocio ahora mismo.</p>
-          </div>
-        </div>
-      </div>
-
       {/* ── CHECKLIST DE PRIMEROS PASOS (solo mientras el negocio está empezando) ── */}
       {mostrarChecklist && (
         <section className="rounded-3xl p-6 border border-teal-500/30 bg-gradient-to-br from-teal-500/5 via-white to-white dark:from-teal-500/10 dark:via-slate-900 dark:to-slate-900 shadow-sm space-y-4">
@@ -741,7 +1145,7 @@ function DashboardGeneralComercio({
 
       {/* ── 1. RENTABILIDAD DE HOY — tarjeta héroe (Ventas) + cinta secundaria (Utilidad / Alertas) ── */}
       <section className="space-y-2.5">
-        <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Hoy</h3>
+        <h3 className="text-[11px] font-bold text-slate-900 dark:text-white uppercase tracking-wider px-0.5">Hoy</h3>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* Tarjeta héroe: Ventas de Hoy Multi-Moneda */}
           <div className="lg:col-span-7 self-start bg-white dark:bg-slate-900 rounded-2xl p-5 border border-teal-200 dark:border-teal-500/30 shadow-sm space-y-3.5">
@@ -761,21 +1165,31 @@ function DashboardGeneralComercio({
                 </div>
 
                 {/* Total Consolidado */}
-                <div className="mt-2 font-['Outfit'] font-black text-3xl text-slate-900 dark:text-white tracking-tight">
+                <div className="mt-2 font-['Outfit'] font-black text-3xl text-teal-700 dark:text-teal-400 tracking-tight">
                   ${totalConsolidadoUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                  <span className="text-xs font-bold text-slate-400 font-sans uppercase">USD Consolidado</span>
+                  <span className="text-xs font-bold text-slate-400 font-sans uppercase">Vendido Hoy</span>
                 </div>
+                {cantidadVentasHoy > 0 && (
+                  <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">
+                    Ticket promedio: <span className="text-slate-700 dark:text-slate-200 font-mono">${(totalConsolidadoUSD / cantidadVentasHoy).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
 
-                {/* Equivalencias oficiales del total en Bolívares y Pesos */}
+                {/* Equivalencias oficiales — COP solo si el negocio configuró esa tasa;
+                    mostrarla siempre a un negocio que nunca cobra en pesos es ruido puro. */}
                 <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap">
                   <span>Equivalente:</span>
                   <span className="font-bold text-slate-700 dark:text-slate-200">
                     Bs. {totalConsolidadoBs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                  <span>·</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-200">
-                    COP ${Math.round(totalConsolidadoCop).toLocaleString()}
-                  </span>
+                  {tasaCop > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="font-bold text-slate-700 dark:text-slate-200">
+                        COP ${Math.round(totalConsolidadoCop).toLocaleString()}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -786,10 +1200,10 @@ function DashboardGeneralComercio({
 
             {/* Desglose real por tipo de moneda recibida */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                Cobrado hoy por tipo de moneda:
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Cobrado por moneda:
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className={`grid gap-2 ${tasaCop > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
                 {/* Dólares */}
                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
                   <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">
@@ -812,16 +1226,18 @@ function DashboardGeneralComercio({
                   </div>
                 </div>
 
-                {/* Pesos COP */}
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">
-                    <span>Pesos COP</span>
-                    <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">COP $</span>
+                {/* Pesos COP — solo si el negocio configuró una tasa USD->COP */}
+                {tasaCop > 0 && (
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">
+                      <span>Pesos COP</span>
+                      <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">COP $</span>
+                    </div>
+                    <div className="font-mono font-black text-sm text-amber-600 dark:text-amber-400 truncate">
+                      COP ${Math.round(cobradoCop).toLocaleString()}
+                    </div>
                   </div>
-                  <div className="font-mono font-black text-sm text-amber-600 dark:text-amber-400 truncate">
-                    COP ${Math.round(cobradoCop).toLocaleString()}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -844,7 +1260,7 @@ function DashboardGeneralComercio({
                       )}
                     </>
                   ) : (
-                    <div className="font-['Outfit'] font-black text-xl text-slate-300 dark:text-slate-600">—</div>
+                    <div className="text-xs text-slate-400 mt-1">{tieneVentaRegistrada ? "Sin ventas hoy" : "Se calcula cuando registres tu primera venta con costo"}</div>
                   )}
                 </div>
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-500/20 transition-colors"><IconCoins size={15} className="text-emerald-600 dark:text-emerald-400" /></div>
@@ -858,24 +1274,31 @@ function DashboardGeneralComercio({
               </div>
             )}
 
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => document.getElementById("alertas-inventario-bajo")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              disabled={productosBajoStock.length === 0}
+              className={`w-full pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-left ${productosBajoStock.length > 0 ? "cursor-pointer" : "cursor-default"}`}
+            >
               <div className="min-w-0">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>Requiere tu atención</span>
                 <div className={`font-['Outfit'] font-black text-sm truncate ${productosBajoStock.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>
-                  {productosBajoStock.length > 0 ? `${productosBajoStock.length} producto${productosBajoStock.length === 1 ? "" : "s"} bajo mínimo` : "Todo en orden"}
+                  {productosBajoStock.length > 0
+                    ? `${productosBajoStock.length} producto${productosBajoStock.length === 1 ? "" : "s"} bajo mínimo${productosAgotados.length > 0 ? ` (${productosAgotados.length} agotado${productosAgotados.length === 1 ? "" : "s"})` : ""} — ver →`
+                    : "Todo en orden"}
                 </div>
               </div>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${productosBajoStock.length > 0 ? "bg-amber-500/15" : "bg-emerald-500/10"}`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${productosBajoStock.length > 0 ? "bg-amber-500/15 group-hover:bg-amber-500/25" : "bg-emerald-500/10"}`}>
                 {productosBajoStock.length > 0 ? <IconWarning size={15} className="text-amber-600 dark:text-amber-400" /> : <IconCheckCircle size={15} className="text-emerald-600 dark:text-emerald-400" />}
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </section>
 
       {/* ── 2. ACCESOS RÁPIDOS — lo que se usa todos los días, un clic ── */}
       <section className="space-y-2.5">
-        <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Accesos rápidos</h3>
+        <h3 className="text-[11px] font-bold text-slate-900 dark:text-white uppercase tracking-wider px-0.5">Accesos rápidos</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           <button type="button" onClick={onIrAPos} className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-xl py-3 px-3.5 border border-slate-200 dark:border-slate-800 hover:border-teal-500/50 transition-colors cursor-pointer text-left">
             <div className="w-8 h-8 rounded-md bg-teal-500/10 flex items-center justify-center"><IconCard size={16} className="text-teal-600 dark:text-teal-400" /></div>
@@ -905,44 +1328,348 @@ function DashboardGeneralComercio({
 
       {/* ── 3. PULSO DE LA SEMANA ── */}
       <section className="space-y-2.5">
-        <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-0.5">Esta semana</h3>
+        <h3 className="text-[11px] font-bold text-slate-900 dark:text-white uppercase tracking-wider px-0.5">Esta semana</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ventas de la Semana</span>
+              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Ventas de la Semana</span>
               <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center"><IconChart size={17} className="text-cyan-600 dark:text-cyan-400" /></div>
             </div>
-            <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white truncate">{fmtMonedas(ventasSemana)}</div>
+            {(() => {
+              const entradas = Object.entries(ventasSemana);
+              const [primero, ...resto] = entradas;
+              return (
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <div className="font-['Outfit'] font-black text-2xl text-teal-600 dark:text-teal-400 truncate">
+                    {primero ? `${primero[0] === "USD" ? "$" : primero[0] + " "}${primero[1].toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}
+                  </div>
+                  {resto.length > 0 && (
+                    <div className="flex items-baseline gap-3 pl-3 border-l-2 border-slate-200 dark:border-slate-700">
+                      {resto.map(([m, v]) => (
+                        <span key={m} className="font-['Outfit'] font-bold text-sm text-indigo-500 dark:text-indigo-400 truncate">
+                          {m} {v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {cambioSemanaPct != null && (
+              <div className={`inline-flex items-center gap-1 text-[11px] font-bold ${cambioSemanaPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}`}>
+                <span>{cambioSemanaPct >= 0 ? "▲" : "▼"}</span>
+                <span>{Math.abs(cambioSemanaPct).toFixed(1)}% vs semana pasada</span>
+              </div>
+            )}
           </div>
 
           <button type="button" onClick={onIrAInventario} className="text-left bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2 cursor-pointer hover:border-teal-500/50 transition-colors">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Productos en Stock</span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center"><IconBank size={17} className="text-emerald-600 dark:text-emerald-400" /></div>
+              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Productos en Stock</span>
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center"><IconBox size={17} className="text-emerald-600 dark:text-emerald-400" /></div>
             </div>
-            <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{productos.length}</div>
+            <div className="font-['Outfit'] font-black text-2xl text-emerald-600 dark:text-emerald-400">{productos.length}</div>
           </button>
 
-          <div className={`rounded-2xl p-5 border shadow-sm space-y-2 ${productosSinCosto > 0 ? "bg-slate-100 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
+          <div className={`rounded-2xl p-5 border shadow-sm space-y-2 ${productosSinCosto > 0 ? "bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"}`}>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Sin costo registrado</span>
-              <div className="w-9 h-9 rounded-xl bg-slate-500/10 flex items-center justify-center"><IconCoins size={17} className="text-slate-500" /></div>
+              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Sin costo registrado</span>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${productosSinCosto > 0 ? "bg-amber-500/15" : "bg-slate-500/10"}`}><IconCoins size={17} className={productosSinCosto > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-500"} /></div>
             </div>
-            <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{productosSinCosto}</div>
-            <p className="text-[11px] text-slate-400">{productosSinCosto > 0 ? "Su margen no se puede calcular todavía." : "Todo tu catálogo tiene costo real."}</p>
+            {tieneProductos ? (
+              <>
+                <div className={`font-['Outfit'] font-black text-2xl ${productosSinCosto > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-white"}`}>{productosSinCosto}</div>
+                <p className="text-[11px] text-slate-400">{productosSinCosto > 0 ? "Su margen no se puede calcular todavía." : "Todo tu catálogo tiene costo real."}</p>
+              </>
+            ) : (
+              <>
+                <div className="font-['Outfit'] font-black text-2xl text-slate-300 dark:text-slate-600">—</div>
+                <p className="text-[11px] text-slate-400">Aún no tienes productos registrados.</p>
+              </>
+            )}
           </div>
         </div>
       </section>
 
-      {/* ── 4. LO QUE REQUIERE ACCIÓN ── */}
+      {/* ── 3.5 VENTAS DE HOY (detalle, no solo el total) — más reciente primero ── */}
       <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <h3 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <IconReceipt size={15} className="text-teal-600 dark:text-teal-400" /> Ventas de Hoy
+            {(ventasHoyOrdenadas.length > 0 || ingresosHoyOrdenados.length > 0) && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-400 font-bold">
+                {ventasHoyOrdenadas.length > 0 ? ventasHoyOrdenadas.length : ingresosHoyOrdenados.length}
+              </span>
+            )}
+          </h3>
+          {esAdmin && (
+            <button type="button" onClick={onIrAPos} className="text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer">
+              Ir al POS →
+            </button>
+          )}
+        </div>
+        {ventasHoyOrdenadas.length > 0 ? (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-96 overflow-y-auto">
+            {ventasHoyOrdenadas.map((v) => {
+              const abierta = ventaHoyExpandidaId === v.id;
+              return (
+                <div key={v.id}>
+                  <button
+                    type="button"
+                    onClick={() => setVentaHoyExpandidaId(abierta ? null : v.id)}
+                    className="w-full p-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {new Date(v.fecha).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase">
+                          {v.metodoPago}
+                        </span>
+                        {v.esCredito && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 uppercase">
+                            Crédito
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate mt-0.5">
+                        {v.cliente?.nombre || "Cliente de mostrador"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <div className="font-['Outfit'] font-black text-sm text-teal-600 dark:text-teal-400">${v.total.toFixed(2)}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">Bs. {v.totalBs.toFixed(2)}</div>
+                      </div>
+                      <IconChevronRight size={13} className={`text-slate-400 transition-transform ${abierta ? "rotate-90" : ""}`} />
+                    </div>
+                  </button>
+
+                  {abierta && (
+                    <div className="px-3.5 pb-3.5 bg-slate-50 dark:bg-slate-800/40 space-y-2.5">
+                      <div className="pt-2.5 space-y-1">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Productos ({v.lineas.length})</div>
+                        {v.lineas.map((linea, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300">
+                            <span className="truncate">{linea.cantidad}x {linea.nombre}</span>
+                            <span className="font-mono flex-shrink-0 ml-2">${(linea.precio * linea.cantidad).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {v.pagosMixtos && v.pagosMixtos.length > 0 && (
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pago mixto</div>
+                          {v.pagosMixtos.map((p, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300">
+                              <span>{p.metodo}{p.referencia ? ` (Ref: ${p.referencia})` : ""}</span>
+                              <span className="font-mono">${p.montoUSD.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200 dark:border-slate-700">
+                        <span className="text-[10px] text-slate-400">
+                          {v.cliente?.documento && v.cliente.documento !== "-" ? `C.I./RIF: ${v.cliente.documento}` : "Sin documento registrado"}
+                        </span>
+                        {v.utilidad != null && (
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Utilidad: ${v.utilidad.toFixed(2)}</span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={onIrAPos}
+                        className="w-full py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors"
+                      >
+                        Ver Nota de Entrega / Ticket en POS →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : ingresosHoyOrdenados.length > 0 ? (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-96 overflow-y-auto">
+            {ingresosHoyOrdenados.map((m) => {
+              const abierta = ventaHoyExpandidaId === m.id;
+              return (
+                <div key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => setVentaHoyExpandidaId(abierta ? null : m.id)}
+                    className="w-full p-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {new Date(m.fechaRegistro).toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase">
+                          {m.moneda}
+                        </span>
+                        {/* Canal de venta — POS (mostrador) o WEB (pedido confirmado del
+                            catálogo público). Ventas viejas, de antes de esta trazabilidad,
+                            no muestran nada en vez de adivinar. */}
+                        {m.referenciaTipo === "WEB" ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-600 dark:text-purple-400 uppercase flex items-center gap-1">
+                            <IconShoppingBag size={9} /> Web
+                          </span>
+                        ) : m.referenciaTipo === "POS" ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-400 uppercase flex items-center gap-1">
+                            <IconCard size={9} /> POS
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate mt-0.5">
+                        {m.concepto || "Ingreso de caja"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="font-['Outfit'] font-black text-sm text-teal-600 dark:text-teal-400">
+                        {m.moneda === "USD" ? "$" : m.moneda + " "}{Number(m.monto).toFixed(2)}
+                      </div>
+                      <IconChevronRight size={13} className={`text-slate-400 transition-transform ${abierta ? "rotate-90" : ""}`} />
+                    </div>
+                  </button>
+
+                  {abierta && (
+                    <div className="px-3.5 pb-3.5 pt-2.5 bg-slate-50 dark:bg-slate-800/40 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300">
+                        <span className="text-slate-400">Fecha completa:</span>
+                        <span className="font-mono">{new Date(m.fechaRegistro).toLocaleString("es-VE")}</span>
+                      </div>
+                      {m.moduloOrigen && (
+                        <div className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300">
+                          <span className="text-slate-400">Origen:</span>
+                          <span className="font-mono">{m.moduloOrigen}{m.referenciaTipo ? ` · ${m.referenciaTipo}` : ""}</span>
+                        </div>
+                      )}
+
+                      {/* Comprobante de pago — se ancla al movimiento de caja real (no al
+                          ticket local) para que nunca se pierda al cambiar de dispositivo. */}
+                      {(m.capturaPagoBase64 || capturasPagoSubidas[m.id]) ? (
+                        <button
+                          type="button"
+                          onClick={() => setComprobanteAmpliado(m.capturaPagoBase64 || capturasPagoSubidas[m.id])}
+                          className="flex items-center gap-2 pt-1 cursor-pointer"
+                        >
+                          <img
+                            src={m.capturaPagoBase64 || capturasPagoSubidas[m.id]}
+                            alt="Comprobante de pago"
+                            className="h-10 w-10 rounded-lg object-cover border border-slate-300 dark:border-slate-600"
+                          />
+                          <span className="text-[11px] font-bold text-teal-600 dark:text-teal-400 underline">Ver comprobante de pago</span>
+                        </button>
+                      ) : (
+                        <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={subiendoComprobanteId === m.id}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file || !tenantId) return;
+                              setSubiendoComprobanteId(m.id);
+                              const reader = new FileReader();
+                              reader.onload = async () => {
+                                try {
+                                  const capturaBase64 = typeof reader.result === "string" ? reader.result : "";
+                                  await subirComprobanteMovimientoCaja(tenantId, m.id, capturaBase64);
+                                  setCapturasPagoSubidas((prev) => ({ ...prev, [m.id]: capturaBase64 }));
+                                  setErrorComprobanteId(null);
+                                } catch {
+                                  setErrorComprobanteId(m.id);
+                                } finally {
+                                  setSubiendoComprobanteId(null);
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                          <span className="text-[11px] font-bold text-teal-600 dark:text-teal-400 underline">
+                            {subiendoComprobanteId === m.id ? "Subiendo..." : "+ Adjuntar comprobante de pago"}
+                          </span>
+                        </label>
+                      )}
+                      {errorComprobanteId === m.id && (
+                        <p className="text-[10px] text-rose-500">No se pudo subir el comprobante, intenta de nuevo.</p>
+                      )}
+
+                      <p className="text-[10px] text-slate-400 pt-1">
+                        Este registro viene directo de caja; para ver el ticket/Nota de Entrega completa entra al POS.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-8 text-center text-xs text-slate-400">
+            Todavía no has registrado ninguna venta hoy.
+          </div>
+        )}
+      </section>
+
+      {cuentasPorPagarProximas.length > 0 && (
+        <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <h3 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
+              <IconWallet size={15} className="text-rose-500" /> Cuentas por Pagar Próximas a Vencer
+            </h3>
+            <button type="button" onClick={onIrACuentas} className="text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer">
+              Ver Cuentas →
+            </button>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            {cuentasPorPagarProximas.map((c) => {
+              const dias = c.fechaVencimiento ? diasParaVencerCuenta(c.fechaVencimiento) : null;
+              const vencida = dias != null && dias < 0;
+              return (
+                <div key={c.id} className="p-3.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{c.entidadNombre}</div>
+                    <div className="text-[11px] text-slate-400 truncate">{c.concepto}</div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-xs font-mono font-bold text-slate-900 dark:text-white">
+                      {c.moneda === "USD" ? "$" : c.moneda + " "}{c.saldoPendiente.toFixed(2)}
+                    </div>
+                    <div className={`text-[10px] font-bold ${vencida ? "text-rose-600 dark:text-rose-400" : dias != null ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
+                      {dias == null ? "Sin fecha" : vencida ? `Vencida (${Math.abs(dias)}d)` : dias === 0 ? "Vence hoy" : `Vence en ${dias}d`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ── 4. LO QUE REQUIERE ACCIÓN ── */}
+      <section id="alertas-inventario-bajo" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden scroll-mt-4">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3">
+          <h3 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
             <IconWarning size={15} className="text-amber-500" /> Alertas de Inventario Bajo
           </h3>
-          <button type="button" onClick={onIrAInventario} className="text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer">
-            Ver Inventario →
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10">
+              <span className="font-['Outfit'] font-black text-sm text-amber-600 dark:text-amber-400">{productosBajoStock.length - productosAgotados.length}</span>
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase">Bajo mínimo</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10">
+              <span className="font-['Outfit'] font-black text-sm text-rose-600 dark:text-rose-400">{productosAgotados.length}</span>
+              <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase">Agotados</span>
+            </div>
+            <button type="button" onClick={onIrAInventario} className="text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer">
+              Ver Inventario →
+            </button>
+          </div>
         </div>
         {productosBajoStock.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
@@ -961,19 +1688,39 @@ function DashboardGeneralComercio({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {productosBajoStock.map((p) => (
-                  <tr key={p.id}>
-                    <td className="p-3 font-mono text-slate-500 dark:text-slate-400">{p.codigo}</td>
-                    <td className="p-3 font-bold text-slate-900 dark:text-white">{p.nombre}</td>
-                    <td className="p-3 text-right font-bold text-amber-600 dark:text-amber-400">{p.stock} {p.unidadMedida || ""}</td>
-                    <td className="p-3 text-right text-slate-500 dark:text-slate-400">{p.stockMinimo}</td>
-                  </tr>
-                ))}
+                {productosBajoStock.map((p) => {
+                  const agotado = p.stock <= 0;
+                  return (
+                    <tr key={p.id}>
+                      <td className="p-3 font-mono text-slate-500 dark:text-slate-400">{p.codigo}</td>
+                      <td className="p-3 font-bold text-slate-900 dark:text-white">
+                        {p.nombre}
+                        {agotado && <span className="ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 uppercase">Agotado</span>}
+                      </td>
+                      <td className={`p-3 text-right font-bold ${agotado ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"}`}>{p.stock} {p.unidadMedida || ""}</td>
+                      <td className="p-3 text-right text-slate-500 dark:text-slate-400">{p.stockMinimo}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </section>
+
+      {comprobanteAmpliado && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setComprobanteAmpliado(null)}
+        >
+          <img
+            src={comprobanteAmpliado}
+            alt="Comprobante de pago en tamaño completo"
+            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1003,7 +1750,7 @@ function RelojEnVivoHeader() {
   );
 }
 
-export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
+export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: () => void; onIrAEquipoRoles?: () => void }) {
   const { user } = useAuth();
 
   // Rubro Activo: fijo al que el tenant realmente contrató (user.industry), nunca
@@ -1069,27 +1816,29 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "gastos" | "cierre" | "auditoria">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "cierre" | "auditoria">("general");
+  // Submódulos dentro de "Administración" — antes CXC/CXP e Ingresos&Gastos eran dos
+  // entradas separadas en el sidebar; se agrupan porque ambas son la misma función de
+  // negocio (control administrativo del dinero), no dos cosas distintas.
+  const [subTabAdmin, setSubTabAdmin] = useState<"cxc_cxp" | "ingresos_gastos" | "cuentas_bancarias">("ingresos_gastos");
 
-  const [cuentas, setCuentas] = useState<CuentaComercio[]>(() => {
-    try {
-      const g = localStorage.getItem("aurora_comercio_cuentas");
-      return g ? JSON.parse(g) : CUENTAS_INICIALES_COMERCIO;
-    } catch {
-      return CUENTAS_INICIALES_COMERCIO;
-    }
-  });
+  // Las cuentas por cobrar/pagar viven en el backend real (ver cargarCuentas más abajo,
+  // definida después junto a cargarIngresosCaja/cargarGastosCaja) — arranca vacío y se
+  // hidrata por useEffect cuando hay tenant activo. CUENTAS_INICIALES_COMERCIO solo se usa
+  // como demo cuando no hay sesión (modo preview sin tenant).
+  const [cuentas, setCuentas] = useState<CuentaComercio[]>(CUENTAS_INICIALES_COMERCIO);
 
   const guardarCuentas = (nuevas: CuentaComercio[]) => {
     setCuentas(nuevas);
-    try {
-      localStorage.setItem("aurora_comercio_cuentas", JSON.stringify(nuevas));
-    } catch {}
   };
   // Dentro de "Cierres & Reportes": arqueo de caja (todos) vs. utilidad real por
   // producto (solo Dueño/Administrador — mismo criterio que el backend, ver
   // ReporteRepuestoController.exigirRol).
   const [subCierre, setSubCierre] = useState<"caja" | "utilidad">("caja");
+  // "Administración" se expande en el propio sidebar y muestra sus submódulos
+  // ahí mismo (Ingresos & Gastos / CXC-CXP / Cuentas Bancarias) — mismo patrón
+  // que el "Cuentas" de Fina, en vez de pestañas horizontales dentro del panel.
+  const [administracionExpandida, setAdministracionExpandida] = useState(false);
   // El sidebar de w-64 fijo aplastaba todo el contenido en pantallas angostas
   // (celular) — no había forma de navegar sin hacer scroll horizontal. En
   // móvil ahora vive fuera de flujo (fixed) y entra/sale con un botón
@@ -1107,6 +1856,23 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       return PRODUCTOS_INICIALES;
     }
   });
+
+  const productosDelRubro = useMemo(() => productos.filter((p) => p.rubro === perfilActivo), [productos, perfilActivo]);
+
+  const productosBajoStockInventario = useMemo(
+    () => productosDelRubro.filter((p) => p.stock <= p.stockMinimo).sort((a, b) => a.stock / Math.max(a.stockMinimo, 1) - b.stock / Math.max(b.stockMinimo, 1)),
+    [productosDelRubro]
+  );
+  const productosAgotadosInventario = useMemo(() => productosBajoStockInventario.filter((p) => p.stock <= 0), [productosBajoStockInventario]);
+
+  // Solo artículos con fecha de vencimiento configurada y dentro de los próximos 30 días
+  // (o ya vencidos) — el resto del inventario (sin fecha) no tiene nada que alertar.
+  const productosPorVencerInventario = useMemo(
+    () => productosDelRubro
+      .filter((p) => p.fechaVencimiento && diasParaVencerComercio(p.fechaVencimiento) <= 30)
+      .sort((a, b) => diasParaVencerComercio(a.fechaVencimiento!) - diasParaVencerComercio(b.fechaVencimiento!)),
+    [productosDelRubro]
+  );
 
   const [clientes, setClientes] = useState<ClienteComercio[]>(() => {
     try {
@@ -1207,6 +1973,16 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [montoRecibido, setMontoRecibido] = useState("");
   const [monedaVuelto, setMonedaVuelto] = useState<"USD" | "VES" | "COP">("USD");
   const [ventaReciente, setVentaReciente] = useState<VentaComercio | null>(null);
+  // ─── Pago Mixto ───────────────────────────────────────────────────────
+  const [modoCobro, setModoCobro] = useState<"unico" | "mixto">("unico");
+  const [pagosMixtos, setPagosMixtos] = useState<PagoMixtoItem[]>([]);
+  const [pagoMixtoMetodo, setPagoMixtoMetodo] = useState("EFECTIVO_USD");
+  const [pagoMixtoMoneda, setPagoMixtoMoneda] = useState<"USD" | "VES" | "COP">("USD");
+  const [pagoMixtoMonto, setPagoMixtoMonto] = useState("");
+  const [pagoMixtoRef, setPagoMixtoRef] = useState("");
+  // ─── Email cliente ───────────────────────────────────────────────────
+  const [emailClienteModal, setEmailClienteModal] = useState("");
+  const [enviarEmailAlConfirmar, setEnviarEmailAlConfirmar] = useState(false);
   const [modalNuevoProducto, setModalNuevoProducto] = useState(false);
   const [clienteAbonoSel, setClienteAbonoSel] = useState<ClienteComercio | null>(null);
   const [montoAbono, setMontoAbono] = useState("");
@@ -1231,6 +2007,32 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [toast, setToast] = useState<{ tipo: "success" | "error" | "info"; mensaje: string } | null>(null);
   const [editarModalItem, setEditarModalItem] = useState<ProductoComercio | null>(null);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+  // Foto del producto para el catálogo público — aparte del resto del formulario (que es
+  // no controlado, vía FormData) porque necesita previsualización inmediata al elegir el
+  // archivo, antes de guardar nada.
+  const [editarImagenBase64, setEditarImagenBase64] = useState<string | undefined>(undefined);
+
+  const handleEditarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      mostrarToast("La imagen no debe superar los 2MB.", "error");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setEditarImagenBase64(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Sugerencia de qué pedir como "atributo" según palabras clave en la categoría escrita
+  // (zapatos → Talla, celulares → Modelo, ropa → Talla) — no es un motor de categorías
+  // configurable, solo evita que el dueño tenga que adivinar qué escribir ahí. Vive fuera
+  // del componente porque no depende de ningún estado.
+  const [categoriaEnEdicion, setCategoriaEnEdicion] = useState("");
+  const [editarTab, setEditarTab] = useState<"datos" | "catalogo">("datos");
   const [ajustarStockModalItem, setAjustarStockModalItem] = useState<ProductoComercio | null>(null);
   const [guardandoAjuste, setGuardandoAjuste] = useState(false);
   const [comprasRepuesto, setComprasRepuesto] = useState<CompraRepuesto[] | null>(null);
@@ -1240,20 +2042,6 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const [modalNuevoProveedor, setModalNuevoProveedor] = useState(false);
 
   
-  const cargarPedidoWebAlPos = (pedido: PedidoWeb) => {
-    const linea: LineaCarritoComercio = {
-      productoId: "web-" + pedido.id,
-      codigo: pedido.numeroPedido,
-      nombre: `Pedido Web #${pedido.numeroPedido} (${pedido.clienteNombre})`,
-      precio: Number(pedido.totalUsd),
-      cantidad: 1,
-      unidadMedida: "Pedido",
-    };
-    setCarrito([linea]);
-    setTab("pos");
-    mostrarToast(`Pedido #${pedido.numeroPedido} cargado al mostrador POS. Listo para cobrar.`, "success");
-  };
-
   const mostrarToast = (mensaje: string, tipo: "success" | "error" | "info" = "success") => {
     setToast({ tipo, mensaje });
     setTimeout(() => setToast(null), 4000);
@@ -1273,7 +2061,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             codigo: r.codigoSku,
             codigoOem: r.codigoOriginalOem || "",
             nombre: r.descripcion,
-            categoria: r.codigoOriginalOem ? "Repuestos & Ferretería" : "General",
+            categoria: r.categoria || "General",
             rubro: perfilActivo,
             precio: r.precioVenta,
             costo: r.costoUnitario || 0,
@@ -1284,6 +2072,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             precioMayorista: r.precioMayorista || undefined,
             cantidadMinimaMayorista: r.cantidadMinimaMayorista || undefined,
             ubicacion: "Almacén Central",
+            visible: r.visible !== false,
+            ordenVisualizacion: r.ordenVisualizacion ?? 0,
+            descripcionLarga: r.descripcionLarga || undefined,
+            imagenBase64: r.imagenBase64 || undefined,
+            grupoVariante: r.grupoVariante || undefined,
+            atributoVariante: r.atributoVariante || undefined,
+            colorVariante: r.colorVariante || undefined,
+            fechaVencimiento: r.fechaVencimiento || undefined,
           }));
           setProductos((prev) => {
             const otros = prev.filter((p) => p.rubro !== perfilActivo);
@@ -1312,6 +2108,39 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
   const cargarGastosCaja = () => {
     if (!user?.tenantId) return;
     listarMovimientos(user.tenantId, "EGRESO").then(setGastosCaja).catch(() => setGastosCaja([]));
+  };
+
+  // Cuentas por cobrar/pagar reales del motor financiero — antes esta pestaña se
+  // alimentaba de localStorage y nunca reflejaba lo que el backend ya registraba
+  // (ventas a crédito, compras a proveedor a crédito), así que dos dispositivos del
+  // mismo negocio veían listas distintas y todo se perdía si se limpiaba el navegador.
+  const movimientoACuenta = (m: MovimientoCaja): CuentaComercio => {
+    const marcador = m.tipo === "CXC" ? "— Cliente: " : "— Proveedor: ";
+    const idx = m.concepto.lastIndexOf(marcador);
+    return {
+      id: `mc-${m.id}`,
+      tipo: m.tipo as "CXP" | "CXC",
+      entidadNombre: idx >= 0 ? m.concepto.slice(idx + marcador.length) : m.concepto,
+      concepto: m.concepto,
+      numeroDocumento: m.referenciaId != null ? String(m.referenciaId) : undefined,
+      montoOriginal: m.monto,
+      saldoPendiente: m.saldoPendiente ?? m.monto,
+      moneda: (m.moneda as "USD" | "VES" | "COP") || "USD",
+      estado: (m.estado as "PENDIENTE" | "PAGADO") || "PENDIENTE",
+      fechaRegistro: m.fechaRegistro,
+      fechaVencimiento: m.fechaVencimiento || undefined,
+      referenciaId: m.referenciaId != null ? String(m.referenciaId) : undefined,
+    };
+  };
+
+  const cargarCuentas = () => {
+    if (!user?.tenantId) return;
+    Promise.all([
+      listarMovimientos(user.tenantId, "CXC"),
+      listarMovimientos(user.tenantId, "CXP"),
+    ])
+      .then(([cxc, cxp]) => setCuentas([...cxc, ...cxp].map(movimientoACuenta)))
+      .catch((err) => console.error("No se pudieron cargar las cuentas por cobrar/pagar:", err));
   };
 
   const registrarGasto = async () => {
@@ -1351,6 +2180,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       listarProveedoresRepuesto().then(setProveedoresRepuesto).catch(() => {});
       cargarIngresosCaja();
       cargarGastosCaja();
+      cargarCuentas();
       if (esComercio) cargarComprasRepuesto();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1392,8 +2222,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           setModalCobro(true);
         }
       } else if (e.key === "Escape") {
-        if (modalCobro) setModalCobro(false);
-        else if (modalNuevoProducto) setModalNuevoProducto(false);
+        if (modalCobro) {
+          setModalCobro(false);
+          setModoCobro("unico");
+          setPagosMixtos([]);
+          setPagoMixtoMonto("");
+          setPagoMixtoRef("");
+          setEmailClienteModal("");
+          setEnviarEmailAlConfirmar(false);
+        } else if (modalNuevoProducto) setModalNuevoProducto(false);
         else if (kardexModalItem) setKardexModalItem(null);
         else if (presentacionesModalItem) setPresentacionesModalItem(null);
         else if (modalCompraProveedor) setModalCompraProveedor(false);
@@ -1564,7 +2401,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
     // Calcular monto recibido en USD equivalente
     let recibidoEnUSD = totalUSD;
     const ingresado = parseFloat(montoRecibido);
-    if (!isNaN(ingresado) && ingresado > 0) {
+    if (modoCobro === "mixto") {
+      recibidoEnUSD = pagosMixtos.reduce((acc, p) => acc + p.montoUSD, 0);
+    } else if (!isNaN(ingresado) && ingresado > 0) {
       if (monedaRecibida === "USD") recibidoEnUSD = ingresado;
       else if (monedaRecibida === "VES" && tasaActivaBs > 0) recibidoEnUSD = ingresado / tasaActivaBs;
       else if (monedaRecibida === "COP" && tasaCop > 0) recibidoEnUSD = ingresado / tasaCop;
@@ -1640,12 +2479,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       totalCop: totalCopCalculado,
       costoTotal,
       utilidad,
-      metodoPago: esCredito ? "CREDITO_CUENTA" : metodoPagoSel,
+      metodoPago: esCredito ? "CREDITO_CUENTA" : (modoCobro === "mixto" ? "PAGO_MIXTO" : metodoPagoSel),
       esCredito,
-      recibido: esCredito ? 0 : (ingresado || (monedaRecibida === "VES" ? totalBs : monedaRecibida === "COP" ? totalCopCalculado : totalUSD)),
-      monedaRecibida: esCredito ? "USD" : monedaRecibida,
+      recibido: esCredito ? 0 : (modoCobro === "mixto" ? recibidoEnUSD : (ingresado || (monedaRecibida === "VES" ? totalBs : monedaRecibida === "COP" ? totalCopCalculado : totalUSD))),
+      monedaRecibida: esCredito ? "USD" : (modoCobro === "mixto" ? "USD" : monedaRecibida),
       vuelto: vueltoFinal,
       monedaVuelto,
+      pagosMixtos: modoCobro === "mixto" ? [...pagosMixtos] : undefined,
+      emailCliente: emailClienteModal.trim() || undefined,
     };
 
     // Registrar en el histórico persistente de ventas
@@ -1673,9 +2514,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           if (!item.backendId) continue;
           const claveIdemp = `${numRecibo}-${item.backendId}-${item.presentacionId || "base"}-${Date.now()}`;
           if (item.presentacionId) {
+            // TODO: despacharPorPresentacion aún no soporta venta a crédito (solo venderRepuestoPorVolumen la
+            // soporta) — extenderlo igual antes de ofrecer crédito en ventas por presentación fraccionada.
             await despacharPorPresentacion(item.presentacionId, user.tenantId, item.cantidad, monedaRecibida, ingresado || undefined, claveIdemp);
           } else {
-            await venderRepuestoPorVolumen(item.backendId, user.tenantId, item.cantidad, monedaRecibida, ingresado || undefined, claveIdemp);
+            await venderRepuestoPorVolumen(
+              item.backendId, user.tenantId, item.cantidad, monedaRecibida, ingresado || undefined, claveIdemp,
+              undefined, esCredito ? 0 : undefined, esCredito ? 15 : undefined,
+              esCredito ? clienteParaVenta.nombre : undefined
+            );
           }
         }
         cargarRepuestosBackend();
@@ -1739,40 +2586,25 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       });
     }
 
-    // Si es crédito, registrar en Cuentas por Cobrar (CXC)
+    // La CXC de una venta a crédito ya se registró en el backend real dentro del loop de
+    // arriba (RepuestoConversionService.registrarCobroVenta) — cargarCuentas() más abajo
+    // refresca la lista desde ahí, no hace falta fabricarla localmente.
     if (esCredito) {
-
-      // Registrar cuenta por cobrar formal en el Panel Administrativo
-      const nuevaCxc: CuentaComercio = {
-        id: `cxc-${Date.now()}`,
-        tipo: "CXC",
-        entidadNombre: clienteParaVenta.nombre,
-        entidadDocumento: clienteParaVenta.documento,
-        concepto: `Venta a crédito Ticket ${numRecibo} - ${clienteParaVenta.nombre}`,
-        numeroDocumento: numRecibo,
-        montoOriginal: totalUSD,
-        saldoPendiente: totalUSD,
-        moneda: "USD",
-        estado: "PENDIENTE",
-        fechaRegistro: new Date().toISOString().split("T")[0],
-        fechaVencimiento: new Date(Date.now() + 15 * 86400000).toISOString().split("T")[0],
-        referenciaTipo: "VENTA",
-        referenciaId: numRecibo
-      };
-
-      setCuentas((prev) => {
-        const updated = [nuevaCxc, ...prev];
-        try { localStorage.setItem("aurora_comercio_cuentas", JSON.stringify(updated)); } catch {}
-        return updated;
-      });
-
       mostrarToast(`Venta a crédito cargada a Cuentas por Cobrar (CXC) de ${clienteParaVenta.nombre} por $${totalUSD.toFixed(2)}`, "success");
+      if (user?.tenantId) cargarCuentas();
     }
 
         setVentaReciente(nuevaVenta);
     setCarrito([]);
     setModalCobro(false);
     setMontoRecibido("");
+    // Limpiar estados de pago mixto y email para la próxima venta
+    setModoCobro("unico");
+    setPagosMixtos([]);
+    setPagoMixtoMonto("");
+    setPagoMixtoRef("");
+    setEmailClienteModal("");
+    setEnviarEmailAlConfirmar(false);
     limpiarClienteAMostrador();
   };
 
@@ -1884,6 +2716,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 { id: "general" as const, Icon: IconChart, etiqueta: "Vista General" },
                 { id: "pos" as const, Icon: IconCard, etiqueta: "POS Mostrador" },
                 { id: "inventario" as const, Icon: IconBox, etiqueta: "Inventario & Stock" },
+                ...(esComercio ? [{ id: "pedidos_web" as const, Icon: IconShoppingBag, etiqueta: "Pedidos Web" }] : []),
               ],
             },
             {
@@ -1891,28 +2724,65 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               items: [
                 ...(esComercio ? [{ id: "proveedores" as const, Icon: IconTruck, etiqueta: "Proveedores" }] : []),
                 { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
-                { id: "administracion" as const, Icon: IconWallet, etiqueta: "Cuentas por Cobrar & Pagar" },
-                { id: "gastos" as const, Icon: IconBank, etiqueta: "Ingresos & Gastos" },
+                { id: "administracion" as const, Icon: IconWallet, etiqueta: "Administración" },
                 { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
                 ...(user?.rol === "DUENO_ADMIN" ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría" }] : []),
               ],
             },
           ]).map((grupo) => (
             <div key={grupo.titulo} className="space-y-1.5">
-              <div className="px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <div className="px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                 {grupo.titulo}
               </div>
-              {grupo.items.map((item) => (
+              {grupo.items.map((item) => item.id === "administracion" ? (
+                <div key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => setAdministracionExpandida((v) => !v)}
+                    className={`sidebar-glare w-full flex items-center gap-3 border-l-2 px-3 py-2.5 rounded-md font-medium text-[13px] transition-colors cursor-pointer ${
+                      tab === item.id
+                        ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
+                        : "text-slate-800 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
+                    }`}
+                  >
+                    <span className={tab === item.id ? "text-teal-700" : "text-slate-500"}><item.Icon size={15} /></span>
+                    <span className="flex-1 text-left">{item.etiqueta}</span>
+                    <IconChevronRight size={12} className={`text-slate-400 transition-transform ${administracionExpandida ? "rotate-90" : ""}`} />
+                  </button>
+                  {administracionExpandida && (
+                    <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-0.5">
+                      {([
+                        { subTab: "ingresos_gastos" as const, etiqueta: "Ingresos & Gastos" },
+                        { subTab: "cxc_cxp" as const, etiqueta: "Cuentas por Cobrar & Pagar" },
+                        { subTab: "cuentas_bancarias" as const, etiqueta: "Cuentas Bancarias" },
+                      ]).map((sub) => (
+                        <button
+                          key={sub.subTab}
+                          type="button"
+                          onClick={() => { setTab("administracion"); setSubTabAdmin(sub.subTab); setSidebarAbierto(false); }}
+                          className={`w-full text-left px-3 py-2 rounded-md font-medium text-[12.5px] transition-colors cursor-pointer ${
+                            tab === "administracion" && subTabAdmin === sub.subTab
+                              ? "text-teal-800 bg-teal-50/70"
+                              : "text-slate-600 hover:bg-slate-100/70 hover:text-slate-900"
+                          }`}
+                        >
+                          {sub.etiqueta}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <button
                   key={item.id}
                   onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
                   className={`sidebar-glare w-full flex items-center gap-3 border-l-2 px-3 py-2.5 rounded-md font-medium text-[13px] transition-colors cursor-pointer ${
                     tab === item.id
                       ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
-                      : "text-slate-600 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
+                      : "text-slate-800 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
                   }`}
                 >
-                  <span className={tab === item.id ? "text-teal-700" : "text-slate-400"}><item.Icon size={15} /></span>
+                  <span className={tab === item.id ? "text-teal-700" : "text-slate-500"}><item.Icon size={15} /></span>
                   <span>{item.etiqueta}</span>
                 </button>
               ))}
@@ -1922,21 +2792,18 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   <div className="pt-3 mt-3 border-t border-slate-100">
           <button
             type="button"
-            title="Tu catálogo digital público con precios y código QR para que tus clientes pidan por WhatsApp"
+            title="Tienda, pagos y catálogo digital público con código QR"
             onClick={() => { setModalQrVisible(true); setSidebarAbierto(false); }}
-            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
           >
-            <IconShoppingBag size={16} />
-            <span className="flex-1 text-left">Mi Catálogo Online & QR</span>
-            <span className="text-[8px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
-              Online
-            </span>
+            <IconSettings size={16} />
+            <span className="flex-1 text-left">Configuración</span>
           </button>
           <button
             type="button"
             title="Atención y ventas automatizadas por WhatsApp, conectadas a tu inventario en tiempo real"
             onClick={() => { setModalIaVisible(true); setSidebarAbierto(false); }}
-            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors mt-1"
+            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors mt-1"
           >
             <div className="w-4 h-4 flex items-center justify-center text-slate-400">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -2025,14 +2892,17 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               productos={productos.filter((p) => p.rubro === perfilActivo)}
               ingresosCaja={ingresosCaja}
               ventas={ventas}
+              cuentas={cuentas}
               tasaActivaBs={tasaActivaBs}
               tasaCop={tasaCop}
               esAdmin={user?.rol === "DUENO_ADMIN"}
               nombreNegocio={user?.empresa || "tu negocio"}
+              tenantId={user?.tenantId}
               onIrAInventario={() => setTab("inventario")}
               onIrAPos={() => setTab("pos")}
               onIrAProveedores={() => setTab("proveedores")}
               onIrAUtilidad={() => { setTab("cierre"); setSubCierre("utilidad"); }}
+              onIrACuentas={() => { setTab("administracion"); setSubTabAdmin("cxc_cxp"); setAdministracionExpandida(true); }}
             />
           )}
 
@@ -2455,6 +3325,95 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               </div>
             </div>
 
+            {(productosBajoStockInventario.length > 0 || productosPorVencerInventario.length > 0) && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                  <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                    <IconWarning size={14} className="text-amber-500" />
+                    <h4 className="font-['Outfit'] font-black text-xs text-slate-900 dark:text-white">Alertas de Inventario Bajo</h4>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full" title="Bajo mínimo">
+                        {productosBajoStockInventario.length - productosAgotadosInventario.length} bajo
+                      </span>
+                      <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full" title="Agotados (stock 0)">
+                        {productosAgotadosInventario.length} agotados
+                      </span>
+                    </div>
+                  </div>
+                  {productosBajoStockInventario.length === 0 ? (
+                    <div className="p-5 text-center text-[11px] text-slate-400 flex items-center justify-center gap-2">
+                      <IconCheckCircle size={13} className="text-emerald-500" /> Todo el inventario está por encima del mínimo.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto max-h-56 overflow-y-auto">
+                      <table className="w-full text-left text-[11px]">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase text-[9px] sticky top-0 bg-white dark:bg-slate-900">
+                            <th className="p-2.5">Código</th>
+                            <th className="p-2.5">Producto</th>
+                            <th className="p-2.5 text-right">Stock</th>
+                            <th className="p-2.5 text-right">Mínimo</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {productosBajoStockInventario.map((p) => {
+                            const agotado = p.stock <= 0;
+                            return (
+                              <tr key={p.id}>
+                                <td className="p-2.5 font-mono text-slate-500 dark:text-slate-400">{p.codigo}</td>
+                                <td className="p-2.5 font-bold text-slate-900 dark:text-white">{p.nombre}</td>
+                                <td className={`p-2.5 text-right font-bold ${agotado ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"}`}>{p.stock} {p.unidadMedida || ""}</td>
+                                <td className="p-2.5 text-right text-slate-500 dark:text-slate-400">{p.stockMinimo}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                  <div className="p-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                    <IconHourglass size={14} className="text-amber-500" />
+                    <h4 className="font-['Outfit'] font-black text-xs text-slate-900 dark:text-white">Alertas de Vencimiento</h4>
+                    <span className="ml-auto text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">{productosPorVencerInventario.length}</span>
+                  </div>
+                  {productosPorVencerInventario.length === 0 ? (
+                    <div className="p-5 text-center text-[11px] text-slate-400 flex items-center justify-center gap-2">
+                      <IconCheckCircle size={13} className="text-emerald-500" /> Sin artículos por vencer en los próximos 30 días.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto max-h-56 overflow-y-auto">
+                      <table className="w-full text-left text-[11px]">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase text-[9px] sticky top-0 bg-white dark:bg-slate-900">
+                            <th className="p-2.5">Código</th>
+                            <th className="p-2.5">Producto</th>
+                            <th className="p-2.5 text-right">Stock</th>
+                            <th className="p-2.5 text-right">Vencimiento</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {productosPorVencerInventario.map((p) => {
+                            const info = textoVencimientoComercio(p.fechaVencimiento!);
+                            return (
+                              <tr key={p.id}>
+                                <td className="p-2.5 font-mono text-slate-500 dark:text-slate-400">{p.codigo}</td>
+                                <td className="p-2.5 font-bold text-slate-900 dark:text-white">{p.nombre}</td>
+                                <td className="p-2.5 text-right text-slate-500 dark:text-slate-400">{p.stock} {p.unidadMedida || ""}</td>
+                                <td className={`p-2.5 text-right font-bold ${info.color}`}>{info.texto}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase tracking-wider sticky top-0 text-[11px]">
@@ -2481,7 +3440,14 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                         <div>{p.codigo}</div>
                         {p.codigoOem && <div className="text-[10px] text-cyan-400 font-mono">OEM: {p.codigoOem}</div>}
                       </td>
-                      <td className="p-3 font-sans font-bold text-slate-900 dark:text-white">{p.nombre}</td>
+                      <td className="p-3 font-sans font-bold text-slate-900 dark:text-white">
+                        {p.nombre}
+                        {esComercio && p.fechaVencimiento && (
+                          <div className={`text-[10px] font-bold ${textoVencimientoComercio(p.fechaVencimiento).color}`}>
+                            {textoVencimientoComercio(p.fechaVencimiento).texto}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-3 font-sans text-slate-500 dark:text-slate-400">{p.categoria}</td>
                       {esFarmacia && <td className="p-3 text-emerald-400">{p.principioActivo || "—"}</td>}
                       {esFarmacia && <td className="p-3 text-slate-600 dark:text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
@@ -2548,7 +3514,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                             Ajustar
                           </button>
                           <button
-                            onClick={() => setEditarModalItem(p)}
+                            onClick={() => { setEditarModalItem(p); setEditarImagenBase64(p.imagenBase64); setCategoriaEnEdicion(p.categoria === "General" ? "" : p.categoria || ""); setEditarTab("datos"); }}
                             className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-slate-500 dark:text-slate-300 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
                             title="Editar datos del producto"
                             disabled={!p.backendId}
@@ -2872,39 +3838,44 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
         })()}
 
         {/* ══════════════════════════════════════════════════════════════════
-            TAB: INGRESOS & GASTOS — gastos sueltos (alquiler, papelería,
-            servicios) que no pasan por el POS; las ventas siguen entrando
-            solas desde el mostrador, esto es solo para anotar lo demás.
+            TAB: ADMINISTRACIÓN — Ingresos & Gastos / CXC-CXP / Cuentas Bancarias
+            son submódulos navegables desde el propio sidebar (desplegable bajo
+            "Administración"), no pestañas horizontales duplicadas acá.
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "administracion" && (
-          <CuentasPorCobrarPagarComercio
-            cuentas={cuentas}
-            guardarCuentas={guardarCuentas}
-            tasaActivaBs={tasaActivaBs}
-            tasaCop={tasaCop}
-            clientes={clientes}
-            setClientes={setClientes}
-            proveedores={proveedoresRepuesto}
-            ingresosCaja={ingresosCaja}
-            setIngresosCaja={setIngresosCaja}
-            gastosCaja={gastosCaja}
-            setGastosCaja={setGastosCaja}
-            mostrarToast={mostrarToast}
-            cargarIngresosCaja={cargarIngresosCaja}
-            cargarGastosCaja={cargarGastosCaja}
-            tenantId={user?.tenantId}
-          />
-        )}
-
-        {tab === "gastos" && (
-          <IngresosGastosComercio
-            ingresosCaja={ingresosCaja}
-            gastosCaja={gastosCaja}
-            formGasto={formGasto}
-            setFormGasto={setFormGasto}
-            registrarGasto={registrarGasto}
-            guardandoGasto={guardandoGasto}
-          />
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            {subTabAdmin === "cuentas_bancarias" && user?.tenantId ? (
+              <CuentasBancariasComercio tenantId={user.tenantId} mostrarToast={mostrarToast} />
+            ) : subTabAdmin === "cxc_cxp" ? (
+              <CuentasPorCobrarPagarComercio
+                cuentas={cuentas}
+                guardarCuentas={guardarCuentas}
+                tasaActivaBs={tasaActivaBs}
+                tasaCop={tasaCop}
+                clientes={clientes}
+                setClientes={setClientes}
+                proveedores={proveedoresRepuesto}
+                ingresosCaja={ingresosCaja}
+                setIngresosCaja={setIngresosCaja}
+                gastosCaja={gastosCaja}
+                setGastosCaja={setGastosCaja}
+                mostrarToast={mostrarToast}
+                cargarIngresosCaja={cargarIngresosCaja}
+                cargarGastosCaja={cargarGastosCaja}
+                cargarCuentas={cargarCuentas}
+                tenantId={user?.tenantId}
+              />
+            ) : (
+              <IngresosGastosComercio
+                ingresosCaja={ingresosCaja}
+                gastosCaja={gastosCaja}
+                formGasto={formGasto}
+                setFormGasto={setFormGasto}
+                registrarGasto={registrarGasto}
+                guardandoGasto={guardandoGasto}
+              />
+            )}
+          </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════════════
@@ -2946,7 +3917,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           <PedidosWebPanel
             tenantId={user.tenantId}
             tasaVes={tasaActivaBs}
-            onCargarAlPos={cargarPedidoWebAlPos}
+            nombreNegocio={nombreLocal}
+            onPedidoConfirmado={() => { cargarRepuestosBackend(); cargarIngresosCaja(); }}
             onVerQrModal={() => setModalQrVisible(true)}
           />
         )}
@@ -2966,6 +3938,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
           tenantId={user.tenantId}
           nombreNegocio={user?.empresa || "Mi Comercio"}
           onClose={() => setModalQrVisible(false)}
+          esDuenoAdmin={user?.rol === "DUENO_ADMIN"}
+          onIrAEquipoRoles={onIrAEquipoRoles}
         />
       )}
 
@@ -2978,11 +3952,62 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       )}
 
       {modalCobro && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalCobro(false)}>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl cursor-default" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => {
+            setModalCobro(false);
+            setModoCobro("unico");
+            setPagosMixtos([]);
+            setPagoMixtoMonto("");
+            setPagoMixtoRef("");
+            setEmailClienteModal("");
+            setEnviarEmailAlConfirmar(false);
+          }}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl cursor-default overflow-y-auto max-h-[95vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ── Cabecera ── */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Cobro en Mostrador</h3>
-              <button onClick={() => setModalCobro(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white"><IconClose size={18} /></button>
+              <button
+                onClick={() => {
+                  setModalCobro(false);
+                  setModoCobro("unico");
+                  setPagosMixtos([]);
+                  setPagoMixtoMonto("");
+                  setPagoMixtoRef("");
+                  setEmailClienteModal("");
+                  setEnviarEmailAlConfirmar(false);
+                }}
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                <IconClose size={18} />
+              </button>
+            </div>
+
+            {/* ── Selector Modo Pago ── */}
+            <div className="flex rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 text-xs font-black">
+              {(["unico", "mixto"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setModoCobro(m);
+                    setPagosMixtos([]);
+                    setPagoMixtoMonto("");
+                    setPagoMixtoRef("");
+                  }}
+                  className={`flex-1 py-2 transition-all cursor-pointer ${
+                    modoCobro === m
+                      ? "bg-teal-500 text-slate-950"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {m === "unico" ? "Pago Unico" : "Dividir Pago (Mixto)"}
+                </button>
+              ))}
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/70 dark:border-slate-700/60 space-y-1">
@@ -3000,6 +4025,9 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               </div>
             </div>
 
+            {/* ── Sección Pago Único (oculta en modo mixto) ── */}
+            {modoCobro === "unico" && (
+            <>
             <div>
               <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">1. Método de Pago</label>
               <div className="grid grid-cols-3 gap-2 text-xs">
@@ -3157,7 +4185,15 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
 
             <div className="pt-2 flex gap-2">
               <button
-                onClick={() => setModalCobro(false)}
+                onClick={() => {
+                  setModalCobro(false);
+                  setModoCobro("unico");
+                  setPagosMixtos([]);
+                  setPagoMixtoMonto("");
+                  setPagoMixtoRef("");
+                  setEmailClienteModal("");
+                  setEnviarEmailAlConfirmar(false);
+                }}
                 className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
               >
                 Cancelar
@@ -3168,6 +4204,178 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               >
                 Confirmar e Imprimir
               </button>
+            </div>
+            </>
+            )}
+
+
+            {/* ── Sección PAGO MIXTO ── */}
+            {modoCobro === "mixto" && (() => {
+              const totalCubierto = pagosMixtos.reduce((a, p) => a + p.montoUSD, 0);
+              const restante = Math.max(0, totalUSD - totalCubierto);
+              const cubierto100 = restante <= 0.005;
+              const vueltoMixto = Math.max(0, totalCubierto - totalUSD);
+
+              const sugerirMonto = (mon: "USD" | "VES" | "COP") => {
+                if (mon === "USD") return restante.toFixed(2);
+                if (mon === "VES" && tasaActivaBs > 0) return (restante * tasaActivaBs).toFixed(2);
+                if (mon === "COP" && tasaCop > 0) return String(Math.round(restante * tasaCop));
+                return "";
+              };
+
+              const metodosRapidos: [string, string, "USD"|"VES"|"COP"][] = [
+                ["EFECTIVO_USD", "$ USD Efectivo", "USD"],
+                ["EFECTIVO_BS", "Bs Efectivo", "VES"],
+                ["PAGO_MOVIL", "Pago Móvil", "VES"],
+                ["PUNTO_VENTA", "Punto Débito", "VES"],
+                ["ZELLE", "Zelle/USDT", "USD"],
+                ["COP_EFECTIVO", "Pesos COP", "COP"],
+              ];
+
+              const agregarPago = () => {
+                const monto = parseFloat(pagoMixtoMonto);
+                if (isNaN(monto) || monto <= 0) return;
+                let montoUSD = monto;
+                if (pagoMixtoMoneda === "VES" && tasaActivaBs > 0) montoUSD = monto / tasaActivaBs;
+                if (pagoMixtoMoneda === "COP" && tasaCop > 0) montoUSD = monto / tasaCop;
+                setPagosMixtos(prev => [...prev, {
+                  id: `pm-${Date.now()}`,
+                  metodo: pagoMixtoMetodo,
+                  moneda: pagoMixtoMoneda,
+                  montoOriginal: monto,
+                  montoUSD,
+                  referencia: pagoMixtoRef.trim() || undefined,
+                }]);
+                setPagoMixtoMonto("");
+                setPagoMixtoRef("");
+              };
+
+              return (
+                <div className="border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-4 bg-slate-50 dark:bg-slate-800/50">
+
+                  {/* Barra de estado financiero */}
+                  <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div className="text-slate-500">Total</div>
+                      <div className="font-mono font-black text-sm text-slate-900 dark:text-white">${totalUSD.toFixed(2)}</div>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div className="text-slate-500">Cubierto</div>
+                      <div className="font-mono font-black text-sm text-teal-500">${totalCubierto.toFixed(2)}</div>
+                    </div>
+                    <div className={`p-2 rounded-xl border ${
+                      cubierto100
+                        ? "bg-teal-500/10 border-teal-400 text-teal-600 dark:text-teal-300"
+                        : "bg-amber-500/10 border-amber-400 text-amber-600 dark:text-amber-300"
+                    }`}>
+                      <div className="text-[9px]">{cubierto100 ? "Cubierto" : "Restante"}</div>
+                      <div className="font-mono font-black text-sm">
+                        {cubierto100 ? (vueltoMixto > 0.005 ? `Vuelto $${vueltoMixto.toFixed(2)}` : "100% Cubierto") : `$${restante.toFixed(2)}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lista de pagos registrados */}
+                  {pagosMixtos.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pagos registrados:</div>
+                      {pagosMixtos.map((p) => {
+                        const fmtOrig = p.moneda === "USD" ? `$${p.montoOriginal.toFixed(2)} USD` :
+                          p.moneda === "VES" ? `Bs.${p.montoOriginal.toFixed(2)}` :
+                          `COP ${Math.round(p.montoOriginal).toLocaleString("en-US")}`;
+                        return (
+                          <div key={p.id} className="flex items-center justify-between text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
+                            <div>
+                              <span className="font-bold text-slate-800 dark:text-white">{p.metodo.replace(/_/g, " ")}</span>
+                              {p.referencia && <span className="text-slate-400 ml-1">(Ref: {p.referencia})</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-slate-600 dark:text-slate-300">{fmtOrig}</span>
+                              <span className="font-mono font-black text-teal-500">${p.montoUSD.toFixed(2)}</span>
+                              <button type="button" onClick={() => setPagosMixtos(prev => prev.filter(x => x.id !== p.id))} className="text-red-400 hover:text-red-600 font-black cursor-pointer">×</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Formulario Añadir Pago */}
+                  {!cubierto100 && (
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">+ Añadir pago:</div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {metodosRapidos.map(([id, label, mon]) => (
+                          <button key={id} type="button"
+                            onClick={() => {
+                              setPagoMixtoMetodo(id);
+                              setPagoMixtoMoneda(mon);
+                              setPagoMixtoMonto(sugerirMonto(mon));
+                            }}
+                            className={`py-2 px-1.5 rounded-xl text-[10px] font-bold border transition-all cursor-pointer text-center ${
+                              pagoMixtoMetodo === id ? "bg-teal-500/20 border-teal-400 text-teal-600 dark:text-teal-300" : "bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-teal-400"
+                            }`}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={pagoMixtoMonto}
+                          onChange={(e) => setPagoMixtoMonto(e.target.value)}
+                          placeholder={`Monto en ${pagoMixtoMoneda}`}
+                          className="flex-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-mono text-slate-900 dark:text-white focus:outline-none focus:border-teal-400"
+                        />
+                        <input
+                          type="text"
+                          value={pagoMixtoRef}
+                          onChange={(e) => setPagoMixtoRef(e.target.value)}
+                          placeholder="Ref. (opcional)"
+                          className="w-28 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-teal-400"
+                        />
+                        <button type="button" onClick={agregarPago}
+                          className="px-3 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer">
+                          + Agregar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botón confirmar mixto */}
+                  <button
+                    disabled={!cubierto100}
+                    onClick={() => ejecutarCobro(false)}
+                    className={`w-full py-3 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                      cubierto100
+                        ? "bg-teal-500 hover:bg-teal-400 text-slate-950 shadow-lg"
+                        : "bg-slate-300 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {cubierto100 ? "Confirmar Pago Mixto e Imprimir" : `Faltan $${restante.toFixed(2)} por cubrir`}
+                  </button>
+                </div>
+              );
+            })()}
+
+            {/* ── Email opcional ── */}
+            <div className="pt-1">
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Email del cliente (opcional)</label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={emailClienteModal}
+                  onChange={(e) => setEmailClienteModal(e.target.value)}
+                  placeholder="cliente@email.com"
+                  className="flex-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-teal-400"
+                />
+                <label className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer select-none">
+                  <input type="checkbox" checked={enviarEmailAlConfirmar} onChange={(e) => setEnviarEmailAlConfirmar(e.target.checked)} className="rounded" />
+                  Enviar al confirmar
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -3283,11 +4491,31 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                           <button
                             onClick={() => imprimirTicketComercio(v, nombreLocal, tasaActivaBs, tasaCop)}
                             className="px-2.5 py-1 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-[10px] font-bold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                            title="Re-imprimir este comprobante"
+                            title="Re-imprimir ticket 80mm"
                           >
                             <IconReceipt size={12} />
-                            <span>Imprimir</span>
+                            <span>Ticket</span>
                           </button>
+                          <button
+                            onClick={() => generarNotaEntregaPDF(v, nombreLocal, tasaActivaBs, tasaCop, true)}
+                            className="px-2.5 py-1 rounded-xl bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:hover:bg-indigo-800/60 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Descargar Nota de Entrega PDF (SENIAT)"
+                          >
+                            <IconDownload size={12} />
+                            <span>Nota PDF</span>
+                          </button>
+                          {v.emailCliente && (
+                            <button
+                              onClick={() => {
+                                enviarNotaEntregaPorCorreo(v, nombreLocal, tasaActivaBs, tasaCop);
+                                mostrarToast("PDF descargado y correo abierto", "success");
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-800/60 text-[10px] font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Enviar Nota de Entrega por correo"
+                            >
+                              <span>✉️ Correo</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -3394,17 +4622,41 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               )}
             </div>
 
-            <div className="flex gap-2 pt-2">
+            {/* Sección Email en modal ventaReciente */}
+            {ventaReciente.emailCliente && (
+              <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{ventaReciente.emailCliente}</span>
+                <button
+                  onClick={() => {
+                    const v = ventaReciente!;
+                    enviarNotaEntregaPorCorreo(v, nombreLocal, tasaActivaBs, tasaCop);
+                    mostrarToast("PDF descargado y cliente de correo abierto", "success");
+                  }}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-black text-xs cursor-pointer"
+                >
+                  Enviar por Correo
+                </button>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2 flex-wrap">
               <button
                 onClick={() => imprimirTicketComercio(ventaReciente, nombreLocal, tasaActivaBs, tasaCop)}
                 className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
               >
-                ️ Imprimir Ticket 80mm
+                Imprimir Ticket 80mm
+              </button>
+              <button
+                onClick={() => generarNotaEntregaPDF(ventaReciente, nombreLocal, tasaActivaBs, tasaCop, true)}
+                className="flex-1 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-black text-xs cursor-pointer shadow-lg"
+              >
+                Nota de Entrega PDF
               </button>
               {ventaReciente.esCredito && (
                 <button
                   onClick={() => {
                     setVentaReciente(null);
+                    setSubTabAdmin("cxc_cxp");
                     setTab("administracion");
                   }}
                   className="px-3 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shadow-md"
@@ -3440,12 +4692,17 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 const nombre = String(fd.get("nombre"));
                 const codigo = String(fd.get("codigo") || `COD-${Date.now().toString().slice(-4)}`);
                 const precio = Number(fd.get("precio")) || 1;
-                const costo = Number(fd.get("costo")) || 0.5;
+                // Sin fallback a un número inventado: si el dueño no escribe costo, se
+                // guarda 0 (= "sin costo real todavía"), no un $0.50 fantasma que hacía
+                // que "Sin costo registrado" y el margen mintieran mostrando datos falsos
+                // como si fueran reales.
+                const costo = Number(fd.get("costo")) || 0;
                 const stock = Number(fd.get("stock")) || 10;
                 const unidadMedida = String(fd.get("unidadMedida") || "UNIDAD");
                 const codigoOem = String(fd.get("codigoOem") || "") || undefined;
                 const precioMayorista = fd.get("precioMayorista") ? Number(fd.get("precioMayorista")) : undefined;
                 const cantidadMinimaMayorista = fd.get("cantidadMinimaMayorista") ? Number(fd.get("cantidadMinimaMayorista")) : undefined;
+                const fechaVencimiento = String(fd.get("fechaVencimiento") || "") || undefined;
 
                 let backendId: number | undefined = undefined;
 
@@ -3461,6 +4718,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       unidadBase: unidadMedida,
                       precioMayorista,
                       cantidadMinimaMayorista,
+                      fechaVencimiento,
                     });
                     backendId = guardado.id;
                     mostrarToast("Artículo registrado exitosamente en base de datos PostgreSQL", "success");
@@ -3487,6 +4745,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   ubicacion: String(fd.get("ubicacion") || "") || undefined,
                   precioMayorista,
                   cantidadMinimaMayorista,
+                  fechaVencimiento,
                 };
 
                 setProductos((prev) => [nuevo, ...prev]);
@@ -3552,8 +4811,8 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-teal-400 block mb-1">Código OEM / Fabricante</label>
-                      <input name="codigoOem" placeholder="Ej. 04465-0K090" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                      <label className="text-[10px] font-bold text-teal-400 block mb-1">Código de Fabricante / OEM (Opcional)</label>
+                      <input name="codigoOem" placeholder="Ej. 04465-0K090 — solo si aplica a tu rubro" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -3569,6 +4828,11 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                   <div>
                     <label className="text-[10px] font-bold text-teal-400 block mb-1">Ubicación en Almacén / Estante</label>
                     <input name="ubicacion" placeholder="Ej. Pasillo 3 - Gaveta 4" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-amber-500 block mb-1">Fecha de Vencimiento (Opcional)</label>
+                    <input name="fechaVencimiento" type="date" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Solo si el artículo caduca (pinturas, adhesivos, químicos). Te avisaremos en Inventario cuando se acerque.</p>
                   </div>
                 </div>
               )}
@@ -3730,7 +4994,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
       {/* ── MODAL EDITAR PRODUCTO ── */}
       {editarModalItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setEditarModalItem(null)}>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 cursor-default max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Editar Producto</h3>
@@ -3751,6 +5015,19 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                 const stockMinimo = Number(fd.get("stockMinimo")) || editarModalItem.stockMinimo;
                 const precioMayorista = fd.get("precioMayorista") ? Number(fd.get("precioMayorista")) : undefined;
                 const cantidadMinimaMayorista = fd.get("cantidadMinimaMayorista") ? Number(fd.get("cantidadMinimaMayorista")) : undefined;
+                const categoria = String(fd.get("categoria") || "").trim() || undefined;
+                const visible = fd.get("visible") === "on";
+                const ordenVisualizacion = Number(fd.get("ordenVisualizacion")) || 0;
+                const descripcionLarga = String(fd.get("descripcionLarga") || "").trim();
+                // "" (vacío) SÍ se manda — a diferencia de los demás campos opcionales,
+                // acá vacío es una elección real ("borrar la foto/descripción"), no
+                // "no toqué este campo". Ver RepuestoItemController.actualizar: cualquier
+                // valor no-null se aplica, incluida la cadena vacía.
+                const imagenBase64 = editarImagenBase64 ?? "";
+                const grupoVariante = String(fd.get("grupoVariante") || "").trim();
+                const atributoVariante = String(fd.get("atributoVariante") || "").trim();
+                const colorVariante = String(fd.get("colorVariante") || "").trim();
+                const fechaVencimiento = String(fd.get("fechaVencimiento") || "") || undefined;
 
                 setGuardandoEdicion(true);
                 try {
@@ -3762,9 +5039,22 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
                     stockMinimo,
                     precioMayorista,
                     cantidadMinimaMayorista,
+                    categoria,
+                    visible,
+                    ordenVisualizacion,
+                    descripcionLarga,
+                    imagenBase64,
+                    grupoVariante,
+                    atributoVariante,
+                    colorVariante,
+                    fechaVencimiento,
                   });
                   setProductos((prev) => prev.map((p) => p.id === editarModalItem.id ? {
                     ...p, nombre, precio, unidadMedida, codigoOem, stockMinimo, precioMayorista, cantidadMinimaMayorista,
+                    categoria: categoria || "General", visible, ordenVisualizacion, descripcionLarga, imagenBase64,
+                    grupoVariante: grupoVariante || undefined, atributoVariante: atributoVariante || undefined,
+                    colorVariante: colorVariante || undefined,
+                    fechaVencimiento: fechaVencimiento || p.fechaVencimiento,
                   } : p));
                   mostrarToast("Producto actualizado correctamente.", "success");
                   setEditarModalItem(null);
@@ -3776,53 +5066,192 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
               }}
               className="space-y-3 text-xs"
             >
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Nombre del Producto</label>
-                <input required name="nombre" defaultValue={editarModalItem.nombre} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
+              {/* Dos pestañas en vez de un formulario larguísimo — todos los campos siguen
+                  montados en el DOM (solo se ocultan con CSS), así que cambiar de pestaña
+                  nunca pierde lo que ya escribiste en la otra. */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 w-fit sticky top-0 z-10">
+                <button
+                  type="button"
+                  onClick={() => setEditarTab("datos")}
+                  className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                    editarTab === "datos"
+                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  Datos del Producto
+                </button>
+                {esComercio && (
+                  <button
+                    type="button"
+                    onClick={() => setEditarTab("catalogo")}
+                    className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                      editarTab === "catalogo"
+                        ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    Catálogo Público
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className={editarTab === "datos" ? "space-y-3" : "hidden"}>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Precio Detal ($)</label>
-                  <input required name="precio" type="number" step="0.01" defaultValue={editarModalItem.precio} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Nombre del Producto</label>
+                  <input required name="nombre" defaultValue={editarModalItem.nombre} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Stock Mínimo (alerta)</label>
-                  <input name="stockMinimo" type="number" defaultValue={editarModalItem.stockMinimo} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Precio Detal ($)</label>
+                    <input required name="precio" type="number" step="0.01" defaultValue={editarModalItem.precio} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Stock Mínimo (alerta)</label>
+                    <input name="stockMinimo" type="number" defaultValue={editarModalItem.stockMinimo} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                  </div>
                 </div>
-              </div>
-              {esComercio && (
-                <div className="space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-teal-400 block mb-1">Unidad de Medida Base</label>
-                      <select name="unidadMedida" defaultValue={editarModalItem.unidadMedida || "UNIDAD"} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
-                        <option value="UNIDAD">Pieza / Unidad (UNIDAD)</option>
-                        <option value="METRO">Metro (METRO)</option>
-                        <option value="KILOGRAMO">Kilogramo (KILOGRAMO)</option>
-                        <option value="SACO">Saco / Bulto (SACO)</option>
-                        <option value="GALON">Galón / Litro (GALON)</option>
-                      </select>
+                {esComercio && (
+                  <div className="space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-teal-400 block mb-1">Unidad de Medida Base</label>
+                        <select name="unidadMedida" defaultValue={editarModalItem.unidadMedida || "UNIDAD"} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
+                          <option value="UNIDAD">Pieza / Unidad (UNIDAD)</option>
+                          <option value="METRO">Metro (METRO)</option>
+                          <option value="KILOGRAMO">Kilogramo (KILOGRAMO)</option>
+                          <option value="SACO">Saco / Bulto (SACO)</option>
+                          <option value="GALON">Galón / Litro (GALON)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-teal-400 block mb-1">Código de Fabricante / OEM (Opcional)</label>
+                        <input name="codigoOem" defaultValue={editarModalItem.codigoOem || ""} placeholder="Solo si aplica a tu rubro" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-emerald-400 block mb-1">Precio Mayorista ($) (Opcional)</label>
+                        <input name="precioMayorista" type="number" step="0.01" defaultValue={editarModalItem.precioMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-emerald-400 block mb-1">Cant. Mínima Mayorista</label>
+                        <input name="cantidadMinimaMayorista" type="number" step="1" defaultValue={editarModalItem.cantidadMinimaMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                      </div>
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-teal-400 block mb-1">Código OEM / Fabricante</label>
-                      <input name="codigoOem" defaultValue={editarModalItem.codigoOem || ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                      <label className="text-[10px] font-bold text-amber-500 block mb-1">Fecha de Vencimiento (Opcional)</label>
+                      <input name="fechaVencimiento" type="date" defaultValue={editarModalItem.fechaVencimiento || ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Solo si el artículo caduca. Te avisaremos en Inventario cuando se acerque.</p>
                     </div>
                   </div>
+                )}
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  El stock actual y el costo no se editan aquí — se actualizan solos a través de compras, ventas y ajustes (Kárdex), para mantener la auditoría.
+                </p>
+              </div>
+
+              {esComercio && (
+                <div className={editarTab === "catalogo" ? "space-y-3 p-3.5 bg-slate-100/60 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-slate-700" : "hidden"}>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[10px] font-bold text-emerald-400 block mb-1">Precio Mayorista ($) (Opcional)</label>
-                      <input name="precioMayorista" type="number" step="0.01" defaultValue={editarModalItem.precioMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Categoría</label>
+                      <input
+                        name="categoria"
+                        placeholder="Ej. Celulares, Perfumes, Zapatos…"
+                        defaultValue={editarModalItem.categoria === "General" ? "" : editarModalItem.categoria}
+                        onChange={(e) => setCategoriaEnEdicion(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                      />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-emerald-400 block mb-1">Cant. Mínima Mayorista</label>
-                      <input name="cantidadMinimaMayorista" type="number" step="1" defaultValue={editarModalItem.cantidadMinimaMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Orden (menor = primero)</label>
+                      <input name="ordenVisualizacion" type="number" step="1" defaultValue={editarModalItem.ordenVisualizacion ?? 0} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="visible" defaultChecked={editarModalItem.visible !== false} className="w-4 h-4 rounded accent-teal-500" />
+                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                      Visible en el catálogo público (desmarca para ocultarlo sin borrarlo del inventario)
+                    </span>
+                  </label>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">
+                      Descripción para el cliente (distinta del nombre)
+                    </label>
+                    <textarea
+                      name="descripcionLarga"
+                      rows={3}
+                      placeholder="Ej. Martillo de uña forjado en acero, mango antideslizante, garantía de 6 meses…"
+                      defaultValue={editarModalItem.descripcionLarga || ""}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Foto del producto</label>
+                    <div className="flex items-center gap-3">
+                      {editarImagenBase64 ? (
+                        <img src={editarImagenBase64} alt="" className="w-16 h-16 rounded-xl object-cover border border-slate-300 dark:border-slate-700 shrink-0" />
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400 shrink-0">
+                          <IconBox size={20} />
+                        </div>
+                      )}
+                      <div className="flex-1 space-y-1.5">
+                        <input type="file" accept="image/*" onChange={handleEditarFoto} className="w-full text-[11px] text-slate-600 dark:text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-teal-500 file:text-slate-950 file:font-bold file:text-[11px] file:cursor-pointer cursor-pointer" />
+                        {editarImagenBase64 && (
+                          <button type="button" onClick={() => setEditarImagenBase64("")} className="text-[10px] font-bold text-rose-500 hover:underline cursor-pointer">
+                            Quitar foto
+                          </button>
+                        )}
+                        <p className="text-[9px] text-slate-400">JPG o PNG, máx. 2MB.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-300 dark:border-slate-700 space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Variantes (tallas, colores) — opcional
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      El inventario sigue siendo un producto por talla/color, cada uno con su propio stock. Esto solo los junta en una sola tarjeta del catálogo público con selector — primero modelo (Grupo), después Color, después Talla, como en cualquier tienda de ropa/calzado.
+                    </p>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">1. Modelo / Grupo (igual en todas las variantes)</label>
+                      <input
+                        name="grupoVariante"
+                        placeholder="Ej. zapato-nike-air-max"
+                        defaultValue={editarModalItem.grupoVariante || ""}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-[11px]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">2. Color (opcional)</label>
+                        <input
+                          name="colorVariante"
+                          placeholder="Ej. Rojo, Azul…"
+                          defaultValue={editarModalItem.colorVariante || ""}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">
+                          3. {sugerirAtributoPorCategoria(categoriaEnEdicion).etiqueta}
+                        </label>
+                        <input
+                          name="atributoVariante"
+                          placeholder={sugerirAtributoPorCategoria(categoriaEnEdicion).placeholder}
+                          defaultValue={editarModalItem.atributoVariante || ""}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                El stock actual y el costo no se editan aquí — se actualizan solos a través de compras, ventas y ajustes (Kárdex), para mantener la auditoría.
-              </p>
               <div className="pt-2 flex justify-end gap-2">
                 <button type="button" onClick={() => setEditarModalItem(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
                   Cancelar
@@ -4004,6 +5433,7 @@ export default function ComercioApp({ onSalir }: { onSalir: () => void }) {
             setModalCompraProveedor(false);
             cargarRepuestosBackend();
             cargarComprasRepuesto();
+            cargarCuentas();
             mostrarToast("Factura de compra procesada. Stock y costo promedio actualizados en Kárdex.", "success");
           }}
           onNuevoProveedor={(nuevo) => setProveedoresRepuesto((prev) => [...prev, nuevo])}
@@ -4179,8 +5609,14 @@ function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOri
         }`}
       >
         <span className={`w-2 h-2 rounded-full ${tasaActivaNumero > 0 ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-        <span className="text-[10px] px-1 rounded bg-black/5 dark:bg-white/10 uppercase tracking-wider">{etiquetaOrigen}</span>
-        <span>{tasaActivaNumero > 0 ? `Bs. ${tasaActivaNumero.toFixed(2)}` : "Sin tasa"}</span>
+        {tasaActivaNumero > 0 ? (
+          <>
+            <span className="text-[10px] px-1 rounded bg-black/5 dark:bg-white/10 uppercase tracking-wider">{etiquetaOrigen}</span>
+            <span>Bs. {tasaActivaNumero.toFixed(2)}</span>
+          </>
+        ) : (
+          <span className="underline">Configurar tasa →</span>
+        )}
         {tasaCop && (
           <span className="text-slate-500 dark:text-slate-400 text-[10px] font-normal">· COP {Number(tasaCop.tasa).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
         )}
@@ -4284,6 +5720,7 @@ function CuentasPorCobrarPagarComercio({
   mostrarToast,
   cargarIngresosCaja,
   cargarGastosCaja,
+  cargarCuentas,
   tenantId,
 }: {
   cuentas: CuentaComercio[];
@@ -4300,6 +5737,7 @@ function CuentasPorCobrarPagarComercio({
   mostrarToast: (m: string, t?: "success" | "error" | "info") => void;
   cargarIngresosCaja: () => void;
   cargarGastosCaja: () => void;
+  cargarCuentas: () => void;
   tenantId?: number;
 }) {
   const [subTab, setSubTab] = useState<"CXP" | "CXC">("CXP");
@@ -4584,106 +6022,48 @@ function CuentasPorCobrarPagarComercio({
           onClose={() => setCuentaAbonando(null)}
           onConfirmar={async (montoAbono, monedaAbono, formaPago) => {
             const cta = cuentaAbonando;
-            const nuevoSaldo = Math.max(0, cta.saldoPendiente - montoAbono);
-            const quedaPagada = nuevoSaldo <= 0.005;
+            const movimientoId = cta.id.startsWith("mc-") ? Number(cta.id.slice(3)) : NaN;
 
-            // 1. Actualizar cuenta en el listado
-            const cuentasActualizadas = cuentas.map((c) =>
-              c.id === cta.id
-                ? {
-                    ...c,
-                    saldoPendiente: nuevoSaldo,
-                    estado: quedaPagada ? ("PAGADO" as const) : c.estado,
-                  }
-                : c
-            );
-            guardarCuentas(cuentasActualizadas);
+            if (!tenantId || Number.isNaN(movimientoId)) {
+              mostrarToast("No se pudo identificar esta cuenta en el servidor — recarga la pestaña e intenta de nuevo.", "error");
+              return;
+            }
 
-            // 2. REGISTRO CONTABLE AUTOMÁTICO EN CAJA (FLUJO LIMPIO ADMINISTRATIVO)
+            // abonarMovimiento ya registra el abono en la propia cuenta (saldo/estado) Y el
+            // ingreso/egreso de caja correspondiente en una sola transacción atómica en el
+            // backend (MotorFinancieroService.abonarMovimiento) — no hay que duplicarlo acá.
+            try {
+              await abonarMovimiento(tenantId, movimientoId, { monto: montoAbono, moneda: monedaAbono });
+            } catch (err: any) {
+              mostrarToast(err?.message || "No se pudo registrar el abono en el servidor.", "error");
+              return;
+            }
+
+            cargarCuentas();
+            const quedaSaldada = montoAbono >= cta.saldoPendiente - 0.005;
+            // Cuando la cuenta queda saldada, desaparece de "Pendientes" (por diseño, es la
+            // bandeja de lo que falta cobrar/pagar) pero SIGUE registrada — solo se mueve
+            // detrás de "Ver Saldadas". Sin este aviso explícito parece que el pago hizo
+            // que la cuenta "desapareciera" en vez de archivarse con su historial intacto.
+            const avisoSaldada = quedaSaldada ? " La cuenta quedó SALDADA — la ves en \"Ver Saldadas\", no desapareció." : "";
             if (cta.tipo === "CXP") {
-              // Pago a proveedor = EGRESO / GASTO EN CAJA
-              const nuevoEgreso: MovimientoCaja = {
-                id: Date.now(),
-                tenantId: tenantId || 0,
-                tipo: "EGRESO",
-                monto: montoAbono,
-                moneda: monedaAbono,
-                concepto: `Pago CxP a ${cta.entidadNombre} (${cta.concepto}) - ${formaPago}`,
-                fechaRegistro: new Date().toISOString(),
-                saldoPendiente: null,
-                estado: "PAGADO",
-                fechaVencimiento: null,
-                moduloOrigen: "COMERCIO",
-                referenciaTipo: "CXP",
-                referenciaId: null,
-              };
-              setGastosCaja((prev) => [nuevoEgreso, ...prev]);
-
-              if (tenantId) {
-                try {
-                  await registrarMovimiento(tenantId, {
-                    tipo: "EGRESO",
-                    monto: montoAbono,
-                    moneda: monedaAbono,
-                    concepto: nuevoEgreso.concepto,
-                  });
-                  cargarGastosCaja();
-                } catch (e) {
-                  console.warn("Sincronización en backend diferida:", e);
-                }
-              }
-
+              cargarGastosCaja();
               mostrarToast(
-                `Pago de ${monedaAbono === "USD" ? "$" : "Bs. "}${montoAbono.toFixed(2)} registrado. Se contabilizó el egreso en caja automáticamente.`,
+                `Pago de ${monedaAbono === "USD" ? "$" : "Bs. "}${montoAbono.toFixed(2)} registrado (${formaPago}). Se contabilizó el egreso en caja automáticamente.${avisoSaldada}`,
                 "success"
               );
             } else {
-              // Cobro a cliente = INGRESO EN CAJA
-              const nuevoIngreso: MovimientoCaja = {
-                id: Date.now(),
-                tenantId: tenantId || 0,
-                tipo: "INGRESO",
-                monto: montoAbono,
-                moneda: monedaAbono,
-                concepto: `Cobro CxC de ${cta.entidadNombre} (${cta.concepto}) - ${formaPago}`,
-                fechaRegistro: new Date().toISOString(),
-                saldoPendiente: null,
-                estado: "PAGADO",
-                fechaVencimiento: null,
-                moduloOrigen: "COMERCIO",
-                referenciaTipo: "CXC",
-                referenciaId: null,
-              };
-              setIngresosCaja((prev) => [nuevoIngreso, ...prev]);
-
-              // Descontar saldo del cliente en clientes
+              cargarIngresosCaja();
+              // Descontar saldo del cliente en la lista local de clientes (solo caché de UI para el CRM del mostrador)
               setClientes((prev) => {
-                const updated = prev.map((cl) => {
-                  if (cl.nombre === cta.entidadNombre || (cl.documento && cl.documento === cta.entidadDocumento)) {
-                    return { ...cl, saldoPendiente: Math.max(0, cl.saldoPendiente - montoAbono) };
-                  }
-                  return cl;
-                });
+                const updated = prev.map((cl) =>
+                  cl.nombre === cta.entidadNombre ? { ...cl, saldoPendiente: Math.max(0, cl.saldoPendiente - montoAbono) } : cl
+                );
                 try { localStorage.setItem("aurora_comercio_clientes", JSON.stringify(updated)); } catch {}
                 return updated;
               });
-
-              if (tenantId) {
-                try {
-                  await registrarMovimiento(tenantId, {
-                    tipo: "INGRESO",
-                    monto: montoAbono,
-                    moneda: monedaAbono,
-                    concepto: nuevoIngreso.concepto,
-                  });
-                  cargarIngresosCaja();
-                } catch (e) {
-                  console.warn("Sincronización en backend diferida:", e);
-                }
-              }
-
               mostrarToast(
-                `Cobro de ${monedaAbono === "USD" ? "$" : "Bs. "}${montoAbono.toFixed(2)} registrado. Se contabilizó el ingreso en caja y se actualizó el saldo del cliente.`,
+                `Cobro de ${monedaAbono === "USD" ? "$" : "Bs. "}${montoAbono.toFixed(2)} registrado (${formaPago}). Se contabilizó el ingreso en caja y se actualizó el saldo del cliente.${avisoSaldada}`,
                 "success"
               );
             }
@@ -4697,13 +6077,307 @@ function CuentasPorCobrarPagarComercio({
       {modalNuevaCxp && (
         <ModalNuevaCxpComercio
           proveedores={proveedores}
-          onClose={() => setModalNuevaCxp(false)}
-          onGuardar={(nueva) => {
-            guardarCuentas([nueva, ...cuentas]);
-            setModalNuevaCxp(false);
-            mostrarToast("Cuenta por pagar registrada en el panel administrativo.", "success");
+          onGuardar={async (datos) => {
+            if (!tenantId) {
+              mostrarToast("No hay negocio activo — inicia sesión de nuevo.", "error");
+              return;
+            }
+            try {
+              await registrarCuentaManual(tenantId, { tipo: "CXP", ...datos });
+              cargarCuentas();
+              setModalNuevaCxp(false);
+              mostrarToast("Cuenta por pagar registrada en el panel administrativo.", "success");
+            } catch (err: any) {
+              mostrarToast(err?.message || "No se pudo registrar la cuenta por pagar.", "error");
+            }
           }}
+          onClose={() => setModalNuevaCxp(false)}
         />
+      )}
+    </div>
+  );
+}
+
+const TIPO_CUENTA_LABELS: Record<TipoCuentaBancaria, string> = {
+  EFECTIVO: "Efectivo", BANCO: "Banco", PAGO_MOVIL: "Pago Móvil", BILLETERA_DIGITAL: "Billetera Digital", OTRO: "Otro",
+};
+
+/** "Dónde está guardado el dinero" (Caja Efectivo, Cuenta Dólares, cada banco) —
+ * independiente del ledger de ventas/gastos por moneda que ya lleva MovimientoCaja. */
+function CuentasBancariasComercio({ tenantId, mostrarToast }: { tenantId: number; mostrarToast: (m: string, t?: "success" | "error" | "info") => void }) {
+  const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [modalNueva, setModalNueva] = useState(false);
+  const [modalMovimiento, setModalMovimiento] = useState<{ cuenta: CuentaBancaria; tipo: "ingresar" | "retirar" } | null>(null);
+  const [modalTransferir, setModalTransferir] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = () => {
+    setCargando(true);
+    listarCuentasBancarias(tenantId)
+      .then(setCuentas)
+      .catch(() => mostrarToast("No se pudieron cargar las cuentas bancarias.", "error"))
+      .finally(() => setCargando(false));
+  };
+
+  useEffect(() => { cargar(); }, [tenantId]);
+
+  const totalesPorMoneda = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const c of cuentas) if (c.activa) acc[c.moneda] = (acc[c.moneda] || 0) + Number(c.saldo);
+    return acc;
+  }, [cuentas]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {Object.entries(totalesPorMoneda).map(([m, v]) => (
+            <div key={m} className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300">
+              Total {m}: <span className="text-teal-600 dark:text-teal-400">{m === "USD" ? "$" : m + " "}{v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setModalTransferir(true)}
+            disabled={cuentas.length < 2}
+            className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs cursor-pointer border border-slate-300 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Transferir entre Cuentas
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalNueva(true)}
+            className="px-4 py-2 rounded-xl bg-teal-500 text-slate-950 font-bold text-xs cursor-pointer hover:bg-teal-400 shadow-md transition-colors"
+          >
+            + Nueva Cuenta
+          </button>
+        </div>
+      </div>
+
+      {cargando ? (
+        <div className="p-8 text-center text-xs text-slate-400">Cargando cuentas...</div>
+      ) : cuentas.length === 0 ? (
+        <div className="p-10 text-center text-xs text-slate-400 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+          Todavía no registras ninguna cuenta. Crea "Caja Efectivo" o el nombre de tu banco para empezar a saber dónde está tu dinero.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cuentas.map((c) => (
+            <div key={c.id} className={`bg-white dark:bg-slate-900 rounded-2xl p-5 border shadow-sm space-y-3 ${c.activa ? "border-slate-200 dark:border-slate-800" : "border-slate-200 dark:border-slate-800 opacity-50"}`}>
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-teal-500/10 flex items-center justify-center"><IconWallet size={16} className="text-teal-600 dark:text-teal-400" /></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase">
+                    {TIPO_CUENTA_LABELS[c.tipo]}
+                  </span>
+                  {!c.metodoPagoVinculado && (
+                    <button
+                      type="button"
+                      title="Eliminar cuenta"
+                      onClick={async () => {
+                        if (!window.confirm(`¿Eliminar la cuenta "${c.nombre}"? Esto borra también su historial de movimientos y no se puede deshacer.`)) return;
+                        try {
+                          await eliminarCuentaBancaria(tenantId, c.id);
+                          mostrarToast("Cuenta eliminada.", "success");
+                          cargar();
+                        } catch (err: any) {
+                          mostrarToast(err?.message || "No se pudo eliminar la cuenta.", "error");
+                        }
+                      }}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                    >
+                      <IconClose size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-600 dark:text-slate-400 truncate">{c.nombre}</div>
+                <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white truncate">
+                  {c.moneda === "USD" ? "$" : c.moneda + " "}{Number(c.saldo).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModalMovimiento({ cuenta: c, tipo: "ingresar" })}
+                  className="flex-1 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold cursor-pointer transition-colors"
+                >
+                  + Ingresar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalMovimiento({ cuenta: c, tipo: "retirar" })}
+                  className="flex-1 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[11px] font-bold cursor-pointer transition-colors"
+                >
+                  - Retirar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modalNueva && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalNueva(false)}>
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              const nombre = String(fd.get("nombre") || "").trim();
+              const tipo = String(fd.get("tipo") || "BANCO") as TipoCuentaBancaria;
+              const moneda = String(fd.get("moneda") || "USD");
+              const saldoInicial = Number(fd.get("saldoInicial")) || 0;
+              setGuardando(true);
+              try {
+                await crearCuentaBancaria(tenantId, { nombre, tipo, moneda, saldoInicial });
+                mostrarToast("Cuenta creada correctamente.", "success");
+                setModalNueva(false);
+                cargar();
+              } catch (err: any) {
+                mostrarToast(err?.message || "No se pudo crear la cuenta.", "error");
+              } finally {
+                setGuardando(false);
+              }
+            }}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 cursor-default shadow-2xl"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nueva Cuenta</h3>
+              <button type="button" onClick={() => setModalNueva(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Nombre</label>
+              <input required name="nombre" placeholder="Ej. Caja Efectivo / Banco Mercantil" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Tipo</label>
+                <select name="tipo" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm">
+                  {Object.entries(TIPO_CUENTA_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Moneda</label>
+                <select name="moneda" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm">
+                  <option value="USD">USD</option>
+                  <option value="VES">VES</option>
+                  <option value="COP">COP</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Saldo Inicial (opcional)</label>
+              <input name="saldoInicial" type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-mono" />
+            </div>
+            <button type="submit" disabled={guardando} className="w-full py-2.5 rounded-xl bg-teal-500 text-slate-950 font-black cursor-pointer hover:bg-teal-400 shadow-md disabled:opacity-50">
+              {guardando ? "Creando..." : "Crear Cuenta"}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {modalMovimiento && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalMovimiento(null)}>
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              const monto = Number(fd.get("monto"));
+              const concepto = String(fd.get("concepto") || "");
+              if (!monto || monto <= 0) return;
+              setGuardando(true);
+              try {
+                if (modalMovimiento.tipo === "ingresar") await ingresarSaldoCuentaBancaria(tenantId, modalMovimiento.cuenta.id, monto, concepto);
+                else await retirarSaldoCuentaBancaria(tenantId, modalMovimiento.cuenta.id, monto, concepto);
+                mostrarToast(modalMovimiento.tipo === "ingresar" ? "Ingreso registrado." : "Retiro registrado.", "success");
+                setModalMovimiento(null);
+                cargar();
+              } catch (err: any) {
+                mostrarToast(err?.message || "No se pudo registrar el movimiento.", "error");
+              } finally {
+                setGuardando(false);
+              }
+            }}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 cursor-default shadow-2xl"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">
+                {modalMovimiento.tipo === "ingresar" ? "Ingresar Saldo" : "Retirar Saldo"} — {modalMovimiento.cuenta.nombre}
+              </h3>
+              <button type="button" onClick={() => setModalMovimiento(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Monto ({modalMovimiento.cuenta.moneda})</label>
+              <input required name="monto" type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-mono" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Concepto (opcional)</label>
+              <input name="concepto" placeholder="Ej. Depósito de ventas del día" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm" />
+            </div>
+            <button type="submit" disabled={guardando} className={`w-full py-2.5 rounded-xl font-black cursor-pointer shadow-md disabled:opacity-50 ${modalMovimiento.tipo === "ingresar" ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950" : "bg-rose-500 hover:bg-rose-400 text-white"}`}>
+              {guardando ? "Guardando..." : modalMovimiento.tipo === "ingresar" ? "Confirmar Ingreso" : "Confirmar Retiro"}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {modalTransferir && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalTransferir(false)}>
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              const origenId = Number(fd.get("origenId"));
+              const destinoId = Number(fd.get("destinoId"));
+              const monto = Number(fd.get("monto"));
+              if (!origenId || !destinoId || !monto || monto <= 0) return;
+              setGuardando(true);
+              try {
+                await transferirEntreCuentasBancarias(tenantId, origenId, destinoId, monto);
+                mostrarToast("Transferencia realizada correctamente.", "success");
+                setModalTransferir(false);
+                cargar();
+              } catch (err: any) {
+                mostrarToast(err?.message || "No se pudo transferir.", "error");
+              } finally {
+                setGuardando(false);
+              }
+            }}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 cursor-default shadow-2xl"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Transferir entre Cuentas</h3>
+              <button type="button" onClick={() => setModalTransferir(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">Solo se puede transferir entre cuentas de la misma moneda.</p>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Desde</label>
+              <select required name="origenId" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm">
+                {cuentas.map((c) => <option key={c.id} value={c.id}>{c.nombre} ({c.moneda} {Number(c.saldo).toFixed(2)})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Hacia</label>
+              <select required name="destinoId" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm">
+                {cuentas.map((c) => <option key={c.id} value={c.id}>{c.nombre} ({c.moneda} {Number(c.saldo).toFixed(2)})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Monto</label>
+              <input required name="monto" type="number" step="0.01" placeholder="0.00" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm font-mono" />
+            </div>
+            <button type="submit" disabled={guardando} className="w-full py-2.5 rounded-xl bg-teal-500 text-slate-950 font-black cursor-pointer hover:bg-teal-400 shadow-md disabled:opacity-50">
+              {guardando ? "Transfiriendo..." : "Confirmar Transferencia"}
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );
@@ -4846,38 +6520,31 @@ function ModalNuevaCxpComercio({
 }: {
   proveedores: ProveedorRepuesto[];
   onClose: () => void;
-  onGuardar: (c: CuentaComercio) => void;
+  onGuardar: (datos: { monto: number; concepto: string; entidadNombre?: string; diasCredito?: number }) => void | Promise<void>;
 }) {
   const [proveedorNombre, setProveedorNombre] = useState(proveedores[0]?.nombre || "");
   const [numeroFactura, setNumeroFactura] = useState("");
   const [concepto, setConcepto] = useState("");
   const [monto, setMonto] = useState("");
   const [diasCredito, setDiasCredito] = useState("15");
+  const [guardando, setGuardando] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const m = parseFloat(monto);
     if (!m || m <= 0) return;
 
-    const dias = parseInt(diasCredito) || 15;
-    const fVenc = new Date(Date.now() + dias * 86400000).toISOString().split("T")[0];
-
-    const nueva: CuentaComercio = {
-      id: `cxp-${Date.now()}`,
-      tipo: "CXP",
-      entidadNombre: proveedorNombre.trim() || "Proveedor Comercial",
-      concepto: concepto.trim() || `Factura ${numeroFactura.trim() || "S/N"} - ${proveedorNombre}`,
-      numeroDocumento: numeroFactura.trim() || undefined,
-      montoOriginal: m,
-      saldoPendiente: m,
-      moneda: "USD",
-      estado: "PENDIENTE",
-      fechaRegistro: new Date().toISOString().split("T")[0],
-      fechaVencimiento: fVenc,
-      referenciaTipo: "MANUAL",
-    };
-
-    onGuardar(nueva);
+    setGuardando(true);
+    try {
+      await onGuardar({
+        monto: m,
+        concepto: concepto.trim() || `Factura ${numeroFactura.trim() || "S/N"}`,
+        entidadNombre: proveedorNombre.trim() || "Proveedor Comercial",
+        diasCredito: parseInt(diasCredito) || 15,
+      });
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -4960,9 +6627,10 @@ function ModalNuevaCxpComercio({
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-md"
+              disabled={guardando}
+              className="flex-1 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-60 disabled:cursor-not-allowed text-slate-950 font-black text-xs cursor-pointer shadow-md"
             >
-              Guardar Cuenta
+              {guardando ? "Guardando…" : "Guardar Cuenta"}
             </button>
           </div>
         </form>
@@ -5025,10 +6693,26 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
   const utilidadPorMoneda: Record<string, number> = {};
   for (const m of monedas) utilidadPorMoneda[m] = (totalIngresos[m] || 0) - (totalGastos[m] || 0);
 
-  const fmtLista = (obj: Record<string, number>) => {
+  // Antes se unían todas las monedas en un solo texto ("$182.25 · VES 17,320.00")
+  // que se cortaba en dos líneas dentro de la tarjeta (el dólar arriba, el
+  // bolívar abajo) — parecía un solo número mal escrito. Ahora van una al lado
+  // de la otra en la misma línea, con una separación visible y colores
+  // distintos, porque son dos montos independientes, no una sola cifra.
+  const renderMontos = (obj: Record<string, number>, colorPrimario: string) => {
     const entradas = Object.entries(obj);
-    if (entradas.length === 0) return "$0.00";
-    return entradas.map(([m, v]) => `${m === "USD" ? "$" : m + " "}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(" · ");
+    const [primero, ...resto] = entradas;
+    return (
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className={`font-['Outfit'] font-black text-2xl ${colorPrimario} truncate`}>
+          {primero ? `${primero[0] === "USD" ? "$" : primero[0] + " "}${primero[1].toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}
+        </span>
+        {resto.length > 0 && (
+          <span className="text-sm font-bold text-indigo-500 dark:text-indigo-400 pl-2 border-l-2 border-slate-200 dark:border-slate-700 truncate">
+            {resto.map(([m, v]) => `${m} ${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(" · ")}
+          </span>
+        )}
+      </div>
+    );
   };
 
   const movimientosPeriodo = useMemo(
@@ -5102,7 +6786,7 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
             </div>
             <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ingresos</div>
           </div>
-          <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{fmtLista(totalIngresos)}</div>
+          {renderMontos(totalIngresos, "text-slate-900 dark:text-white")}
           <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
             {ingresosPeriodo.length === 0 ? "Sin ingresos en este período" : `${ingresosPeriodo.length} movimiento${ingresosPeriodo.length === 1 ? "" : "s"}`}
           </div>
@@ -5114,7 +6798,7 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
             </div>
             <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gastos</div>
           </div>
-          <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">{fmtLista(totalGastos)}</div>
+          {renderMontos(totalGastos, "text-slate-900 dark:text-white")}
           <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
             {gastosPeriodo.length === 0 ? "Sin gastos en este período" : `${gastosPeriodo.length} movimiento${gastosPeriodo.length === 1 ? "" : "s"}`}
           </div>
@@ -5124,12 +6808,12 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${hayNegativo ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"}`}>
               <IconChartTrend size={18} className="shrink-0" />
             </div>
-            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Utilidad</div>
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Balance de Caja</div>
           </div>
-          <div className={`font-['Outfit'] font-black text-2xl ${hayNegativo ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-            {fmtLista(utilidadPorMoneda)}
+          {renderMontos(utilidadPorMoneda, hayNegativo ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}
+          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+            Ingresos − Gastos — no es tu ganancia real (no resta el costo de lo vendido, ver "Ver Utilidad")
           </div>
-          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Ingresos − Gastos</div>
         </div>
       </div>
 
@@ -5536,7 +7220,7 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
 function UtilidadComercio() {
   type Preset = "hoy" | "semana" | "mes" | "personalizado";
 
-  const hoyISO = () => new Date().toISOString().slice(0, 10);
+  const hoyISO = () => fechaLocalISO();
   const rangoPreset = (p: Preset): { desde: string; hasta: string } => {
     const hoy = new Date();
     const hasta = hoyISO();
@@ -5544,11 +7228,11 @@ function UtilidadComercio() {
     if (p === "semana") {
       const d = new Date(hoy);
       d.setDate(d.getDate() - 6);
-      return { desde: d.toISOString().slice(0, 10), hasta };
+      return { desde: fechaLocalISO(d), hasta };
     }
     if (p === "mes") {
       const d = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-      return { desde: d.toISOString().slice(0, 10), hasta };
+      return { desde: fechaLocalISO(d), hasta };
     }
     return { desde: hasta, hasta };
   };
@@ -5653,6 +7337,88 @@ function UtilidadComercio() {
                 <div className="text-[10px] text-amber-600 dark:text-amber-400/80 mt-0.5">
                   {datos.coberturaPct === 0 ? "Sin costo conocido en este período" : "Parte de las ventas no tiene costo registrado"}
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Facturación vs Utilidad — mismos dos números que ya están en las tarjetas
+              de arriba, pero en un gráfico para comparar de un vistazo qué tan grande
+              es la utilidad real frente a lo facturado (sin costo de venta). */}
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+            <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-4">Facturación vs Utilidad</h4>
+            <ResponsiveContainer width="100%" height={110}>
+              <BarChart
+                data={[
+                  { name: "Facturación", valor: datos.ventasBrutas },
+                  { name: "Utilidad", valor: datos.utilidad },
+                ]}
+                layout="vertical"
+                margin={{ left: 10, right: 16 }}
+              >
+                <XAxis type="number" tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
+                <Tooltip
+                  formatter={((v: any) => [fmt(Number(v)), ""]) as any}
+                  contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
+                />
+                <Bar dataKey="valor" radius={[0, 6, 6, 0]}>
+                  <Cell fill="#0ea5e9" />
+                  <Cell fill="#10b981" />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Top 5 por unidades vendidas y por utilidad — mismo patrón visual que
+              Horeca (BarChart horizontal de recharts), reutilizando los mismos datos
+              de datos.productos que ya trae RepuestosReporteService, sin pedir nada
+              nuevo al backend. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Top 5 Más Vendidos</h4>
+                <span className="text-[11px] text-slate-400">Unidades</span>
+              </div>
+              {datos.productos.length === 0 ? (
+                <div className="h-[200px] flex items-center justify-center text-xs text-slate-400">Sin ventas en este período.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart
+                    data={[...datos.productos].sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 5)}
+                    layout="vertical"
+                    margin={{ left: 10, right: 16 }}
+                  >
+                    <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                    <YAxis type="category" dataKey="descripcion" width={110} tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      formatter={((v: any) => [`${v} unidades`, "Vendido"]) as any}
+                      contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
+                    />
+                    <Bar dataKey="cantidadVendida" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">Top 5 Mayor Utilidad</h4>
+                <span className="text-[11px] text-slate-400">{datos.moneda}</span>
+              </div>
+              {datos.productos.length === 0 ? (
+                <div className="h-[200px] flex items-center justify-center text-xs text-slate-400">Sin ventas con costo conocido en este período.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={datos.productos.slice(0, 5)} layout="vertical" margin={{ left: 10, right: 16 }}>
+                    <XAxis type="number" tick={{ fontSize: 10 }} />
+                    <YAxis type="category" dataKey="descripcion" width={110} tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      formatter={((v: any) => [fmt(Number(v)), "Utilidad"]) as any}
+                      contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
+                    />
+                    <Bar dataKey="utilidad" fill="#10b981" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               )}
             </div>
           </div>
@@ -5766,6 +7532,36 @@ function ModalCompraProveedorComercio({
   const [costoInput, setCostoInput] = useState("");
   const [precioVentaInput, setPrecioVentaInput] = useState("");
   const [guardandoCompra, setGuardandoCompra] = useState(false);
+
+  // Calculadora "compra a granel": el proveedor cobra por peso/bulto (ej. "8 kg de
+  // tornillos") pero el negocio vende y controla stock por unidad (ej. 150 tornillos)
+  // — antes el dueño tenía que sacar esa cuenta a mano (costo total ÷ unidades que
+  // rinde) y meter el resultado en "Costo Unit." de memoria, con el margen de error
+  // que eso implica. Solo calcula y rellena Cantidad/Costo Unit. de arriba; no manda
+  // nada al backend por su cuenta.
+  const [granelAbierto, setGranelAbierto] = useState(false);
+  const [granelCantidadComprada, setGranelCantidadComprada] = useState("");
+  const [granelUnidadCompra, setGranelUnidadCompra] = useState("Kg");
+  const [granelCostoTotal, setGranelCostoTotal] = useState("");
+  const [granelUnidadesResultantes, setGranelUnidadesResultantes] = useState("");
+
+  const granelCostoUnitario = useMemo(() => {
+    const unidades = Number(granelUnidadesResultantes);
+    const costo = Number(granelCostoTotal);
+    if (!unidades || unidades <= 0 || !costo || costo <= 0) return null;
+    return costo / unidades;
+  }, [granelCostoTotal, granelUnidadesResultantes]);
+
+  const aplicarCalculoGranel = () => {
+    if (granelCostoUnitario == null) return;
+    setCantidadInput(granelUnidadesResultantes);
+    // El costo unitario en el sistema se guarda con 2 decimales — con compras a
+    // granel de artículos muy baratos (ej. $10 entre 150 unidades = $0.0667) esos
+    // 2 decimales pueden perder algo de precisión frente al costo real por unidad;
+    // aceptable para el piloto, no crítico a este volumen de montos.
+    setCostoInput(granelCostoUnitario.toFixed(2));
+    setGranelAbierto(false);
+  };
 
   // Precargar costo y precio de venta actual al seleccionar producto
   useEffect(() => {
@@ -6132,6 +7928,57 @@ function ModalCompraProveedorComercio({
                 }`}>
                   {(Number(precioVentaInput) - Number(costoInput)) >= 0 ? "+" : ""}${(Number(precioVentaInput) - Number(costoInput)).toFixed(2)} / und ({((Number(precioVentaInput) - Number(costoInput)) / Number(costoInput) * 100).toFixed(1)}% margen)
                 </span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Calculadora de compra a granel (peso/bulto → costo por unidad) ── */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700/60 bg-slate-50 dark:bg-slate-800/40 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setGranelAbierto((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/70"
+            >
+              <span>¿Compraste a granel? (ej. 8 Kg que rinden 150 unidades) — calcular costo por unidad</span>
+              <span className="text-slate-400">{granelAbierto ? "Ocultar" : "Mostrar"}</span>
+            </button>
+            {granelAbierto && (
+              <div className="p-3 pt-1 grid grid-cols-2 sm:grid-cols-4 gap-2 items-end border-t border-slate-200 dark:border-slate-700/60">
+                <div>
+                  <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Cant. comprada</label>
+                  <input type="number" step="0.01" placeholder="8" value={granelCantidadComprada} onChange={(e) => setGranelCantidadComprada(e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono" />
+                </div>
+                <div>
+                  <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Unidad de compra</label>
+                  <input type="text" placeholder="Kg, Bulto, Caja…" value={granelUnidadCompra} onChange={(e) => setGranelUnidadCompra(e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs" />
+                </div>
+                <div>
+                  <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Costo total pagado ($)</label>
+                  <input type="number" step="0.01" placeholder="10.00" value={granelCostoTotal} onChange={(e) => setGranelCostoTotal(e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono" />
+                </div>
+                <div>
+                  <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Unidades que rinde</label>
+                  <input type="number" step="1" placeholder="150" value={granelUnidadesResultantes} onChange={(e) => setGranelUnidadesResultantes(e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-mono" />
+                </div>
+                <div className="col-span-2 sm:col-span-4 flex items-center justify-between gap-2 pt-1">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {granelCostoUnitario != null
+                      ? <>Costo por unidad: <span className="font-mono font-bold text-teal-600 dark:text-teal-400">${granelCostoUnitario.toFixed(4)}</span> ({granelCantidadComprada || "?"} {granelUnidadCompra} → {granelUnidadesResultantes} unidades)</>
+                      : "Completa costo total y unidades que rinde para calcular"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={granelCostoUnitario == null}
+                    onClick={aplicarCalculoGranel}
+                    className="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-bold text-[11px] cursor-pointer shrink-0"
+                  >
+                    Usar este cálculo
+                  </button>
+                </div>
               </div>
             )}
           </div>

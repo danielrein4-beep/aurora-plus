@@ -2238,6 +2238,14 @@ export interface MovimientoCaja {
   moduloOrigen: string | null;
   referenciaTipo: string | null;
   referenciaId: number | null;
+  capturaPagoBase64?: string | null;
+}
+
+export function subirComprobanteMovimientoCaja(tenantId: number, movimientoId: number, capturaBase64: string): Promise<MovimientoCaja> {
+  return request(`/api/financiero/movimientos/${movimientoId}/comprobante?tenantId=${tenantId}`, {
+    method: "POST",
+    body: JSON.stringify({ capturaBase64 })
+  });
 }
 
 export function registrarMovimiento(tenantId: number, datos: { tipo: "INGRESO" | "EGRESO"; monto: number; moneda: string; concepto: string }): Promise<MovimientoCaja> {
@@ -2253,6 +2261,116 @@ export function listarMovimientos(tenantId: number, tipo?: TipoMovimientoCaja): 
   const params = new URLSearchParams({ tenantId: String(tenantId) });
   if (tipo) params.set("tipo", tipo);
   return request(`/api/financiero/movimientos?${params}`);
+}
+
+/** Cuenta por cobrar/pagar manual, no ligada a una venta o compra real (ej. "pagué la luz a crédito"). */
+export function registrarCuentaManual(tenantId: number, datos: {
+  tipo: "CXC" | "CXP"; monto: number; concepto: string; entidadNombre?: string; diasCredito?: number;
+}): Promise<MovimientoCaja> {
+  return request(`/api/financiero/movimientos/cuenta?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CUENTAS BANCARIAS — "dónde está guardado el dinero" (Caja Efectivo, Cuenta
+// Dólares, cada banco), independiente del ledger de ventas/gastos por moneda
+// que ya lleva MovimientoCaja.
+// ═══════════════════════════════════════════════════════════════════════
+export type TipoCuentaBancaria = "EFECTIVO" | "BANCO" | "PAGO_MOVIL" | "BILLETERA_DIGITAL" | "OTRO";
+
+export interface CuentaBancaria {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  tipo: TipoCuentaBancaria;
+  moneda: string;
+  saldo: number;
+  activa: boolean;
+  fechaCreacion: string;
+  metodoPagoVinculado?: string | null; // "EFECTIVO"/"PAGO_MOVIL"/"ZELLE"/"BINANCE"/"BANCOLOMBIA" si se auto-generó desde Configuración > Pagos
+}
+
+export interface MovimientoCuentaBancaria {
+  id: number;
+  tenantId: number;
+  cuentaId: number;
+  tipo: "INGRESO" | "EGRESO" | "TRANSFERENCIA_ENTRADA" | "TRANSFERENCIA_SALIDA";
+  monto: number;
+  saldoAnterior: number;
+  saldoNuevo: number;
+  concepto: string;
+  fechaRegistro: string;
+}
+
+export function listarCuentasBancarias(tenantId: number): Promise<CuentaBancaria[]> {
+  return request(`/api/financiero/cuentas-bancarias?tenantId=${tenantId}`);
+}
+
+export function crearCuentaBancaria(tenantId: number, datos: {
+  nombre: string; tipo: TipoCuentaBancaria; moneda: string; saldoInicial?: number;
+}): Promise<CuentaBancaria> {
+  return request(`/api/financiero/cuentas-bancarias?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function actualizarCuentaBancaria(tenantId: number, id: number, datos: {
+  nombre?: string; tipo?: TipoCuentaBancaria; activa?: boolean;
+}): Promise<CuentaBancaria> {
+  return request(`/api/financiero/cuentas-bancarias/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function ingresarSaldoCuentaBancaria(tenantId: number, id: number, monto: number, concepto?: string): Promise<CuentaBancaria> {
+  return request(`/api/financiero/cuentas-bancarias/${id}/ingresar?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify({ monto, concepto }) });
+}
+
+export function retirarSaldoCuentaBancaria(tenantId: number, id: number, monto: number, concepto?: string): Promise<CuentaBancaria> {
+  return request(`/api/financiero/cuentas-bancarias/${id}/retirar?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify({ monto, concepto }) });
+}
+
+export function transferirEntreCuentasBancarias(tenantId: number, origenId: number, destinoId: number, monto: number): Promise<void> {
+  return request(`/api/financiero/cuentas-bancarias/transferir?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify({ origenId, destinoId, monto }) });
+}
+
+export function historialCuentaBancaria(tenantId: number, id: number): Promise<MovimientoCuentaBancaria[]> {
+  return request(`/api/financiero/cuentas-bancarias/${id}/movimientos?tenantId=${tenantId}`);
+}
+
+export function eliminarCuentaBancaria(tenantId: number, id: number): Promise<void> {
+  return request(`/api/financiero/cuentas-bancarias/${id}?tenantId=${tenantId}`, { method: "DELETE" });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// COMERCIO — PEDIDOS DEL CATÁLOGO PÚBLICO (WhatsApp / catálogo online)
+// ═══════════════════════════════════════════════════════════════════════
+export interface PedidoWebComercio {
+  id: number;
+  tenantId: number;
+  numeroPedido: string;
+  clienteNombre: string;
+  clienteTelefono: string;
+  tipoEntrega: string;
+  direccionEntrega: string;
+  metodoPago: string;
+  estado: "PENDIENTE" | "COMPLETADO" | "CANCELADO";
+  totalUsd: number;
+  totalBs: number;
+  tasaCambio: number;
+  itemsJson: string;
+  notas: string;
+  fechaCreacion: string;
+  capturaPagoBase64?: string | null;
+}
+
+export function listarPedidosWebComercio(): Promise<PedidoWebComercio[]> {
+  return request(`/api/comercio/catalogo/pedidos`);
+}
+
+/** Rechazar/reabrir un pedido — sin efectos en inventario o caja. Para completar uno, usar confirmarPedidoWebComercio. */
+export function cambiarEstadoPedidoWebComercio(pedidoId: number, estado: "PENDIENTE" | "CANCELADO"): Promise<PedidoWebComercio> {
+  return request(`/api/comercio/catalogo/pedidos/${pedidoId}/estado?estado=${estado}`, { method: "POST" });
+}
+
+/** Confirma el pedido: descuenta el inventario real, registra el ingreso en caja y calcula utilidad — mismo motor que el POS de mostrador. */
+export function confirmarPedidoWebComercio(pedidoId: number): Promise<PedidoWebComercio> {
+  return request(`/api/comercio/catalogo/pedidos/${pedidoId}/confirmar`, { method: "POST" });
 }
 
 // --- Licenciamiento: contratar una vertical adicional sobre el mismo tenant ---
@@ -3048,6 +3166,29 @@ export async function impersonarTenantSuperAdmin(tenantId: number): Promise<{ to
 }
 
 
+// ══════════════════════════════════════════════════════════════════════════
+// EQUIPO Y ROLES — self-servicio del propio Dueño/Administrador del negocio
+// (distinto de listarUsuariosTenantSuperAdmin/crearUsuarioTenantSuperAdmin de
+// arriba, que son para el super-admin de la plataforma sobre CUALQUIER
+// tenant). Estos usan la sesión normal del dueño, restringido a SU tenant —
+// el backend (AuthController.exigirDuenoAdmin) rechaza a cualquiera que no
+// sea DUENO_ADMIN, pero además el frontend nunca debe mostrarle esta pantalla
+// a un empleado (ver Dashboard.tsx, pestaña "team").
+// ══════════════════════════════════════════════════════════════════════════
+export function listarUsuariosPropios(tenantId: number): Promise<UsuarioTenant[]> {
+  return request(`/api/auth/usuarios?tenantId=${tenantId}`);
+}
+
+export function crearUsuarioPropio(tenantId: number, datos: {
+  username: string; password: string; rol: string; nombreCompleto?: string;
+}): Promise<UsuarioTenant> {
+  return request(`/api/auth/usuarios?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function desactivarUsuarioPropio(tenantId: number, usuarioId: number): Promise<void> {
+  return request(`/api/auth/usuarios/${usuarioId}/desactivar?tenantId=${tenantId}`, { method: "POST" });
+}
+
 export interface UsuarioTenant {
   id: number;
   tenantId: number;
@@ -3111,6 +3252,15 @@ export interface RepuestoItem {
   costoUnitario?: number;
   stockMinimo?: number;
   proveedorPrincipalId?: number | null;
+  categoria?: string | null; // organización del catálogo público — null = "General"
+  visible?: boolean; // false = oculto del catálogo público (el inventario/POS lo siguen viendo)
+  ordenVisualizacion?: number; // menor = aparece primero en el catálogo público
+  descripcionLarga?: string | null; // descripción de venta para el catálogo público (distinta de `descripcion`, que es el nombre corto)
+  imagenBase64?: string | null; // foto del producto como data-URI ("data:image/...;base64,...")
+  grupoVariante?: string | null; // junta este SKU con otros del mismo producto base (ej. distinta talla) en una sola tarjeta del catálogo público
+  atributoVariante?: string | null; // etiqueta de este SKU dentro del grupo (ej. "Talla 38")
+  colorVariante?: string | null; // segunda faceta de variante (ej. "Rojo") — selector de color, luego talla
+  fechaVencimiento?: string | null; // "YYYY-MM-DD" — caducidad del artículo (ej. pinturas, químicos), no por lote
 }
 
 export interface PresentacionRepuesto {
@@ -3224,13 +3374,22 @@ export function historialMovimientosRepuesto(id: number, tenantId: number): Prom
   return request(`/api/repuestos/items/${id}/movimientos?tenantId=${tenantId}`);
 }
 
+/**
+ * `montoPagadoAhora`/`diasCredito`: venta a crédito — si se omite `montoPagadoAhora` o es igual
+ * al total, es una venta de contado normal. Si es menor, la diferencia queda como cuenta por
+ * cobrar (CXC) real, atribuida a `clienteId` (ver RepuestoConversionService.registrarCobroVenta).
+ */
 export function venderRepuestoPorVolumen(
   id: number,
   tenantId: number,
   cantidad: number,
   monedaPago?: string,
   montoRecibido?: number,
-  claveIdempotencia?: string
+  claveIdempotencia?: string,
+  clienteId?: number,
+  montoPagadoAhora?: number,
+  diasCredito?: number,
+  nombreClienteManual?: string
 ): Promise<ResultadoVentaRepuestoVolumen> {
   const params = new URLSearchParams({
     tenantId: String(tenantId),
@@ -3239,6 +3398,10 @@ export function venderRepuestoPorVolumen(
   if (monedaPago) params.append("monedaPago", monedaPago);
   if (montoRecibido !== undefined) params.append("montoRecibido", String(montoRecibido));
   if (claveIdempotencia) params.append("claveIdempotencia", claveIdempotencia);
+  if (clienteId !== undefined) params.append("clienteId", String(clienteId));
+  if (montoPagadoAhora !== undefined) params.append("montoPagadoAhora", String(montoPagadoAhora));
+  if (diasCredito !== undefined) params.append("diasCredito", String(diasCredito));
+  if (nombreClienteManual) params.append("nombreClienteManual", nombreClienteManual);
 
   return request(`/api/repuestos/items/${id}/vender?${params.toString()}`, {
     method: "POST",

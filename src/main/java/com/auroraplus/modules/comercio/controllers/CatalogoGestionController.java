@@ -6,6 +6,7 @@ import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.modules.comercio.entities.PedidoWebComercio;
 import com.auroraplus.modules.comercio.repositories.PedidoWebComercioRepository;
+import com.auroraplus.modules.comercio.services.ConfirmacionPedidoWebService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -31,9 +32,15 @@ public class CatalogoGestionController {
     @Autowired
     private PedidoWebComercioRepository pedidoWebRepository;
 
+    @Autowired
+    private ConfirmacionPedidoWebService confirmacionPedidoWebService;
+
     public static class PerfilTiendaRequest {
         public String nombreEmpresa;
         public String logoBase64;
+        public String colorAcentoTienda;
+        public String bannerBase64;
+        public String estiloBannerTienda;
         public String telefonoWhatsapp;
         public String emailContacto;
         public String domicilioFiscal;
@@ -59,6 +66,10 @@ public class CatalogoGestionController {
         resp.put("nombreEmpresa", licencia.getNombreEmpresa());
         resp.put("slugCatalogo", licencia.getSlugCatalogo() != null ? licencia.getSlugCatalogo() : "tienda-" + tenantId);
         resp.put("logoBase64", licencia.getLogoBase64());
+        resp.put("personalizacionTiendaActiva", licencia.isPersonalizacionTiendaActiva());
+        resp.put("colorAcentoTienda", licencia.getColorAcentoTienda());
+        resp.put("bannerBase64", licencia.getBannerBase64());
+        resp.put("estiloBannerTienda", licencia.getEstiloBannerTienda());
         resp.put("telefonoWhatsapp", licencia.getTelefonoContacto() != null ? licencia.getTelefonoContacto() : "");
         resp.put("emailContacto", licencia.getEmailContacto() != null ? licencia.getEmailContacto() : "");
         resp.put("domicilioFiscal", licencia.getDomicilioFiscal() != null ? licencia.getDomicilioFiscal() : "");
@@ -80,6 +91,25 @@ public class CatalogoGestionController {
         }
         if (req.logoBase64 != null) {
             licencia.setLogoBase64(req.logoBase64.trim().isBlank() ? null : req.logoBase64.trim());
+        }
+        // El cliente nunca decide si tiene el add-on: el flag de licencia es la
+        // única autoridad. Campos inválidos se ignoran para no bloquear el
+        // resto del perfil que el dueño sí puede actualizar.
+        if (licencia.isPersonalizacionTiendaActiva()) {
+            if (req.colorAcentoTienda != null) {
+                String color = req.colorAcentoTienda.trim();
+                if (color.isBlank()) {
+                    licencia.setColorAcentoTienda(null);
+                } else if (color.matches("^#[0-9a-fA-F]{6}$")) {
+                    licencia.setColorAcentoTienda(color);
+                }
+            }
+            if (req.bannerBase64 != null) {
+                licencia.setBannerBase64(req.bannerBase64.trim().isBlank() ? null : req.bannerBase64.trim());
+            }
+            if (req.estiloBannerTienda != null && ("COMPACTO".equals(req.estiloBannerTienda) || "VITRINA".equals(req.estiloBannerTienda))) {
+                licencia.setEstiloBannerTienda(req.estiloBannerTienda);
+            }
         }
         if (req.telefonoWhatsapp != null) {
             licencia.setTelefonoContacto(req.telefonoWhatsapp.trim());
@@ -129,6 +159,10 @@ public class CatalogoGestionController {
         resp.put("nombreEmpresa", licencia.getNombreEmpresa());
         resp.put("slugCatalogo", licencia.getSlugCatalogo());
         resp.put("logoBase64", licencia.getLogoBase64());
+        resp.put("personalizacionTiendaActiva", licencia.isPersonalizacionTiendaActiva());
+        resp.put("colorAcentoTienda", licencia.getColorAcentoTienda());
+        resp.put("bannerBase64", licencia.getBannerBase64());
+        resp.put("estiloBannerTienda", licencia.getEstiloBannerTienda());
         resp.put("telefonoWhatsapp", licencia.getTelefonoContacto());
         resp.put("emailContacto", licencia.getEmailContacto());
         resp.put("domicilioFiscal", licencia.getDomicilioFiscal());
@@ -142,6 +176,16 @@ public class CatalogoGestionController {
         public String documento;
         public String titular;
         public Boolean activo;
+        public Boolean zelleActivo;
+        public String zelleCorreo;
+        public String zelleTitular;
+        public Boolean binanceManualActivo;
+        public String binancePayId;
+        public Boolean bancolombiaActivo;
+        public String bancolombiaCuenta;
+        public String bancolombiaTipoCuenta;
+        public String bancolombiaTitular;
+        public String bancolombiaDocumento;
     }
 
     @GetMapping("/pago-movil")
@@ -157,6 +201,16 @@ public class CatalogoGestionController {
         pagoMovil.put("documento", licencia.getPagoMovilDocumento() != null ? licencia.getPagoMovilDocumento() : "");
         pagoMovil.put("titular", licencia.getPagoMovilTitular() != null ? licencia.getPagoMovilTitular() : "");
         pagoMovil.put("activo", licencia.isPagoMovilActivo());
+        pagoMovil.put("zelleActivo", licencia.isZelleActivo());
+        pagoMovil.put("zelleCorreo", licencia.getZelleCorreo() != null ? licencia.getZelleCorreo() : "");
+        pagoMovil.put("zelleTitular", licencia.getZelleTitular() != null ? licencia.getZelleTitular() : "");
+        pagoMovil.put("binanceManualActivo", licencia.isBinanceManualActivo());
+        pagoMovil.put("binancePayId", licencia.getBinancePayId() != null ? licencia.getBinancePayId() : "");
+        pagoMovil.put("bancolombiaActivo", licencia.isBancolombiaActivo());
+        pagoMovil.put("bancolombiaCuenta", licencia.getBancolombiaCuenta() != null ? licencia.getBancolombiaCuenta() : "");
+        pagoMovil.put("bancolombiaTipoCuenta", licencia.getBancolombiaTipoCuenta() != null ? licencia.getBancolombiaTipoCuenta() : "");
+        pagoMovil.put("bancolombiaTitular", licencia.getBancolombiaTitular() != null ? licencia.getBancolombiaTitular() : "");
+        pagoMovil.put("bancolombiaDocumento", licencia.getBancolombiaDocumento() != null ? licencia.getBancolombiaDocumento() : "");
         return ResponseEntity.ok(pagoMovil);
     }
 
@@ -172,6 +226,16 @@ public class CatalogoGestionController {
         if (req.documento != null) licencia.setPagoMovilDocumento(req.documento.trim());
         if (req.titular != null) licencia.setPagoMovilTitular(req.titular.trim());
         if (req.activo != null) licencia.setPagoMovilActivo(req.activo);
+        if (req.zelleActivo != null) licencia.setZelleActivo(req.zelleActivo);
+        if (req.zelleCorreo != null) licencia.setZelleCorreo(req.zelleCorreo.trim());
+        if (req.zelleTitular != null) licencia.setZelleTitular(req.zelleTitular.trim());
+        if (req.binanceManualActivo != null) licencia.setBinanceManualActivo(req.binanceManualActivo);
+        if (req.binancePayId != null) licencia.setBinancePayId(req.binancePayId.trim());
+        if (req.bancolombiaActivo != null) licencia.setBancolombiaActivo(req.bancolombiaActivo);
+        if (req.bancolombiaCuenta != null) licencia.setBancolombiaCuenta(req.bancolombiaCuenta.trim());
+        if (req.bancolombiaTipoCuenta != null) licencia.setBancolombiaTipoCuenta(req.bancolombiaTipoCuenta.trim());
+        if (req.bancolombiaTitular != null) licencia.setBancolombiaTitular(req.bancolombiaTitular.trim());
+        if (req.bancolombiaDocumento != null) licencia.setBancolombiaDocumento(req.bancolombiaDocumento.trim());
         licenciaTenantRepository.save(licencia);
 
         Map<String, Object> resp = new LinkedHashMap<>();
@@ -180,6 +244,16 @@ public class CatalogoGestionController {
         resp.put("documento", licencia.getPagoMovilDocumento());
         resp.put("titular", licencia.getPagoMovilTitular());
         resp.put("activo", licencia.isPagoMovilActivo());
+        resp.put("zelleActivo", licencia.isZelleActivo());
+        resp.put("zelleCorreo", licencia.getZelleCorreo());
+        resp.put("zelleTitular", licencia.getZelleTitular());
+        resp.put("binanceManualActivo", licencia.isBinanceManualActivo());
+        resp.put("binancePayId", licencia.getBinancePayId());
+        resp.put("bancolombiaActivo", licencia.isBancolombiaActivo());
+        resp.put("bancolombiaCuenta", licencia.getBancolombiaCuenta());
+        resp.put("bancolombiaTipoCuenta", licencia.getBancolombiaTipoCuenta());
+        resp.put("bancolombiaTitular", licencia.getBancolombiaTitular());
+        resp.put("bancolombiaDocumento", licencia.getBancolombiaDocumento());
         return ResponseEntity.ok(resp);
     }
 
@@ -190,9 +264,20 @@ public class CatalogoGestionController {
         return ResponseEntity.ok(pedidoWebRepository.findByTenantIdOrderByFechaCreacionDesc(tenantId));
     }
 
+    /**
+     * Cambia el estado del pedido SIN efectos contables (rechazar, reabrir, marcar en
+     * preparación/despachado) — "COMPLETADO" queda excluido a propósito: ese estado solo
+     * se alcanza pasando por /confirmar, que sí descuenta inventario y registra el ingreso
+     * real. Permitirlo acá dejaría un pedido "completado" fantasma, sin ningún rastro
+     * contable, que fue exactamente el bug que esto reemplaza.
+     */
     @PostMapping("/pedidos/{pedidoId:[0-9]+}/estado")
     public ResponseEntity<?> actualizarEstadoPedido(@PathVariable Long pedidoId, @RequestParam String estado) {
         AuthContext.exigirRol("DUENO_ADMIN");
+        if ("COMPLETADO".equalsIgnoreCase(estado)) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                "Para completar un pedido usa /pedidos/{id}/confirmar — así se descuenta el inventario y se registra la venta real."));
+        }
         Long tenantId = TenantContext.getCurrentTenant();
         PedidoWebComercio p = pedidoWebRepository.findById(pedidoId).orElse(null);
         if (p == null || !p.getTenantId().equals(tenantId)) {
@@ -200,5 +285,17 @@ public class CatalogoGestionController {
         }
         p.setEstado(estado);
         return ResponseEntity.ok(pedidoWebRepository.save(p));
+    }
+
+    /** Confirma el pedido: descuenta inventario real, registra el ingreso en caja y calcula utilidad — ver ConfirmacionPedidoWebService. */
+    @PostMapping("/pedidos/{pedidoId:[0-9]+}/confirmar")
+    public ResponseEntity<?> confirmarPedido(@PathVariable Long pedidoId) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = TenantContext.getCurrentTenant();
+        try {
+            return ResponseEntity.ok(confirmacionPedidoWebService.confirmar(tenantId, pedidoId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

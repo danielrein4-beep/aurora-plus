@@ -64,6 +64,8 @@ public class RepuestoItemController {
             throw new RuntimeException("El código SKU es obligatorio");
         }
         item.setTenantId(tenantId);
+        if (item.getVisible() == null) item.setVisible(true);
+        if (item.getOrdenVisualizacion() == null) item.setOrdenVisualizacion(0);
         RepuestoItem guardado = repuestoItemRepository.save(item);
         auditoriaService.registrar(tenantId, "COMERCIO", "CREAR", "RepuestoItem", guardado.getId(), "Creó el repuesto SKU " + guardado.getCodigoSku());
         return ResponseEntity.status(HttpStatus.CREATED).body(guardado);
@@ -84,6 +86,15 @@ public class RepuestoItemController {
                 if (datos.getUnidadBase() != null) item.setUnidadBase(datos.getUnidadBase());
                 if (datos.getStockMinimo() != null) item.setStockMinimo(datos.getStockMinimo());
                 if (datos.getProveedorPrincipalId() != null) item.setProveedorPrincipalId(datos.getProveedorPrincipalId());
+                if (datos.getCategoria() != null) item.setCategoria(datos.getCategoria());
+                if (datos.getVisible() != null) item.setVisible(datos.getVisible());
+                if (datos.getOrdenVisualizacion() != null) item.setOrdenVisualizacion(datos.getOrdenVisualizacion());
+                if (datos.getDescripcionLarga() != null) item.setDescripcionLarga(datos.getDescripcionLarga());
+                if (datos.getImagenBase64() != null) item.setImagenBase64(datos.getImagenBase64());
+                if (datos.getGrupoVariante() != null) item.setGrupoVariante(datos.getGrupoVariante());
+                if (datos.getAtributoVariante() != null) item.setAtributoVariante(datos.getAtributoVariante());
+                if (datos.getColorVariante() != null) item.setColorVariante(datos.getColorVariante());
+                if (datos.getFechaVencimiento() != null) item.setFechaVencimiento(datos.getFechaVencimiento());
                 return ResponseEntity.ok(repuestoItemRepository.save(item));
             })
             .orElse(ResponseEntity.notFound().build());
@@ -113,15 +124,24 @@ public class RepuestoItemController {
         return movimientoRepuestoRepository.findByRepuestoIdOrderByFechaRegistroDesc(id);
     }
 
-    /** Subfase 5.3: venta directa con precio automático Mayorista/Detal según cantidad. */
+    /**
+     * Subfase 5.3: venta directa con precio automático Mayorista/Detal según cantidad.
+     * `montoPagadoAhora`/`diasCredito`: venta a crédito — si el cliente no paga el total ahora,
+     * la diferencia queda como cuenta por cobrar (CXC) real en el motor financiero, ver
+     * RepuestoConversionService.registrarCobroVenta.
+     */
     @PostMapping("/{id}/vender")
     public ResponseEntity<Map<String, Object>> venderPorVolumen(@PathVariable Long id, @RequestParam Long tenantId,
                                                                   @RequestParam BigDecimal cantidad,
                                                                   @RequestParam(required = false) String monedaPago,
                                                                   @RequestParam(required = false) BigDecimal montoRecibido,
                                                                   @RequestParam(required = false) String claveIdempotencia,
-                                                                  @RequestParam(required = false) Long clienteId) {
-        RepuestoConversionService.ResultadoVenta resultado = repuestoConversionService.venderPorVolumen(id, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, clienteId);
+                                                                  @RequestParam(required = false) Long clienteId,
+                                                                  @RequestParam(required = false) BigDecimal montoPagadoAhora,
+                                                                  @RequestParam(required = false) Integer diasCredito,
+                                                                  @RequestParam(required = false) String nombreClienteManual) {
+        RepuestoConversionService.ResultadoVenta resultado = repuestoConversionService.venderPorVolumen(
+            id, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, clienteId, montoPagadoAhora, diasCredito, nombreClienteManual);
         return ResponseEntity.ok(Map.of(
             "precioUnitarioAplicado", resultado.getPrecioUnitarioAplicado(),
             "total", resultado.getTotal(),
@@ -186,6 +206,10 @@ public class RepuestoItemController {
                 Optional<RepuestoItem> existente = repuestoItemRepository.findByCodigoSkuAndTenantId(item.codigoSku.trim(), tenantId);
                 RepuestoItem repuesto = existente.orElseGet(RepuestoItem::new);
                 boolean esNuevo = repuesto.getId() == null;
+                if (esNuevo) {
+                    repuesto.setVisible(true);
+                    repuesto.setOrdenVisualizacion(0);
+                }
 
                 repuesto.setTenantId(tenantId);
                 repuesto.setCodigoSku(item.codigoSku.trim());

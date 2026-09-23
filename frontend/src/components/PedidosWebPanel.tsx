@@ -1,15 +1,107 @@
 import React, { useState, useEffect, useMemo } from "react";
+import jsPDF from "jspdf";
+import { listarPedidosWebComercio, cambiarEstadoPedidoWebComercio, confirmarPedidoWebComercio, ApiError } from "../api";
 
-// El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
-// no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
-function obtenerTokenSesion(): string {
-  try {
-    const raw = localStorage.getItem("aurora_token");
-    if (!raw) return "";
-    return JSON.parse(raw).token || "";
-  } catch {
-    return "";
+const METODO_PAGO_LABELS_ND: Record<string, string> = {
+  PAGO_MOVIL: "Pago Móvil", TRANSFERENCIA: "Transferencia Bancaria", EFECTIVO_USD: "Efectivo (USD)",
+  EFECTIVO_BS: "Efectivo (Bs.)", ZELLE: "Zelle", BINANCE: "Binance Pay (USDT)", BANCOLOMBIA: "Bancolombia",
+};
+
+/** Nota de Entrega (tienda → consumidor) para un pedido web ya confirmado — mismo
+ * documento que el mostrador genera para una venta de POS, adaptado a los datos que
+ * de verdad existen en un pedido web (itemsJson es el texto ya formateado que se le
+ * muestra al cliente, no una lista estructurada; no hay necesidad de reparsearlo). */
+function generarNotaEntregaWebPDF(pedido: PedidoWeb, nombreTienda: string): jsPDF {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const W = 210;
+  const margin = 14;
+  const colRight = W - margin;
+  let y = 15;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(20, 20, 20);
+  doc.text(nombreTienda, margin, y);
+
+  const ndX = W - 72;
+  doc.setDrawColor(30, 150, 130);
+  doc.setLineWidth(0.6);
+  doc.rect(ndX, y - 8, 58, 24, "S");
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(30, 150, 130);
+  doc.text("NOTA DE ENTREGA", ndX + 29, y - 2, { align: "center" });
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60);
+  doc.text(`Pedido: #${pedido.numeroPedido}`, ndX + 29, y + 4, { align: "center" });
+  doc.text(`Fecha: ${new Date().toLocaleDateString("es-VE")}`, ndX + 29, y + 9, { align: "center" });
+  doc.text(`Canal: Catálogo Online`, ndX + 29, y + 14, { align: "center" });
+  doc.text(pedido.tipoEntrega === "DELIVERY" ? "Modalidad: Delivery" : "Modalidad: Retiro en Tienda", ndX + 29, y + 19, { align: "center" });
+
+  y += 28;
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(20, 20, 20);
+  doc.text("RECEPTOR:", margin, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(pedido.clienteNombre || "Consumidor final", margin + 20, y);
+  y += 5;
+  doc.text(`Tel: ${pedido.clienteTelefono || "-"}`, margin, y);
+  doc.text(`Pago: ${METODO_PAGO_LABELS_ND[pedido.metodoPago] || pedido.metodoPago}`, margin + 70, y);
+  y += 5;
+  if (pedido.tipoEntrega === "DELIVERY" && pedido.direccionEntrega) {
+    doc.text(`Dirección: ${pedido.direccionEntrega}`, margin, y);
+    y += 5;
   }
+
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(margin, y, colRight, y);
+  y += 5;
+
+  doc.setFillColor(240, 250, 248);
+  doc.rect(margin, y - 4, colRight - margin, 7, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(30, 120, 110);
+  doc.text("ARTÍCULOS DEL PEDIDO", margin + 2, y);
+  y += 8;
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(40, 40, 40);
+  doc.setFontSize(9);
+  const lineas = doc.splitTextToSize(pedido.itemsJson || "No especificado", colRight - margin - 4);
+  lineas.forEach((linea: string) => {
+    doc.text(linea, margin + 2, y);
+    y += 5;
+    if (y > 240) { doc.addPage(); y = 20; }
+  });
+
+  y += 4;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, y, colRight, y);
+  y += 6;
+
+  const totX = colRight - 60;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(80, 80, 80);
+  doc.text("Total USD:", totX, y);
+  doc.text(`$${Number(pedido.totalUsd).toFixed(2)}`, colRight - 2, y, { align: "right" });
+  if (Number(pedido.totalBs) > 0) {
+    y += 5;
+    doc.text("Total Bs.:", totX, y);
+    doc.text(`Bs.${Number(pedido.totalBs).toFixed(2)}`, colRight - 2, y, { align: "right" });
+  }
+  y += 12;
+
+  doc.setFontSize(7);
+  doc.setTextColor(150, 150, 150);
+  doc.text("Documento generado automáticamente por Aurora Plus al confirmar el pedido.", margin, y);
+
+  doc.save(`Nota-Entrega-${pedido.numeroPedido}.pdf`);
+  return doc;
 }
 
 function SvgSearch({ className = "w-4 h-4" }: { className?: string }) {
@@ -92,32 +184,34 @@ export interface PedidoWeb {
   itemsJson: string;
   notas: string;
   fechaCreacion: string;
+  capturaPagoBase64?: string | null;
 }
 
 interface Props {
   tenantId: number;
   tasaVes: number;
-  onCargarAlPos: (pedido: PedidoWeb) => void;
+  nombreNegocio: string;
+  onPedidoConfirmado?: () => void;
   onVerQrModal: () => void;
 }
 
-export default function PedidosWebPanel({ tenantId, tasaVes, onCargarAlPos, onVerQrModal }: Props) {
+export default function PedidosWebPanel({ tenantId, tasaVes, nombreNegocio, onPedidoConfirmado, onVerQrModal }: Props) {
   const [pedidos, setPedidos] = useState<PedidoWeb[]>([]);
   const [cargando, setCargando] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState<"TODOS" | "PENDIENTE" | "COMPLETADO">("TODOS");
   const [busqueda, setBusqueda] = useState("");
   const [actualizandoId, setActualizandoId] = useState<number | null>(null);
+  const [errorPorPedido, setErrorPorPedido] = useState<Record<number, string>>({});
+  // Visor propio para el comprobante en vez de <a target="_blank"> — Chrome bloquea
+  // navegar una pestaña nueva directo a una imagen "data:" (protección anti-phishing),
+  // así que el link abría una pestaña que nunca cargaba nada.
+  const [comprobanteAmpliado, setComprobanteAmpliado] = useState<string | null>(null);
 
   const cargarPedidos = async () => {
     setCargando(true);
     try {
-      const res = await fetch(`/api/comercio/catalogo/pedidos`, {
-        headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPedidos(data || []);
-      }
+      const data = await listarPedidosWebComercio();
+      setPedidos((data as unknown as PedidoWeb[]) || []);
     } catch (err) {
       console.warn("No se pudieron consultar pedidos web:", err);
     } finally {
@@ -131,20 +225,34 @@ export default function PedidosWebPanel({ tenantId, tasaVes, onCargarAlPos, onVe
     return () => clearInterval(interval);
   }, [tenantId]);
 
-  const cambiarEstado = async (id: number, nuevoEstado: string) => {
+  /** Rechazar o reabrir — sin efectos en inventario/caja, seguro de reintentar. */
+  const cambiarEstado = async (id: number, nuevoEstado: "PENDIENTE" | "CANCELADO") => {
     setActualizandoId(id);
+    setErrorPorPedido((prev) => ({ ...prev, [id]: "" }));
     try {
-      const res = await fetch(`/api/comercio/catalogo/pedidos/${id}/estado?estado=${nuevoEstado}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
-      });
-      if (res.ok) {
-        setPedidos((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, estado: nuevoEstado as any } : p))
-        );
-      }
+      const actualizado = await cambiarEstadoPedidoWebComercio(id, nuevoEstado);
+      setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, ...(actualizado as unknown as PedidoWeb) } : p)));
     } catch (err) {
-      console.error("Error al actualizar estado del pedido", err);
+      setErrorPorPedido((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : "No se pudo actualizar el pedido." }));
+    } finally {
+      setActualizandoId(null);
+    }
+  };
+
+  /** Confirma de verdad: descuenta inventario real, registra el ingreso en caja y calcula utilidad — mismo motor que el POS. */
+  const confirmarPedido = async (id: number) => {
+    setActualizandoId(id);
+    setErrorPorPedido((prev) => ({ ...prev, [id]: "" }));
+    try {
+      const actualizado = await confirmarPedidoWebComercio(id) as unknown as PedidoWeb;
+      setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, ...actualizado } : p)));
+      generarNotaEntregaWebPDF(actualizado, nombreNegocio);
+      onPedidoConfirmado?.();
+    } catch (err) {
+      setErrorPorPedido((prev) => ({
+        ...prev,
+        [id]: err instanceof ApiError ? err.message : "No se pudo confirmar el pedido.",
+      }));
     } finally {
       setActualizandoId(null);
     }
@@ -301,7 +409,9 @@ export default function PedidosWebPanel({ tenantId, tasaVes, onCargarAlPos, onVe
                       className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                         esPendiente
                           ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                          : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                          : p.estado === "CANCELADO"
+                            ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                            : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                       }`}
                     >
                       {p.estado}
@@ -336,12 +446,12 @@ export default function PedidosWebPanel({ tenantId, tasaVes, onCargarAlPos, onVe
                     <span className="inline-flex items-center gap-1 font-semibold">
                       {p.tipoEntrega === "DELIVERY" ? (
                         <>
-                          <SvgTruck className="w-3 h-3 text-teal-400" />
+                          <SvgTruck className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                           <span>Delivery</span>
                         </>
                       ) : (
                         <>
-                          <SvgStore className="w-3 h-3 text-teal-400" />
+                          <SvgStore className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                           <span>Retiro en Tienda</span>
                         </>
                       )}
@@ -349,6 +459,28 @@ export default function PedidosWebPanel({ tenantId, tasaVes, onCargarAlPos, onVe
                     <span>•</span>
                     <span className="font-medium">{p.metodoPago}</span>
                   </div>
+
+                  {/* Captura del pago que subió el cliente — así el dueño no tiene que
+                      pedirla por WhatsApp por separado, solo verificarla acá. */}
+                  {p.capturaPagoBase64 ? (
+                    <button
+                      type="button"
+                      onClick={() => setComprobanteAmpliado(p.capturaPagoBase64!)}
+                      className="inline-flex items-center gap-2 mt-1 cursor-pointer"
+                      title="Ver comprobante de pago en tamaño completo"
+                    >
+                      <img
+                        src={p.capturaPagoBase64}
+                        alt="Comprobante de pago"
+                        className="h-12 w-12 rounded-lg object-cover border border-slate-300 dark:border-slate-600"
+                      />
+                      <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 underline">Ver comprobante</span>
+                    </button>
+                  ) : (
+                    <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      Sin comprobante de pago
+                    </span>
+                  )}
 
                   {p.tipoEntrega === "DELIVERY" && p.direccionEntrega && (
                     <p className="text-[11px] text-slate-600 dark:text-slate-300 italic pt-0.5">
@@ -373,47 +505,86 @@ export default function PedidosWebPanel({ tenantId, tasaVes, onCargarAlPos, onVe
                 </div>
 
                 {/* Totales y Acciones */}
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-black font-mono text-teal-600 dark:text-teal-400">
-                      ${Number(p.totalUsd).toFixed(2)} USD
-                    </div>
-                    {Number(p.totalBs) > 0 && (
-                      <div className="text-[10px] font-mono text-slate-400">
-                        {Number(p.totalBs).toFixed(2)} Bs.
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-black font-mono text-slate-900 dark:text-white">
+                        ${Number(p.totalUsd).toFixed(2)} USD
                       </div>
-                    )}
-                  </div>
+                      {Number(p.totalBs) > 0 && (
+                        <div className="text-[10px] font-mono text-slate-400">
+                          {Number(p.totalBs).toFixed(2)} Bs.
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    {esPendiente && (
-                      <button
-                        type="button"
-                        onClick={() => onCargarAlPos(p)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs shadow-sm transition-all active:scale-95"
-                      >
-                        <span>Cargar al POS</span>
-                        <SvgArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      disabled={actualizandoId === p.id}
-                      onClick={() => cambiarEstado(p.id, esPendiente ? "COMPLETADO" : "PENDIENTE")}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                        esPendiente
-                          ? "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-                          : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
-                      }`}
-                    >
-                      {esPendiente ? "Listo / Despachado" : "Reabrir"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {esPendiente && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={actualizandoId === p.id}
+                            onClick={() => cambiarEstado(p.id, "CANCELADO")}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors disabled:opacity-50"
+                          >
+                            Rechazar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={actualizandoId === p.id}
+                            onClick={() => confirmarPedido(p.id)}
+                            title="Descuenta el inventario real y registra el ingreso en caja"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-60 text-slate-950 font-bold text-xs shadow-sm transition-all active:scale-95"
+                          >
+                            <span>{actualizandoId === p.id ? "Confirmando…" : "Confirmar Pedido"}</span>
+                            {actualizandoId !== p.id && <SvgArrowRight className="w-3.5 h-3.5" />}
+                          </button>
+                        </>
+                      )}
+                      {p.estado === "CANCELADO" && (
+                        <button
+                          type="button"
+                          disabled={actualizandoId === p.id}
+                          onClick={() => cambiarEstado(p.id, "PENDIENTE")}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition-colors disabled:opacity-50"
+                        >
+                          Reabrir
+                        </button>
+                      )}
+                      {p.estado === "COMPLETADO" && (
+                        <button
+                          type="button"
+                          onClick={() => generarNotaEntregaWebPDF(p, nombreNegocio)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                        >
+                          Descargar Nota de Entrega
+                        </button>
+                      )}
+                    </div>
                   </div>
+                  {errorPorPedido[p.id] && (
+                    <p className="text-[11px] font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-lg px-2.5 py-1.5">
+                      {errorPorPedido[p.id]}
+                    </p>
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {comprobanteAmpliado && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setComprobanteAmpliado(null)}
+        >
+          <img
+            src={comprobanteAmpliado}
+            alt="Comprobante de pago en tamaño completo"
+            className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
