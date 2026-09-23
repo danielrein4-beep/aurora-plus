@@ -7,6 +7,9 @@ import SociedadesCeba from "./SociedadesCeba";
 import ModalVentaAnimales, { type ModoVenta } from "./ganaderia/ModalVentaAnimales";
 import ModalJornadaOrdeno, { vacasDeOrdeno } from "./ganaderia/ModalJornadaOrdeno";
 import ModalVacunacion, { type VacunacionAplicada } from "./ganaderia/ModalVacunacion";
+import ModalReproduccion from "./ganaderia/ModalReproduccion";
+import ModalCelo from "./ganaderia/ModalCelo";
+import ModalMastitis from "./ganaderia/ModalMastitis";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
@@ -296,9 +299,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [pendientesOffline, setPendientesOffline] = useState(0);
   const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
   const [vacunaAbierta, setVacunaAbierta] = useState<{ animalId?: number } | null>(null);
-  const [modalReproduccion, setModalReproduccion] = useState(false);
-  const [modalCelo, setModalCelo] = useState(false);
-  const [modalMastitis, setModalMastitis] = useState(false);
+  const [reproAbierta, setReproAbierta] = useState<{ tipo?: string; resultado?: string } | null>(null);
+  const [celoAbierto, setCeloAbierto] = useState(false);
+  const [mastitisAbierta, setMastitisAbierta] = useState(false);
   const [modalFichaAnimal, setModalFichaAnimal] = useState<AnimalGanaderia | null>(null);
   const [ventaAbierta, setVentaAbierta] = useState<ModoVenta | null>(null);
   const [modalEditarAnimal, setModalEditarAnimal] = useState<AnimalGanaderia | null>(null);
@@ -336,28 +339,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     fechaCompra: new Date().toISOString().slice(0, 10),
     estadoReproductivo: "VACIA" as "VACIA" | "PREÑADA" | "EN_ESPERA",
     estadoProductivo: "SECA" as "CRIANDO" | "ORDEÑO" | "SECA",
-  });
-
-  // Formulario de Celos (Evento Reproductivo dedicado)
-  const [formCelo, setFormCelo] = useState({
-    hembraId: 0,
-    fecha: new Date().toISOString().slice(0, 10),
-    tipoCelo: "NATURAL",
-    sintomasCelo: "Acepta monta, moco cristalino abundante, hiperactividad",
-    horaOptimaIA: "AM/PM: Inseminar 12 horas después de observado el celo",
-  });
-
-  // Formulario de Mastitis (Sanidad dedicada con retiro de leche)
-  const [formMastitis, setFormMastitis] = useState({
-    animalId: 0,
-    fecha: new Date().toISOString().slice(0, 10),
-    cuartoAfectado: "PD",
-    gradoCmt: "GRADO_2",
-    farmacoAplicado: "Cefalexina + Gentamicina Intramamaria",
-    diasRetiroLeche: 4,
-    veterinario: "Dr. Médico Veterinario",
-    costo: 12.0,
-    notas: "Cuarto posterior derecho caliente y reactivo al reactivo California Mastitis Test (CMT).",
   });
 
   const [ultimoDespachoLecheId, setUltimoDespachoLecheId] = useState<number | null>(null);
@@ -398,16 +379,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [pesoNuevo, setPesoNuevo] = useState<number>(400);
   const [gdpData, setGdpData] = useState<any>(null);
 
-
-  // Formulario reproducción
-  const [formRepro, setFormRepro] = useState({
-    hembraId: 0,
-    tipo: "DIAGNOSTICO_PRENEZ",
-    fecha: new Date().toISOString().slice(0, 10),
-    resultado: "PREÑADA_CONFIRMADA",
-    fechaProbableParto: new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10),
-    sementalReferenciaExterna: "Pajuela Toro Don Juan (IA)",
-  });
 
   // Notificaciones flotantes
   const [notificacion, setNotificacion] = useState<string | null>(null);
@@ -474,20 +445,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // seleccionado no existe de verdad, se corrige al primero real disponible.
   useEffect(() => {
     if (animalesActivos.length === 0) return;
-    const hembras = animalesActivos.filter(a => a.sexo === "HEMBRA");
     if (!animalesActivos.some(a => a.id === formOrdeno.animalId)) {
       setFormOrdeno(prev => ({ ...prev, animalId: animalesActivos[0].id }));
-    }
-    if (hembras.length > 0) {
-      if (!hembras.some(a => a.id === formRepro.hembraId)) {
-        setFormRepro(prev => ({ ...prev, hembraId: hembras[0].id }));
-      }
-      if (!hembras.some(a => a.id === formCelo.hembraId)) {
-        setFormCelo(prev => ({ ...prev, hembraId: hembras[0].id }));
-      }
-      if (!hembras.some(a => a.id === formMastitis.animalId)) {
-        setFormMastitis(prev => ({ ...prev, animalId: hembras[0].id }));
-      }
     }
   }, [animalesActivos]);
 
@@ -797,52 +756,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Abre la venta de animales; "MULTIPLE" = vender un lote seleccionando varios animales.
   const abrirVentaAnimales = (modo: ModoVenta) => setVentaAbierta(modo);
-  // Manejador: Registrar Celo (Evento Reproductivo dedicado)
-  const handleGuardarCelo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await registrarEventoReproductivoGanaderia(tenantId, {
-        hembraId: Number(formCelo.hembraId),
-        tipo: "CELO",
-        fecha: formCelo.fecha,
-        tipoCelo: formCelo.tipoCelo,
-        sintomasCelo: formCelo.sintomasCelo,
-        horaOptimaIA: formCelo.horaOptimaIA,
-      });
-      setAnimales(prev => prev.map(a => a.id === Number(formCelo.hembraId) ? { ...a, estadoReproductivo: "EN_ESPERA" } : a));
-      const hembra = animales.find(a => a.id === Number(formCelo.hembraId));
-      notificar(`Celo registrado para hembra ${hembra?.arete || ''}. Estado reproductivo actualizado a 'EN_ESPERA' (programada para IA).`);
-    } catch {
-      notificar("No se pudo registrar el evento de celo — revisa tu conexión.");
-      return;
-    }
-    setModalCelo(false);
-  };
-
-  // Manejador: Registrar Mastitis (Sanidad dedicada con retiro de leche)
-  const handleGuardarMastitis = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await registrarMastitisGanaderia(tenantId, {
-        animalId: Number(formMastitis.animalId),
-        fecha: formMastitis.fecha,
-        cuartoAfectado: formMastitis.cuartoAfectado,
-        gradoCmt: formMastitis.gradoCmt,
-        farmacoAplicado: formMastitis.farmacoAplicado,
-        diasRetiroLeche: Number(formMastitis.diasRetiroLeche),
-        veterinario: formMastitis.veterinario,
-        costo: Number(formMastitis.costo),
-        notas: formMastitis.notas,
-      });
-      const vaca = animales.find(a => a.id === Number(formMastitis.animalId));
-      notificar(`Alerta sanitaria: Mastitis registrada en ${vaca?.arete || 'vaca'}. Cuarto ${formMastitis.cuartoAfectado} en tratamiento. Bloqueo de leche activo por ${formMastitis.diasRetiroLeche} días.`);
-    } catch {
-      notificar("No se pudo registrar el tratamiento de mastitis — revisa tu conexión.");
-      return;
-    }
-    setModalMastitis(false);
-  };
-
   // Manejador: Crear nuevo potrero con color
   const handleGuardarPotrero = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1285,26 +1198,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const alAplicarVacuna = (aplicacion: VacunacionAplicada) => {
     setUltimaVacunacion(aplicacion);
     obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
-  };
-
-  // Manejador: Registrar evento reproductivo
-  const handleGuardarRepro = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await registrarEventoReproductivoGanaderia(tenantId, {
-        hembraId: Number(formRepro.hembraId),
-        tipo: formRepro.tipo,
-        fecha: formRepro.fecha,
-        resultado: formRepro.resultado,
-        fechaProbableParto: formRepro.fechaProbableParto,
-        sementalReferenciaExterna: formRepro.sementalReferenciaExterna,
-      });
-    } catch {
-      notificar(`No se pudo registrar el evento reproductivo — revisa tu conexión e inténtalo de nuevo.`);
-      return;
-    }
-    notificar(`Evento reproductivo registrado en el expediente.`);
-    setModalReproduccion(false);
   };
 
   // Exportar matriz a XLSX
@@ -3188,13 +3081,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
                 <div className="space-y-1 text-xs">
                   <button
-                    onClick={() => { setModalReproduccion(true); setFormRepro({ ...formRepro, tipo: "SERVICIO" }); }}
+                    onClick={() => { setReproAbierta({ tipo: "SERVICIO" }); }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Servicios (Monta / IA)</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => { setModalReproduccion(true); setFormRepro({ ...formRepro, tipo: "DIAGNOSTICO_PRENEZ" }); }}
+                    onClick={() => { setReproAbierta({ tipo: "DIAGNOSTICO_PRENEZ" }); }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Revisiones & Palpación</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
@@ -3215,15 +3108,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   </button>
                   <button
                     onClick={() => {
-                      setModalReproduccion(true);
-                      setFormRepro({ ...formRepro, tipo: "DIAGNOSTICO_PRENEZ", resultado: "ABORTO_NO_GESTANTE" });
+                      setReproAbierta({ tipo: "DIAGNOSTICO_PRENEZ", resultado: "ABORTO_NO_GESTANTE" });
                     }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Abortos & Pérdidas</span>
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => setModalCelo(true)}
+                    onClick={() => setCeloAbierto(true)}
                     className="w-full text-left p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold cursor-pointer flex items-center justify-between border border-purple-500/20">
                     <span>• Celos & Detección para IA</span>
                     <span className="text-[10px] text-purple-300">Registrar →</span>
@@ -3258,8 +3150,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   </button>
                   <button
                     onClick={() => {
-                      setModalReproduccion(true);
-                      setFormRepro({ ...formRepro, tipo: "DIAGNOSTICO_PRENEZ", resultado: "SECADO_PREVIO_PARTO" });
+                      setReproAbierta({ tipo: "DIAGNOSTICO_PRENEZ", resultado: "SECADO_PREVIO_PARTO" });
                     }}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Secados</span>
@@ -3319,7 +3210,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <span className="text-[10px] text-slate-400">Aplicar →</span>
                   </button>
                   <button
-                    onClick={() => setModalMastitis(true)}
+                    onClick={() => setMastitisAbierta(true)}
                     className="w-full text-left p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold cursor-pointer flex items-center justify-between border border-rose-500/20">
                     <span>• Mastitis (Prueba CMT & Retiro Leche)</span>
                     <span className="text-[10px] text-rose-300">Registrar →</span>
@@ -5707,323 +5598,37 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* MODAL: REPRODUCCIÓN */}
-      {modalReproduccion && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/30 text-left space-y-4">
-            <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-              Registro Reproductivo
-            </h3>
-            <form onSubmit={handleGuardarRepro} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-400 block mb-1">Hembra</label>
-                <select
-                  value={formRepro.hembraId}
-                  onChange={e => setFormRepro({ ...formRepro, hembraId: Number(e.target.value) })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
-                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
-                    <option key={a.id} value={a.id}>{a.arete} - {a.nombre || a.tipoAnimal}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Tipo de Evento</label>
-                <select
-                  value={formRepro.tipo}
-                  onChange={e => setFormRepro({ ...formRepro, tipo: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-bold">
-                  <option value="DIAGNOSTICO_PRENEZ">Diagnóstico de Preñez (Palpación / Eco)</option>
-                  <option value="SERVICIO">Servicio / Inseminación Artificial</option>
-                  <option value="PARTO">Parto / Nacimiento</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Semental / Pajuela de IA</label>
-                <input
-                  type="text"
-                  value={formRepro.sementalReferenciaExterna}
-                  onChange={e => setFormRepro({ ...formRepro, sementalReferenciaExterna: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Fecha Estimada de Parto</label>
-                <input
-                  type="date"
-                  value={formRepro.fechaProbableParto}
-                  onChange={e => setFormRepro({ ...formRepro, fechaProbableParto: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModalReproduccion(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
-                  Guardar Evento
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {reproAbierta && (
+        <ModalReproduccion
+          animalesActivos={animalesActivos}
+          valoresIniciales={reproAbierta}
+          tenantId={tenantId}
+          notificar={notificar}
+          onCerrar={() => setReproAbierta(null)}
+        />
       )}
 
       {/* MODAL: EVENTO DEDICADO DE CELO & SINCRONIZACIÓN */}
-      {modalCelo && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/40 text-left space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <span className="text-rose-400"><IconFire size={20} /></span>
-                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-                  Detección de Celo
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalCelo(false)}
-                className="text-slate-400 hover:text-white cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleGuardarCelo} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-400 block mb-1">Hembra en Celo *</label>
-                <select
-                  required
-                  value={formCelo.hembraId}
-                  onChange={e => setFormCelo({ ...formCelo, hembraId: Number(e.target.value) })}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
-                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Fecha de Detección</label>
-                  <input
-                    type="date"
-                    required
-                    value={formCelo.fecha}
-                    onChange={e => setFormCelo({ ...formCelo, fecha: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Tipo de Celo</label>
-                  <select
-                    value={formCelo.tipoCelo}
-                    onChange={e => setFormCelo({ ...formCelo, tipoCelo: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white">
-                    <option value="NATURAL">Celo Natural</option>
-                    <option value="SINCRONIZADO">Sincronizado (IATF / Protocolo)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Signos Clínicos y Síntomas Observados</label>
-                <input
-                  type="text"
-                  value={formCelo.sintomasCelo}
-                  onChange={e => setFormCelo({ ...formCelo, sintomasCelo: e.target.value })}
-                  placeholder="Ej. Acepta monta, moco cristalino filante, vulva edematosa"
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Hora Óptima de Inseminación (Regla AM/PM)</label>
-                <input
-                  type="text"
-                  value={formCelo.horaOptimaIA}
-                  onChange={e => setFormCelo({ ...formCelo, horaOptimaIA: e.target.value })}
-                  placeholder="Ej. Detectado AM → Inseminar PM (12 horas después)"
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-[11px]"
-                />
-                <p className="text-[10px] text-purple-400 mt-1 flex items-start gap-1">
-                  <IconBulb size={12} className="shrink-0 mt-0.5" /> Al guardar, el estado reproductivo de la hembra cambiará automáticamente a <strong>EN_ESPERA</strong>.
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModalCelo(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer shadow-lg shadow-purple-500/20">
-                  Registrar Celo
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {celoAbierto && (
+        <ModalCelo
+          animales={animales}
+          animalesActivos={animalesActivos}
+          tenantId={tenantId}
+          notificar={notificar}
+          onRegistrado={id => setAnimales(prev => prev.map(a => a.id === id ? { ...a, estadoReproductivo: "EN_ESPERA" } : a))}
+          onCerrar={() => setCeloAbierto(false)}
+        />
       )}
 
       {/* MODAL: EVENTO DEDICADO DE MASTITIS (SANIDAD & RETIRO DE LECHE) */}
-      {modalMastitis && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <span className="text-rose-400"><IconWarning size={20} /></span>
-                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-                  Diagnóstico y Tratamiento de Mastitis
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalMastitis(false)}
-                className="text-slate-400 hover:text-white cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleGuardarMastitis} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-400 block mb-1">Vaca Afectada *</label>
-                <select
-                  required
-                  value={formMastitis.animalId}
-                  onChange={e => setFormMastitis({ ...formMastitis, animalId: Number(e.target.value) })}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
-                  {animalesActivos.filter(a => a.sexo === "HEMBRA").map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.arete} - {a.nombre || a.tipoAnimal} ({a.raza || "Bovino"}) · Potrero: {a.potrero?.nombre || "Sin Potrero"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Cuarto Mamario Afectado *</label>
-                  <select
-                    value={formMastitis.cuartoAfectado}
-                    onChange={e => setFormMastitis({ ...formMastitis, cuartoAfectado: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
-                    <option value="AD">AD (Anterior Derecho)</option>
-                    <option value="AI">AI (Anterior Izquierdo)</option>
-                    <option value="PD">PD (Posterior Derecho)</option>
-                    <option value="PI">PI (Posterior Izquierdo)</option>
-                    <option value="MULTIPLES">Múltiples Cuartos</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Severidad / Prueba CMT</label>
-                  <select
-                    value={formMastitis.gradoCmt}
-                    onChange={e => setFormMastitis({ ...formMastitis, gradoCmt: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold">
-                    <option value="TRAZAS">Trazas (Subclínica leve)</option>
-                    <option value="GRADO_1">Grado 1 (Gel ligero sin grumos)</option>
-                    <option value="GRADO_2">Grado 2 (Gel espeso marcado)</option>
-                    <option value="GRADO_3">Grado 3 (Clínica aguda / Cuajo)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Fármaco Intramamario / Antibiótico</label>
-                  <input
-                    type="text"
-                    required
-                    value={formMastitis.farmacoAplicado}
-                    onChange={e => setFormMastitis({ ...formMastitis, farmacoAplicado: e.target.value })}
-                    placeholder="Ej. Cefalexina Intramamaria"
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-rose-400 block mb-1 font-bold">Días de Retiro de Leche *</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    min="0"
-                    max="30"
-                    required
-                    value={formMastitis.diasRetiroLeche}
-                    onChange={e => setFormMastitis({ ...formMastitis, diasRetiroLeche: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-400 block mb-1">Veterinario / Técnico</label>
-                  <input
-                    type="text"
-                    value={formMastitis.veterinario}
-                    onChange={e => setFormMastitis({ ...formMastitis, veterinario: e.target.value })}
-                    placeholder="Ej. Dr. González"
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">Costo Estimado Tratamiento (USD)</label>
-                  <input
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.5"
-                    min="0"
-                    value={formMastitis.costo}
-                    onChange={e => setFormMastitis({ ...formMastitis, costo: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-400 block mb-1">Notas Clínicas</label>
-                <textarea
-                  rows={2}
-                  value={formMastitis.notas}
-                  onChange={e => setFormMastitis({ ...formMastitis, notas: e.target.value })}
-                  placeholder="Detalles de síntomas o respuesta al tratamiento..."
-                  className="w-full p-2 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
-                />
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-300 flex items-center gap-2">
-                <IconWarning size={14} />
-                <span>La leche de esta vaca quedará bloqueada en las alertas sanitarias y en el modo de ordeño diario durante el período de retiro.</span>
-              </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModalMastitis(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer transition-colors shadow-lg shadow-rose-600/30">
-                  Registrar Tratamiento & Alerta
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {mastitisAbierta && (
+        <ModalMastitis
+          animales={animales}
+          animalesActivos={animalesActivos}
+          tenantId={tenantId}
+          notificar={notificar}
+          onCerrar={() => setMastitisAbierta(false)}
+        />
       )}
 
       {/* MODAL: REGISTRO DE VENTA / DESPACHO DE ANIMAL (individual o lote, por precio total o por kilo) */}
