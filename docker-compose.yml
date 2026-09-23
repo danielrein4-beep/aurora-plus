@@ -1,55 +1,147 @@
+# Stack de Aurora+. El MISMO archivo levanta producción y pruebas: lo que
+# cambia es el .env de cada carpeta (STACK_NAME, DOMAIN, contraseñas, base).
+#
+#   producción -> /opt/aurora/production  (STACK_NAME=aurora-prod,   perfil "edge")
+#   pruebas    -> /opt/aurora/staging     (STACK_NAME=aurora-staging, sin perfil)
+#
+# Solo el stack de producción corre Caddy (puertos 80/443); el de pruebas se
+# cuelga de ese mismo Caddy a través de la red compartida "aurora_edge", así
+# nunca pelean por los puertos ni comparten base de datos.
+name: ${STACK_NAME:-aurora-prod}
+
+x-logging: &logging
+  # Sin esto, los logs de Docker crecen sin límite hasta llenar el disco del
+  # VPS (20-40GB en un CX22) y tumbar el servidor sin aviso.
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:16
     restart: unless-stopped
+    logging: *logging
     environment:
-      POSTGRES_DB: auroraplus_db
-      POSTGRES_USER: postgres
+      POSTGRES_DB: ${DB_NAME:-auroraplus_db}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en .env antes de levantar en producción}
+    healthcheck:
+      # "app" arranca con Flyway + Hibernate validate: si la base todavía no
+      # acepta conexiones, el backend se cae al arrancar. Con esto, Compose
+      # espera a que Postgres esté realmente listo, no solo "creado".
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-auroraplus_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     volumes:
       - aurora_db_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    mem_limit: ${DB_MEM_LIMIT:-1g}
     # Sin mapeo de puertos al host a propósito: Postgres solo debe ser
-    # alcanzable desde "app"/"backup" dentro de la red interna de Docker, no
-    # desde internet. Para inspeccionar/migrar a mano usar
-    # `docker compose exec db psql -U postgres -d auroraplus_db` en vez de
-    # abrir el puerto — eso evita que cualquiera en internet pueda intentar
-    # conectarse directo a la base.
+    # alcanzable desde app/backup dentro de la red interna, no desde internet.
+    # Para inspeccionar a mano: docker compose exec db psql -U postgres -d auroraplus_db
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
+    logging: *logging
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
-      DB_URL: jdbc:postgresql://db:5432/auroraplus_db
-      DB_USERNAME: postgres
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-auroraplus_db}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en .env antes de levantar en producción}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET en .env antes de levantar en producción}
       SUPER_ADMIN_USERNAME: ${SUPER_ADMIN_USERNAME:-admin}
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?Defina SUPER_ADMIN_PASSWORD en .env antes de levantar en producción}
-      # En producción, definir FRONTEND_URL=https://{el mismo DOMAIN de abajo}
-      # en el .env — de eso depende que el link del correo de "olvidé mi
-      # clave" apunte al dominio real y no a localhost.
+      # Debe ser https://<DOMAIN>: de esto depende que el link del correo de
+      # "olvidé mi clave" apunte al dominio real y no a localhost.
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8443}
-    # Tampoco se publica al host: todo el tráfico entra por Caddy (abajo),
-    # que es quien habla HTTPS con el mundo exterior y reenvía internamente
-    # a "app:8080". Antes esto estaba en "8080:8080", expuesto en plano.
+      # Correo (recuperación de clave, informes, récipes). Antes NO se pasaban
+      # al contenedor: en el servidor el envío de correo habría quedado mudo,
+      # sin error visible, porque spring.mail.username cae a vacío.
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-notificaciones@auroraplus.app}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Aurora+}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      # Monitoreo de errores: sin DSN el starter queda inactivo. En el servidor
+      # es la única forma de enterarse de una excepción sin leer logs a mano.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+      # La JVM en contenedor toma por defecto 1/4 de la RAM del contenedor;
+      # con esto usa el 70% del límite de abajo. ExitOnOutOfMemoryError hace
+      # que un OOM mate el proceso y "restart: unless-stopped" lo reviva, en
+      # vez de dejar la app viva pero atascada.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError -Duser.timezone=America/Caracas}
+    healthcheck:
+      # Chequeo sin dependencias extra (la imagen JRE no trae curl): abre un
+      # socket TCP contra el puerto de Tomcat desde bash.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    mem_limit: ${APP_MEM_LIMIT:-2g}
+    networks:
+      internal:
+      edge:
+        aliases:
+          - ${STACK_NAME:-aurora-prod}-app
     expose:
       - "8080"
 
-  # Reverse proxy con HTTPS automático (Let's Encrypt) — es el único servicio
-  # que recibe tráfico de internet (puertos 80/443). Caddy renueva los
-  # certificados solo mientras DOMAIN apunte por DNS a este servidor; en local
-  # (DOMAIN=localhost, el valor por defecto) sirve en HTTP plano sin intentar
-  # pedir un certificado, porque "localhost" no es un dominio público.
+  # SPA de React ya compilada, servida como archivos estáticos. Este servicio
+  # NO existía: sin él, el dominio servía el HTML viejo del backend.
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Se incrusta en el bundle al compilar (ver frontend/Dockerfile).
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      edge:
+        aliases:
+          - ${STACK_NAME:-aurora-prod}-web
+    expose:
+      - "8080"
+
+  # Reverse proxy público con HTTPS automático. Solo se levanta en el stack de
+  # producción (perfil "edge"); el stack de pruebas usa este mismo Caddy a
+  # través de la red aurora_edge, por eso no lo duplica.
   caddy:
     image: caddy:2-alpine
+    profiles: ["edge"]
     restart: unless-stopped
+    logging: *logging
     depends_on:
       - app
+      - web
     environment:
       DOMAIN: ${DOMAIN:-localhost}
+      STAGING_DOMAIN: ${STAGING_DOMAIN:-staging.localhost}
+      APP_UPSTREAM: ${STACK_NAME:-aurora-prod}-app:8080
+      WEB_UPSTREAM: ${STACK_NAME:-aurora-prod}-web:8080
+      STAGING_APP_UPSTREAM: ${STAGING_STACK_NAME:-aurora-staging}-app:8080
+      STAGING_WEB_UPSTREAM: ${STAGING_STACK_NAME:-aurora-staging}-web:8080
     ports:
       - "80:80"
       - "443:443"
@@ -57,26 +149,42 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - edge
 
-  # Respaldo automático de la base — corre pg_dump periódicamente y guarda los
-  # archivos en ./backups del HOST (no en un volumen interno de Docker), para
-  # que sobrevivan a un `docker compose down -v` accidental y se puedan copiar
-  # fuera del servidor (scp/rsync) para tener una copia offsite real.
+  # Respaldo automático: pg_dump periódico a ./backups del HOST (no a un
+  # volumen interno), para que sobreviva a un "docker compose down -v" y se
+  # pueda copiar fuera del servidor con scp/rsync.
   backup:
     image: postgres:16
     restart: unless-stopped
+    logging: *logging
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
-      DB_USERNAME: postgres
+      DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en .env antes de levantar en producción}
-      DB_NAME: auroraplus_db
+      DB_NAME: ${DB_NAME:-auroraplus_db}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
     volumes:
       - ./backups:/backups
       - ./docker/backup/backup.sh:/backup.sh:ro
+    networks:
+      - internal
     entrypoint: ["sh", "/backup.sh"]
+
+networks:
+  # Red privada del stack: base de datos y backend, sin salida a internet
+  # entrante. Cada stack (prod/staging) tiene la suya, aisladas entre sí.
+  internal:
+  # Red compartida entre stacks, por donde el Caddy de producción alcanza
+  # tanto a producción como a pruebas. La crea deploy.sh si no existe:
+  #   docker network create aurora_edge
+  edge:
+    name: aurora_edge
+    external: true
 
 volumes:
   aurora_db_data:

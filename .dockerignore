@@ -1,5 +1,15 @@
+# Lo que NUNCA debe entrar al contexto de build (ni al image final).
+# Mientras más liviano el contexto, más rápido el build en el VPS.
 target/
 .git/
 .idea/
 *.iml
 .vscode/
+.tools/
+backups/
+docs/
+*.log
+frontend/node_modules/
+frontend/dist/
+frontend/.figma/make/langserver
+.env
