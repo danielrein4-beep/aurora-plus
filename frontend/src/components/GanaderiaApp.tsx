@@ -281,7 +281,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [cargandoFicha, setCargandoFicha] = useState(false);
 
   // Sub-vistas por pestaña
-  const [subPotreros, setSubPotreros] = useState<"mapa" | "lista">("mapa");
+  const [subPotreros, setSubPotreros] = useState<"mapa" | "lista">("lista");
   const [subInventario, setSubInventario] = useState<"matriz" | "fichas" | "distribucion">("matriz");
 
   // Estados de datos
@@ -1728,7 +1728,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
               items: [
                 { id: "resumen" as const, Icon: IconDashboardGrid, etiqueta: "Panel General", badge: 0 },
                 { id: "inventario" as const, Icon: IconCow, etiqueta: "Hato & Inventario", badge: 0 },
-                { id: "potreros" as const, Icon: IconPin, etiqueta: "Mapa & Potreros", badge: 0 },
+                { id: "potreros" as const, Icon: IconPin, etiqueta: "Potreros", badge: 0 },
                 { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción & Pesajes", badge: 0 },
               ],
             },
@@ -2355,18 +2355,18 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
               <div className="flex items-center gap-2">
                 <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1 text-xs">
                   <button
+                    onClick={() => setSubPotreros("lista")}
+                    className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
+                      subPotreros === "lista" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
+                    }`}>
+                    Gestión de Potreros ({potreros.length})
+                  </button>
+                  <button
                     onClick={() => setSubPotreros("mapa")}
                     className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
                       subPotreros === "mapa" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
                     Mapa Satelital
-                  </button>
-                  <button
-                    onClick={() => setSubPotreros("lista")}
-                    className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
-                      subPotreros === "lista" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
-                    }`}>
-                    Lista & Aforos ({potreros.length})
                   </button>
                 </div>
 
@@ -2388,74 +2388,127 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 onGuardarPotreroTrazado={handleGuardarPotreroTrazado}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {potreros.map(pot => {
-                  const enDescanso = pot.estado === "EN_DESCANSO";
+              (() => {
+                // Días desde una fecha ISO (inicio de uso o de descanso).
+                const diasDesde = (iso?: string) => {
+                  if (!iso) return null;
+                  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+                  if (isNaN(d.getTime())) return null;
+                  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+                };
+                const animalesEn = (potId: number) => animalesActivos.filter(a => a.potrero?.id === potId);
+                const sinPotrero = animalesActivos.filter(a => !a.potrero).length;
+                const haTotal = potreros.reduce((s, p) => s + (Number(p.areaHectareas) || 0), 0);
+                if (potreros.length === 0) {
                   return (
-                    <div
-                      key={pot.id}
-                      className={`apple-glass rounded-3xl p-6 border text-left space-y-4 transition-all ${
-                        enDescanso
-                          ? "border-amber-500/30 bg-amber-500/[0.02]"
-                          : "border-emerald-500/40 bg-emerald-500/[0.03]"
-                      }`}>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            {pot.color && (
-                              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: pot.color }} />
-                            )}
-                            <span className="font-mono text-[10px] text-slate-400 font-bold">{pot.codigo || `POT-${pot.id}`}</span>
-                          </div>
-                          <h4 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white mt-1">
-                            {pot.nombre}
-                          </h4>
-                        </div>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                          enDescanso
-                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                            : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                        }`}>
-                          {enDescanso ? "EN DESCANSO" : "ACTIVO"}
-                        </span>
-                      </div>
-
-                      <div className="space-y-2 text-xs text-slate-600 dark:text-white/70">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Área:</span>
-                          <span className="font-semibold">{pot.areaHectareas} ha</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Especie Forrajera:</span>
-                          <span className="font-semibold">{pot.tipoPasto || "Pasto Natural"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Capacidad Máxima:</span>
-                          <span className="font-semibold">{pot.capacidadAnimales || 25} animales</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Descanso Mínimo:</span>
-                          <span className="font-semibold">{pot.diasDescansoMinimo || 28} días</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-200/60 dark:border-white/10 flex items-center justify-between">
-                        {pot.estado === "ACTIVO" ? (
-                          <button
-                            onClick={() => setModalRotar(pot)}
-                            className="w-full btn-cyber-neon text-white text-xs font-bold py-2 rounded-xl cursor-pointer text-center">
-                            Rotar Hato de este Potrero →
-                          </button>
-                        ) : (
-                          <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1.5">
-                            <span>Recuperación de forraje activa</span>
-                          </div>
-                        )}
-                      </div>
+                    <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center space-y-3">
+                      <p className="text-sm text-slate-600">Todavía no hay potreros registrados.</p>
+                      <button onClick={abrirNuevoPotrero} className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer">
+                        + Agregar el primer potrero
+                      </button>
                     </div>
                   );
-                })}
-              </div>
+                }
+                return (
+                  <div className="space-y-3">
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                          <tr>
+                            <th className="p-3">Potrero</th>
+                            <th className="p-3 text-right">Área</th>
+                            <th className="p-3">Pasto</th>
+                            <th className="p-3">Estado</th>
+                            <th className="p-3 text-right">Animales hoy</th>
+                            <th className="p-3 text-right">Capacidad</th>
+                            <th className="p-3 text-right">Carga</th>
+                            <th className="p-3 text-right">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {potreros.map(pot => {
+                            const enDescanso = pot.estado === "EN_DESCANSO";
+                            const enMantenimiento = pot.estado === "EN_MANTENIMIENTO";
+                            const dias = diasDesde(enDescanso ? pot.fechaInicioDescanso : pot.fechaInicioUso);
+                            const listo = enDescanso && dias != null && pot.diasDescansoMinimo != null && dias >= pot.diasDescansoMinimo;
+                            const ocupantes = animalesEn(pot.id).length;
+                            const area = Number(pot.areaHectareas) || 0;
+                            const sobrecargado = pot.capacidadAnimales != null && ocupantes > pot.capacidadAnimales;
+                            return (
+                              <tr key={pot.id} className="hover:bg-slate-50/70">
+                                <td className="p-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: pot.color || "#94A3B8" }} />
+                                    <div>
+                                      <div className="font-semibold text-slate-900">{pot.nombre}</div>
+                                      <div className="font-mono text-[10px] text-slate-400">{pot.codigo || `POT-${pot.id}`}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="p-3 text-right font-mono text-slate-800">{area > 0 ? `${area} ha` : "—"}</td>
+                                <td className="p-3 text-slate-700">{pot.tipoPasto || <span className="text-slate-400">Sin definir</span>}</td>
+                                <td className="p-3">
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    enDescanso ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                      : enMantenimiento ? "bg-slate-100 text-slate-600 border border-slate-200"
+                                      : "bg-teal-50 text-teal-800 border border-teal-200"
+                                  }`}>
+                                    {enDescanso ? "En descanso" : enMantenimiento ? "Mantenimiento" : "En uso"}
+                                  </span>
+                                  <div className="text-[10px] text-slate-500 mt-1">
+                                    {dias != null ? `${dias} día${dias === 1 ? "" : "s"}` : "Sin fecha"}
+                                    {enDescanso && pot.diasDescansoMinimo != null && ` de ${pot.diasDescansoMinimo} mínimos`}
+                                    {listo && <span className="ml-1 font-semibold text-teal-700">· listo para usar</span>}
+                                  </div>
+                                </td>
+                                <td className={`p-3 text-right font-mono font-bold ${sobrecargado ? "text-rose-600" : "text-slate-900"}`}>
+                                  {ocupantes}
+                                </td>
+                                <td className="p-3 text-right font-mono text-slate-600">{pot.capacidadAnimales ?? "—"}</td>
+                                <td className="p-3 text-right font-mono text-slate-600">{area > 0 ? `${(ocupantes / area).toFixed(2)} cab/ha` : "—"}</td>
+                                <td className="p-3">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => abrirEditarPotrero(pot)}
+                                      className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer">
+                                      Editar
+                                    </button>
+                                    {!enDescanso && ocupantes > 0 && (
+                                      <button
+                                        onClick={() => setModalRotar(pot)}
+                                        className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-800 !text-white font-semibold cursor-pointer">
+                                        Rotar
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot className="bg-slate-50 border-t border-slate-200 text-[11px] font-bold text-slate-700">
+                          <tr>
+                            <td className="p-3">Total ({potreros.length} potreros)</td>
+                            <td className="p-3 text-right font-mono">{haTotal.toFixed(1)} ha</td>
+                            <td className="p-3" colSpan={2}>
+                              {potreros.filter(p => p.estado === "EN_DESCANSO").length} en descanso
+                            </td>
+                            <td className="p-3 text-right font-mono">{animalesActivos.length - sinPotrero}</td>
+                            <td className="p-3" />
+                            <td className="p-3 text-right font-mono">{haTotal > 0 ? `${((animalesActivos.length - sinPotrero) / haTotal).toFixed(2)} cab/ha` : "—"}</td>
+                            <td className="p-3" />
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    {sinPotrero > 0 && (
+                      <p className="text-[11px] text-amber-700">
+                        {sinPotrero} animal(es) activos no tienen potrero asignado. Asígnelos desde su ficha o al importar el hato.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()
             )}
 
           </div>
