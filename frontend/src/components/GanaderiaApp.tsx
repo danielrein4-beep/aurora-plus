@@ -31,6 +31,8 @@ import SeccionPotreros from "./ganaderia/SeccionPotreros";
 import SeccionPanel from "./ganaderia/SeccionPanel";
 import SeccionHato from "./ganaderia/SeccionHato";
 import SeccionSanidad from "./ganaderia/SeccionSanidad";
+import BarraLateralGanaderia from "./ganaderia/BarraLateralGanaderia";
+import BarraSuperiorGanaderia from "./ganaderia/BarraSuperiorGanaderia";
 import type { TabGanaderia, SubPotreros, SubInventario, SubSanidad } from "./ganaderia/tipos";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 import {
@@ -569,254 +571,43 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* ══════════════════════ SIDEBAR (drawer en móvil, fijo en desktop) — mismo patrón institucional que Comercio/Horeca ══════════════════════ */}
-      {sidebarAbierto && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarAbierto(false)}
-          aria-hidden="true"
-        />
-      )}
-      <aside
-        className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
-          sidebarAbierto ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Identidad de la finca — mismo patrón institucional que Comercio (A+ de respaldo, sin íconos de rubro). */}
-        <button
-          onClick={onSalir}
-          className="flex items-center gap-3 text-left group cursor-pointer px-5 py-4 border-b border-slate-200"
-          title="Volver al Hub General"
-        >
-          <div className="w-10 h-10 rounded-md border border-slate-200 bg-white text-slate-700 flex items-center justify-center overflow-hidden group-hover:border-teal-300 transition-colors flex-shrink-0">
-            <span className="font-semibold tracking-[-0.06em] text-sm" aria-label="Aurora Plus">A+</span>
-          </div>
-          <div className="min-w-0">
-            <div className="font-['IBM_Plex_Sans'] font-semibold text-sm text-slate-900 leading-tight tracking-tight truncate">
-              {user?.empresa || "Mi Finca"}
-            </div>
-            <div className="text-[10px] text-slate-400 tracking-[0.02em] truncate font-medium mt-1">
-              Ganadería by <span className="font-semibold text-slate-600">A+</span>
-            </div>
-          </div>
-        </button>
-
-        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
-          {([
-            {
-              titulo: "Operación",
-              items: [
-                { id: "resumen" as const, Icon: IconDashboardGrid, etiqueta: "Panel General", badge: 0 },
-                { id: "inventario" as const, Icon: IconCow, etiqueta: "Hato & Inventario", badge: 0 },
-                { id: "potreros" as const, Icon: IconPin, etiqueta: "Potreros", badge: 0 },
-                { id: "engorde" as const, Icon: IconScale, etiqueta: "Engorde (GDP)", badge: 0 },
-                { id: "sociedades" as const, Icon: IconUsers, etiqueta: "Ceba en sociedad", badge: 0 },
-                { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción & Pesajes", badge: 0 },
-              ],
-            },
-            {
-              titulo: "Control",
-              items: [
-                { id: "sanidad" as const, Icon: IconSyringe, etiqueta: "Sanidad & Trazabilidad", badge: alertasSanitarias.length },
-                { id: "eventos" as const, Icon: IconCalendar, etiqueta: "Centro de Eventos", badge: 0 },
-                { id: "reportes" as const, Icon: IconChart, etiqueta: "Centro de Reportes", badge: 0 },
-                ...(user?.rol === "DUENO_ADMIN" ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría", badge: 0 }] : []),
-              ],
-            },
-          ]).map((grupo) => (
-            <div key={grupo.titulo} className="space-y-1.5">
-              <div className="px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                {grupo.titulo}
-              </div>
-              {grupo.items.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => { setTab(item.id); setSidebarAbierto(false); }}
-                  className={`sidebar-glare w-full flex items-center gap-3 border-l-2 px-3 py-2.5 rounded-md font-medium text-[13px] transition-colors cursor-pointer ${
-                    tab === item.id
-                      ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
-                      : "text-slate-800 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
-                  }`}
-                >
-                  <span className={tab === item.id ? "text-teal-700" : "text-slate-500"}><item.Icon size={15} /></span>
-                  <span className="flex-1 text-left">{item.etiqueta}</span>
-                  {item.badge > 0 && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          ))}
-
-          {/* Acciones rápidas de campo */}
-          <div className="pt-3 mt-3 border-t border-slate-100 space-y-1">
-            <div className="px-3 pb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Acciones rápidas
-            </div>
-            <button
-              type="button"
-              onClick={() => { abrirVaqueraRapida(); setSidebarAbierto(false); }}
-              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-            >
-              <span className="text-slate-400"><IconMilk size={16} /></span>
-              <span className="flex-1 text-left">Ordeño rápido</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setAltaAnimal({}); setSidebarAbierto(false); }}
-              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-            >
-              <span className="text-slate-400"><IconTag size={16} /></span>
-              <span className="flex-1 text-left">Alta de animal</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { abrirVentaAnimales("MULTIPLE"); setSidebarAbierto(false); }}
-              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-            >
-              <span className="text-slate-400"><IconCoins size={16} /></span>
-              <span className="flex-1 text-left">Vender animales</span>
-            </button>
-            {puedeImportarHato && (
-              <button
-                type="button"
-                onClick={() => { setModalImportarHato(true); setSidebarAbierto(false); }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-              >
-                <span className="text-slate-400"><IconUpload size={16} /></span>
-                <span className="flex-1 text-left">Importar hato</span>
-              </button>
-            )}
-          </div>
-        </nav>
-
-        {/* Soporte: tickets con el equipo de Aurora (super admin) */}
-        <div className="px-3 pt-3 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => { setAperturaSoporte(n => n + 1); setSidebarAbierto(false); }}
-            title="Solicitar ayuda al equipo de Aurora y ver tus tickets"
-            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-          >
-            <span className="text-slate-400">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </span>
-            <span className="flex-1 text-left">Soporte</span>
-          </button>
-        </div>
-
-        {/* Salir al Hub */}
-        <div className="p-4 border-t border-slate-100">
-          <button
-            onClick={onSalir}
-            className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left"
-          >
-            ← Salir al Hub
-          </button>
-        </div>
-      </aside>
+      <BarraLateralGanaderia
+        alertasSanitarias={alertasSanitarias}
+        animales={animales}
+        potreros={potreros}
+        puedeImportarHato={puedeImportarHato}
+        sidebarAbierto={sidebarAbierto}
+        tab={tab}
+        nombreFinca={user?.empresa || "Mi Finca"}
+        puedeVerAuditoria={user?.rol === "DUENO_ADMIN"}
+        abrirVaqueraRapida={abrirVaqueraRapida}
+        abrirVentaAnimales={abrirVentaAnimales}
+        onSalir={onSalir}
+        setAltaAnimal={setAltaAnimal}
+        setAperturaSoporte={setAperturaSoporte}
+        setModalImportarHato={setModalImportarHato}
+        setSidebarAbierto={setSidebarAbierto}
+        setTab={setTab}
+      />
 
       {/* ══════════════════════ COLUMNA DERECHA: TOPBAR + CONTENIDO ══════════════════════ */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
 
       {/* ── TOPBAR: SINCRONIZACIÓN, MONEDAS, LECHE, FISCAL Y TEMA ── */}
-      <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between lg:justify-end gap-3 sticky top-0 z-30 backdrop-blur-2xl">
-        <button
-          onClick={() => setSidebarAbierto(true)}
-          className="lg:hidden p-2 -ml-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-          aria-label="Abrir menú"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
-
-                {/* Barra de Tasas Multi-Moneda & Precio Leche Centralizado */}
-        <div className="flex flex-wrap items-center gap-2 min-w-0">
-          {/* Badge Modo Campo / Sincronizacion Offline */}
-          <button
-            type="button"
-            onClick={handleSincronizarManual}
-            disabled={sincronizandoOffline || pendientesOffline === 0}
-            title={pendientesOffline > 0 ? "Haga clic para sincronizar cambios locales con el servidor" : "Conexion activa con el servidor"}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all shadow-sm ${
-              !estaOnline || pendientesOffline > 0
-                ? "bg-amber-500/15 border-amber-500/40 text-amber-500 dark:text-amber-400 hover:bg-amber-500/25 cursor-pointer"
-                : "bg-emerald-500/10 border-emerald-500/25 text-emerald-600 dark:text-emerald-400"
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${
-              !estaOnline ? "bg-amber-400 animate-pulse" : (pendientesOffline > 0 ? "bg-amber-400" : "bg-emerald-400")
-            }`}></span>
-            <span>
-              {!estaOnline 
-                ? `Modo Campo (${pendientesOffline} pend.)`
-                : (pendientesOffline > 0 ? `Sincronizar (${pendientesOffline})` : "En Linea")
-              }
-            </span>
-            {pendientesOffline > 0 && (
-              <svg className={`w-3.5 h-3.5 ${sincronizandoOffline ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            )}
-          </button>
-          {/* Tasas de cambio */}
-          <button
-            type="button"
-            onClick={() => setModalEditarTasas(true)}
-            title="Configurar monedas activas y tasas de cambio de la finca"
-            className="flex items-center gap-2 apple-glass-pill rounded-full px-3.5 py-1.5 border border-slate-300/80 dark:border-white/15 text-[11px] hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all cursor-pointer group shadow-sm"
-          >
-            <span className="text-slate-500 dark:text-white/40 font-medium flex items-center gap-1">
-              <span>Monedas:</span>
-            </span>
-            <span className="font-mono font-bold text-slate-700 dark:text-white">USD</span>
-            {monedasConfig.VES && (
-              <>
-                <span className="text-slate-400 dark:text-white/20">•</span>
-                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">1$ = Bs. {tasaBCV.toFixed(2)}</span>
-              </>
-            )}
-            {monedasConfig.COP && (
-              <>
-                <span className="text-slate-400 dark:text-white/20">•</span>
-                <span className="font-mono font-bold text-sky-600 dark:text-sky-400">{tasaCOP.toLocaleString()} COP</span>
-              </>
-            )}
-            <span className="opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all"><IconSettings size={13} /></span>
-          </button>
-
-          {/* Precio Leche */}
-          <button
-            type="button"
-            onClick={() => setModalEditarPrecioLeche(true)}
-            title="Precio centralizado de leche por litro — Haga clic para editar"
-            className="flex items-center gap-1.5 apple-glass-pill rounded-full px-3 py-1.5 border border-sky-400/30 text-[11px] hover:border-sky-400/60 hover:bg-sky-500/10 transition-all cursor-pointer group shadow-sm"
-          >
-            <span className="text-slate-500 dark:text-white/40 font-medium">Leche:</span>
-            <span className="font-mono font-bold text-sky-500 dark:text-sky-400">${precioLecheUSD.toFixed(2)}/L</span>
-            <span className="opacity-70 group-hover:opacity-100"><IconEdit size={12} /></span>
-          </button>
-
-          {/* Datos Fiscales (RIF / Razón Social / Domicilio) para notas de entrega */}
-          <button
-            type="button"
-            onClick={() => setModalDatosFiscales(true)}
-            title="Datos fiscales opcionales para tus notas de entrega (RIF, razón social, domicilio)"
-            className="flex items-center gap-1.5 apple-glass-pill rounded-full px-3 py-1.5 border border-purple-400/30 text-[11px] hover:border-purple-400/60 hover:bg-purple-500/10 transition-all cursor-pointer group shadow-sm"
-          >
-            <IconFileText size={13} className="text-purple-500 dark:text-purple-400" />
-            <span className="text-slate-500 dark:text-white/40 font-medium">Fiscal</span>
-          </button>
-        </div>
-
-        <ThemeToggle className="scale-[0.72] origin-right" />
-      </header>
+      <BarraSuperiorGanaderia
+        estaOnline={estaOnline}
+        monedasConfig={monedasConfig}
+        pendientesOffline={pendientesOffline}
+        precioLecheUSD={precioLecheUSD}
+        sincronizandoOffline={sincronizandoOffline}
+        tasaBCV={tasaBCV}
+        tasaCOP={tasaCOP}
+        handleSincronizarManual={handleSincronizarManual}
+        setModalDatosFiscales={setModalDatosFiscales}
+        setModalEditarPrecioLeche={setModalEditarPrecioLeche}
+        setModalEditarTasas={setModalEditarTasas}
+        setSidebarAbierto={setSidebarAbierto}
+      />
 
       {/* ── CUERPO PRINCIPAL ── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
