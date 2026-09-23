@@ -5,10 +5,11 @@ import {
   registrarPesoGanaderia,
   editarPesoGanaderia,
   eliminarPesoGanaderia,
+  descargarReporteEngordePdf,
   type FilaEngordeGanaderia,
   type RegistroPesoGanaderia,
 } from "../api";
-import { fechaLocalISO } from "./ReportesCampoGanaderia";
+import { fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 
 /**
  * Control de engorde del hato: GDP (ganancia diaria de peso) de cada animal activo,
@@ -159,11 +160,21 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
 
   return (
     <div className="space-y-5 text-left">
-      <div>
-        <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Engorde del Hato</h3>
-        <p className="text-xs text-slate-500">
-          Ganancia diaria de peso (GDP) de cada animal activo, entre su primer y su último pesaje. El último tramo muestra si se estancó.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Engorde del Hato</h3>
+          <p className="text-xs text-slate-500">
+            Ganancia diaria de peso (GDP) de cada animal activo, entre su primer y su último pesaje. El último tramo muestra si se estancó.
+          </p>
+        </div>
+        <BotonPdf
+          etiqueta={filtroPotrero || filtroLote ? "PDF de engorde (filtrado)" : "PDF de engorde"}
+          variante="primario"
+          notificar={notificar}
+          obtener={() => descargarReporteEngordePdf(
+            filtroPotrero && filtroPotrero !== "__sin__" ? filas.find(f => f.potrero === filtroPotrero)?.potreroId ?? null : null,
+            filtroLote || null)}
+        />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

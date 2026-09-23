@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { IconFileText, IconMilk, IconSyringe } from "../Icons";
-import { descargarReporteOrdenoPdf, descargarConstanciaVacunacionPdf } from "../api";
+import {
+  descargarReporteOrdenoPdf, descargarConstanciaVacunacionPdf,
+  descargarInventarioHatoPdf, descargarReporteEngordePdf, descargarReportePotrerosPdf,
+} from "../api";
 
 /** Fecha local YYYY-MM-DD (toISOString daría el día siguiente pasadas las 8 p. m. en Venezuela). */
 export function fechaLocalISO(d: Date = new Date()) {
@@ -13,6 +16,40 @@ export function abrirPdf(blob: Blob) {
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank");
   setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+/** Botón institucional para generar y abrir un PDF, con estado de carga y aviso de error. */
+export function BotonPdf({ etiqueta, obtener, notificar, variante = "secundario" }: {
+  etiqueta: string;
+  obtener: () => Promise<Blob>;
+  notificar: (msg: string) => void;
+  variante?: "primario" | "secundario";
+}) {
+  const [generando, setGenerando] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={generando}
+      onClick={async () => {
+        setGenerando(true);
+        try {
+          abrirPdf(await obtener());
+        } catch (e) {
+          notificar(`No se pudo generar el PDF: ${e instanceof Error ? e.message : "intente de nuevo"}`);
+        } finally {
+          setGenerando(false);
+        }
+      }}
+      className={`inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer transition-colors disabled:opacity-50 ${
+        variante === "primario"
+          ? "bg-teal-700 hover:bg-teal-800 !text-white"
+          : "border border-slate-300 bg-white text-slate-700 hover:border-teal-400 hover:text-teal-800"
+      }`}
+    >
+      <IconFileText size={13} />
+      <span>{generando ? "Generando..." : etiqueta}</span>
+    </button>
+  );
 }
 
 /** Lunes a domingo de la semana que contiene la fecha dada. */
@@ -172,6 +209,20 @@ export default function ReportesCampoGanaderia({ vacunas, notificar }: Props) {
             {generando === "vacunas" ? "Generando..." : "Generar constancia PDF"}
           </button>
         </div>
+      </div>
+
+      {/* Reportes de gestión: foto completa de la finca */}
+      <div className="pt-4 border-t border-slate-200 dark:border-white/10 space-y-2">
+        <div className="text-sm font-bold text-slate-900 dark:text-white">Reportes de gestión</div>
+        <p className="text-[11px] text-slate-500 dark:text-white/50">
+          Inventario del hato por categoría, raza y preñez; engorde (GDP) con los animales estancados; ocupación y descanso de potreros.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <BotonPdf etiqueta="Inventario del hato" obtener={descargarInventarioHatoPdf} notificar={notificar} />
+          <BotonPdf etiqueta="Engorde (GDP)" obtener={() => descargarReporteEngordePdf()} notificar={notificar} />
+          <BotonPdf etiqueta="Potreros" obtener={descargarReportePotrerosPdf} notificar={notificar} />
+        </div>
+        <p className="text-[10px] text-slate-400">La liquidación de cada ceba en sociedad se descarga desde Ceba en sociedad.</p>
       </div>
     </div>
   );

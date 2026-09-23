@@ -4,7 +4,7 @@ import ModalImportarHato from "./ModalImportarHato";
 import TenantSoporteWidget from "./TenantSoporteWidget";
 import EngordeGanadero from "./EngordeGanadero";
 import SociedadesCeba from "./SociedadesCeba";
-import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
+import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
   contarPendientesGanaderia,
@@ -50,7 +50,7 @@ import {
   type TanqueLeche, type VentaLecheTanque,
   type GastoGanaderia, type VentaGanaderiaResumen,
   listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
-  tasaVigente, actualizarTasa,
+  tasaVigente, actualizarTasa, descargarInventarioHatoPdf, descargarReportePotrerosPdf,
 } from "../api";
 
 interface Props {
@@ -2377,6 +2377,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   </button>
                 </div>
 
+                <BotonPdf etiqueta="PDF de potreros" obtener={descargarReportePotrerosPdf} notificar={notificar} />
                 <button
                   onClick={abrirNuevoPotrero}
                   className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer">
@@ -2562,6 +2563,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     Locación & Estatus
                   </button>
                 </div>
+
+                <BotonPdf etiqueta="PDF del hato" obtener={descargarInventarioHatoPdf} notificar={notificar} />
 
                 <button
                   onClick={() => abrirVentaAnimales("MULTIPLE")}

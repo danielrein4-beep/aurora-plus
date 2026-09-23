@@ -49,6 +49,9 @@ public class GanaderiaImportacionService {
     private PotreroRepository potreroRepository;
 
     @Autowired
+    private com.auroraplus.modules.ganaderia.repositories.SociedadCebaRepository sociedadCebaRepository;
+
+    @Autowired
     private EventoReproductivoRepository eventoReproductivoRepository;
 
     @Autowired
@@ -74,6 +77,8 @@ public class GanaderiaImportacionService {
         public String estadoProductivo;   // CRIANDO, ORDEÑO, SECA
         public String padrotePrenez;      // arete del toro que la preñó, o nombre/pajuela externa
         public String fechaProbableParto;
+        public String socio;                // nombre del socio de una ceba en sociedad ACTIVA (vacío = animal propio)
+        public String fechaEntradaSociedad; // opcional; por defecto, hoy
     }
 
     public static class ErrorFila {
@@ -93,6 +98,7 @@ public class GanaderiaImportacionService {
         public int totalFilas;
         public int animalesImportados;
         public int preneces;
+        public int animalesEnSociedad;
         public List<ErrorFila> errores = new ArrayList<>();
         public Map<String, Integer> porTipo = new TreeMap<>();
         public Map<String, Integer> porRaza = new TreeMap<>();
@@ -119,6 +125,8 @@ public class GanaderiaImportacionService {
         String estadoProductivo;
         String padrotePrenez;
         LocalDate fechaProbableParto;
+        com.auroraplus.modules.ganaderia.entities.SociedadCeba sociedad;
+        LocalDate fechaEntradaSociedad;
     }
 
     /**
@@ -142,6 +150,10 @@ public class GanaderiaImportacionService {
         for (Potrero p : potreroRepository.findByTenantId(tenantId)) {
             if (p.getNombre() != null) potrerosPorNombre.put(clave(p.getNombre()), p);
         }
+        Map<String, com.auroraplus.modules.ganaderia.entities.SociedadCeba> sociedadesPorSocio = new HashMap<>();
+        for (var soc : sociedadCebaRepository.findByTenantIdOrderByFechaInicioDesc(tenantId)) {
+            if ("ACTIVA".equals(soc.getEstado())) sociedadesPorSocio.putIfAbsent(clave(soc.getNombreSocio()), soc);
+        }
         Map<String, Animal> hatoExistente = new HashMap<>();
         for (Animal a : animalRepository.findByTenantId(tenantId)) {
             hatoExistente.put(clave(a.getArete()), a);
@@ -152,7 +164,7 @@ public class GanaderiaImportacionService {
         Map<String, FilaValida> enArchivo = new HashMap<>();
         for (int i = 0; i < filas.size(); i++) {
             int numero = i + 2; // fila 1 del Excel son los encabezados
-            FilaValida v = validarFila(numero, filas.get(i), potrerosPorNombre, resultado.errores);
+            FilaValida v = validarFila(numero, filas.get(i), potrerosPorNombre, sociedadesPorSocio, resultado.errores);
             if (v == null) continue;
             String k = clave(v.arete);
             if (enArchivo.containsKey(k)) {
@@ -206,6 +218,7 @@ public class GanaderiaImportacionService {
             resultado.porTipo.merge(v.tipoAnimal != null ? v.tipoAnimal : "SIN TIPO", 1, Integer::sum);
             resultado.porRaza.merge(v.raza != null ? v.raza : "Sin raza", 1, Integer::sum);
             if ("PREÑADA".equals(v.estadoReproductivo)) resultado.preneces++;
+            if (v.sociedad != null) resultado.animalesEnSociedad++;
         }
 
         if (!resultado.errores.isEmpty() || !confirmar) {
@@ -230,6 +243,11 @@ public class GanaderiaImportacionService {
             a.setCostoAdquisicion(v.valorEstimado);
             a.setPotrero(v.potrero);
             a.setLote(v.lote);
+            if (v.sociedad != null) {
+                a.setSociedadCebaId(v.sociedad.getId());
+                a.setPesoEntradaSociedad(v.pesoActual);
+                a.setFechaEntradaSociedad(v.fechaEntradaSociedad != null ? v.fechaEntradaSociedad : LocalDate.now());
+            }
             a.setEstado("ACTIVO");
             if (v.estadoReproductivo != null) a.setEstadoReproductivo(v.estadoReproductivo);
             if (v.estadoProductivo != null) a.setEstadoProductivo(v.estadoProductivo);
@@ -315,7 +333,9 @@ public class GanaderiaImportacionService {
         return new ArrayList<>(porHembra.values());
     }
 
-    private FilaValida validarFila(int numero, FilaImportacion f, Map<String, Potrero> potreros, List<ErrorFila> errores) {
+    private FilaValida validarFila(int numero, FilaImportacion f, Map<String, Potrero> potreros,
+                                   Map<String, com.auroraplus.modules.ganaderia.entities.SociedadCeba> sociedades,
+                                   List<ErrorFila> errores) {
         int erroresAntes = errores.size();
         FilaValida v = new FilaValida();
         v.numero = numero;
@@ -389,6 +409,25 @@ public class GanaderiaImportacionService {
 
         v.padrotePrenez = texto(f.padrotePrenez);
         v.fechaProbableParto = fecha(f.fechaProbableParto, numero, "fechaProbableParto", errores);
+
+        // Ceba en sociedad: el socio debe tener una sociedad ACTIVA creada en Aurora
+        String socio = texto(f.socio);
+        if (socio != null) {
+            v.sociedad = sociedades.get(clave(socio));
+            if (v.sociedad == null) {
+                errores.add(new ErrorFila(numero, "socio",
+                    "No hay una sociedad activa con el socio '" + socio + "'. Créela primero en Ceba en sociedad o deje la celda vacía"));
+            } else if (v.pesoActual == null || v.pesoActual.signum() <= 0) {
+                errores.add(new ErrorFila(numero, "pesoActual",
+                    "Un animal en sociedad necesita peso: es la base para calcular los kilos ganados"));
+            }
+            v.fechaEntradaSociedad = fecha(f.fechaEntradaSociedad, numero, "fechaEntradaSociedad", errores);
+            if (v.fechaEntradaSociedad != null && v.fechaEntradaSociedad.isAfter(LocalDate.now())) {
+                errores.add(new ErrorFila(numero, "fechaEntradaSociedad", "La fecha de entrada a la sociedad está en el futuro"));
+            }
+        } else if (texto(f.fechaEntradaSociedad) != null) {
+            errores.add(new ErrorFila(numero, "fechaEntradaSociedad", "Indicó fecha de entrada a la sociedad pero no el socio"));
+        }
         if ((v.padrotePrenez != null || v.fechaProbableParto != null) && !"PREÑADA".equals(v.estadoReproductivo)) {
             errores.add(new ErrorFila(numero, "estadoReproductivo",
                 "Indicó padrote o fecha de parto pero el estado reproductivo no es PREÑADA"));

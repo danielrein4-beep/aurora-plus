@@ -33,6 +33,8 @@ const COLUMNAS: Array<{ encabezado: string; campo: keyof FilaImportacionHato; ej
   { encabezado: "Estado productivo", campo: "estadoProductivo", ejemplo: ["", "ORDEÑO", "CRIANDO"] },
   { encabezado: "Padrote de la preñez", campo: "padrotePrenez", ejemplo: ["", "T-001", ""] },
   { encabezado: "Fecha probable de parto", campo: "fechaProbableParto", ejemplo: ["", "15/12/2026", ""] },
+  { encabezado: "Socio (ceba en sociedad)", campo: "socio", ejemplo: ["", "", ""] },
+  { encabezado: "Fecha entrada sociedad", campo: "fechaEntradaSociedad", ejemplo: ["", "", ""] },
 ];
 
 const INSTRUCCIONES: string[][] = [
@@ -48,6 +50,8 @@ const INSTRUCCIONES: string[][] = [
   ["Estado reproductivo: VACIA, PREÑADA o EN_ESPERA. Estado productivo: CRIANDO, ORDEÑO o SECA."],
   ["Padrote de la preñez (solo preñadas): arete del toro si está en su hato, o el nombre del toro o la pajuela si es externo."],
   ["Valor estimado: referencia contable opcional. La carga inicial NO registra compras ni gastos."],
+  ["Socio (ceba en sociedad): nombre exacto de un socio con sociedad ACTIVA creada en Ceba en sociedad. Vacío = animal propio de la finca."],
+  ["Los animales de un socio necesitan Peso (kg): es el peso de entrada para calcular los kilos ganados. Fecha entrada sociedad: opcional, por defecto hoy."],
   [""],
   ["Si una sola fila tiene error, no se guarda nada: Aurora le indica fila por fila qué corregir y vuelve a subir el archivo."],
 ];
@@ -247,8 +251,8 @@ export default function ModalImportarHato({ onCerrar, onImportado }: Props) {
                 <div className="font-mono font-black text-2xl text-slate-900 dark:text-white">{vistaPrevia.totalFilas}</div>
               </div>
               <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5">
-                <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/40">Preñadas</div>
-                <div className="font-mono font-black text-2xl text-slate-900 dark:text-white">{vistaPrevia.preneces}</div>
+                <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/40">Preñadas · en sociedad</div>
+                <div className="font-mono font-black text-2xl text-slate-900 dark:text-white">{vistaPrevia.preneces} · {vistaPrevia.animalesEnSociedad ?? 0}</div>
               </div>
               <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 col-span-2 sm:col-span-1">
                 <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/40">Filas con error</div>
