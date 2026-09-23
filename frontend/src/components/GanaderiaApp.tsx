@@ -864,6 +864,25 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     }
   };
 
+  // Abre la venta de animales; "MULTIPLE" = vender un lote seleccionando varios animales.
+  const abrirVentaAnimales = (modo: "INDIVIDUAL" | "MULTIPLE") => {
+    const activos = animales.filter(a => a.estado === "ACTIVO" || !a.estado);
+    if (activos.length > 0) {
+      setFormVenta({
+        animalId: activos[0].id,
+        comprador: "",
+        precioUSD: 0,
+        precioPorKg: 0,
+        pesoSalida: activos[0].pesoActual || 0,
+        motivo: "BENEFICIO",
+      });
+    }
+    setVentaModo(modo);
+    setAnimalesVentaSeleccionados([]);
+    setUltimaVentaId(null);
+    setModalVentaAnimal(true);
+  };
+
   // Manejador: Despacho por Venta / Beneficio (POST /api/ganaderia/ventas a través de VentaAnimalController)
   const handleRegistrarVentaAnimal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1747,6 +1766,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
               <span className="text-slate-400"><IconTag size={16} /></span>
               <span className="flex-1 text-left">Alta de animal</span>
             </button>
+            <button
+              type="button"
+              onClick={() => { abrirVentaAnimales("MULTIPLE"); setSidebarAbierto(false); }}
+              className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            >
+              <span className="text-slate-400"><IconCoins size={16} /></span>
+              <span className="flex-1 text-left">Vender animales</span>
+            </button>
             {puedeImportarHato && (
               <button
                 type="button"
@@ -2435,6 +2462,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     Locación & Estatus
                   </button>
                 </div>
+
+                <button
+                  onClick={() => abrirVentaAnimales("MULTIPLE")}
+                  className="apple-glass-btn text-xs font-bold px-3.5 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+                  <IconCoins size={13} />
+                  <span>Vender lote</span>
+                </button>
 
                 {puedeImportarHato && (
                   <button
@@ -3604,22 +3638,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <span className="text-[10px] text-emerald-400 font-bold">Ingresar →</span>
                   </button>
                   <button
-                    onClick={() => {
-                      if (animales.length > 0) {
-                        setFormVenta({
-                          animalId: animales[0].id,
-                          comprador: "",
-                          precioUSD: 0,
-                          precioPorKg: 0,
-                          pesoSalida: animales[0].pesoActual || 0,
-                          motivo: "BENEFICIO",
-                        });
-                      }
-                      setVentaModo("INDIVIDUAL");
-                      setAnimalesVentaSeleccionados([]);
-                      setUltimaVentaId(null);
-                      setModalVentaAnimal(true);
-                    }}
+                    onClick={() => abrirVentaAnimales("INDIVIDUAL")}
                     className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
                     <span>• Venta / Beneficio (Salida Real)</span>
                     <span className="text-[10px] text-rose-400 font-bold">Despachar →</span>
