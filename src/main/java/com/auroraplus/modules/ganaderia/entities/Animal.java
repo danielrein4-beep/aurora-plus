@@ -94,6 +94,24 @@ public class Animal {
     @Column(name = "estado_productivo", length = 30)
     private String estadoProductivo = "SECA";
 
+    // Ceba en sociedad: null = animal propio de la finca.
+    @Column(name = "sociedad_ceba_id")
+    private Long sociedadCebaId;
+
+    // Peso y fecha con que entró a la sociedad: base de los kilos ganados a repartir.
+    @Column(name = "peso_entrada_sociedad", precision = 10, scale = 2)
+    private BigDecimal pesoEntradaSociedad;
+
+    @Column(name = "fecha_entrada_sociedad")
+    private LocalDate fechaEntradaSociedad;
+
+    public Long getSociedadCebaId() { return sociedadCebaId; }
+    public void setSociedadCebaId(Long sociedadCebaId) { this.sociedadCebaId = sociedadCebaId; }
+    public BigDecimal getPesoEntradaSociedad() { return pesoEntradaSociedad; }
+    public void setPesoEntradaSociedad(BigDecimal pesoEntradaSociedad) { this.pesoEntradaSociedad = pesoEntradaSociedad; }
+    public LocalDate getFechaEntradaSociedad() { return fechaEntradaSociedad; }
+    public void setFechaEntradaSociedad(LocalDate fechaEntradaSociedad) { this.fechaEntradaSociedad = fechaEntradaSociedad; }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
