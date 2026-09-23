@@ -41,7 +41,8 @@ public class OdontologiaDocumentosController {
 
     private void validarPermisoClinico() {
         String rol = AuthContext.getRol();
-        if (rol != null && !"DUENO_ADMIN".equalsIgnoreCase(rol) && !"MEDICO".equalsIgnoreCase(rol) && !"SUPER_ADMIN".equalsIgnoreCase(rol)) {
+        // Sin rol no hay acceso: toda sesion valida de Aurora lo trae en el token.
+        if (rol == null || !"DUENO_ADMIN".equalsIgnoreCase(rol) && !"MEDICO".equalsIgnoreCase(rol) && !"SUPER_ADMIN".equalsIgnoreCase(rol)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "Acceso denegado: el expediente odontologico es informacion clinica confidencial.");
         }

@@ -69,7 +69,8 @@ public class OdontologiaPortalController {
 
     private void validarPermisoClinico() {
         String rol = AuthContext.getRol();
-        if (rol != null && !"DUENO_ADMIN".equalsIgnoreCase(rol) && !"MEDICO".equalsIgnoreCase(rol) && !"SUPER_ADMIN".equalsIgnoreCase(rol)) {
+        // Sin rol no hay acceso: toda sesion valida de Aurora lo trae en el token.
+        if (rol == null || !"DUENO_ADMIN".equalsIgnoreCase(rol) && !"MEDICO".equalsIgnoreCase(rol) && !"SUPER_ADMIN".equalsIgnoreCase(rol)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado.");
         }
     }
@@ -152,6 +153,7 @@ public class OdontologiaPortalController {
 
     private static final int MAX_INTENTOS = 5;
     private static final int MINUTOS_BLOQUEO = 15;
+    private static final int MAX_BLOQUEOS = 3;
     private static final long SESION_MS = 30 * 60 * 1000L;
 
     @Value("${jwt.secret}")
@@ -255,7 +257,7 @@ public class OdontologiaPortalController {
     public ResponseEntity<Map<String, Object>> verificar(@PathVariable String token, @RequestBody VerificarRequest req) {
         Acceso a = resolver(token);
         Map<String, Object> enlace = jdbcTemplate.queryForMap(
-            "SELECT intentos_fallidos, bloqueado_hasta > now() AS bloqueado FROM salud_odontologia_portal_enlaces WHERE id = ? FOR UPDATE",
+            "SELECT intentos_fallidos, bloqueos, bloqueado_hasta > now() AS bloqueado FROM salud_odontologia_portal_enlaces WHERE id = ? FOR UPDATE",
             a.enlaceId());
         if (Boolean.TRUE.equals(enlace.get("bloqueado"))) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
@@ -268,9 +270,18 @@ public class OdontologiaPortalController {
         if (!MessageDigest.isEqual(esperada.getBytes(StandardCharsets.UTF_8), dada.getBytes(StandardCharsets.UTF_8))) {
             int intentos = ((Number) enlace.get("intentos_fallidos")).intValue() + 1;
             if (intentos >= MAX_INTENTOS) {
+                int bloqueos = ((Number) enlace.get("bloqueos")).intValue() + 1;
+                // Tras MAX_BLOQUEOS el enlace se desactiva: adivinar insistiendo por dias no debe funcionar.
+                if (bloqueos >= MAX_BLOQUEOS) {
+                    jdbcTemplate.update(
+                        "UPDATE salud_odontologia_portal_enlaces SET intentos_fallidos = 0, bloqueos = ?, revocado = true WHERE id = ?",
+                        bloqueos, a.enlaceId());
+                    return sinCache(HttpStatus.GONE, Map.of("message",
+                        "Por seguridad este enlace se desactivo. Pidale uno nuevo a su clinica."));
+                }
                 jdbcTemplate.update(
-                    "UPDATE salud_odontologia_portal_enlaces SET intentos_fallidos = 0, bloqueado_hasta = ? WHERE id = ?",
-                    Timestamp.valueOf(LocalDateTime.now().plusMinutes(MINUTOS_BLOQUEO)), a.enlaceId());
+                    "UPDATE salud_odontologia_portal_enlaces SET intentos_fallidos = 0, bloqueos = ?, bloqueado_hasta = ? WHERE id = ?",
+                    bloqueos, Timestamp.valueOf(LocalDateTime.now().plusMinutes(MINUTOS_BLOQUEO)), a.enlaceId());
                 return sinCache(HttpStatus.TOO_MANY_REQUESTS, Map.of("message",
                     "Demasiados intentos. Por seguridad espere " + MINUTOS_BLOQUEO + " minutos e intente de nuevo."));
             }
