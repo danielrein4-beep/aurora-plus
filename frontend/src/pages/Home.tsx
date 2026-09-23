@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import SpecularButton from "../components/SpecularButton";
@@ -6,19 +6,43 @@ import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware,
   IconRestaurant, IconFarm,
-  IconCustomize, IconLink, IconCloud, IconLock,
-  IconCard, IconBox, IconBolt, IconShield,
-  IconTooth, IconVet,
+  IconTooth, IconCheck,
 } from "../Icons";
 
 const INDUSTRIES = [
-  { Icon: IconClinic,     name: "Mediclinic Pro",      desc: "Historias clínicas, agenda, sala de espera en vivo, cotizador multidivisa, vademécum de fármacos y récipe médico oficial en PDF." },
-  { Icon: IconTooth,      name: "Odontología",         desc: "Odontograma FDI interactivo, periodontograma de 6 puntos, planes de tratamiento por fases y presupuesto dental dual USD/Bs." },
-  { Icon: IconHardware,   name: "Comercio",            desc: "POS mostrador, inventario en tiempo real, catálogo público con pedidos por WhatsApp, y asistente de IA que responde precios y stock 24/7." },
-  { Icon: IconRestaurant, name: "Restaurantes",        desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos." },
-  { Icon: IconFarm,       name: "Control de Fincas",   desc: "Mapa satelital de potreros, básculas bluetooth para pesaje en manga, y control sanitario que bloquea la venta de un animal en período de retiro." },
-  { Icon: IconVet,        name: "Veterinaria",         desc: "Agenda, historias clínicas, sala de espera y cotizador para clínicas de mascotas — el mismo motor de Mediclinic, adaptado." },
+  { Icon: IconClinic,     name: "Mediclinic Pro",    desc: "Historias clínicas, agenda, sala de espera en vivo, cotizador multidivisa.", imgs: ["/industrias/mediclinic.jpg"], placeholder: "" },
+  { Icon: IconTooth,      name: "Odontología",       desc: "Odontograma FDI interactivo, periodontograma de 6 puntos, planes por fases.", imgs: ["/industrias/odontologia.jpg"], placeholder: "linear-gradient(135deg,#0ea5b8,#0d3b3d)" },
+  { Icon: IconHardware,   name: "Comercio",          desc: "POS mostrador, inventario en tiempo real, catálogo con pedidos por WhatsApp.", imgs: ["/industrias/comercio-electronica.jpg", "/industrias/comercio-ferreteria.jpg", "/industrias/comercio-telefonos.jpg"], placeholder: "linear-gradient(135deg,#d97706,#7c2d12)" },
+  { Icon: IconRestaurant, name: "Restaurantes",      desc: "Comandas digitales, mesas, cocina en tiempo real y cierres de caja automáticos.", imgs: ["/industrias/restaurantes.jpg"], placeholder: "linear-gradient(135deg,#e11d48,#4c0519)" },
+  { Icon: IconFarm,       name: "Control de Fincas", desc: "Mapa satelital de potreros, básculas bluetooth y control sanitario.", imgs: ["/industrias/ganaderia.jpg"], placeholder: "linear-gradient(135deg,#16a34a,#052e16)" },
+  // Veterinaria: aún en construcción, no se muestra en esta grilla hasta que tenga foto y esté lista.
 ];
+
+// Comercio sirve muchos rubros (ferretería, farmacia, retail...): la tarjeta
+// rota entre varias fotos si hay más de una en `imgs`, en vez de una sola foto fija.
+function IndustryPhoto({ imgs }: { imgs: string[] }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (imgs.length < 2) return;
+    const id = setInterval(() => setI((n) => (n + 1) % imgs.length), 4000);
+    return () => clearInterval(id);
+  }, [imgs.length]);
+  if (imgs.length === 0) return null;
+  return (
+    <>
+      {imgs.map((src, idx) => (
+        <img
+          key={src}
+          src={src}
+          alt=""
+          className={`absolute inset-0 w-full h-full object-cover transition duration-1000 ease-in-out group-hover:scale-105 ${
+            idx === i ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
+    </>
+  );
+}
 
 const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombre: string; desc: string; Icon: typeof IconClinic }> = {
   restaurante: { ruta: "/restaurante", label: "Aurora Horeca", nombre: "Aurora Horeca", desc: "Comandas digitales, mesas, cocina en tiempo real, inventario y cierres de caja automáticos.", Icon: IconRestaurant },
@@ -32,12 +56,12 @@ const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombr
 const SISTEMA_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", nombre: "Mediclinic Pro — Espacio Clínico", desc: "Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.", Icon: IconClinic };
 
 const FEATURES = [
-  { Icon: IconCustomize, title: "Asistente de IA por WhatsApp", desc: "En Comercio: responde precios, stock y tasa BCV al instante y sin costo. Con límites de costo por negocio." },
-  { Icon: IconFarm,      title: "Control Sanitario Estricto", desc: "En Ganadería: si un animal sigue en período de retiro por vacuna o tratamiento, el sistema bloquea su venta." },
-  { Icon: IconTooth,     title: "Récipe Médico y Vademécum", desc: "En Mediclinic y Odontología: 36+ fármacos con posología, detección de alergias y récipe oficial en PDF." },
-  { Icon: IconLink,      title: "Módulos Integrados", desc: "Ventas, inventario, caja y auditoría conectados sin planillas paralelas ni datos duplicados." },
-  { Icon: IconCloud,     title: "Nube + Local Resiliente", desc: "Trabaja con o sin internet. Sincronización automática al recuperar la conectividad." },
-  { Icon: IconLock,      title: "Seguridad y Auditoría", desc: "Roles y permisos granulares por tenant, con trazabilidad completa de cada acción." },
+  { title: "Asistente de IA por WhatsApp", desc: "En Comercio: responde precios, stock y tasa BCV al instante y sin costo. Con límites de costo por negocio." },
+  { title: "Control Sanitario Estricto", desc: "En Ganadería: si un animal sigue en período de retiro por vacuna o tratamiento, el sistema bloquea su venta." },
+  { title: "Récipe Médico y Vademécum", desc: "En Mediclinic y Odontología: 36+ fármacos con posología, detección de alergias y récipe oficial en PDF." },
+  { title: "Módulos Integrados", desc: "Ventas, inventario, caja y auditoría conectados sin planillas paralelas ni datos duplicados." },
+  { title: "Nube + Local Resiliente", desc: "Trabaja con o sin internet. Sincronización automática al recuperar la conectividad." },
+  { title: "Seguridad y Auditoría", desc: "Roles y permisos granulares por tenant, con trazabilidad completa de cada acción." },
 ];
 
 const PLANS = [
@@ -76,7 +100,7 @@ export default function Home() {
             <img
               src="/hero-laptop.png"
               alt="Aurora Productividad"
-              className="w-full h-full object-cover object-center opacity-35 select-none mix-blend-multiply"
+              className="w-full h-full object-cover object-center opacity-45 select-none mix-blend-multiply"
             />
             {/* Difuminado perimetral: arriba fuerte (no pelea con el texto), abajo hacia el blanco del borde de sección, y en ambos lados para que no se vea recortada */}
             <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white pointer-events-none" />
@@ -86,14 +110,14 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 max-w-5xl mx-auto text-center flex flex-col items-center">
-          
+
           {/* H1 Monumental */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#1D1D1F] max-w-4xl leading-[1.06] mb-6">
             Automatiza, simplifica y haz crecer tu negocio.
           </h1>
 
           {/* Subtítulo */}
-          <p className="text-lg sm:text-xl md:text-2xl text-[#86868B] max-w-2xl font-normal leading-relaxed mb-10 tracking-tight">
+          <p className="text-lg sm:text-xl md:text-2xl text-[#6E6E73] max-w-2xl font-normal leading-relaxed mb-10 tracking-tight">
             De la libreta y las hojas de Excel a la tranquilidad de un sistema integrado. Controla caja, inventario, agenda clínica y producción en tiempo real.
           </p>
 
@@ -141,8 +165,10 @@ export default function Home() {
             const miSistema = SISTEMA_POR_INDUSTRIA[user?.industry || ""] || SISTEMA_POR_DEFECTO;
             return (
               <div className="w-full max-w-2xl bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-6 mb-16 text-left flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-start gap-3 border-l-2 border-[#0F766E] pl-4">
-                  <miSistema.Icon size={20} />
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#177E89] shadow-sm">
+                    <miSistema.Icon size={24} />
+                  </div>
                   <div>
                     <div className="text-xs font-bold uppercase tracking-wider text-[#177E89]">
                       Sistema Asignado
@@ -193,24 +219,27 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {INDUSTRIES.map((ind, idx) => {
-              const IconComp = ind.Icon;
               return (
                 <div
                   key={ind.name}
                   onClick={() => setActiveIndustry(idx)}
-                  className={`bg-white border border-l-2 rounded-xl p-7 transition-all cursor-pointer shadow-sm ${
-                    activeIndustry === idx ? "border-[#177E89] border-l-[#0F766E] ring-1 ring-[#177E89]" : "border-[#E5E5EA] border-l-[#B8C8CD] hover:border-[#B8C8CD] hover:border-l-[#0F766E]"
+                  className={`bg-white border rounded-2xl overflow-hidden cursor-pointer shadow-sm transition-all ${
+                    activeIndustry === idx ? "border-[#177E89] ring-1 ring-[#177E89]" : "border-[#E5E5EA] hover:border-[#D1D1D6]"
                   }`}
                 >
-                  <h3 className="flex items-center gap-2.5 text-lg font-bold text-[#1D1D1F] tracking-tight mb-2">
-                    <span className="text-[#0F766E]"><IconComp size={19} /></span>
-                    <span>{ind.name}</span>
-                  </h3>
-                  <p className="text-sm text-[#86868B] leading-relaxed">
-                    {ind.desc}
-                  </p>
+                  <div className="group relative aspect-[16/10] overflow-hidden" style={ind.imgs.length === 0 ? { background: ind.placeholder } : undefined}>
+                    <IndustryPhoto imgs={ind.imgs} />
+                  </div>
+                  <div className="p-5">
+                    <h3 className="text-base font-bold text-[#1D1D1F] tracking-tight mb-1">
+                      {ind.name}
+                    </h3>
+                    <p className="text-xs text-[#86868B] leading-relaxed">
+                      {ind.desc}
+                    </p>
+                  </div>
                 </div>
               );
             })}
@@ -243,15 +272,13 @@ export default function Home() {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-8 text-left">
               {[
-                { label: "Caja Central", val: "Sincronizada", Icon: IconCard },
-                { label: "Kardex e Insumos", val: "Auto-Descuento", Icon: IconBox },
-                { label: "Modo Offline", val: "Persistencia Total", Icon: IconBolt },
-                { label: "Auditoría RBAC", val: "Trazabilidad 100%", Icon: IconShield },
+                { label: "Caja Central", val: "Sincronizada" },
+                { label: "Kardex e Insumos", val: "Auto-Descuento" },
+                { label: "Modo Offline", val: "Persistencia Total" },
+                { label: "Auditoría RBAC", val: "Trazabilidad 100%" },
               ].map((item) => (
                 <div key={item.label} className="bg-white border border-[#E5E5EA] rounded-2xl p-5 shadow-sm">
-                  <div className="text-[#177E89] mb-3">
-                    <item.Icon size={20} />
-                  </div>
+                  <div className="w-8 h-px bg-[#177E89] mb-4" aria-hidden="true" />
                   <div className="text-[11px] font-semibold text-[#86868B] uppercase tracking-wider mb-1">{item.label}</div>
                   <div className="text-sm font-bold text-[#1D1D1F]">{item.val}</div>
                 </div>
@@ -277,13 +304,10 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map((feat) => {
-              const FeatIcon = feat.Icon;
               return (
-                <div key={feat.title} className="bg-[#F5F5F7] border border-[#E5E5EA] border-l-2 border-l-[#B8C8CD] rounded-xl p-7">
-                  <h3 className="flex items-center gap-2.5 text-base font-bold text-[#1D1D1F] mb-2">
-                    <span className="text-[#0F766E]"><FeatIcon size={18} /></span>
-                    <span>{feat.title}</span>
-                  </h3>
+                <div key={feat.title} className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-7">
+                  <div className="w-8 h-px bg-[#177E89] mb-5" aria-hidden="true" />
+                  <h3 className="text-base font-bold text-[#1D1D1F] mb-2">{feat.title}</h3>
                   <p className="text-xs text-[#86868B] leading-relaxed">{feat.desc}</p>
                 </div>
               );
@@ -332,7 +356,9 @@ export default function Home() {
                   <ul className="space-y-3 mb-8">
                     {p.features.map((feat) => (
                       <li key={feat} className="text-xs text-[#1D1D1F] flex items-center gap-3">
-                        <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-bold">✓</span>
+                        <span className="w-4 h-4 rounded-full bg-[#177E89]/10 text-[#177E89] flex items-center justify-center flex-shrink-0">
+                          <IconCheck size={9} />
+                        </span>
                         <span>{feat}</span>
                       </li>
                     ))}

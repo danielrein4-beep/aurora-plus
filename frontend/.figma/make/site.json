@@ -1,1 +1,7 @@
-{}
+{
+  "title": "Aurora+",
+  "description": "Sistema de gestion multi-industria: ganaderia, salud, comercio, hoteleria y repuestos.",
+  "language": "es",
+  "icons": { "icon": "/favicon.png" },
+  "robots": { "index": false }
+}

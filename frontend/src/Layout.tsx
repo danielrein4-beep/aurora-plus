@@ -50,7 +50,7 @@ export default function Layout() {
   }, []);
 
   return (
-    <div className="min-h-full bg-white text-[#1D1D1F] overflow-x-hidden antialiased flex flex-col justify-between">
+    <div className="min-h-full bg-[#F5F5F7] text-[#1D1D1F] overflow-x-hidden antialiased flex flex-col justify-between">
       <AuroraGradientDef />
 
       <Nav />
