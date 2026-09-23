@@ -24,6 +24,11 @@ import ModalPrecioLeche from "./ganaderia/ModalPrecioLeche";
 import ModalDatosFiscales from "./ganaderia/ModalDatosFiscales";
 import ModalDespachoLeche from "./ganaderia/ModalDespachoLeche";
 import ModalCalibrarTanque from "./ganaderia/ModalCalibrarTanque";
+import SeccionProduccion from "./ganaderia/SeccionProduccion";
+import SeccionEventos from "./ganaderia/SeccionEventos";
+import SeccionFinanzas from "./ganaderia/SeccionFinanzas";
+import SeccionPotreros from "./ganaderia/SeccionPotreros";
+import type { TabGanaderia, SubPotreros, SubInventario, SubSanidad } from "./ganaderia/tipos";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
@@ -212,12 +217,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [gastoAbierto, setGastoAbierto] = useState(false);
 
   // Pestaña principal activa
-  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "engorde" | "sociedades" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
+  const [tab, setTab] = useState<TabGanaderia>("resumen");
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
   const [aperturaSoporte, setAperturaSoporte] = useState(0);
 
   // Sub-vistas Sanidad & Trazabilidad
-  const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
+  const [subSanidad, setSubSanidad] = useState<SubSanidad>("individual");
   const [animalFichaId, setAnimalFichaId] = useState<number | null>(null);
   const [alertasSanitarias, setAlertasSanitarias] = useState<AlertaSanitariaGanaderia[]>([]);
   const [fichaVacunas, setFichaVacunas] = useState<AplicacionVacunaGanaderia[]>([]);
@@ -228,8 +233,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [cargandoFicha, setCargandoFicha] = useState(false);
 
   // Sub-vistas por pestaña
-  const [subPotreros, setSubPotreros] = useState<"mapa" | "lista">("lista");
-  const [subInventario, setSubInventario] = useState<"matriz" | "fichas" | "distribucion">("matriz");
+  const [subPotreros, setSubPotreros] = useState<SubPotreros>("lista");
+  const [subInventario, setSubInventario] = useState<SubInventario>("matriz");
 
   // Estados de datos
   const [animales, setAnimales] = useState<AnimalGanaderia[]>([]);
@@ -1320,180 +1325,18 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             PESTAÑA 2: MAPA & POTREROS (INTEGRACIÓN INTELIGENTE)
         ───────────────────────────────────────────────────────────── */}
         {tab === "potreros" && (
-          <div className="space-y-5 text-left">
-            
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-                  Sistema de Pastoreo & Delimitación de Potreros
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-white/40">
-                  Visualización satelital en alta resolución, rotación Voisin y registro de forrajes.
-                </p>
-              </div>
-
-              {/* Sub-selector: Mapa Satelital vs. Lista de Potreros */}
-              <div className="flex items-center gap-2">
-                <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1 text-xs">
-                  <button
-                    onClick={() => setSubPotreros("lista")}
-                    className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
-                      subPotreros === "lista" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
-                    }`}>
-                    Gestión de Potreros ({potreros.length})
-                  </button>
-                  <button
-                    onClick={() => setSubPotreros("mapa")}
-                    className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
-                      subPotreros === "mapa" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
-                    }`}>
-                    Mapa Satelital
-                  </button>
-                </div>
-
-                <BotonPdf etiqueta="PDF de potreros" obtener={descargarReportePotrerosPdf} notificar={notificar} />
-                <button
-                  onClick={abrirNuevoPotrero}
-                  className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer">
-                  + Agregar Potrero
-                </button>
-              </div>
-            </div>
-
-            {subPotreros === "mapa" ? (
-              <GanaderiaMapa
-                potreros={potreros}
-                animales={animales}
-                onRotarHato={(pot) => setModalRotar(pot)}
-                onCrearPotrero={abrirNuevoPotrero}
-                onEditarPotrero={abrirEditarPotrero}
-                onGuardarPotreroTrazado={handleGuardarPotreroTrazado}
-              />
-            ) : (
-              (() => {
-                // Días desde una fecha ISO (inicio de uso o de descanso).
-                const diasDesde = (iso?: string) => {
-                  if (!iso) return null;
-                  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
-                  if (isNaN(d.getTime())) return null;
-                  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
-                };
-                const animalesEn = (potId: number) => animalesActivos.filter(a => a.potrero?.id === potId);
-                const sinPotrero = animalesActivos.filter(a => !a.potrero).length;
-                const haTotal = potreros.reduce((s, p) => s + (Number(p.areaHectareas) || 0), 0);
-                if (potreros.length === 0) {
-                  return (
-                    <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center space-y-3">
-                      <p className="text-sm text-slate-600">Todavía no hay potreros registrados.</p>
-                      <button onClick={abrirNuevoPotrero} className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer">
-                        + Agregar el primer potrero
-                      </button>
-                    </div>
-                  );
-                }
-                return (
-                  <div className="space-y-3">
-                    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-                          <tr>
-                            <th className="p-3">Potrero</th>
-                            <th className="p-3 text-right">Área</th>
-                            <th className="p-3">Pasto</th>
-                            <th className="p-3">Estado</th>
-                            <th className="p-3 text-right">Animales hoy</th>
-                            <th className="p-3 text-right">Capacidad</th>
-                            <th className="p-3 text-right">Carga</th>
-                            <th className="p-3 text-right">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {potreros.map(pot => {
-                            const enDescanso = pot.estado === "EN_DESCANSO";
-                            const enMantenimiento = pot.estado === "EN_MANTENIMIENTO";
-                            const dias = diasDesde(enDescanso ? pot.fechaInicioDescanso : pot.fechaInicioUso);
-                            const listo = enDescanso && dias != null && pot.diasDescansoMinimo != null && dias >= pot.diasDescansoMinimo;
-                            const ocupantes = animalesEn(pot.id).length;
-                            const area = Number(pot.areaHectareas) || 0;
-                            const sobrecargado = pot.capacidadAnimales != null && ocupantes > pot.capacidadAnimales;
-                            return (
-                              <tr key={pot.id} className="hover:bg-slate-50/70">
-                                <td className="p-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: pot.color || "#94A3B8" }} />
-                                    <div>
-                                      <div className="font-semibold text-slate-900">{pot.nombre}</div>
-                                      <div className="font-mono text-[10px] text-slate-400">{pot.codigo || `POT-${pot.id}`}</div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="p-3 text-right font-mono text-slate-800">{area > 0 ? `${area} ha` : "—"}</td>
-                                <td className="p-3 text-slate-700">{pot.tipoPasto || <span className="text-slate-400">Sin definir</span>}</td>
-                                <td className="p-3">
-                                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    enDescanso ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                      : enMantenimiento ? "bg-slate-100 text-slate-600 border border-slate-200"
-                                      : "bg-teal-50 text-teal-800 border border-teal-200"
-                                  }`}>
-                                    {enDescanso ? "En descanso" : enMantenimiento ? "Mantenimiento" : "En uso"}
-                                  </span>
-                                  <div className="text-[10px] text-slate-500 mt-1">
-                                    {dias != null ? `${dias} día${dias === 1 ? "" : "s"}` : "Sin fecha"}
-                                    {enDescanso && pot.diasDescansoMinimo != null && ` de ${pot.diasDescansoMinimo} mínimos`}
-                                    {listo && <span className="ml-1 font-semibold text-teal-700">· listo para usar</span>}
-                                  </div>
-                                </td>
-                                <td className={`p-3 text-right font-mono font-bold ${sobrecargado ? "text-rose-600" : "text-slate-900"}`}>
-                                  {ocupantes}
-                                </td>
-                                <td className="p-3 text-right font-mono text-slate-600">{pot.capacidadAnimales ?? "—"}</td>
-                                <td className="p-3 text-right font-mono text-slate-600">{area > 0 ? `${(ocupantes / area).toFixed(2)} cab/ha` : "—"}</td>
-                                <td className="p-3">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    <button
-                                      onClick={() => abrirEditarPotrero(pot)}
-                                      className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold cursor-pointer">
-                                      Editar
-                                    </button>
-                                    {!enDescanso && ocupantes > 0 && (
-                                      <button
-                                        onClick={() => setModalRotar(pot)}
-                                        className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-800 !text-white font-semibold cursor-pointer">
-                                        Rotar
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot className="bg-slate-50 border-t border-slate-200 text-[11px] font-bold text-slate-700">
-                          <tr>
-                            <td className="p-3">Total ({potreros.length} potreros)</td>
-                            <td className="p-3 text-right font-mono">{haTotal.toFixed(1)} ha</td>
-                            <td className="p-3" colSpan={2}>
-                              {potreros.filter(p => p.estado === "EN_DESCANSO").length} en descanso
-                            </td>
-                            <td className="p-3 text-right font-mono">{animalesActivos.length - sinPotrero}</td>
-                            <td className="p-3" />
-                            <td className="p-3 text-right font-mono">{haTotal > 0 ? `${((animalesActivos.length - sinPotrero) / haTotal).toFixed(2)} cab/ha` : "—"}</td>
-                            <td className="p-3" />
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                    {sinPotrero > 0 && (
-                      <p className="text-[11px] text-amber-700">
-                        {sinPotrero} animal(es) activos no tienen potrero asignado. Asígnelos desde su ficha o al importar el hato.
-                      </p>
-                    )}
-                  </div>
-                );
-              })()
-            )}
-
-          </div>
+          <SeccionPotreros
+            animales={animales}
+            animalesActivos={animalesActivos}
+            notificar={notificar}
+            potreros={potreros}
+            subPotreros={subPotreros}
+            abrirEditarPotrero={abrirEditarPotrero}
+            abrirNuevoPotrero={abrirNuevoPotrero}
+            handleGuardarPotreroTrazado={handleGuardarPotreroTrazado}
+            setModalRotar={setModalRotar}
+            setSubPotreros={setSubPotreros}
+          />
         )}
 
         {/* ─────────────────────────────────────────────────────────────
@@ -2493,449 +2336,46 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         )}
 
         {tab === "eventos" && (
-          <div className="space-y-6 text-left">
-            <div>
-              <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-                Centro de Eventos
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-white/40">
-                Hub de registro directo para novedades sanitarias, productivas, reproductivas y labores de campo.
-              </p>
-            </div>
-
-            {/* Cuadrícula de Bloques de Eventos estilo GanSoft */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              
-              {/* 1. REPRODUCTIVOS */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">Reproductivos</h4>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <button
-                    onClick={() => { setReproAbierta({ tipo: "SERVICIO" }); }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Servicios (Monta / IA)</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
-                  </button>
-                  <button
-                    onClick={() => { setReproAbierta({ tipo: "DIAGNOSTICO_PRENEZ" }); }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Revisiones & Palpación</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAltaAnimal({ origen: "NACIMIENTO", tipoAnimal: "BECERRA", fechaNacimiento: fechaLocalISO() });
-                    }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Partos / Alta de Cría en Finca</span>
-                    <span className="text-[10px] text-emerald-400 font-bold">Dar de alta →</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setReproAbierta({ tipo: "DIAGNOSTICO_PRENEZ", resultado: "ABORTO_NO_GESTANTE" });
-                    }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Abortos & Pérdidas</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
-                  </button>
-                  <button
-                    onClick={() => setCeloAbierto(true)}
-                    className="w-full text-left p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold cursor-pointer flex items-center justify-between border border-purple-500/20">
-                    <span>• Celos & Detección para IA</span>
-                    <span className="text-[10px] text-purple-300">Registrar →</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. PRODUCTIVOS */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">Productivos</h4>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <button
-                    onClick={abrirVaqueraRapida}
-                    className="w-full text-left p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold cursor-pointer flex items-center justify-between">
-                    <span>• Ordeño Rápido (Modo Vaquera)</span>
-                    <span className="text-[10px] bg-emerald-500/30 px-1.5 py-0.5 rounded text-emerald-300">Teclado →</span>
-                  </button>
-                  <button
-                    onClick={() => setOrdenoAbierto(true)}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Pesaje Individual de Leche</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
-                  </button>
-                  <button
-                    onClick={() => setModalVentaLeche(true)}
-                    className="w-full text-left p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-bold cursor-pointer flex items-center justify-between">
-                    <span>• Venta Cisterna / Planta (Tanque)</span>
-                    <span className="text-[10px] bg-sky-500/30 px-1.5 py-0.5 rounded text-sky-300">Despacho →</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setReproAbierta({ tipo: "DIAGNOSTICO_PRENEZ", resultado: "SECADO_PREVIO_PARTO" });
-                    }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Secados</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
-                  </button>
-                  <button
-                    onClick={() => { setModalPesaje(animales[0]); }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Pesajes de Carne & GDP</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. INVENTARIOS */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">Inventarios</h4>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <button
-                    onClick={() => { setTab("inventario"); setSubInventario("matriz"); }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Matriz de Lotes</span>
-                    <span className="text-[10px] text-slate-400">Abrir →</span>
-                  </button>
-                  <button
-                    onClick={() => { setModalRotar(potreros[0]); }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Cambios de Lote / Potrero</span>
-                    <span className="text-[10px] text-slate-400">Ejecutar →</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAltaAnimal({ origen: "NACIMIENTO" });
-                    }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Alta de Animales (Nacimiento / Compra)</span>
-                    <span className="text-[10px] text-slate-400">Registrar →</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 4. VETERINARIOS & SANIDAD */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">Veterinarios & Sanidad</h4>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <button
-                    onClick={() => setVacunaAbierta({})}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Vacunación & Desparasitación</span>
-                    <span className="text-[10px] text-slate-400">Aplicar →</span>
-                  </button>
-                  <button
-                    onClick={() => setMastitisAbierta(true)}
-                    className="w-full text-left p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold cursor-pointer flex items-center justify-between border border-rose-500/20">
-                    <span>• Mastitis (Prueba CMT & Retiro Leche)</span>
-                    <span className="text-[10px] text-rose-300">Registrar →</span>
-                  </button>
-                  <button
-                    onClick={() => setVacunaAbierta({})}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Control de Tiempos de Retiro</span>
-                    <span className="text-[10px] text-slate-400">Verificar →</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 5. POTREROS */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">Potreros</h4>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <button
-                    onClick={abrirNuevoPotrero}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Agregar Potrero al Mapa</span>
-                    <span className="text-[10px] text-slate-400">Crear →</span>
-                  </button>
-                  <button
-                    onClick={() => { setModalRotar(potreros[0]); }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Rotaciones Voisin</span>
-                    <span className="text-[10px] text-slate-400">Rotar →</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setTab("potreros");
-                      notificar("Selecciona un potrero para calcular y registrar el aforo de forraje.");
-                    }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Aforos & Planificación de Pastoreo</span>
-                    <span className="text-[10px] text-slate-400">Calcular →</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 6. OTROS */}
-              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">Movimientos & Otros</h4>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <button
-                    onClick={() => {
-                      setAltaAnimal({ origen: "COMPRA", proveedor: "", costoCompra: 0, lote: "Lote Compra" });
-                    }}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Compras de Ganado (Ingreso Real)</span>
-                    <span className="text-[10px] text-emerald-400 font-bold">Ingresar →</span>
-                  </button>
-                  <button
-                    onClick={() => abrirVentaAnimales("INDIVIDUAL")}
-                    className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
-                    <span>• Venta / Beneficio (Salida Real)</span>
-                    <span className="text-[10px] text-rose-400 font-bold">Despachar →</span>
-                  </button>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
+          <SeccionEventos
+            animales={animales}
+            notificar={notificar}
+            potreros={potreros}
+            abrirNuevoPotrero={abrirNuevoPotrero}
+            abrirVaqueraRapida={abrirVaqueraRapida}
+            abrirVentaAnimales={abrirVentaAnimales}
+            setAltaAnimal={setAltaAnimal}
+            setCeloAbierto={setCeloAbierto}
+            setMastitisAbierta={setMastitisAbierta}
+            setModalPesaje={setModalPesaje}
+            setModalRotar={setModalRotar}
+            setModalVentaLeche={setModalVentaLeche}
+            setOrdenoAbierto={setOrdenoAbierto}
+            setReproAbierta={setReproAbierta}
+            setSubInventario={setSubInventario}
+            setTab={setTab}
+            setVacunaAbierta={setVacunaAbierta}
+          />
         )}
 
         {/* ─────────────────────────────────────────────────────────────
             PESTAÑA 5: PRODUCCIÓN & PESAJES
         ───────────────────────────────────────────────────────────── */}
         {tab === "produccion" && (
-          <div className="space-y-6 text-left">
-            
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-                  Producción Lechera & Curvas de Crecimiento (GDP)
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-white/40">
-                  Pesaje por turno en sala de ordeño y seguimiento de ganancia diaria de peso.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <button
-                  onClick={abrirVaqueraRapida}
-                  className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md hover:scale-105 transition-all flex items-center gap-2 cursor-pointer">
-                  <span>Modo Vaquera Rápida (Bulk Entry)</span>
-                </button>
-                <button
-                  onClick={() => setOrdenoAbierto(true)}
-                  className="apple-glass px-4 py-2 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 cursor-pointer">
-                  + Ordeño Individual
-                </button>
-              </div>
-            </div>
-
-            {/* Resumen de Producción */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
-                <div className="text-xs text-slate-400 font-medium">Producción Total Registrada</div>
-                <div className="font-['Outfit'] font-black text-3xl text-sky-500 dark:text-sky-400">
-                  {ordenos.reduce((sum, o) => sum + (Number(o.cantidadLitros) || 0), 0).toFixed(1)} L
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-white/40">En {ordenos.length} registros individuales</div>
-              </div>
-
-              <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
-                <div className="text-xs text-slate-400 font-medium">Ingresos Estimados (USD)</div>
-                <div className="font-['Outfit'] font-black text-3xl text-emerald-500 dark:text-emerald-400">
-                  ${ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0).toFixed(2)}
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
-                  <span>A razón de ${precioLecheUSD.toFixed(2)} / Litro</span>
-                  <button
-                    type="button"
-                    onClick={() => setModalEditarPrecioLeche(true)}
-                    className="text-sky-400 hover:text-sky-300 font-bold ml-1 underline cursor-pointer text-[10px]">
-                    <span className="inline-flex items-center gap-1"><IconEdit size={11} /> Editar Precio</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
-                <div className="text-xs text-slate-400 font-medium">Equivalente en Moneda Local</div>
-                <div className="font-['Outfit'] font-black text-2xl text-purple-500 dark:text-purple-400">
-                  {monedasConfig.VES && (
-                    <div>Bs. {(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  )}
-                  {monedasConfig.COP && (
-                    <div className="text-lg text-sky-400">COP ${Math.round(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * tasaCOP).toLocaleString()}</div>
-                  )}
-                  {!monedasConfig.VES && !monedasConfig.COP && (
-                    <div className="text-base text-slate-400">Solo USD (Base)</div>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
-                  <span>{monedasConfig.VES ? `Tasa Bs: ${tasaBCV.toFixed(2)}` : "Configuración de monedas"}</span>
-                  <button onClick={() => setModalEditarTasas(true)} className="text-purple-400 hover:text-purple-300 font-bold ml-2 underline cursor-pointer">
-                    <span className="inline-flex items-center gap-1"><IconSettings size={11} /> Monedas & Tasas</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Subsección: Tanque de Leche & Despacho a Cisterna */}
-            <div className="apple-glass rounded-3xl p-5 border border-sky-500/20 bg-sky-950/20 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <span className="text-sky-400"><IconMilk size={26} /></span>
-                <div>
-                  <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
-                    Tanque Frío: {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} L en Stock
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-white/50">
-                    Capacidad {(tanqueLeche?.capacidadLitros ?? 2000).toLocaleString()} L • Temperatura {tanqueLeche?.temperaturaCelsius ?? 4.0}°C
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setModalAjusteTanque(true)}
-                  className="px-3 py-1.5 rounded-xl apple-glass border border-white/15 text-slate-700 dark:text-white text-xs font-semibold cursor-pointer">
-                  <span className="inline-flex items-center gap-1.5"><IconSettings size={13} /> Calibrar</span> Tanque
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModalVentaLeche(true)}
-                  className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Despachar / Venta Cisterna</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Tabla de Registros de Ordeño */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">
-                  Registros de Ordeño por Vaca & Turno
-                </h4>
-                <span className="text-xs text-slate-400">{ordenos.length} registros</span>
-              </div>
-
-              <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
-                    <tr>
-                      <th className="p-4">Fecha</th>
-                      <th className="p-4">Arete / Animal</th>
-                      <th className="p-4">Turno</th>
-                      <th className="p-4">Destino</th>
-                      <th className="p-4">Litros</th>
-                      <th className="p-4">% Grasa / Prot.</th>
-                      <th className="p-4">Monto USD</th>
-                      {monedasConfig.VES && <th className="p-4 text-right">Monto Bs.</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                    {ordenos.map(o => (
-                      <tr key={o.id} className="hover:bg-white/5 transition-colors">
-                        <td className="p-4 font-mono">{o.fecha}</td>
-                        <td className="p-4 font-bold text-slate-900 dark:text-white">
-                          {o.animal?.arete} - {o.animal?.nombre || "Sin nombre"}
-                        </td>
-                        <td className="p-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            o.turno === "MANANA" ? "bg-amber-500/15 text-amber-500" : "bg-indigo-500/15 text-indigo-400"
-                          }`}>
-                            {o.turno}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            o.destino === "VENTA_DIRECTA"
-                              ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                              : "bg-sky-500/15 text-sky-400 border border-sky-500/30"
-                          }`}>
-                            {o.destino === "VENTA_DIRECTA" ? "Venta Directa" : "Tanque"}
-                          </span>
-                        </td>
-                        <td className="p-4 font-bold text-sky-500 text-sm">{o.cantidadLitros} L</td>
-                        <td className="p-4 text-slate-400">{o.porcentajeGrasa || 3.8}% / {o.porcentajeProteina || 3.2}%</td>
-                        <td className="p-4 font-bold text-emerald-500">${Number(o.montoVenta || 0).toFixed(2)}</td>
-                        {monedasConfig.VES && (
-                          <td className="p-4 text-right font-mono text-slate-500 dark:text-white/70">
-                            Bs. {(Number(o.montoVenta || 0) * tasaBCV).toFixed(2)}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Histórico de Ventas de Leche (Despachos de Tanque) */}
-            <div className="space-y-3 pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">
-                    Histórico de Despachos & Ventas de Leche en Tanque
-                  </h4>
-                  <p className="text-[11px] text-slate-400">Entregas de cisterna a receptoras, queseras o plantas industriales</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setModalVentaLeche(true)}
-                  className="text-xs font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer">
-                  + Registrar Despacho
-                </button>
-              </div>
-
-              {ventasLeche.length === 0 ? (
-                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 text-center text-xs text-slate-400">
-                  No hay ventas registradas aún. El stock del tanque se acumula de los ordeños diarios con destino "Tanque".
-                </div>
-              ) : (
-                <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
-                      <tr>
-                        <th className="p-4">Fecha</th>
-                        <th className="p-4">Comprador / Planta</th>
-                        <th className="p-4">Litros Vendidos</th>
-                        <th className="p-4">Precio x Litro</th>
-                        <th className="p-4">Total USD</th>
-                        <th className="p-4">Moneda Pago</th>
-                        <th className="p-4">Notas</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                      {ventasLeche.map(v => (
-                        <tr key={v.id} className="hover:bg-white/5 transition-colors">
-                          <td className="p-4 font-mono">{v.fecha}</td>
-                          <td className="p-4 font-bold text-slate-900 dark:text-white">{v.compradorOPlanta}</td>
-                          <td className="p-4 font-bold text-sky-400">{v.litrosVendidos} L</td>
-                          <td className="p-4 font-mono">${Number(v.precioLitroUSD).toFixed(4)}</td>
-                          <td className="p-4 font-bold text-emerald-400">${Number(v.totalUSD).toFixed(2)}</td>
-                          <td className="p-4">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/15">
-                              {v.monedaPago || "USD"}
-                            </span>
-                          </td>
-                          <td className="p-4 text-slate-400 italic max-w-xs truncate">{v.notas || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-          </div>
+          <SeccionProduccion
+            monedasConfig={monedasConfig}
+            ordenos={ordenos}
+            precioLecheUSD={precioLecheUSD}
+            tanqueLeche={tanqueLeche}
+            tasaBCV={tasaBCV}
+            tasaCOP={tasaCOP}
+            ventasLeche={ventasLeche}
+            abrirVaqueraRapida={abrirVaqueraRapida}
+            setModalAjusteTanque={setModalAjusteTanque}
+            setModalEditarPrecioLeche={setModalEditarPrecioLeche}
+            setModalEditarTasas={setModalEditarTasas}
+            setModalVentaLeche={setModalVentaLeche}
+            setOrdenoAbierto={setOrdenoAbierto}
+          />
         )}
 
         {/* ─────────────────────────────────────────────────────────────
@@ -2944,509 +2384,25 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         {/* ─────────────────────────────────────────────────────────────
             PESTAÑA 6: CENTRO DE REPORTES & FINANZAS DEL HATO
         ───────────────────────────────────────────────────────────── */}
-        {tab === "reportes" && (() => {
-          // Helper para calcular semana ISO (YYYY-Www)
-          const getISOWeekInfo = (dateStr: string) => {
-            if (!dateStr) return null;
-            const cleanDate = dateStr.slice(0, 10);
-            const d = new Date(cleanDate + "T12:00:00Z");
-            if (isNaN(d.getTime())) return null;
-
-            const day = d.getUTCDay() || 7;
-            d.setUTCDate(d.getUTCDate() + 4 - day);
-            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-            const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-            const year = d.getUTCFullYear();
-            const weekKey = `${year}-W${String(weekNo).padStart(2, "0")}`;
-
-            const orig = new Date(cleanDate + "T12:00:00Z");
-            const origDay = orig.getUTCDay() || 7;
-            const monday = new Date(orig);
-            monday.setUTCDate(orig.getUTCDate() - (origDay - 1));
-            const sunday = new Date(monday);
-            sunday.setUTCDate(monday.getUTCDate() + 6);
-
-            const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", timeZone: "UTC" };
-            const rangoTexto = `${monday.toLocaleDateString("es-ES", opts)} – ${sunday.toLocaleDateString("es-ES", opts)}`;
-
-            return { weekKey, year, weekNo, rangoTexto, mondayTime: monday.getTime() };
-          };
-
-          const hoyInfo = getISOWeekInfo(new Date().toISOString().slice(0, 10));
-          const semanaActualKey = hoyInfo?.weekKey ?? "2026-W37";
-
-          const listaGastos = gastos;
-
-          interface SemanaBucket {
-            weekKey: string;
-            rangoTexto: string;
-            mondayTime: number;
-            esSemanaActual: boolean;
-            ingresosLeche: number;
-            ingresosAnimales: number;
-            ingresosTotales: number;
-            gastosTotales: number;
-            neto: number;
-            gastosCount: number;
-          }
-
-          const weekMap = new Map<string, SemanaBucket>();
-
-          const getOrCreateBucket = (info: NonNullable<ReturnType<typeof getISOWeekInfo>>) => {
-            if (!weekMap.has(info.weekKey)) {
-              weekMap.set(info.weekKey, {
-                weekKey: info.weekKey,
-                rangoTexto: info.rangoTexto,
-                mondayTime: info.mondayTime,
-                esSemanaActual: info.weekKey === semanaActualKey,
-                ingresosLeche: 0,
-                ingresosAnimales: 0,
-                ingresosTotales: 0,
-                gastosTotales: 0,
-                neto: 0,
-                gastosCount: 0,
-              });
-            }
-            return weekMap.get(info.weekKey)!;
-          };
-
-          // Asegurar que la semana actual siempre esté inicializada
-          if (hoyInfo) {
-            getOrCreateBucket(hoyInfo);
-          }
-
-          // 1. Ingresos: Ventas de leche de tanque
-          for (const v of ventasLeche) {
-            const info = getISOWeekInfo(v.fecha);
-            if (!info) continue;
-            const b = getOrCreateBucket(info);
-            const monto = Number(v.totalUSD) || (Number(v.litrosVendidos || 0) * Number(v.precioLitroUSD || precioLecheUSD));
-            b.ingresosLeche += monto;
-            b.ingresosTotales += monto;
-          }
-
-          // 2. Ingresos: Ordeños con venta directa
-          for (const o of ordenos) {
-            if (o.destino === "VENTA_DIRECTA" || (Number(o.montoVenta) > 0 && o.destino !== "TANQUE")) {
-              const info = getISOWeekInfo(o.fecha);
-              if (!info) continue;
-              const b = getOrCreateBucket(info);
-              const monto = Number(o.montoVenta) || (Number(o.cantidadLitros || 0) * (Number(o.precioVentaLitro) || precioLecheUSD));
-              b.ingresosLeche += monto;
-              b.ingresosTotales += monto;
-            }
-          }
-
-          // 3. Ingresos: Ventas de Animales
-          for (const va of ventasAnimales) {
-            const info = getISOWeekInfo(va.fecha);
-            if (!info) continue;
-            const b = getOrCreateBucket(info);
-            const monto = Number(va.total) || 0;
-            b.ingresosAnimales += monto;
-            b.ingresosTotales += monto;
-          }
-
-          // 4. Gastos Operativos
-          for (const g of listaGastos) {
-            const info = getISOWeekInfo(g.fecha);
-            if (!info) continue;
-            const b = getOrCreateBucket(info);
-            const monto = Number(g.monto) || 0;
-            b.gastosTotales += monto;
-            b.gastosCount++;
-          }
-
-          // Calcular balances netos
-          for (const b of weekMap.values()) {
-            b.neto = b.ingresosTotales - b.gastosTotales;
-          }
-
-          // Orden cronológico descendente
-          const listaSemanas = Array.from(weekMap.values()).sort((a, b) => b.mondayTime - a.mondayTime);
-
-          const semActual = weekMap.get(semanaActualKey) || {
-            weekKey: semanaActualKey,
-            rangoTexto: hoyInfo?.rangoTexto ?? "Esta semana",
-            mondayTime: 0,
-            esSemanaActual: true,
-            ingresosLeche: 0,
-            ingresosAnimales: 0,
-            ingresosTotales: 0,
-            gastosTotales: 0,
-            neto: 0,
-            gastosCount: 0,
-          };
-
-          return (
-            <div className="space-y-7 text-left">
-              {/* Encabezado Principal de la Pestaña */}
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider mb-2">
-                    <span>Módulo Financiero & Operativo</span>
-                  </div>
-                  <h3 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 dark:text-white">
-                    Centro Financiero & Reportes
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-white/50 max-w-2xl">
-                    Flujo de caja semanal del hato (Semanas ISO), balance de ingresos por ventas de leche y ganado vs gastos operativos, y exportaciones oficiales.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2.5">
-                  <button
-                    onClick={() => setGastoAbierto(true)}
-                    className="btn-cyber-neon text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg hover:scale-105 transition-all cursor-pointer flex items-center gap-2"
-                  >
-                    <IconCoins size={15} />
-                    <span>+ Registrar Gasto</span>
-                  </button>
-                  <button
-                    onClick={exportarInventarioXLSX}
-                    className="apple-glass px-4 py-2.5 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 cursor-pointer flex items-center gap-1.5"
-                  >
-                    <IconChart size={15} />
-                    <span>Exportar XLSX</span>
-                  </button>
-                </div>
-              </div>
-
-              <ReportesCampoGanaderia vacunas={vacunas} notificar={notificar} />
-
-              {/* 3 Tarjetas de Resumen Financiero Semanal (Semana Actual) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Tarjeta 1: Ingresos de la Semana */}
-                <div className="apple-glass rounded-3xl p-6 border border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-slate-900/60 to-slate-900/80 text-left space-y-2 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <IconChart size={13} /> Ingresos Semanales
-                    </span>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      {semActual.weekKey}
-                    </span>
-                  </div>
-                  <div className="font-['Outfit'] font-black text-3xl text-emerald-400">
-                    ${semActual.ingresosTotales.toFixed(2)} <span className="text-sm font-normal text-slate-400">USD</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="inline-flex items-center gap-1"><IconMilk size={11} /> Leche: ${semActual.ingresosLeche.toFixed(2)}</span>
-                    <span>•</span>
-                    <span className="inline-flex items-center gap-1"><IconCow size={11} /> Ganado: ${semActual.ingresosAnimales.toFixed(2)}</span>
-                  </div>
-                  {(monedasConfig.VES || monedasConfig.COP) && (
-                    <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
-                      {monedasConfig.VES && (
-                        <div className="font-mono text-emerald-300">
-                          Bs. {(semActual.ingresosTotales * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                      )}
-                      {monedasConfig.COP && (
-                        <div className="font-mono text-sky-300">
-                          COP ${Math.round(semActual.ingresosTotales * tasaCOP).toLocaleString()}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Tarjeta 2: Gastos de la Semana */}
-                <div className="apple-glass rounded-3xl p-6 border border-rose-500/30 bg-gradient-to-br from-rose-950/20 via-slate-900/60 to-slate-900/80 text-left space-y-2 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <IconChart size={13} className="rotate-180" /> Gastos Semanales
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                      {semActual.gastosCount} registro(s)
-                    </span>
-                  </div>
-                  <div className="font-['Outfit'] font-black text-3xl text-rose-400">
-                    ${semActual.gastosTotales.toFixed(2)} <span className="text-sm font-normal text-slate-400">USD</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    Egresos de caja en insumos, mano de obra y mantenimiento
-                  </div>
-                  {(monedasConfig.VES || monedasConfig.COP) && (
-                    <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
-                      {monedasConfig.VES && (
-                        <div className="font-mono text-rose-300">
-                          Bs. {(semActual.gastosTotales * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                      )}
-                      {monedasConfig.COP && (
-                        <div className="font-mono text-sky-300">
-                          COP ${Math.round(semActual.gastosTotales * tasaCOP).toLocaleString()}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Tarjeta 3: Neto de la Semana */}
-                <div className={`apple-glass rounded-3xl p-6 border text-left space-y-2 shadow-lg ${
-                  semActual.neto >= 0
-                    ? "border-sky-500/30 bg-gradient-to-br from-sky-950/20 via-slate-900/60 to-slate-900/80"
-                    : "border-amber-500/30 bg-gradient-to-br from-amber-950/20 via-slate-900/60 to-slate-900/80"
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <IconScale size={13} /> Neto de la Semana
-                    </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      semActual.neto >= 0 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                    }`}>
-                      {semActual.neto >= 0 ? "Superávit" : "Déficit"}
-                    </span>
-                  </div>
-                  <div className={`font-['Outfit'] font-black text-3xl ${semActual.neto >= 0 ? "text-sky-400" : "text-amber-400"}`}>
-                    {semActual.neto >= 0 ? `+$${semActual.neto.toFixed(2)}` : `-$${Math.abs(semActual.neto).toFixed(2)}`} <span className="text-sm font-normal text-slate-400">USD</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    {semActual.rangoTexto}
-                  </div>
-                  {(monedasConfig.VES || monedasConfig.COP) && (
-                    <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
-                      {monedasConfig.VES && (
-                        <div className="font-mono text-slate-200">
-                          Bs. {(semActual.neto * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                      )}
-                      {monedasConfig.COP && (
-                        <div className="font-mono text-sky-300">
-                          COP ${Math.round(semActual.neto * tasaCOP).toLocaleString()}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Sección 1: Gastos Operativos Recientes */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                      <IconCoins size={15} /> Gastos Operativos Recientes
-                    </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-white/40">
-                      Registro de egresos por categoría (alimentación, sanidad, jornales, repuestos)
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setGastoAbierto(true)}
-                    className="text-xs font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
-                  >
-                    + Registrar Gasto
-                  </button>
-                </div>
-
-                {listaGastos.length === 0 ? (
-                  <div className="p-8 rounded-3xl border border-white/10 apple-glass text-center space-y-2">
-                    <span className="text-amber-400 flex justify-center"><IconFileText size={30} /></span>
-                    <h5 className="font-bold text-sm text-white">Sin gastos operativos registrados aún</h5>
-                    <p className="text-xs text-slate-400 max-w-md mx-auto">
-                      Esta finca no tiene salidas de caja registradas. Presiona el botón "+ Registrar Gasto" para registrar alimentación, sanidad, insumos o jornales.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
-                        <tr>
-                          <th className="p-4">Fecha</th>
-                          <th className="p-4">Categoría</th>
-                          <th className="p-4">Descripción</th>
-                          <th className="p-4">Monto USD</th>
-                          {monedasConfig.VES && <th className="p-4 text-right">Monto Bs.</th>}
-                          {monedasConfig.COP && <th className="p-4 text-right">Monto COP</th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                        {listaGastos.map(g => {
-                          const cat = CATEGORIAS_GASTO_GANADERIA.find(c => c.id === g.categoria);
-                          return (
-                            <tr key={g.id} className="hover:bg-white/5 transition-colors">
-                              <td className="p-4 font-mono">{g.fecha}</td>
-                              <td className="p-4">
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${cat?.colorBadge || "text-slate-300 bg-white/10 border-white/20"}`}>
-                                  {cat ? <cat.icon size={12} /> : <IconTag size={12} />}
-                                  <span>{cat ? cat.label.split("/")[0].trim() : g.categoria}</span>
-                                </span>
-                              </td>
-                              <td className="p-4 text-slate-800 dark:text-white/90 font-medium max-w-sm truncate">{g.descripcion}</td>
-                              <td className="p-4 font-mono font-bold text-rose-400">${Number(g.monto).toFixed(2)}</td>
-                              {monedasConfig.VES && (
-                                <td className="p-4 text-right font-mono text-slate-400">
-                                  Bs. {(Number(g.monto) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                              )}
-                              {monedasConfig.COP && (
-                                <td className="p-4 text-right font-mono text-sky-400/80">
-                                  COP ${Math.round(Number(g.monto) * tasaCOP).toLocaleString()}
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Sección 2: Flujo de Caja Semanal (Semanas ISO) */}
-              <div className="space-y-3 pt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                      <IconCalendar size={13} /> Flujo de Caja Semanal (Semanas ISO)
-                    </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-white/40">
-                      Balance neto: Ingresos (Leche en cisterna + ordeño + ganado) menos Gastos Operativos agrupados por semana ISO
-                    </p>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto rounded-3xl border border-slate-200/80 dark:border-white/10 apple-glass">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
-                      <tr>
-                        <th className="p-4">Semana ISO</th>
-                        <th className="p-4">Venta Leche</th>
-                        <th className="p-4">Venta Ganado</th>
-                        <th className="p-4">Total Ingresos</th>
-                        <th className="p-4">Gastos Operativos</th>
-                        <th className="p-4">Balance Neto</th>
-                        {(monedasConfig.VES || monedasConfig.COP) && <th className="p-4 text-right">Equivalente Local</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                      {listaSemanas.map(s => (
-                        <tr key={s.weekKey} className={`hover:bg-white/5 transition-colors ${s.esSemanaActual ? "bg-emerald-500/[0.04]" : ""}`}>
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-slate-900 dark:text-white">{s.weekKey}</span>
-                              {s.esSemanaActual && (
-                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                  Semana Actual
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-400 block">{s.rangoTexto}</span>
-                          </td>
-                          <td className="p-4 font-mono text-sky-400">${s.ingresosLeche.toFixed(2)}</td>
-                          <td className="p-4 font-mono text-emerald-400">${s.ingresosAnimales.toFixed(2)}</td>
-                          <td className="p-4 font-mono font-bold text-slate-900 dark:text-white">${s.ingresosTotales.toFixed(2)}</td>
-                          <td className="p-4 font-mono font-bold text-rose-400">${s.gastosTotales.toFixed(2)}</td>
-                          <td className="p-4">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-xl font-mono font-black text-xs ${
-                              s.neto >= 0
-                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                                : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                            }`}>
-                              {s.neto >= 0 ? `+$${s.neto.toFixed(2)}` : `-$${Math.abs(s.neto).toFixed(2)}`}
-                            </span>
-                          </td>
-                          {(monedasConfig.VES || monedasConfig.COP) && (
-                            <td className="p-4 text-right font-mono text-xs">
-                              {monedasConfig.VES && (
-                                <div className={s.neto >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                                  Bs. {(s.neto * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </div>
-                              )}
-                              {monedasConfig.COP && (
-                                <div className="text-[10px] text-slate-400">
-                                  COP ${Math.round(s.neto * tasaCOP).toLocaleString()}
-                                </div>
-                              )}
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Sección 3: Informes Oficiales & Exportaciones Consolidadas */}
-              <div className="space-y-3 pt-4">
-                <div>
-                  <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    <IconFileText size={13} /> Informes Consolidados & Exportaciones
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-white/40">
-                    Informes ejecutivos y de gestión técnica para auditoría, registros sanitarios y fiscales
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {/* Reportes de Gestión */}
-                  <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                    <h5 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
-                      Gestión del Hato
-                    </h5>
-                    <div className="space-y-2 text-xs">
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={exportarInventarioXLSX}>
-                        <span>Inventario de Animales</span>
-                        <span className="text-emerald-400 font-bold">XLSX</span>
-                      </div>
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando informe de movimientos de potrero...")}>
-                        <span>Historial de Movimientos</span>
-                        <span className="text-emerald-400 font-bold">PDF</span>
-                      </div>
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando distribución reproductiva...")}>
-                        <span>Reproductores & Vientres</span>
-                        <span className="text-emerald-400 font-bold">XLSX</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Reportes de Animales */}
-                  <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                    <h5 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
-                      Animales & Vientres
-                    </h5>
-                    <div className="space-y-2 text-xs">
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando vientres confirmados...")}>
-                        <span>Vientres Preñados</span>
-                        <span className="text-emerald-400 font-bold">Ver</span>
-                      </div>
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando hembras próximas a parir...")}>
-                        <span>Próximas a Parir (30d)</span>
-                        <span className="text-emerald-400 font-bold">Ver</span>
-                      </div>
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Cargando hembras en ordeño...")}>
-                        <span>Animales en Lactancia</span>
-                        <span className="text-emerald-400 font-bold">Ver</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Reportes de Potreros */}
-                  <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-                    <h5 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white pb-2 border-b border-white/10">
-                      Potreros & Pasturas
-                    </h5>
-                    <div className="space-y-2 text-xs">
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => { setTab("potreros"); setSubPotreros("lista"); }}>
-                        <span>Aforo General de Pastos</span>
-                        <span className="text-emerald-400 font-bold">Ver</span>
-                      </div>
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando registro de descansos...")}>
-                        <span>Días de Descanso Acumulados</span>
-                        <span className="text-emerald-400 font-bold">XLSX</span>
-                      </div>
-                      <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Calculando carga animal global...")}>
-                        <span>Carga Animal por Hectárea</span>
-                        <span className="text-emerald-400 font-bold">XLSX</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {tab === "reportes" && (
+          <SeccionFinanzas
+            gastos={gastos}
+            monedasConfig={monedasConfig}
+            notificar={notificar}
+            ordenos={ordenos}
+            potreros={potreros}
+            precioLecheUSD={precioLecheUSD}
+            tasaBCV={tasaBCV}
+            tasaCOP={tasaCOP}
+            vacunas={vacunas}
+            ventasAnimales={ventasAnimales}
+            ventasLeche={ventasLeche}
+            exportarInventarioXLSX={exportarInventarioXLSX}
+            setGastoAbierto={setGastoAbierto}
+            setSubPotreros={setSubPotreros}
+            setTab={setTab}
+          />
+        )}
 
         {tab === "engorde" && (
           <EngordeGanadero
