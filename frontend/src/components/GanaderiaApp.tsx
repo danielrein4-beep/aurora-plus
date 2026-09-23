@@ -19,6 +19,11 @@ import ModalAltaAnimal, { type FormAltaAnimal } from "./ganaderia/ModalAltaAnima
 import ModalEditarAnimal from "./ganaderia/ModalEditarAnimal";
 import ModalPesaje from "./ganaderia/ModalPesaje";
 import ModalFichaAnimal from "./ganaderia/ModalFichaAnimal";
+import ModalTasasMonedas from "./ganaderia/ModalTasasMonedas";
+import ModalPrecioLeche from "./ganaderia/ModalPrecioLeche";
+import ModalDatosFiscales from "./ganaderia/ModalDatosFiscales";
+import ModalDespachoLeche from "./ganaderia/ModalDespachoLeche";
+import ModalCalibrarTanque from "./ganaderia/ModalCalibrarTanque";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
@@ -195,32 +200,11 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     ]).catch((err: any) => notificar(`Las tasas quedaron en pantalla pero no se guardaron en el sistema: ${err?.message || "revise la conexión"}`));
   };
 
-  /** Garantiza que el backend tenga la tasa USD→moneda que el usuario ve en pantalla. */
-  const asegurarTasaEnBackend = async (moneda: "VES" | "COP") => {
-    try {
-      await tasaVigente(tenantId, "USD", moneda);
-    } catch {
-      const tasa = moneda === "VES" ? tasaBCV : tasaCOP;
-      if (tasa > 0) await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: moneda, tasa, origen: "PERSONALIZADA" });
-    }
-  };
-
   // Tanque de Leche & Ventas en Cisterna
   const [tanqueLeche, setTanqueLeche] = useState<TanqueLeche | null>(null);
   const [ventasLeche, setVentasLeche] = useState<VentaLecheTanque[]>([]);
   const [modalVentaLeche, setModalVentaLeche] = useState(false);
   const [modalAjusteTanque, setModalAjusteTanque] = useState(false);
-
-  const [formVentaLeche, setFormVentaLeche] = useState({
-    fecha: fechaLocalISO(),
-    litrosVendidos: 200,
-    precioLitroUSD: 0.55,
-    compradorOPlanta: "",
-    monedaPago: "USD",
-    // Lo cobrado en Bs/COP; vacío = el equivalente a la tasa configurada.
-    montoRecibido: "",
-    notas: "",
-  });
 
   // Gastos Operativos del Hato & Ventas de Animales
   const [gastos, setGastos] = useState<GastoGanaderia[]>([]);
@@ -283,8 +267,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [ventaAbierta, setVentaAbierta] = useState<ModoVenta | null>(null);
   const [modalEditarAnimal, setModalEditarAnimal] = useState<AnimalGanaderia | null>(null);
   const [modalDatosFiscales, setModalDatosFiscales] = useState(false);
-  const [formDatosFiscales, setFormDatosFiscales] = useState({ rif: "", razonSocial: "", domicilioFiscal: "" });
-  const [ultimoDespachoLecheId, setUltimoDespachoLecheId] = useState<number | null>(null);
 
 
   // Modo vaquera rápida (jornada de ordeño de todo el rebaño): ver ganaderia/ModalJornadaOrdeno
@@ -593,92 +575,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Ordeño individual guardado: a la lista y, si fue al tanque, al stock del tanque.
   const alRegistrarOrdeno = (nuevoReg: RegistroOrdenoGanaderia, litrosAlTanque: number) =>
     alGuardarJornada([nuevoReg], litrosAlTanque);
-
-  // Equivalente del despacho en la moneda de cobro, a la tasa configurada.
-  const equivalenteDespachoLeche = () => {
-    const totalUSD = formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD;
-    if (formVentaLeche.monedaPago === "VES") return Math.round(totalUSD * tasaBCV * 100) / 100;
-    if (formVentaLeche.monedaPago === "COP") return Math.round(totalUSD * tasaCOP);
-    return totalUSD;
-  };
-
-  // Manejador: Despacho / Venta de Leche desde el Tanque
-  const handleGuardarVentaLeche = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const litros = Number(formVentaLeche.litrosVendidos);
-    const precio = Number(formVentaLeche.precioLitroUSD);
-    const stockActual = Number(tanqueLeche?.stockActualLitros) || 0;
-
-    if (litros <= 0) {
-      notificar("La cantidad de litros a despachar debe ser mayor a cero.");
-      return;
-    }
-    if (litros > stockActual) {
-      notificar(`Stock insuficiente en el tanque (${stockActual.toFixed(1)} L disponibles). No se pueden despachar ${litros} L.`);
-      return;
-    }
-    if (!formVentaLeche.compradorOPlanta.trim()) {
-      notificar("Debe indicar el comprador o planta receptora.");
-      return;
-    }
-
-    // Cobrado en Bs o COP: el backend necesita lo que entró de verdad a caja.
-    let montoRecibido: number | undefined;
-    if (formVentaLeche.monedaPago !== "USD") {
-      montoRecibido = Number(String(formVentaLeche.montoRecibido).replace(",", ".")) || equivalenteDespachoLeche();
-      if (!montoRecibido || montoRecibido <= 0) {
-        notificar(`Indique el monto recibido en ${formVentaLeche.monedaPago}.`);
-        return;
-      }
-    }
-
-    try {
-      if (formVentaLeche.monedaPago === "VES" || formVentaLeche.monedaPago === "COP") {
-        await asegurarTasaEnBackend(formVentaLeche.monedaPago);
-      }
-      const res = await registrarDespachoLecheTanque(tenantId, {
-        fecha: formVentaLeche.fecha,
-        litrosVendidos: litros,
-        precioLitroUSD: precio,
-        compradorOPlanta: formVentaLeche.compradorOPlanta.trim(),
-        monedaPago: formVentaLeche.monedaPago,
-        montoRecibido,
-        notas: formVentaLeche.notas,
-      });
-
-      setTanqueLeche(res.tanque);
-      setVentasLeche(prev => [res.venta, ...prev]);
-      setUltimoDespachoLecheId(res.venta?.id ?? null);
-      notificar(`Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
-      setFormVentaLeche({
-        fecha: fechaLocalISO(),
-        litrosVendidos: Math.min(200, res.tanque.stockActualLitros),
-        precioLitroUSD: precioLecheUSD,
-        compradorOPlanta: "",
-        monedaPago: "USD",
-        montoRecibido: "",
-        notas: "",
-      });
-    } catch (err: any) {
-      notificar(`Error al despachar leche: ${err.message || "revisa la conexión"}`);
-    }
-  };
-
-  // Manejador: Ajuste / Calibración de Tanque
-  const handleAjustarTanque = async (capacidad: number, temp: number, stockAjuste: number) => {
-    try {
-      const res = await configurarTanqueLeche(tenantId, {
-        capacidadLitros: capacidad,
-        temperaturaCelsius: temp,
-        stockAjuste: stockAjuste,
-      });
-      setTanqueLeche(res);
-      setModalAjusteTanque(false);
-      notificar("Tanque de leche calibrado exitosamente.");
-    } catch {
-      notificar("No se pudo guardar la configuración del tanque.");
-    }
-  };
 
 
   // Sincronizacion de operaciones de campo realizadas offline (manga/potreros)
@@ -1015,12 +911,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           {/* Datos Fiscales (RIF / Razón Social / Domicilio) para notas de entrega */}
           <button
             type="button"
-            onClick={() => {
-              obtenerDatosFiscalesNegocio().then(d => setFormDatosFiscales({
-                rif: d.rif || "", razonSocial: d.razonSocial || "", domicilioFiscal: d.domicilioFiscal || "",
-              })).catch(() => {});
-              setModalDatosFiscales(true);
-            }}
+            onClick={() => setModalDatosFiscales(true)}
             title="Datos fiscales opcionales para tus notas de entrega (RIF, razón social, domicilio)"
             className="flex items-center gap-1.5 apple-glass-pill rounded-full px-3 py-1.5 border border-purple-400/30 text-[11px] hover:border-purple-400/60 hover:bg-purple-500/10 transition-all cursor-pointer group shadow-sm"
           >
@@ -1283,7 +1174,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
+                    onClick={() => setModalVentaLeche(true)}
                     className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
                     <span>Venta Cisterna / Planta</span>
                   </button>
@@ -2679,7 +2570,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <span className="text-[10px] text-slate-400">Registrar →</span>
                   </button>
                   <button
-                    onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
+                    onClick={() => setModalVentaLeche(true)}
                     className="w-full text-left p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-bold cursor-pointer flex items-center justify-between">
                     <span>• Venta Cisterna / Planta (Tanque)</span>
                     <span className="text-[10px] bg-sky-500/30 px-1.5 py-0.5 rounded text-sky-300">Despacho →</span>
@@ -2919,7 +2810,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
+                  onClick={() => setModalVentaLeche(true)}
                   className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer flex items-center gap-1.5">
                   <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Despachar / Venta Cisterna</span>
                 </button>
@@ -2998,7 +2889,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setUltimoDespachoLecheId(null); setModalVentaLeche(true); }}
+                  onClick={() => setModalVentaLeche(true)}
                   className="text-xs font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer">
                   + Registrar Despacho
                 </button>
@@ -3584,614 +3475,53 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
       {/* ── MODAL: ACTUALIZAR TASAS A MANO ── */}
       {modalEditarTasas && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-emerald-500/40 text-left space-y-5 shadow-2xl bg-slate-900/95 text-white">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <span className="text-emerald-400"><IconCoins size={20} /></span>
-                <div>
-                  <h3 className="font-['Outfit'] font-black text-lg text-white">
-                    Configuración de Monedas & Tasas
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Activa las monedas operativas de la finca y ajusta sus tasas</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalEditarTasas(false)}
-                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                const bcv = parseFloat(String(fd.get("tasaBcv") || String(tasaBCV)));
-                const cop = parseFloat(String(fd.get("tasaCop") || String(tasaCOP)));
-                const vesActivo = fd.get("vesActivo") === "on";
-                const copActivo = fd.get("copActivo") === "on";
-                guardarTasas(bcv > 0 ? bcv : tasaBCV, cop > 0 ? cop : tasaCOP, vesActivo, copActivo);
-              }}
-              className="space-y-4 text-xs"
-            >
-              {/* Selector de Monedas Activas */}
-              <div className="space-y-2 p-3 rounded-2xl bg-white/5 border border-white/10">
-                <label className="text-[11px] font-bold text-slate-300 block">
-                  Monedas Activas en esta Finca
-                </label>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-white/5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-emerald-400">USD ($)</span>
-                      <span className="text-[10px] text-slate-400">Dólar Estadounidense (Moneda Base)</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full">Fija</span>
-                  </div>
-
-                  <label className="flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-purple-400">VES (Bs.)</span>
-                      <span className="text-[10px] text-slate-400">Bolívares (Tasa Oficial / Mercado)</span>
-                    </div>
-                    <input
-                      name="vesActivo"
-                      type="checkbox"
-                      defaultChecked={monedasConfig.VES}
-                      className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-sky-400">COP ($)</span>
-                      <span className="text-[10px] text-slate-400">Pesos Colombianos (Frontera)</span>
-                    </div>
-                    <input
-                      name="copActivo"
-                      type="checkbox"
-                      defaultChecked={monedasConfig.COP}
-                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Inputs de Tasas */}
-              <div>
-                <label className="text-[11px] font-bold text-emerald-400 block mb-1">
-                  Tasa Bolívares (Bs. por 1 USD)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-xs">Bs.</span>
-                  <input
-                    name="tasaBcv"
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.01"
-                    min="0.01"
-                    defaultValue={tasaBCV}
-                    required
-                    className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none"
-                    placeholder="43.50"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">Usada para liquidar el ordeño y compras de ganado en moneda local.</p>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-sky-400 block mb-1">
-                  Tasa Pesos Colombianos (COP por 1 USD)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-xs">COP $</span>
-                  <input
-                    name="tasaCop"
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="1"
-                    min="1"
-                    defaultValue={tasaCOP}
-                    required
-                    className="w-full pl-14 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
-                    placeholder="4150"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">Referencia fronteriza para transacciones y compras en efectivo.</p>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setModalEditarTasas(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer">
-                  Guardar Configuración
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModalTasasMonedas
+          tasaBCV={tasaBCV}
+          tasaCOP={tasaCOP}
+          monedasConfig={monedasConfig}
+          onGuardar={guardarTasas}
+          onCerrar={() => setModalEditarTasas(false)}
+        />
       )}
 
       {/* MODAL: DATOS FISCALES OPCIONALES (RIF, RAZÓN SOCIAL, DOMICILIO) */}
       {modalDatosFiscales && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-purple-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <IconFileText size={22} className="text-purple-400" />
-                <div>
-                  <h3 className="font-['Outfit'] font-black text-lg text-white">
-                    Datos Fiscales (Opcional)
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Se estampan en tus notas de entrega de ventas y despachos de leche</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalDatosFiscales(false)}
-                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  await actualizarDatosFiscalesNegocio(formDatosFiscales);
-                  notificar("Datos fiscales actualizados.");
-                  setModalDatosFiscales(false);
-                } catch {
-                  notificar("No se pudieron guardar los datos fiscales — revisa tu conexión.");
-                }
-              }}
-              className="space-y-3.5 text-xs"
-            >
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Razón Social / Nombre del Negocio</label>
-                <input
-                  type="text"
-                  value={formDatosFiscales.razonSocial}
-                  onChange={e => setFormDatosFiscales({ ...formDatosFiscales, razonSocial: e.target.value })}
-                  placeholder="Ej. Agropecuaria El Roble, C.A."
-                  className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white focus:border-purple-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">RIF</label>
-                <input
-                  type="text"
-                  value={formDatosFiscales.rif}
-                  onChange={e => setFormDatosFiscales({ ...formDatosFiscales, rif: e.target.value })}
-                  placeholder="Ej. J-12345678-9"
-                  className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono focus:border-purple-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Domicilio Fiscal</label>
-                <textarea
-                  rows={2}
-                  value={formDatosFiscales.domicilioFiscal}
-                  onChange={e => setFormDatosFiscales({ ...formDatosFiscales, domicilioFiscal: e.target.value })}
-                  placeholder="Dirección de la finca o del negocio"
-                  className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white focus:border-purple-500 focus:outline-none"
-                />
-              </div>
-              <p className="text-[10px] text-slate-400">
-                Ninguno de estos datos es obligatorio — las notas de entrega se generan igual sin ellos, solo sin esa línea.
-              </p>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setModalDatosFiscales(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-cyber-neon text-white font-bold px-6 py-2.5 rounded-xl cursor-pointer">
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModalDatosFiscales notificar={notificar} onCerrar={() => setModalDatosFiscales(false)} />
       )}
 
       {/* MODAL: EDITAR PRECIO DE LA LECHE CENTRALIZADO */}
       {modalEditarPrecioLeche && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-sm w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <span className="text-sky-400"><IconMilk size={26} /></span>
-                <div>
-                  <h3 className="font-['Outfit'] font-black text-lg text-white">
-                    Precio Base de la Leche
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Valor de referencia por litro en USD</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalEditarPrecioLeche(false)}
-                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                const precio = parseFloat(String(fd.get("precioLeche") || "0"));
-                if (precio > 0) {
-                  guardarPrecioLeche(precio);
-                }
-              }}
-              className="space-y-4 text-xs"
-            >
-              <div>
-                <label className="text-[11px] font-bold text-sky-400 block mb-1">
-                  Precio por Litro (USD $)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-sm">$</span>
-                  <input
-                    name="precioLeche"
-                    type="number"
-                    onFocus={e => e.target.select()}
-                    step="0.01"
-                    min="0.01"
-                    defaultValue={precioLecheUSD}
-                    required
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-base font-bold focus:border-sky-500 focus:outline-none"
-                    placeholder="0.55"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1.5">
-                  Este precio se sincroniza automáticamente en la sala de ordeño, Modo Vaquera Rápida y los despachos de tanque.
-                </p>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setModalEditarPrecioLeche(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer">
-                  Guardar Precio
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModalPrecioLeche
+          precioLecheUSD={precioLecheUSD}
+          onGuardar={guardarPrecioLeche}
+          onCerrar={() => setModalEditarPrecioLeche(false)}
+        />
       )}
 
       {/* MODAL: VENTA DE LECHE EN TANQUE (CISTERNA / PLANTA) */}
       {modalVentaLeche && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
-          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white font-['Inter']">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <span className="text-sky-400"><IconTruck size={22} /></span>
-                <div>
-                  <h3 className="font-['Outfit'] font-black text-lg text-white">
-                    Despacho de Leche en Tanque
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Venta de cisterna a receptoría, planta pasteurizadora o quesera
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setModalVentaLeche(false); setUltimoDespachoLecheId(null); }}
-                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            {ultimoDespachoLecheId ? (
-              <div className="space-y-4 text-xs text-center py-4">
-                <div className="text-emerald-400 flex flex-col items-center gap-2">
-                  <IconCheckCircle size={36} />
-                  <span className="font-bold text-sm text-white">Despacho registrado correctamente</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const blob = await descargarNotaEntregaDespachoLechePdf(tenantId, ultimoDespachoLecheId);
-                      const url = URL.createObjectURL(blob);
-                      window.open(url, "_blank");
-                      setTimeout(() => URL.revokeObjectURL(url), 30000);
-                    } catch (e) {
-                      notificar("No se pudo descargar la nota de entrega");
-                    }
-                  }}
-                  className="btn-cyber-neon text-white font-bold px-5 py-2.5 rounded-xl cursor-pointer inline-flex items-center gap-2">
-                  <IconDownload size={14} />
-                  Descargar Nota de Entrega (PDF)
-                </button>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => { setModalVentaLeche(false); setUltimoDespachoLecheId(null); }}
-                    className="text-slate-400 hover:text-white text-[11px] underline cursor-pointer">
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            ) : (
-            <>
-            {/* Alerta de Stock Actual Disponible en Tanque */}
-            <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-bold text-sky-400">Stock Actual en Tanque</span>
-                <div className="font-mono font-black text-xl text-white">
-                  {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} <span className="text-xs text-slate-400">L disponibles</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormVentaLeche({ ...formVentaLeche, litrosVendidos: Number(tanqueLeche?.stockActualLitros) || 0 })}
-                className="px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[11px] font-bold border border-sky-500/30 transition-all cursor-pointer">
-                Despachar Todo
-              </button>
-            </div>
-
-            <form onSubmit={handleGuardarVentaLeche} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Fecha de Despacho *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formVentaLeche.fecha}
-                    onChange={e => setFormVentaLeche({ ...formVentaLeche, fecha: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-xs focus:border-sky-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Litros a Despachar *</label>
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    max={Number(tanqueLeche?.stockActualLitros) || 999999}
-                    required
-                    value={formVentaLeche.litrosVendidos || ""}
-                    onChange={e => setFormVentaLeche({ ...formVentaLeche, litrosVendidos: Number(e.target.value) })}
-                    onFocus={e => e.target.select()}
-                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-sky-400 font-mono font-bold text-sm focus:border-sky-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Comprador / Planta Receptora *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: Planta Lácteos San Simón, Camión Cisterna #04, Quesera Don Luis"
-                  value={formVentaLeche.compradorOPlanta}
-                  onChange={e => setFormVentaLeche({ ...formVentaLeche, compradorOPlanta: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-sky-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Precio x Litro (USD) *</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-emerald-400 font-bold">$</span>
-                    <input
-                      type="number"
-                      onFocus={e => e.target.select()}
-                      step="0.0001"
-                      min="0.0001"
-                      required
-                      value={formVentaLeche.precioLitroUSD}
-                      onChange={e => setFormVentaLeche({ ...formVentaLeche, precioLitroUSD: Number(e.target.value) })}
-                      className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-800 border border-white/15 text-emerald-400 font-mono font-bold text-xs focus:border-emerald-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Moneda de Pago</label>
-                  <select
-                    value={formVentaLeche.monedaPago}
-                    onChange={e => setFormVentaLeche({ ...formVentaLeche, monedaPago: e.target.value, montoRecibido: "" })}
-                    className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-sky-500 focus:outline-none">
-                    <option value="USD">USD ($ Dólares)</option>
-                    {monedasConfig.VES && <option value="VES">VES (Bs. Bolívares)</option>}
-                    {monedasConfig.COP && <option value="COP">COP ($ Pesos Colombianos)</option>}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium text-slate-400 block mb-1">Notas / Guía de Movilización (Opcional)</label>
-                <input
-                  type="text"
-                  placeholder="Número de guía INSAI / chofer / precinto de cisterna..."
-                  value={formVentaLeche.notas}
-                  onChange={e => setFormVentaLeche({ ...formVentaLeche, notas: e.target.value })}
-                  className="w-full p-2 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-sky-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Liquidación Total en Tiempo Real */}
-              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 font-medium text-xs">Total Facturado (USD):</span>
-                  <span className="font-mono font-black text-xl text-emerald-400">
-                    ${(formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD).toFixed(2)} USD
-                  </span>
-                </div>
-                {monedasConfig.VES && formVentaLeche.monedaPago === "VES" && (
-                  <div className="flex items-center justify-between text-[11px] text-emerald-300">
-                    <span>Equivalente en Bolívares:</span>
-                    <span className="font-mono font-bold">
-                      Bs. {((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {monedasConfig.COP && formVentaLeche.monedaPago === "COP" && (
-                  <div className="flex items-center justify-between text-[11px] text-sky-300">
-                    <span>Equivalente en Pesos:</span>
-                    <span className="font-mono font-bold">
-                      COP ${Math.round((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaCOP).toLocaleString()}
-                    </span>
-                  </div>
-                )}
-                {formVentaLeche.monedaPago !== "USD" && (
-                  <div className="pt-2 mt-1 border-t border-emerald-500/20 space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/50 block">
-                      Monto recibido en {formVentaLeche.monedaPago === "VES" ? "Bolívares" : "Pesos"} *
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={formVentaLeche.montoRecibido}
-                      placeholder={equivalenteDespachoLeche().toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                      onChange={e => setFormVentaLeche({ ...formVentaLeche, montoRecibido: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-white/5 border border-slate-300/80 dark:border-white/15 text-sm font-mono text-slate-900 dark:text-white"
-                    />
-                    <span className="text-[10px] text-slate-500 dark:text-white/40">
-                      Vacío = equivalente a la tasa configurada. Escriba lo que pagó la planta si fue otra tasa.
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setModalVentaLeche(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl btn-cyber-neon text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Confirmar Despacho & Descontar Stock</span>
-                </button>
-              </div>
-            </form>
-            </>
-            )}
-          </div>
-        </div>
+        <ModalDespachoLeche
+          tanqueLeche={tanqueLeche}
+          precioLecheUSD={precioLecheUSD}
+          tasaBCV={tasaBCV}
+          tasaCOP={tasaCOP}
+          monedasConfig={monedasConfig}
+          tenantId={tenantId}
+          notificar={notificar}
+          onDespachado={(tanque, venta) => { setTanqueLeche(tanque); setVentasLeche(prev => [venta, ...prev]); }}
+          onCerrar={() => setModalVentaLeche(false)}
+        />
       )}
 
       {/* MODAL: CALIBRACIÓN Y AJUSTE DE TANQUE DE LECHE */}
       {modalAjusteTanque && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="apple-glass modal-siempre-oscuro rounded-3xl p-6 sm:p-7 max-w-md w-full border border-sky-500/40 text-left space-y-4 shadow-2xl bg-slate-900/95 text-white font-['Inter']">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <span className="text-sky-400"><IconSettings size={20} /></span>
-                <div>
-                  <h3 className="font-['Outfit'] font-black text-lg text-white">
-                    Calibrar Tanque de Leche
-                  </h3>
-                  <p className="text-[11px] text-slate-400">Ajuste técnico de capacidad y vara medidora</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalAjusteTanque(false)}
-                className="text-slate-400 hover:text-white text-lg p-1 cursor-pointer">
-                ✕
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                const cap = parseFloat(String(fd.get("capacidad") || "2000"));
-                const temp = parseFloat(String(fd.get("temperatura") || "4.0"));
-                const stock = parseFloat(String(fd.get("stock") || "0"));
-                handleAjustarTanque(cap, temp, stock);
-              }}
-              className="space-y-3.5 text-xs"
-            >
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Capacidad Total del Tanque (Litros)</label>
-                <input
-                  name="capacidad"
-                  type="number"
-                  onFocus={e => e.target.select()}
-                  step="50"
-                  min="100"
-                  defaultValue={tanqueLeche?.capacidadLitros ?? 2000}
-                  required
-                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Temperatura de Enfriamiento (°C)</label>
-                <input
-                  name="temperatura"
-                  type="number"
-                  onFocus={e => e.target.select()}
-                  step="0.1"
-                  defaultValue={tanqueLeche?.temperaturaCelsius ?? 4.0}
-                  required
-                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-sky-400 block mb-1">Stock Actual Calibrado (Litros)</label>
-                <input
-                  name="stock"
-                  type="number"
-                  onFocus={e => e.target.select()}
-                  step="0.5"
-                  min="0"
-                  defaultValue={tanqueLeche?.stockActualLitros ?? 0}
-                  required
-                  className="w-full p-2.5 rounded-xl bg-slate-800 border border-sky-500/40 text-sky-300 font-mono text-sm font-bold focus:border-sky-400 focus:outline-none"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">Útil tras aforar la regla o realizar limpieza técnica del tanque.</p>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setModalAjusteTanque(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg transition-all cursor-pointer">
-                  Guardar Calibración
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModalCalibrarTanque
+          tanqueLeche={tanqueLeche}
+          tenantId={tenantId}
+          notificar={notificar}
+          onAjustado={setTanqueLeche}
+          onCerrar={() => setModalAjusteTanque(false)}
+        />
       )}
 
       {/* ─────────────────────────────────────────────────────────────
