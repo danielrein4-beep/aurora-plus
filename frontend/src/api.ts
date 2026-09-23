@@ -3758,6 +3758,8 @@ export function registrarDespachoLecheTanque(tenantId: number, datos: {
   precioLitroUSD: number;
   compradorOPlanta: string;
   monedaPago?: string;
+  /** Monto efectivamente cobrado en monedaPago (obligatorio si no es USD). */
+  montoRecibido?: number;
   notas?: string;
 }): Promise<{ tanque: TanqueLeche; venta: VentaLecheTanque; mensaje: string }> {
   return request(`/api/ganaderia/ordeno/tanque/despacho?tenantId=${tenantId}`, {

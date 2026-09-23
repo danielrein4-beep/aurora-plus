@@ -47,6 +47,7 @@ import {
   type TanqueLeche, type VentaLecheTanque,
   type GastoGanaderia, type VentaGanaderiaResumen,
   listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
+  tasaVigente, actualizarTasa,
 } from "../api";
 
 interface Props {
@@ -215,6 +216,22 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       localStorage.setItem("aurora_ganaderia_tasa_cop", String(nuevaCop));
     } catch {}
     setModalEditarTasas(false);
+    // El motor financiero (caja, despachos, ventas) usa las tasas del backend:
+    // sin esto Ganadería mostraba una tasa y el backend rechazaba toda venta en Bs/COP.
+    Promise.all([
+      nuevaBcv > 0 ? actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "VES", tasa: nuevaBcv, origen: "PERSONALIZADA" }) : null,
+      nuevaCop > 0 ? actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: "COP", tasa: nuevaCop, origen: "PERSONALIZADA" }) : null,
+    ]).catch((err: any) => notificar(`Las tasas quedaron en pantalla pero no se guardaron en el sistema: ${err?.message || "revise la conexión"}`));
+  };
+
+  /** Garantiza que el backend tenga la tasa USD→moneda que el usuario ve en pantalla. */
+  const asegurarTasaEnBackend = async (moneda: "VES" | "COP") => {
+    try {
+      await tasaVigente(tenantId, "USD", moneda);
+    } catch {
+      const tasa = moneda === "VES" ? tasaBCV : tasaCOP;
+      if (tasa > 0) await actualizarTasa(tenantId, { monedaOrigen: "USD", monedaDestino: moneda, tasa, origen: "PERSONALIZADA" });
+    }
   };
 
   // Tanque de Leche & Ventas en Cisterna
@@ -225,11 +242,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [vaqueraDestino, setVaqueraDestino] = useState<"TANQUE" | "VENTA_DIRECTA">("TANQUE");
 
   const [formVentaLeche, setFormVentaLeche] = useState({
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: fechaLocalISO(),
     litrosVendidos: 200,
     precioLitroUSD: 0.55,
     compradorOPlanta: "",
     monedaPago: "USD",
+    // Lo cobrado en Bs/COP; vacío = el equivalente a la tasa configurada.
+    montoRecibido: "",
     notas: "",
   });
 
@@ -576,6 +595,11 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       if (resPrenez.status === "fulfilled") {
         setPrenezActual(resPrenez.value ?? []);
       }
+
+      // Tasas: la vigente del backend es la que usa caja; si existe, es la que se muestra.
+      const [tVes, tCop] = await Promise.allSettled([tasaVigente(tenantId, "USD", "VES"), tasaVigente(tenantId, "USD", "COP")]);
+      if (tVes.status === "fulfilled" && Number(tVes.value?.tasa) > 0) setTasaBCV(Number(tVes.value.tasa));
+      if (tCop.status === "fulfilled" && Number(tCop.value?.tasa) > 0) setTasaCOP(Number(tCop.value.tasa));
 
       if (resAnimales.status === "fulfilled") {
         setAnimales(resAnimales.value ?? []);
@@ -1232,6 +1256,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     setModalOrdeno(false);
   };
 
+  // Equivalente del despacho en la moneda de cobro, a la tasa configurada.
+  const equivalenteDespachoLeche = () => {
+    const totalUSD = formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD;
+    if (formVentaLeche.monedaPago === "VES") return Math.round(totalUSD * tasaBCV * 100) / 100;
+    if (formVentaLeche.monedaPago === "COP") return Math.round(totalUSD * tasaCOP);
+    return totalUSD;
+  };
+
   // Manejador: Despacho / Venta de Leche desde el Tanque
   const handleGuardarVentaLeche = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1252,13 +1284,27 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       return;
     }
 
+    // Cobrado en Bs o COP: el backend necesita lo que entró de verdad a caja.
+    let montoRecibido: number | undefined;
+    if (formVentaLeche.monedaPago !== "USD") {
+      montoRecibido = Number(String(formVentaLeche.montoRecibido).replace(",", ".")) || equivalenteDespachoLeche();
+      if (!montoRecibido || montoRecibido <= 0) {
+        notificar(`Indique el monto recibido en ${formVentaLeche.monedaPago}.`);
+        return;
+      }
+    }
+
     try {
+      if (formVentaLeche.monedaPago === "VES" || formVentaLeche.monedaPago === "COP") {
+        await asegurarTasaEnBackend(formVentaLeche.monedaPago);
+      }
       const res = await registrarDespachoLecheTanque(tenantId, {
         fecha: formVentaLeche.fecha,
         litrosVendidos: litros,
         precioLitroUSD: precio,
         compradorOPlanta: formVentaLeche.compradorOPlanta.trim(),
         monedaPago: formVentaLeche.monedaPago,
+        montoRecibido,
         notas: formVentaLeche.notas,
       });
 
@@ -1267,11 +1313,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       setUltimoDespachoLecheId(res.venta?.id ?? null);
       notificar(`Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
       setFormVentaLeche({
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: fechaLocalISO(),
         litrosVendidos: Math.min(200, res.tanque.stockActualLitros),
         precioLitroUSD: precioLecheUSD,
         compradorOPlanta: "",
         monedaPago: "USD",
+        montoRecibido: "",
         notas: "",
       });
     } catch (err: any) {
@@ -1594,7 +1641,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
       {/* Notificación Flotante */}
       {notificacion && (
-        <div className="fixed top-5 right-5 z-[2000] apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
+        <div className="fixed top-5 right-5 z-[2100] apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
           <IconCheckCircle size={18} />
           <span>{notificacion}</span>
         </div>
@@ -4764,7 +4811,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                   <label className="text-[11px] font-bold text-slate-300 block mb-1">Moneda de Pago</label>
                   <select
                     value={formVentaLeche.monedaPago}
-                    onChange={e => setFormVentaLeche({ ...formVentaLeche, monedaPago: e.target.value })}
+                    onChange={e => setFormVentaLeche({ ...formVentaLeche, monedaPago: e.target.value, montoRecibido: "" })}
                     className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-sky-500 focus:outline-none">
                     <option value="USD">USD ($ Dólares)</option>
                     {monedasConfig.VES && <option value="VES">VES (Bs. Bolívares)</option>}
@@ -4805,6 +4852,25 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                     <span>Equivalente en Pesos:</span>
                     <span className="font-mono font-bold">
                       COP ${Math.round((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaCOP).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                {formVentaLeche.monedaPago !== "USD" && (
+                  <div className="pt-2 mt-1 border-t border-emerald-500/20 space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/50 block">
+                      Monto recibido en {formVentaLeche.monedaPago === "VES" ? "Bolívares" : "Pesos"} *
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formVentaLeche.montoRecibido}
+                      placeholder={equivalenteDespachoLeche().toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      onChange={e => setFormVentaLeche({ ...formVentaLeche, montoRecibido: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-white/5 border border-slate-300/80 dark:border-white/15 text-sm font-mono text-slate-900 dark:text-white"
+                    />
+                    <span className="text-[10px] text-slate-500 dark:text-white/40">
+                      Vacío = equivalente a la tasa configurada. Escriba lo que pagó la planta si fue otra tasa.
                     </span>
                   </div>
                 )}
