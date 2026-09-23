@@ -2905,14 +2905,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 <div className="space-y-6">
                 {/* Selector rápido de Arete */}
                 <div className="p-4 rounded-3xl apple-glass border border-white/10 space-y-3">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 min-w-0">
                     <label className="text-xs font-bold text-slate-700 dark:text-white/70">
                       Seleccionar Animal por Arete para ver Ficha Completa:
                     </label>
                     <select
                       value={animalFichaId || ""}
                       onChange={(e) => setAnimalFichaId(Number(e.target.value))}
-                      className="px-4 py-2 rounded-xl bg-slate-800 border border-white/15 text-white font-mono font-bold text-xs cursor-pointer focus:border-emerald-500"
+                      className="w-full sm:w-auto max-w-full min-w-0 truncate px-4 py-2 rounded-xl bg-slate-800 border border-white/15 text-white font-mono font-bold text-xs cursor-pointer focus:border-emerald-500"
                     >
                       {animales.map((a) => (
                         <option key={a.id} value={a.id}>
