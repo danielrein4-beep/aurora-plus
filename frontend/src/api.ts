@@ -3798,6 +3798,40 @@ export function obtenerCurvaPesoGanaderia(animalId: number): Promise<RegistroPes
   return request(`/api/ganaderia/pesos/animal/${animalId}`);
 }
 
+/** Fila del resumen de engorde: GDP total y del último tramo; null cuando no hay pesajes suficientes. */
+export interface FilaEngordeGanaderia {
+  animalId: number;
+  arete: string;
+  nombre: string | null;
+  tipoAnimal: string | null;
+  raza: string | null;
+  sexo: string | null;
+  lote: string | null;
+  potreroId: number | null;
+  potrero: string | null;
+  cantidadPesajes: number;
+  pesoInicial: number | null;
+  fechaInicial: string | null;
+  pesoUltimo: number | null;
+  fechaUltimo: string | null;
+  dias: number | null;
+  gananciaTotalKg: number | null;
+  gdpKgDia: number | null;
+  gdpUltimoPeriodoKgDia: number | null;
+}
+
+export function resumenEngordeGanaderia(): Promise<FilaEngordeGanaderia[]> {
+  return request(`/api/ganaderia/pesos/resumen-engorde`);
+}
+
+export function editarPesoGanaderia(id: number, datos: { pesoKg?: number; fecha?: string }): Promise<RegistroPesoGanaderia> {
+  return request(`/api/ganaderia/pesos/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function eliminarPesoGanaderia(id: number): Promise<void> {
+  return request(`/api/ganaderia/pesos/${id}`, { method: "DELETE" });
+}
+
 export function obtenerGdpGanaderia(animalId: number): Promise<GdpGanaderiaResponse> {
   return request(`/api/ganaderia/pesos/animal/${animalId}/gdp`);
 }

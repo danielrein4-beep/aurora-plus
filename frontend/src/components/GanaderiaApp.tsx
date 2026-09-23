@@ -2,6 +2,7 @@ import BitacoraAuditoria from "./BitacoraAuditoria";
 import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
 import ModalImportarHato from "./ModalImportarHato";
 import TenantSoporteWidget from "./TenantSoporteWidget";
+import EngordeGanadero from "./EngordeGanadero";
 import ReportesCampoGanaderia, { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
 import {
   encolarAccionGanaderia,
@@ -265,7 +266,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
 
   // Pestaña principal activa
-  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
+  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "engorde" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
   const [aperturaSoporte, setAperturaSoporte] = useState(0);
 
@@ -926,14 +927,17 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
     try {
       // 1. Si se registró nuevo peso en báscula antes del despacho (solo modo individual), actualizar peso del animal
-      if (ventaModo === "INDIVIDUAL" && formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0) {
-        await actualizarAnimalGanaderia(formVenta.animalId, { pesoActual: Number(formVenta.pesoSalida) });
+      // El peso de báscula al vender se guarda como pesaje: cierra la curva de engorde del animal.
+      const fechaVenta = fechaLocalISO();
+      if (ventaModo === "INDIVIDUAL" && formVenta.pesoSalida && Number(formVenta.pesoSalida) > 0
+          && Number(formVenta.pesoSalida) !== animales.find(a => a.id === formVenta.animalId)?.pesoActual) {
+        await registrarPesoGanaderia(tenantId, formVenta.animalId, Number(formVenta.pesoSalida), fechaVenta);
       }
       if (ventaModo === "MULTIPLE") {
         for (const id of idsVenta) {
           const peso = pesoVentaDe(id);
           if (peso > 0 && peso !== animales.find(a => a.id === id)?.pesoActual) {
-            await actualizarAnimalGanaderia(id, { pesoActual: peso });
+            await registrarPesoGanaderia(tenantId, id, peso, fechaVenta);
           }
         }
       }
@@ -1729,6 +1733,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 { id: "resumen" as const, Icon: IconDashboardGrid, etiqueta: "Panel General", badge: 0 },
                 { id: "inventario" as const, Icon: IconCow, etiqueta: "Hato & Inventario", badge: 0 },
                 { id: "potreros" as const, Icon: IconPin, etiqueta: "Potreros", badge: 0 },
+                { id: "engorde" as const, Icon: IconScale, etiqueta: "Engorde (GDP)", badge: 0 },
                 { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción & Pesajes", badge: 0 },
               ],
             },
@@ -3216,7 +3221,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                           <div className="p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-between">
                             <span className="text-xs text-sky-300 font-medium">Ganancia Diaria (GDP):</span>
                             <span className="font-mono font-black text-sm text-white">
-                              {fichaGdp?.gdpKgDia ? `+${fichaGdp.gdpKgDia.toFixed(2)} kg/día` : "+0.68 kg/día"}
+                              {fichaGdp?.gdpKgDia != null ? `${fichaGdp.gdpKgDia >= 0 ? "+" : ""}${Number(fichaGdp.gdpKgDia).toFixed(2)} kg/día` : "Faltan pesajes"}
                             </span>
                           </div>
 
@@ -4481,6 +4486,15 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             </div>
           );
         })()}
+
+        {tab === "engorde" && (
+          <EngordeGanadero
+            tenantId={tenantId}
+            puedeCorregir={puedeImportarHato}
+            notificar={notificar}
+            onCambio={cargarDatos}
+          />
+        )}
 
         {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (
           <BitacoraAuditoria moduloSugerido="GANADERIA" />
