@@ -11,7 +11,7 @@ export const EstadoNominaBadge: React.FC<EstadoNominaBadgeProps> = ({ estado, cl
     case 'BORRADOR':
       return (
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#1e293b] text-[#94a3b8] border border-[#334155] ${className}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-300 ${className}`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#94a3b8]" />
           Borrador
@@ -20,7 +20,7 @@ export const EstadoNominaBadge: React.FC<EstadoNominaBadgeProps> = ({ estado, cl
     case 'EN_REVISION':
       return (
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#f59e0b]/15 text-[#fbbf24] border border-[#f59e0b]/30 ${className}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#f59e0b]/15 text-amber-600 border border-[#f59e0b]/30 ${className}`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#fbbf24] animate-pulse" />
           En Revisión
@@ -29,7 +29,7 @@ export const EstadoNominaBadge: React.FC<EstadoNominaBadgeProps> = ({ estado, cl
     case 'APROBADA':
       return (
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#10b981]/15 text-[#34d399] border border-[#10b981]/30 ${className}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#10b981]/15 text-emerald-600 border border-[#10b981]/30 ${className}`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#34d399]" />
           Aprobada (Inmutable)
@@ -38,7 +38,7 @@ export const EstadoNominaBadge: React.FC<EstadoNominaBadgeProps> = ({ estado, cl
     case 'AJUSTADA':
       return (
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#38bdf8]/15 text-[#38bdf8] border border-[#38bdf8]/30 ${className}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#38bdf8]/15 text-sky-600 border border-[#38bdf8]/30 ${className}`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
           Ajustada
@@ -47,7 +47,7 @@ export const EstadoNominaBadge: React.FC<EstadoNominaBadgeProps> = ({ estado, cl
     case 'REVERSADA':
       return (
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#ef4444]/15 text-[#f87171] border border-[#ef4444]/30 ${className}`}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#ef4444]/15 text-rose-600 border border-[#ef4444]/30 ${className}`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
           Reversada
@@ -55,7 +55,7 @@ export const EstadoNominaBadge: React.FC<EstadoNominaBadgeProps> = ({ estado, cl
       );
     default:
       return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs bg-[#1e293b] text-[#cbd5e1] ${className}`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700 ${className}`}>
           {estado}
         </span>
       );

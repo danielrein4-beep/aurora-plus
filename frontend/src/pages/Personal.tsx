@@ -245,26 +245,26 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
   const todosRecibos = periodosNomina.flatMap((p) => p.recibos);
 
   return (
-    <div className={`${embedded ? 'aurora-embedded-light min-h-0 bg-transparent text-[#172033]' : 'min-h-screen bg-[#0b111e] text-[#f8fafc]'} font-sans antialiased selection:bg-[#177E89] selection:text-black`}>
+    <div className={`${embedded ? 'min-h-0 bg-transparent text-slate-900' : 'min-h-screen bg-slate-50 text-slate-900'} font-sans antialiased selection:bg-[#177E89] selection:text-black`}>
       {/* Contenedor Principal Responsive (desde 360px) */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
-        {!embedded && <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-[#94a3b8] hover:text-[#177E89] focus:outline-none focus:ring-2 focus:ring-[#177E89]">
+        {!embedded && <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:text-[#177E89] focus:outline-none focus:ring-2 focus:ring-[#177E89]">
           ← Volver al Hub
         </Link>}
         {/* Cabecera Superior del Módulo */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#1e2d48]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#177E89]" />
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#f8fafc]">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                 Gestión de Personal & Aurora Nómina
               </h1>
               <span className="px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono text-xs font-semibold border border-[#177E89]/30">
                 PILOTO
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-[#94a3b8]">
-              Administración unificada de colaboradores, jornadas y nómina interna para Salud, Gastronomía y Agropecuaria.
+            <p className="text-xs sm:text-sm text-slate-500">
+              Tu equipo, sus turnos, su asistencia, metas y nómina en un solo lugar.
             </p>
           </div>
 
@@ -275,7 +275,7 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
               onClick={() => setOcultarSueldo(!ocultarSueldo)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89] ${
                 ocultarSueldo
-                  ? 'bg-[#1e293b] border-[#334155] text-[#94a3b8]'
+                  ? 'bg-slate-100 border-slate-300 text-slate-500'
                   : 'bg-[#177E89]/15 border-[#177E89]/40 text-[#177E89]'
               }`}
               title="Alternar privacidad de remuneraciones"
@@ -286,7 +286,7 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
         </div>
 
         {/* Barra de Navegación de Secciones (Scroll Horizontal Fluido en Móvil) */}
-        <div role="tablist" aria-label="Secciones de Personal" className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-[#1e2d48] no-scrollbar">
+        <div role="tablist" aria-label="Secciones de Personal" className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200 no-scrollbar">
           {pestanas.filter((p) => p.id !== 'nomina' || capacidades?.puedeVerMontosNomina).map((p) => {
             const esActiva = seccionActiva === p.id;
             return (
@@ -299,13 +299,13 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
                 onClick={() => setSeccionActiva(p.id)}
                 className={`flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89] ${
                   esActiva
-                    ? 'bg-[#131c2e] text-[#177E89] border border-[#177E89]/40 shadow-sm'
-                    : 'text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#131c2e]/50'
+                    ? 'bg-slate-50 text-[#177E89] border border-[#177E89]/40 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <span>{p.etiqueta}</span>
                 {p.id === 'nomina' && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/20 text-[#fbbf24] font-mono">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/20 text-amber-600 font-mono">
                     {nominaHabilitada ? 'Activo' : 'Opcional'}
                   </span>
                 )}
@@ -317,7 +317,7 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
         {/* Renderizado de la Sección Activa */}
         <main id={`panel-personal-${seccionActiva}`} role="tabpanel" aria-labelledby={`tab-personal-${seccionActiva}`} className="space-y-6">
           {cargandoDatos && (
-            <div className="rounded-xl border border-white/10 bg-[#0b2341] p-4 font-mono text-xs text-[#177E89]">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 font-mono text-xs text-[#177E89]">
               Cargando datos autorizados de Personal…
             </div>
           )}
@@ -424,9 +424,9 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
             />
           )}
           {!errorDatos && seccionActiva === 'nomina' && periodosNomina.length === 0 && !cargandoDatos && (
-            <div className="rounded-2xl border border-white/10 bg-[#0b2341] p-8 text-center">
-              <h2 className="font-semibold text-white">Aún no hay períodos de nómina</h2>
-              <p className="mt-2 text-sm text-white/60">Crea y calcula el primer período cuando la empresa decida activar Aurora Nómina.</p>
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+              <h2 className="font-semibold text-slate-900">Aún no hay períodos de nómina</h2>
+              <p className="mt-2 text-sm text-slate-500">Crea y calcula el primer período cuando la empresa decida activar Aurora Nómina.</p>
             </div>
           )}
         </main>
