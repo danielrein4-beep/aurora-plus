@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -23,10 +24,10 @@ import java.util.Map;
  * no registraba el ingreso en caja, no sumaba a la utilidad. Un pedido "completado"
  * no dejaba ningún rastro contable real, como si nunca hubiera pasado.
  *
- * Esta confirmación reproduce la venta contra el mismo motor real que usa el POS de
- * mostrador (RepuestoConversionService.venderPorVolumen) — mismo descuento de stock,
- * mismo registro de caja, mismo Kárdex — en vez de un camino aparte que se puede
- * desincronizar. El precio se recalcula al momento de confirmar (nunca se confía en
+ * Esta confirmación cobra el pedido entero como un ticket del POS
+ * (RepuestoConversionService.venderTicket): mismo descuento de stock, mismo registro de
+ * caja, mismo Kárdex y el mismo cálculo de IVA, IGTF y delivery, con su renglón en el
+ * libro de ventas. Antes se vendía línea por línea sin impuestos ni libro. El precio se recalcula al momento de confirmar (nunca se confía en
  * el total que quedó congelado cuando se hizo el pedido): si el precio cambió desde
  * entonces, el ingreso real refleja el precio actual, igual que cualquier venta.
  */
@@ -73,6 +74,7 @@ public class ConfirmacionPedidoWebService {
             throw new RuntimeException("Este pedido no tiene artículos que confirmar");
         }
 
+        List<RepuestoConversionService.LineaTicket> lineas = new ArrayList<>();
         for (Map<String, Object> item : items) {
             String productoId = String.valueOf(item.get("productoId"));
             String nombre = String.valueOf(item.getOrDefault("nombre", productoId));
@@ -82,17 +84,26 @@ public class ConfirmacionPedidoWebService {
             }
             Long repuestoId = Long.parseLong(productoId.substring(4));
             BigDecimal cantidad = new BigDecimal(String.valueOf(item.get("cantidad")));
-            String claveIdempotencia = "pedido-web-" + pedido.getId() + "-" + productoId;
-
-            // Sin monedaPago/montoRecibido explícitos: se registra en la moneda base del
-            // negocio, como cualquier venta de contado — el cliente ya pagó por fuera
-            // (pago móvil/transferencia/Zelle, ver metodoPago) antes de que el dueño
-            // confirme acá; esto es la reconciliación contable de ese cobro, no un cobro
-            // nuevo.
-            repuestoConversionService.venderPorVolumen(repuestoId, tenantId, cantidad, null, null, claveIdempotencia, null,
-                null, null, null, "WEB");
+            lineas.add(new RepuestoConversionService.LineaTicket(repuestoId, null, cantidad));
         }
 
+        // El cliente ya pagó por fuera (pago móvil, Zelle, Binance...) antes de que el dueño
+        // confirme: esto es la reconciliación de ese cobro, en la moneda base del negocio. El
+        // IGTF depende de si ese pago fue en divisas; el delivery, del tipo de entrega elegido.
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
+        BigDecimal delivery = "DELIVERY".equalsIgnoreCase(pedido.getTipoEntrega()) && licencia != null
+            ? licencia.getCostoEnvioDelivery() : null;
+        RepuestoConversionService.OpcionesFiscales fiscal = new RepuestoConversionService.OpcionesFiscales(
+            null, delivery, null, null, esPagoEnDivisas(pedido.getMetodoPago()), "WEB");
+        // "WEB-<id>" y no el número PED-xxxx, que es aleatorio de 4 cifras y puede repetirse.
+        RepuestoConversionService.ResultadoTicket cobro = repuestoConversionService.venderTicket(tenantId, "WEB-" + pedido.getId(), lineas, null, null, null, null, null,
+            pedido.getMetodoPago(), null, null, null, pedido.getClienteNombre(), fiscal);
+
+        if (cobro.total() != null) {
+            // El total final (con IVA, IGTF y delivery recalculados al confirmar) es el que ve el cliente en el correo.
+            pedido.setTotalUsd(cobro.total());
+            if (pedido.getTasaCambio() != null) pedido.setTotalBs(cobro.desglose().subtotal().multiply(pedido.getTasaCambio()).setScale(2, java.math.RoundingMode.HALF_UP));
+        }
         pedido.setEstado("COMPLETADO");
         PedidoWebComercio guardado = pedidoWebRepository.save(pedido);
 
@@ -109,6 +120,15 @@ public class ConfirmacionPedidoWebService {
         }
 
         return guardado;
+    }
+
+    /** Métodos del catálogo que se pagan en divisas (llevan IGTF); pago móvil y efectivo en Bs no. */
+    static boolean esPagoEnDivisas(String metodoPago) {
+        if (metodoPago == null) return false;
+        return switch (metodoPago.trim().toUpperCase()) {
+            case "EFECTIVO_USD", "ZELLE", "BINANCE", "BANCOLOMBIA" -> true;
+            default -> false;
+        };
     }
 
     private void enviarComprobantePorCorreo(PedidoWebComercio pedido, List<Map<String, Object>> items) {

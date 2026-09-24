@@ -483,8 +483,16 @@ public class RepuestoConversionService {
      * Lo fiscal que decide el cajero en este ticket. aplicaIva=false quita el IVA (queda marcado
      * en el libro con el usuario que lo hizo); null = lo que diga la configuración del negocio.
      * delivery: cargo de envío en la moneda base (null o 0 = sin delivery).
+     * pagoEnDivisas: para un cobro que no pasa por la caja del POS (pedido web ya pagado por fuera),
+     * dice si se pagó en divisas (lleva IGTF); null = se deduce de la moneda del pago.
+     * canalVenta: "POS" (por defecto) o "WEB", para el concepto y el origen del asiento de caja.
      */
-    public record OpcionesFiscales(Boolean aplicaIva, BigDecimal delivery, String clienteRif, String usuario) {}
+    public record OpcionesFiscales(Boolean aplicaIva, BigDecimal delivery, String clienteRif, String usuario,
+                                   Boolean pagoEnDivisas, String canalVenta) {
+        public OpcionesFiscales(Boolean aplicaIva, BigDecimal delivery, String clienteRif, String usuario) {
+            this(aplicaIva, delivery, clienteRif, usuario, null, null);
+        }
+    }
 
     public record ResultadoTicket(boolean yaProcesado, BigDecimal total, CalculoFiscalVenta.Desglose desglose) {
         public ResultadoTicket(boolean yaProcesado, BigDecimal total) { this(yaProcesado, total, null); }
@@ -553,7 +561,8 @@ public class RepuestoConversionService {
                     pagadoEnDivisas = pagadoEnDivisas.add(motorFinancieroService.convertirAMonedaBase(tenantId, p.monto(), p.moneda()));
                 }
                 // Lo pagado de más en divisas vuelve como vuelto: CalculoFiscalVenta ya topa el IGTF en el subtotal.
-            } else if (CalculoFiscalVenta.esDivisa(monedaPago != null ? monedaPago : motorFinancieroService.obtenerMonedaBase(tenantId))) {
+            } else if (fiscal != null && fiscal.pagoEnDivisas() != null ? fiscal.pagoEnDivisas()
+                    : CalculoFiscalVenta.esDivisa(monedaPago != null ? monedaPago : motorFinancieroService.obtenerMonedaBase(tenantId))) {
                 // Pago único en divisas: si es a crédito, solo lo que paga ahora.
                 pagadoEnDivisas = montoPagadoAhora != null ? montoPagadoAhora : new BigDecimal("999999999");
             }
@@ -562,7 +571,8 @@ public class RepuestoConversionService {
             cobraIva && !ivaQuitado, cobraIva ? licencia.getAlicuotaIva() : BigDecimal.ZERO, cobraIva && incluyeIva,
             igtfActivo, igtfActivo ? licencia.getAlicuotaIgtf() : BigDecimal.ZERO, pagadoEnDivisas);
         BigDecimal total = desglose.total();
-        String concepto = "Venta POS ticket " + numeroTicket.trim() + " (" + lineas.size() + " línea" + (lineas.size() == 1 ? "" : "s") + ")";
+        String canal = fiscal != null && fiscal.canalVenta() != null ? fiscal.canalVenta() : "POS";
+        String concepto = ("WEB".equals(canal) ? "Venta web pedido " : "Venta POS ticket ") + numeroTicket.trim() + " (" + lineas.size() + " línea" + (lineas.size() == 1 ? "" : "s") + ")";
 
         boolean esMixto = pagos != null && !pagos.isEmpty();
         boolean esCredito = montoPagadoAhora != null && montoPagadoAhora.compareTo(total) < 0;
@@ -593,11 +603,11 @@ public class RepuestoConversionService {
         } else {
             BigDecimal pagaAhora = montoPagadoAhora != null ? montoPagadoAhora : total;
             if (pagaAhora.signum() > 0) {
-                MovimientoCaja ingreso = registrarIngresoCaja(tenantId, pagaAhora, monedaPago, montoRecibido, concepto, "POS", primerMovimiento);
+                MovimientoCaja ingreso = registrarIngresoCaja(tenantId, pagaAhora, monedaPago, montoRecibido, concepto, canal, primerMovimiento);
                 ingreso.setMetodoPago(metodoPago);
             }
             registrarCobroVenta(tenantId, total, monedaPago, montoRecibido, pagaAhora, diasCredito, clienteId,
-                nombreClienteManual, concepto, primerMovimiento, "POS", false);
+                nombreClienteManual, concepto, primerMovimiento, canal, false);
         }
 
         registrarLibroVenta(tenantId, numeroTicket.trim(), desglose, esCredito,
