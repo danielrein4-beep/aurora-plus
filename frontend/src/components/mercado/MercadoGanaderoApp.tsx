@@ -118,6 +118,16 @@ export default function MercadoGanaderoApp() {
             ))}
           </nav>
           <span className="flex-1 md:hidden font-bold font-['Outfit'] text-stone-900 dark:text-white truncate">Mercado Ganadero</span>
+          <button
+            onClick={() => navigate("/ganaderia")}
+            aria-label="Volver a mi finca"
+            title="Volver a mi finca"
+            className="md:hidden w-9 h-9 rounded-xl border border-stone-200 dark:border-white/10 text-stone-600 dark:text-white/70 flex items-center justify-center cursor-pointer shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10" />
+            </svg>
+          </button>
           {puedeNegociar && (
             <button onClick={() => (verificacion && !verificacion.puedeVender ? conVenta(() => ir("PUBLICAR")) : ir("PUBLICAR"))} className="px-4 py-2 rounded-xl bg-[#66B891] hover:bg-[#57A882] text-white text-sm font-bold cursor-pointer shrink-0 shadow-sm">
               Publicar
