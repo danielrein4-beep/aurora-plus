@@ -457,47 +457,47 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       {menuMovilAbierto && (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMenuMovilAbierto(false)} aria-hidden="true" />
       )}
-      <aside className={`w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1 bg-[#0D3B3D] fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${menuMovilAbierto ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="px-2 pb-4 mb-2 border-b border-white/10">
+      <aside className={`w-64 flex-shrink-0 border-r border-slate-200 flex flex-col p-4 space-y-1 bg-[#fcfdfd] fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${menuMovilAbierto ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="px-2 pb-4 mb-2 border-b border-slate-200">
           <div className="flex items-center justify-between">
-            <div className="font-['Outfit'] font-black text-lg text-white">Aurora Horeca</div>
+            <div className="font-['Outfit'] font-black text-lg text-slate-900">Aurora Horeca</div>
             {/* El badge "N en cocina" depende del módulo KDS, que está
                 detrás del paywall Pro — en Plan Base no debe existir en
                 el DOM, ni siquiera oculto por CSS. */}
             {PLAN_ACTUAL === ("PRO" as PlanLicencia) && kdsCounts > 0 && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 font-mono font-bold">{kdsCounts} en cocina</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-mono font-bold">{kdsCounts} en cocina</span>
             )}
           </div>
-          <div className="text-[10px] text-white/40 uppercase tracking-wider mt-0.5">{config.nombreLocal}</div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">{config.nombreLocal}</div>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 pr-0.5">
           {NAV_GRUPOS.map((grupo) => (
             <div key={grupo.titulo} className="space-y-1">
-              <div className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-white/30">{grupo.titulo}</div>
+              <div className="px-3 pt-1 pb-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">{grupo.titulo}</div>
               {sidebarItemsVisibles(grupo.items).filter((n) => n.id !== "recetas" || recetasActivas).map((n) => {
                 const alertaVencimiento = n.id === "inventario" && (lotesPorVencer || []).length > 0;
                 return (
                   <button
                     key={n.id}
                     onClick={() => { irA(n.id); setMenuMovilAbierto(false); }}
-                    className={`sidebar-glare w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    className={`sidebar-glare w-full flex items-center justify-between gap-2.5 border-l-2 px-3 py-2.5 rounded-md text-[13px] font-medium text-left transition-colors cursor-pointer ${
                       n.premium
-                        ? "text-white/30"
+                        ? "text-slate-400 border-transparent"
                         : pagina === n.id
-                        ? "sidebar-glare--active bg-white/10 text-white"
+                        ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
                         : alertaVencimiento
-                        ? "text-red-300"
-                        : "text-white/60 hover:bg-white/5 hover:text-white"
+                        ? "text-red-600 border-transparent hover:bg-red-50"
+                        : "text-slate-800 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
                     }`}
                   >
-                    <span className="flex items-center gap-2.5"><n.Icon size={16} /><span>{n.label}</span></span>
+                    <span className="flex items-center gap-2.5"><span className={pagina === n.id ? "text-teal-700" : "text-slate-500"}><n.Icon size={15} /></span><span>{n.label}</span></span>
                     {n.premium ? (
-                      <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500">
+                      <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
                         <IconLock size={10} /> PRO
                       </span>
                     ) : alertaVencimiento && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">{(lotesPorVencer || []).length}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">{(lotesPorVencer || []).length}</span>
                     )}
                   </button>
                 );
@@ -507,12 +507,12 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         </div>
 
         {/* Switch Modo Clásico / Aurora */}
-        <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs mb-2">
+        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs mb-2">
           <div className="flex items-center justify-between">
-            <span className="text-white/70 text-[11px] font-medium">Modo Clásico</span>
+            <span className="text-slate-600 text-[11px] font-medium">Modo Clásico</span>
             <button
               onClick={alternarModo}
-              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-[#177E89]" : "bg-white/20"}`}
+              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-[#177E89]" : "bg-slate-300"}`}
             >
               <div className={`w-4 h-4 rounded-full bg-white transition-transform ${modoClasico ? "translate-x-4" : "translate-x-0"}`} />
             </button>
@@ -521,7 +521,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
 
         <button
           onClick={onSalir}
-          className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left text-white/70 hover:bg-white/10 cursor-pointer"
+          className="w-full px-3 py-2.5 rounded-md text-[13px] font-medium text-left text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 cursor-pointer border-t border-slate-200"
         >
           ← Volver al Hub
         </button>

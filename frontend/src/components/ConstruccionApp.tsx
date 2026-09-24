@@ -511,7 +511,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
       {/* Menú lateral en escritorio, como el resto de las verticales; en teléfono queda como
           una barra que se desliza de lado. Antes eran 11 pestañas horizontales. */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-      <nav className="border-b lg:border-b-0 lg:border-r border-slate-200 bg-white px-4 lg:px-3 lg:py-4 flex lg:flex-col items-center lg:items-stretch gap-1 overflow-x-auto lg:overflow-y-auto lg:w-60 flex-shrink-0 lg:sticky lg:top-[69px] lg:h-[calc(100vh-69px)]">
+      <nav className="border-b lg:border-b-0 lg:border-r border-slate-200 bg-[#fcfdfd] px-4 lg:px-3 lg:py-4 flex lg:flex-col items-center lg:items-stretch gap-1 overflow-x-auto lg:overflow-y-auto lg:w-60 flex-shrink-0 lg:sticky lg:top-[69px] lg:h-[calc(100vh-69px)]">
         {([
           { id: 'resumen', label: 'Vista General', icon: IconChart },
           { id: 'proyectos', label: 'Proyectos & Contratos', icon: IconConstruction, count: proyectos.length },
@@ -534,8 +534,8 @@ export default function ConstruccionApp({ onSalir }: Props) {
               className={
                 'flex items-center gap-2 px-3.5 py-3 lg:py-2.5 lg:rounded-md text-xs font-semibold border-b-2 lg:border-b-0 lg:border-l-2 transition-colors whitespace-nowrap cursor-pointer ' +
                 (activa
-                  ? 'border-amber-400 text-amber-700 bg-amber-500/5'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300')
+                  ? 'sidebar-glare sidebar-glare--active border-teal-700 text-teal-900 bg-teal-50/80'
+                  : 'sidebar-glare border-transparent text-slate-800 hover:bg-slate-100/70 hover:text-slate-900')
               }
             >
               <Icon size={16} />
