@@ -1415,6 +1415,13 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                   setOdontoEnConsulta(true);
                   setPagina("odontograma");
                 }}
+                onRegistradoYAtender={(p) => {
+                  // Se agrega a la lista ya cargada para que la consulta lo encuentre sin esperar a recargar.
+                  setPacientes((prev) => (prev ? [p, ...prev.filter((x) => x.id !== p.id)] : [p]));
+                  setPacienteSeleccionadoId(p.id);
+                  setOdontoEnConsulta(true);
+                  setPagina("odontograma");
+                }}
               />
             )}
             {pagina === "odontograma" && (
