@@ -3,6 +3,7 @@ import { IconWarning } from "../../Icons";
 import { registrarBajaGanaderia, type AnimalGanaderia } from "../../api";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import { useConfirmar } from "./DialogoConfirmar";
+import { encolarAccionGanaderia, esFalloDeConexion, generarClaveIdempotencia } from "../../offlineQueueGanaderia";
 import type { Notificar } from "./tipos";
 
 /** Causas frecuentes en fincas venezolanas; "Robo / abigeato" no cuenta como mortalidad. */
@@ -23,7 +24,10 @@ interface Props {
   animalesActivos: AnimalGanaderia[];
   /** Animal preseleccionado al abrir desde su ficha. */
   animalIdInicial?: number;
+  tenantId: number;
   notificar: Notificar;
+  /** Se guardó en la cola offline (sin señal): el padre refresca el contador de pendientes. */
+  onEncolado: () => void;
   /** Baja guardada: el padre saca al animal del hato activo con su nuevo estado. */
   onRegistrada: (animalId: number, estado: "MUERTO" | "ROBADO") => void;
   onCerrar: () => void;
@@ -33,7 +37,7 @@ interface Props {
  * Baja de un animal por muerte o robo (abigeato): fecha, causa y observaciones (necropsia,
  * denuncia...). Queda la constancia y la mortalidad del hato se calcula con estas bajas.
  */
-export default function ModalBaja({ animalesActivos, animalIdInicial, notificar, onRegistrada, onCerrar }: Props) {
+export default function ModalBaja({ animalesActivos, animalIdInicial, tenantId, notificar, onRegistrada, onEncolado, onCerrar }: Props) {
   const { confirmar, dialogo } = useConfirmar();
   const [busqueda, setBusqueda] = useState("");
   const [animalId, setAnimalId] = useState<number>(animalIdInicial ?? 0);
@@ -72,7 +76,23 @@ export default function ModalBaja({ animalesActivos, animalIdInicial, notificar,
       notificar(`${animal.arete} dado de baja (${motivo}).`);
       onCerrar();
     } catch (err) {
-      notificar(`No se pudo registrar la baja: ${err instanceof Error ? err.message : "revisa tu conexión"}`);
+      if (!esFalloDeConexion(err)) {
+        notificar(`No se pudo registrar la baja: ${err instanceof Error ? err.message : "inténtalo de nuevo"}`);
+        return;
+      }
+      // Sin señal: queda en la cola y se envía al volver la conexión.
+      encolarAccionGanaderia(tenantId, {
+        tipo: "registrar_baja",
+        id: generarClaveIdempotencia(),
+        claveIdempotencia: generarClaveIdempotencia(),
+        descripcion: `Baja de ${animal.arete} (${motivo})`,
+        creadaEn: Date.now(),
+        payload: { animalId: animal.id, arete: animal.arete, fecha, motivo, observaciones: observaciones.trim() || undefined },
+      });
+      onEncolado();
+      onRegistrada(animal.id, esRobo ? "ROBADO" : "MUERTO");
+      notificar(`Sin señal: la baja de ${animal.arete} quedó guardada en el teléfono y se enviará al volver la conexión.`);
+      onCerrar();
     } finally {
       setGuardando(false);
     }

@@ -13,7 +13,7 @@ import {
   type TableroAlertasGanaderia, type VacunaGanaderia, type AlertaSanitariaGanaderia,
   type TanqueLeche, type VentaLecheTanque, type GastoGanaderia, type VentaGanaderiaResumen,
   listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
-  tasaVigente, actualizarTasa,
+  tasaVigente, actualizarTasa, crearAnimalGanaderia, registrarBajaGanaderia,
 } from "../api";
 
 import { AuroraGradientDef, IconCheckCircle, IconClose, IconCow, IconDownload, IconWarning } from "../Icons";
@@ -471,15 +471,38 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             vacunaId: acc.payload.vacunaId,
             fechaAplicacion: fechaLocalISO(new Date(acc.creadaEn)),
           });
-        }
+        },
+        // Si la señal se cortó después de que el servidor guardó, el reintento choca con lo ya
+        // guardado: eso cuenta como sincronizado, no como error.
+        alta_animal: async (acc) => {
+          try {
+            await crearAnimalGanaderia(tenantId, acc.payload as unknown as Parameters<typeof crearAnimalGanaderia>[1]);
+          } catch (e) {
+            if (!(e instanceof Error && e.message.includes("Ya existe un animal registrado"))) throw e;
+          }
+        },
+        registrar_baja: async (acc) => {
+          try {
+            await registrarBajaGanaderia({ animalId: acc.payload.animalId, fecha: acc.payload.fecha, motivo: acc.payload.motivo, observaciones: acc.payload.observaciones });
+          } catch (e) {
+            if (!(e instanceof Error && e.message.includes("ya no está activo"))) throw e;
+          }
+        },
       });
 
       setPendientesOffline(res.quedanPendientes);
-      if (res.sincronizadas.length > 0) {
-        notificar(`Sincronizacion completada: ${res.sincronizadas.length} registros de campo sincronizados.`);
+      if (res.sincronizadas.some(a => a.tipo === "alta_animal" || a.tipo === "registrar_baja")) {
+        cargarDatos(); // los animales creados sin señal toman su id real
+      }
+      if (res.fallidasDefinitivo.length > 0) {
+        // Antes se descartaban sin avisar: el usuario debe saber qué no quedó guardado.
+        notificar(`No se pudieron guardar ${res.fallidasDefinitivo.length} registro(s) hechos sin señal: `
+          + res.fallidasDefinitivo.map(f => `${f.accion.descripcion} (${f.mensaje})`).join("; "));
+      } else if (res.sincronizadas.length > 0) {
+        notificar(`Sincronización completada: ${res.sincronizadas.length} registro(s) de campo guardados.`);
       }
     } catch {
-      notificar("No se pudo completar la sincronizacion en este momento.");
+      notificar("No se pudo completar la sincronización en este momento.");
     } finally {
       setSincronizandoOffline(false);
     }
@@ -920,7 +943,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           valoresIniciales={altaAnimal}
           tenantId={tenantId}
           notificar={notificar}
-          onCreado={nuevo => { setAnimales(prev => [nuevo, ...prev]); setAnimalFichaId(nuevo.id); }}
+          onCreado={nuevo => { setAnimales(prev => [nuevo, ...prev]); if (nuevo.id > 0) setAnimalFichaId(nuevo.id); }}
+          onEncolado={() => setPendientesOffline(contarPendientesGanaderia(tenantId))}
           onCerrar={() => setAltaAnimal(null)}
         />
       )}
@@ -1011,6 +1035,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           animalIdInicial={bajaAbierta.animalId}
           notificar={notificar}
           onRegistrada={(id, estado) => setAnimales(prev => prev.map(a => a.id === id ? { ...a, estado, potrero: undefined } : a))}
+          onEncolado={() => setPendientesOffline(contarPendientesGanaderia(tenantId))}
+          tenantId={tenantId}
           onCerrar={() => setBajaAbierta(null)}
         />
       )}

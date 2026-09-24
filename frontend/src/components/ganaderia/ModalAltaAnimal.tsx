@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconCart, IconCoins, IconSprout } from "../../Icons";
 import { crearAnimalGanaderia, type AnimalGanaderia, type PotreroGanaderia } from "../../api";
+import { encolarAccionGanaderia, esFalloDeConexion, generarClaveIdempotencia } from "../../offlineQueueGanaderia";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import { RAZAS_BOVINAS_COMUNES } from "./catalogos";
 import type { Notificar } from "./tipos";
@@ -40,6 +41,8 @@ interface Props {
   tenantId: number;
   notificar: Notificar;
   onCreado: (animal: AnimalGanaderia) => void;
+  /** Se guardó en la cola offline (sin señal): el padre refresca el contador de pendientes. */
+  onEncolado: () => void;
   onCerrar: () => void;
 }
 
@@ -48,7 +51,7 @@ interface Props {
  * abierto con raza, potrero y origen para dar de alta varios del mismo lote.
  */
 export default function ModalAltaAnimal({
-  animales, animalesActivos, potreros, valoresIniciales, tenantId, notificar, onCreado, onCerrar,
+  animales, animalesActivos, potreros, valoresIniciales, tenantId, notificar, onCreado, onEncolado, onCerrar,
 }: Props) {
   const [formAnimal, setFormAnimal] = useState<FormAltaAnimal>(() => ({ ...altaVacia(potreros[0]?.id || 0), ...valoresIniciales }));
 
@@ -72,8 +75,10 @@ export default function ModalAltaAnimal({
     e.preventDefault();
     if (!formAnimal.arete.trim()) return;
 
+    // Fuera del try: si no hay señal se reutiliza para guardarlo en la cola offline.
+    let payload: any = {};
     try {
-      const payload: any = {
+      payload = {
         arete: formAnimal.arete.trim(),
         tipoIdentificador: formAnimal.tipoIdentificador,
         nombre: formAnimal.nombre.trim() || undefined,
@@ -102,9 +107,26 @@ export default function ModalAltaAnimal({
       const nuevo = await crearAnimalGanaderia(tenantId, payload);
       onCreado(nuevo);
       notificar(`Animal arete ${nuevo.arete} (${formAnimal.origen === "COMPRA" ? "Compra" : "Nacimiento en Finca"}) registrado con éxito en el hato.`);
-    } catch {
-      notificar(`No se pudo registrar el animal arete ${formAnimal.arete} — revisa tu conexión e inténtalo de nuevo.`);
-      return;
+    } catch (err) {
+      if (!esFalloDeConexion(err)) {
+        notificar(`No se pudo registrar el animal arete ${formAnimal.arete}: ${err instanceof Error ? err.message : "inténtalo de nuevo"}`);
+        return;
+      }
+      // Sin señal (potrero, manga): queda en la cola y se guarda solo al volver la conexión.
+      const payloadOffline = { ...payload, arete: formAnimal.arete.trim() };
+      encolarAccionGanaderia(tenantId, {
+        tipo: "alta_animal",
+        id: generarClaveIdempotencia(),
+        claveIdempotencia: generarClaveIdempotencia(),
+        descripcion: `Alta de ${payloadOffline.arete}`,
+        creadaEn: Date.now(),
+        payload: payloadOffline,
+      });
+      onEncolado();
+      // Se muestra en el hato con un id provisional hasta que se sincronice.
+      onCreado({ ...(payloadOffline as unknown as AnimalGanaderia), id: -Date.now(), estado: "ACTIVO",
+        potrero: potreros.find(p => p.id === Number(formAnimal.potreroId)) });
+      notificar(`Sin señal: el alta de ${payloadOffline.arete} quedó guardada en el teléfono y se enviará al volver la conexión.`);
     }
 
     if (cerrarAlTerminar) {
