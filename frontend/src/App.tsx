@@ -1,4 +1,5 @@
 import AvisosGlobales from "./components/AvisosGlobales";
+import AvisoSuscripcion from "./components/AvisoSuscripcion";
 import CatalogoPublico from "./pages/CatalogoPublico";
 import NotFound from "./pages/NotFound";
 import { obtenerDatosImpersonacion, salirDeImpersonacion } from "./api";
@@ -162,6 +163,7 @@ export default function App() {
         <BrowserRouter>
           <ImpersonacionBarraFlotante />
           <AvisosGlobales />
+          <AvisoSuscripcion />
           <Routes>
             {/* Public site with shared layout */}
             <Route element={<Layout />}>

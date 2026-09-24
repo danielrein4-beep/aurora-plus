@@ -37,11 +37,14 @@ public class SuscripcionTenantController {
     @Autowired private SaasSoporteMensajeRepository mensajeRepository;
 
     public record PagoVista(Long id, LocalDateTime fecha, BigDecimal monto, String moneda, String metodoPago,
-                            String referencia, Integer mesesPagados) {}
+                            String referencia, Integer mesesPagados, Integer diasAcreditados) {}
+
+    /** Un pago que el cliente reportó y el equipo de Aurora todavía revisa (ticket de soporte PAGO). */
+    public record ReportePago(Long id, LocalDateTime fecha, String detalle, String estado) {}
 
     public record EstadoSuscripcion(String nombreEmpresa, String tipoLicencia, String planSolicitado,
                                     LocalDate fechaVencimiento, long diasRestantes, boolean vencida,
-                                    boolean enPrueba, List<PagoVista> pagos,
+                                    boolean enPrueba, List<PagoVista> pagos, List<ReportePago> reportes, String rif,
                                     /** Último día con acceso contando los días de gracia. */
                                     LocalDate accesoHasta) {}
 
@@ -51,7 +54,7 @@ public class SuscripcionTenantController {
         List<PagoVista> pagos = pagoRepository.findByTenantIdOrderByFechaPagoDesc(licencia.getTenantId()).stream()
             .filter(p -> "CONFIRMADO".equals(p.getEstado()))
             .map(p -> new PagoVista(p.getId(), p.getFechaPago(), p.getMonto(), p.getMoneda(), p.getMetodoPago(),
-                p.getReferenciaComprobante(), p.getMesesPagados()))
+                p.getReferenciaComprobante(), p.getMesesPagados(), p.getDiasAcreditados()))
             .toList();
         LocalDate vence = licencia.getFechaVencimientoPago();
         long dias = vence == null ? 0 : ChronoUnit.DAYS.between(LocalDate.now(), vence);
@@ -60,7 +63,8 @@ public class SuscripcionTenantController {
         boolean enPrueba = pagos.isEmpty() && dias <= com.auroraplus.core.auth.controllers.AuthController.DIAS_PRUEBA_GRATIS;
         return new EstadoSuscripcion(licencia.getNombreEmpresa(), licencia.getTipoLicencia().name(),
             licencia.getPlanSolicitado(), vence, Math.max(0, dias), vence != null && vence.isBefore(LocalDate.now()),
-            enPrueba, pagos, vence == null ? null : vence.plusDays(LicenciaService.DIAS_GRACIA));
+            enPrueba, pagos, reportes(licencia.getTenantId()), licencia.getRif(),
+            vence == null ? null : vence.plusDays(LicenciaService.DIAS_GRACIA));
     }
 
     public static class ReportePagoRequest {
@@ -120,6 +124,16 @@ public class SuscripcionTenantController {
         mensajeRepository.save(msg);
 
         return ResponseEntity.ok(guardado);
+    }
+
+    /** Pagos reportados por el cliente (tickets de categoría PAGO), para su historial. */
+    private List<ReportePago> reportes(Long tenantId) {
+        return ticketRepository.findByTenantIdOrderByFechaActualizacionDesc(tenantId).stream()
+            .filter(t -> "PAGO".equals(t.getCategoria()))
+            .limit(30)
+            .map(t -> new ReportePago(t.getId(), t.getFechaCreacion(), t.getTituloAsunto(),
+                "ABIERTO".equals(t.getEstado()) || "EN_PROCESO".equals(t.getEstado()) ? "EN_VERIFICACION" : "REVISADO"))
+            .toList();
     }
 
     private LicenciaTenant licenciaActual() {

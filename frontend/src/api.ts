@@ -6780,6 +6780,15 @@ export interface PagoSuscripcionVista {
   metodoPago: string;
   referencia: string | null;
   mesesPagados: number | null;
+  diasAcreditados?: number | null;
+}
+
+/** Pago que el cliente reportó y el equipo de Aurora revisa (ticket de soporte PAGO). */
+export interface ReportePagoSuscripcion {
+  id: number;
+  fecha: string;
+  detalle: string;
+  estado: "EN_VERIFICACION" | "REVISADO";
 }
 
 export interface EstadoSuscripcion {
@@ -6791,6 +6800,8 @@ export interface EstadoSuscripcion {
   vencida: boolean;
   enPrueba: boolean;
   pagos: PagoSuscripcionVista[];
+  reportes: ReportePagoSuscripcion[];
+  rif: string | null;
   /** Último día con acceso, contando los días de gracia tras el vencimiento. */
   accesoHasta: string | null;
 }

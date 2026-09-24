@@ -1,4 +1,5 @@
 import { obtenerCuentasCobro, combinarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { descargarReciboPagoAurora } from "../utils/reciboAurora";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
@@ -384,7 +385,8 @@ export default function Dashboard() {
     }
   };
   const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">("kpis");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  // "Pagar" desde el aviso de una vertical llega con ?tab=billing&pagar=1 y abre el reporte de pago.
+  const [showPaymentModal, setShowPaymentModal] = useState(() => searchParams.get("pagar") === "1");
   const [cuentasCobro, setCuentasCobro] = useState<SaasCuentasCobroConfig>(obtenerCuentasCobro);
   const [copiadoCampo, setCopiadoCampo] = useState<string | null>(null);
 
@@ -793,6 +795,7 @@ export default function Dashboard() {
         plan: suscripcion?.planSolicitado || undefined,
       });
       reportPayment({ monto: paymentForm.monto, metodo: paymentForm.metodo, referencia: paymentForm.referencia });
+      obtenerEstadoSuscripcion().then(setSuscripcion).catch(() => {});
       setPaymentSuccessMsg("Recibimos tu reporte de pago. Lo verificamos y activamos tu plan; te avisamos por WhatsApp o correo.");
       setPaymentForm((f) => ({ ...f, referencia: "" }));
     } catch (err) {
@@ -1554,6 +1557,7 @@ export default function Dashboard() {
                         <th className="p-3.5">Monto</th>
                         <th className="p-3.5">Método / Referencia</th>
                         <th className="p-3.5">Estado</th>
+                        <th className="p-3.5 text-right">Recibo</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
@@ -1566,18 +1570,35 @@ export default function Dashboard() {
                             <td className="p-3.5 text-slate-600 dark:text-white/70">{p.metodoPago}{p.referencia ? ` · Ref: ${p.referencia}` : ""}</td>
                             <td className="p-3.5">
                               <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-300 font-light uppercase tracking-wide text-[10px]">
-                                CONFIRMADO
+                                VERIFICADO
                               </span>
+                            </td>
+                            <td className="p-3.5 text-right">
+                              <button onClick={() => suscripcion && descargarReciboPagoAurora(p, suscripcion)}
+                                className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-1">
+                                <IconFileText size={12} /> Descargar PDF
+                              </button>
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="p-6 text-center text-slate-400 dark:text-white/40">
+                          <td colSpan={6} className="p-6 text-center text-slate-400 dark:text-white/40">
                             Aún no hay pagos confirmados. Cuando reportes uno, aparece aquí en cuanto el equipo de Aurora lo verifique.
                           </td>
                         </tr>
                       )}
+                      {(suscripcion?.reportes || []).filter((r) => r.estado === "EN_VERIFICACION").map((r) => (
+                        <tr key={`rep-${r.id}`} className="bg-amber-50/50 dark:bg-amber-500/5">
+                          <td className="p-3.5 font-mono text-slate-500 dark:text-white/50">Reporte #{r.id}</td>
+                          <td className="p-3.5 text-slate-600 dark:text-white/60">{new Date(r.fecha).toLocaleDateString("es-VE")}</td>
+                          <td className="p-3.5 text-slate-600 dark:text-white/70" colSpan={2}>{r.detalle.replace(/^Pago reportado:\s*/, "")}</td>
+                          <td className="p-3.5">
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 font-semibold text-[10px]">EN VERIFICACIÓN</span>
+                          </td>
+                          <td className="p-3.5 text-right text-[11px] text-slate-400">Al verificarlo</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
