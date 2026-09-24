@@ -102,10 +102,10 @@ export default function ModalTasasMonedas({ tasaBCV, tasaCOP, monedasConfig, onG
                 defaultValue={tasaBCV}
                 required
                 className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none"
-                placeholder="43.50"
+                placeholder="Ej. 850.00"
               />
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">Usada para liquidar el ordeño y compras de ganado en moneda local.</p>
+            <p className="text-[10px] text-slate-400 mt-1">Usada para liquidar el ordeño y compras de ganado en moneda local. La tasa BCV oficial se carga sola 3 veces al día; aquí solo la cambias si quieres usar una propia.</p>
           </div>
 
           <div>

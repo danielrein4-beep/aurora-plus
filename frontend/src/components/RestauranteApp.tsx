@@ -1043,7 +1043,7 @@ function TasaBadge({ tenantId, tasaPorOrigen, tasaCop, origenTasaActiva, onActua
                 Tasas de Cambio Operativas
               </p>
               <p className="text-[10px] text-slate-500 dark:text-white/40">
-                Selecciona cuál rige el punto de venta hoy
+                Selecciona cuál rige el punto de venta hoy. La BCV se actualiza sola 3 veces al día; la USDT, con su botón.
               </p>
             </div>
             <button
@@ -1100,7 +1100,7 @@ function TasaBadge({ tenantId, tasaPorOrigen, tasaCop, origenTasaActiva, onActua
                 type="button"
                 onClick={() => void refrescarExterna("BCV")}
                 disabled={actualizandoExterna !== null}
-                title="Consultar en vivo (BCV oficial)"
+                title="Consultar ahora (también se actualiza sola a las 8:05 a. m., 1:05 p. m. y 5:05 p. m.)"
                 className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 disabled:opacity-50 cursor-pointer"
               >
                 <IconRefresh size={12} className={actualizandoExterna === "BCV" ? "animate-spin" : ""} />

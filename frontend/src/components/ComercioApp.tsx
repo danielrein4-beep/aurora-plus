@@ -6234,6 +6234,9 @@ function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOri
               {tasaVes && (
                 <p className="text-[10px] text-slate-400">Actualizado: {new Date(tasaVes.fechaActualizacion).toLocaleString()}</p>
               )}
+              {origenTasaActiva === "BCV" && (
+                <p className="text-[10px] text-teal-700 dark:text-teal-400">La tasa BCV se actualiza sola a las 8:05 a. m., 1:05 p. m. y 5:05 p. m. La USDT se actualiza con el botón.</p>
+              )}
               <button type="button" onClick={actualizarAhora} disabled={actualizandoAhora}
                 className="w-full py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
                 <IconRefresh size={12} className={actualizandoAhora ? "animate-spin" : ""} />
