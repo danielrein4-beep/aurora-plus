@@ -3273,7 +3273,16 @@ function HistoriasClinicas({
     setError(null);
   };
 
+  // Matrícula MPPS y Colegio de Médicos son obligatorios en un documento médico venezolano: sin
+  // ellos no se emite nada (antes salían números inventados, "109842" y "5421").
+  const faltanDatosLegalesMedico = (): boolean => {
+    if (config.matriculaMPPS?.trim() && config.colegioMedicos?.trim() && config.doctorNombre?.trim()) return false;
+    dispararToast("Para emitir documentos, completa tu nombre, matrícula MPPS y N° del Colegio de Médicos en Configuración & Perfil.");
+    return true;
+  };
+
   const construirReportData = (): ConsultaReportData | null => {
+    if (faltanDatosLegalesMedico()) return null;
     if (!pacienteSeleccionado) return null;
     const pKg = parseFloat(form.peso) || 70;
     const tM = parseFloat(form.talla) || 1.75;
@@ -3285,11 +3294,11 @@ function HistoriasClinicas({
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     return {
-      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
-      doctorNombre: config.doctorNombre || "Médico Titular",
-      especialidad: config.especialidad || "Dermatología / Medicina General",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       logoBase64: config.logoBase64,
       firmaBase64: config.firmaBase64,
       encabezadoTexto: config.encabezadoTexto,
@@ -3390,6 +3399,7 @@ function HistoriasClinicas({
   };
 
   const construirRecipeReportData = (itemsCustom?: ItemRecipePrescrito[], c?: ConsultaMedica): RecipeReportData | null => {
+    if (faltanDatosLegalesMedico()) return null;
     if (!pacienteSeleccionado) return null;
     const listaItems = itemsCustom || itemsRecipe;
     const medList: RecipeItemData[] = listaItems.map((it) => ({
@@ -3402,11 +3412,11 @@ function HistoriasClinicas({
     }));
 
     return {
-      clinicaNombre: config.clinicaNombre || "Centro Medico Especializado",
-      doctorNombre: config.doctorNombre || "Medico Tratante",
-      especialidad: config.especialidad || "Medicina General / Especialidades",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       telefonoContacto: config.telefonoContacto || pacienteSeleccionado.telefono,
       direccionClinica: config.direccionClinica,
       logoBase64: config.logoBase64,
@@ -3478,17 +3488,18 @@ function HistoriasClinicas({
 
   const handleDescargarPdfConsulta = (c: ConsultaMedica) => {
     if (!pacienteSeleccionado) return;
+    if (faltanDatosLegalesMedico()) return;
     const esForaneo =
       pacienteSeleccionado.tipoOrigen === "Foráneo" ||
       pacienteSeleccionado.tipoOrigen === "FORANEO" ||
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
-      doctorNombre: config.doctorNombre || "Médico Titular",
-      especialidad: config.especialidad || "Dermatología / Medicina General",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       logoBase64: config.logoBase64,
       firmaBase64: config.firmaBase64,
       encabezadoTexto: config.encabezadoTexto,
@@ -3529,17 +3540,18 @@ function HistoriasClinicas({
 
   const handleEnviarWhatsAppConsulta = (c: ConsultaMedica) => {
     if (!pacienteSeleccionado) return;
+    if (faltanDatosLegalesMedico()) return;
     const esForaneo =
       pacienteSeleccionado.tipoOrigen === "Foráneo" ||
       pacienteSeleccionado.tipoOrigen === "FORANEO" ||
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
-      doctorNombre: config.doctorNombre || "Médico Titular",
-      especialidad: config.especialidad || "Dermatología / Medicina General",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       logoBase64: config.logoBase64,
       firmaBase64: config.firmaBase64,
       encabezadoTexto: config.encabezadoTexto,
@@ -3583,17 +3595,18 @@ function HistoriasClinicas({
 
   const handleEnviarCorreoConsulta = (c: ConsultaMedica) => {
     if (!pacienteSeleccionado) return;
+    if (faltanDatosLegalesMedico()) return;
     const esForaneo =
       pacienteSeleccionado.tipoOrigen === "Foráneo" ||
       pacienteSeleccionado.tipoOrigen === "FORANEO" ||
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
-      doctorNombre: config.doctorNombre || "Médico Titular",
-      especialidad: config.especialidad || "Dermatología / Medicina General",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       logoBase64: config.logoBase64,
       firmaBase64: config.firmaBase64,
       encabezadoTexto: config.encabezadoTexto,

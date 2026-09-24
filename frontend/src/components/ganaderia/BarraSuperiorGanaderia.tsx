@@ -81,13 +81,13 @@ export default function BarraSuperiorGanaderia({
         {monedasConfig.VES && (
           <>
             <span className="text-slate-400 dark:text-white/20">•</span>
-            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">1$ = Bs. {tasaBCV.toFixed(2)}</span>
+            <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{tasaBCV > 0 ? `1$ = Bs. ${tasaBCV.toFixed(2)}` : "Sin tasa cargada"}</span>
           </>
         )}
         {monedasConfig.COP && (
           <>
             <span className="text-slate-400 dark:text-white/20">•</span>
-            <span className="font-mono font-bold text-sky-600 dark:text-sky-400">{tasaCOP.toLocaleString()} COP</span>
+            <span className="font-mono font-bold text-sky-600 dark:text-sky-400">{tasaCOP > 0 ? `${tasaCOP.toLocaleString()} COP` : "Sin tasa cargada"}</span>
           </>
         )}
         <span className="opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all"><IconSettings size={13} /></span>
@@ -101,7 +101,7 @@ export default function BarraSuperiorGanaderia({
         className="flex items-center gap-1.5 apple-glass-pill rounded-full px-3 py-1.5 border border-sky-400/30 text-[11px] hover:border-sky-400/60 hover:bg-sky-500/10 transition-all cursor-pointer group shadow-sm"
       >
         <span className="text-slate-500 dark:text-white/40 font-medium">Leche:</span>
-        <span className="font-mono font-bold text-sky-500 dark:text-sky-400">${precioLecheUSD.toFixed(2)}/L</span>
+        <span className="font-mono font-bold text-sky-500 dark:text-sky-400">{precioLecheUSD > 0 ? `$${precioLecheUSD.toFixed(2)}/L` : "Fijar precio"}</span>
         <span className="opacity-70 group-hover:opacity-100"><IconEdit size={12} /></span>
       </button>
 

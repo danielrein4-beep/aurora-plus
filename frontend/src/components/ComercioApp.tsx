@@ -313,36 +313,12 @@ export interface CotizacionComercio {
 // ══════════════════════════════════════════════════════════════════════════
 // CATÁLOGO INICIAL OPTIMIZADO (FERRETERÍA, FARMACIA, RETAIL)
 // ══════════════════════════════════════════════════════════════════════════
-const PRODUCTOS_INICIALES: ProductoComercio[] = [
-  // Ferretería & Repuestos
-  { id: "f-1", codigo: "TORN-38", nombre: "Tornillo Drywall 6x1\" (Caja 100u)", categoria: "Tornillería", rubro: "ferreteria", precio: 2.80, costo: 1.50, stock: 45, stockMinimo: 10, unidadMedida: "Caja", ubicacion: "Pasillo 1 - Gaveta 4", codigoParte: "DW-61" },
-  { id: "f-2", codigo: "TAL-20V", nombre: "Taladro Percutor Inalámbrico 20V", categoria: "Herramientas", rubro: "ferreteria", precio: 68.00, costo: 45.00, stock: 8, stockMinimo: 3, unidadMedida: "Pza", ubicacion: "Vitrina Central", marca: "DeWalt / Ingco" },
-  { id: "f-3", codigo: "CAB-THW12", nombre: "Cable Eléctrico 7 Hilos THW #12 (Metro)", categoria: "Eléctrico", rubro: "ferreteria", precio: 0.95, costo: 0.60, stock: 320, stockMinimo: 50, unidadMedida: "Metro", ubicacion: "Bobina 3" },
-  { id: "f-4", codigo: "TUB-PVC4", nombre: "Tubo PVC Aguas Negras 4\" x 3 Mts", categoria: "Plomería", rubro: "ferreteria", precio: 9.50, costo: 6.50, stock: 24, stockMinimo: 5, unidadMedida: "Tubo", ubicacion: "Patio Trasero" },
-  { id: "f-5", codigo: "DISC-45", nombre: "Disco de Corte para Metal 4 1/2\"", categoria: "Herramientas", rubro: "ferreteria", precio: 1.25, costo: 0.70, stock: 110, stockMinimo: 20, unidadMedida: "Pza", ubicacion: "Pasillo 2" },
-  { id: "f-6", codigo: "CEM-T1", nombre: "Cemento Gris Tipo I 42.5kg", categoria: "Construcción", rubro: "ferreteria", precio: 9.00, costo: 7.20, stock: 65, stockMinimo: 15, unidadMedida: "Saco", ubicacion: "Bodega Principal" },
-  { id: "f-7", codigo: "PAS-HILUX", nombre: "Pastillas de Freno Delanteras Hilux / Fortuner", categoria: "Repuestos", rubro: "ferreteria", precio: 22.00, costo: 14.00, stock: 12, stockMinimo: 4, unidadMedida: "Juego", codigoParte: "04465-0K090", marca: "Bendix / Toyota" },
-  { id: "f-8", codigo: "BUJ-BOSH", nombre: "Bujía Iridium Doble Platino", categoria: "Repuestos", rubro: "ferreteria", precio: 5.50, costo: 3.20, stock: 38, stockMinimo: 8, unidadMedida: "Pza", codigoParte: "FR7DC+", marca: "Bosch" },
 
-  // Farmacia & Droguería
-  { id: "m-1", codigo: "ACT-500", nombre: "Acetaminofén / Paracetamol 500mg x 10 Tab", categoria: "Analgésicos", rubro: "farmacia", precio: 1.20, costo: 0.60, stock: 85, stockMinimo: 20, principioActivo: "Paracetamol", lote: "LT-8842", fechaVencimiento: "2027-10", laboratorio: "Genven / Calox" },
-  { id: "m-2", codigo: "IBU-400", nombre: "Ibuprofeno 400mg x 10 Cápsulas Blandas", categoria: "Analgésicos", rubro: "farmacia", precio: 1.80, costo: 0.95, stock: 60, stockMinimo: 15, principioActivo: "Ibuprofeno", lote: "LT-9102", fechaVencimiento: "2026-05", laboratorio: "Elmor / Ibufen" },
-  { id: "m-3", codigo: "AMX-500", nombre: "Amoxicilina 500mg x 12 Cápsulas", categoria: "Antibióticos", rubro: "farmacia", precio: 3.50, costo: 2.10, stock: 32, stockMinimo: 10, principioActivo: "Amoxicilina", lote: "LT-7740", fechaVencimiento: "2026-08", laboratorio: "Leti" },
-  { id: "m-4", codigo: "LOS-50", nombre: "Losartán Potásico 50mg x 30 Tabletas", categoria: "Cardiovascular", rubro: "farmacia", precio: 4.20, costo: 2.40, stock: 40, stockMinimo: 12, principioActivo: "Losartán", lote: "LT-6211", fechaVencimiento: "2027-12", laboratorio: "Calox" },
-  { id: "m-5", codigo: "OME-20", nombre: "Omeprazol 20mg x 14 Cápsulas", categoria: "Gástrico", rubro: "farmacia", precio: 2.40, costo: 1.30, stock: 50, stockMinimo: 15, principioActivo: "Omeprazol", lote: "LT-5541", fechaVencimiento: "2027-03", laboratorio: "Genéricos" },
-  { id: "m-6", codigo: "ALC-70", nombre: "Alcohol Antiséptico 70% 500ml", categoria: "Insumos", rubro: "farmacia", precio: 1.60, costo: 0.90, stock: 75, stockMinimo: 15, principioActivo: "Alcohol Isopropílico", lote: "LT-3329", fechaVencimiento: "2028-01", laboratorio: "Bialcohol" },
-  { id: "m-7", codigo: "GAS-3X3", nombre: "Gasas Estériles 3\" x 3\" (Sobre 10u)", categoria: "Insumos", rubro: "farmacia", precio: 0.85, costo: 0.40, stock: 120, stockMinimo: 25, lote: "LT-2210", fechaVencimiento: "2028-09", laboratorio: "MedSupply" },
-  { id: "m-8", codigo: "CMP-B", nombre: "Complejo B B12 Inyectable x 3 Ampollas", categoria: "Vitaminas", rubro: "farmacia", precio: 5.80, costo: 3.50, stock: 18, stockMinimo: 6, principioActivo: "Vitaminas B1, B6, B12", lote: "LT-1194", fechaVencimiento: "2026-04", laboratorio: "Bayer / Neurobión" },
+/** Cliente genérico de mostrador: existe en todo negocio, no es un dato de demostración. */
+const CONSUMIDOR_FINAL: ClienteComercio = { id: "c-1", nombre: "Consumidor Final", documento: "V-00000000", telefono: "—", saldoPendiente: 0, limiteCredito: 0 };
 
-  // Retail & Minimarket
-  { id: "r-1", codigo: "HAR-PAN", nombre: "Harina de Maíz Blanco Precocida 1kg", categoria: "Alimentos", rubro: "retail", precio: 1.15, costo: 0.88, stock: 140, stockMinimo: 30 },
-  { id: "r-2", codigo: "ARR-PRIM", nombre: "Arroz Blanco Extra 1kg", categoria: "Alimentos", rubro: "retail", precio: 1.30, costo: 0.95, stock: 95, stockMinimo: 20 },
-  { id: "r-3", codigo: "ACE-SOYA", nombre: "Aceite Vegetal Comestible 1 Litro", categoria: "Alimentos", rubro: "retail", precio: 2.50, costo: 1.85, stock: 48, stockMinimo: 15 },
-  { id: "r-4", codigo: "REF-COCA2", nombre: "Refresco Sabor Cola 2 Litros", categoria: "Bebidas", rubro: "retail", precio: 2.20, costo: 1.60, stock: 36, stockMinimo: 12 },
-  { id: "r-5", codigo: "DET-1KG", nombre: "Detergente Multiusos en Polvo 1kg", categoria: "Limpieza", rubro: "retail", precio: 2.10, costo: 1.45, stock: 40, stockMinimo: 10 },
-  { id: "r-6", codigo: "AGU-5L", nombre: "Botellón de Agua Mineral Purificada 5L", categoria: "Bebidas", rubro: "retail", precio: 1.50, costo: 0.90, stock: 28, stockMinimo: 8 },
-];
-
+// Datos de demostración de versiones anteriores. Ya no se muestran; solo sirven para reconocerlos
+// en cachés viejos del navegador y no subirlos al servidor como si fueran reales.
 const CLIENTES_INICIALES: ClienteComercio[] = [
   { id: "c-1", nombre: "Consumidor Final", documento: "V-00000000", telefono: "—", saldoPendiente: 0, limiteCredito: 0 },
   { id: "c-2", nombre: "Taller Mecánico Hermanos Ramos", documento: "J-31456789-2", telefono: "0414-7581290", saldoPendiente: 145.50, limiteCredito: 500 },
@@ -426,100 +402,6 @@ export const VENTAS_INICIALES: VentaComercio[] = [
     esCredito: false,
     recibido: 5.10,
     monedaRecibida: "USD"
-  }
-];
-export const CUENTAS_INICIALES_COMERCIO: CuentaComercio[] = [
-  // Cuentas por Pagar (CXP)
-  {
-    id: "cxp-1",
-    tipo: "CXP",
-    entidadNombre: "Distribuidora Mayorista Ferretera C.A.",
-    entidadDocumento: "J-30987654-1",
-    concepto: "Factura F-94821 - Lote de Tornillería & Discos de Corte",
-    numeroDocumento: "F-94821",
-    montoOriginal: 450.00,
-    saldoPendiente: 450.00,
-    moneda: "USD",
-    estado: "PENDIENTE",
-    fechaRegistro: "2026-09-15",
-    fechaVencimiento: "2026-09-28",
-    referenciaTipo: "COMPRA"
-  },
-  {
-    id: "cxp-2",
-    tipo: "CXP",
-    entidadNombre: "Lubricantes & Filtros Los Andes",
-    entidadDocumento: "J-40112345-8",
-    concepto: "Factura F-73104 - 10 Cajas de Aceite Motor 20W-50",
-    numeroDocumento: "F-73104",
-    montoOriginal: 320.00,
-    saldoPendiente: 120.00,
-    moneda: "USD",
-    estado: "PENDIENTE",
-    fechaRegistro: "2026-09-12",
-    fechaVencimiento: "2026-09-25",
-    referenciaTipo: "COMPRA"
-  },
-  {
-    id: "cxp-3",
-    tipo: "CXP",
-    entidadNombre: "Materiales Eléctricos del Táchira",
-    entidadDocumento: "J-29871023-4",
-    concepto: "Factura F-61209 - Bombillos LED y Cajas de Breakers",
-    numeroDocumento: "F-61209",
-    montoOriginal: 180.00,
-    saldoPendiente: 0.00,
-    moneda: "USD",
-    estado: "PAGADO",
-    fechaRegistro: "2026-09-05",
-    fechaVencimiento: "2026-09-18",
-    referenciaTipo: "COMPRA"
-  },
-  // Cuentas por Cobrar (CXC)
-  {
-    id: "cxc-1",
-    tipo: "CXC",
-    entidadNombre: "Taller Mecánico Hermanos Ramos",
-    entidadDocumento: "J-31456789-2",
-    concepto: "Ticket TKT-382945 - Venta a Crédito 5 Cajas Tornillos y Bombillos",
-    numeroDocumento: "TKT-382945",
-    montoOriginal: 145.50,
-    saldoPendiente: 145.50,
-    moneda: "USD",
-    estado: "PENDIENTE",
-    fechaRegistro: "2026-09-19",
-    fechaVencimiento: "2026-09-30",
-    referenciaTipo: "VENTA"
-  },
-  {
-    id: "cxc-2",
-    tipo: "CXC",
-    entidadNombre: "Constructora Andina C.A.",
-    entidadDocumento: "J-40982314-1",
-    concepto: "Ticket TKT-383012 - Venta a Crédito Materiales de Obra",
-    numeroDocumento: "TKT-383012",
-    montoOriginal: 380.00,
-    saldoPendiente: 380.00,
-    moneda: "USD",
-    estado: "PENDIENTE",
-    fechaRegistro: "2026-09-20",
-    fechaVencimiento: "2026-10-05",
-    referenciaTipo: "VENTA"
-  },
-  {
-    id: "cxc-3",
-    tipo: "CXC",
-    entidadNombre: "Servicios Industriales Vargas",
-    entidadDocumento: "V-18765432",
-    concepto: "Ticket TKT-381044 - Venta a Crédito Repuestos y Filtros",
-    numeroDocumento: "TKT-381044",
-    montoOriginal: 250.00,
-    saldoPendiente: 0.00,
-    moneda: "USD",
-    estado: "PAGADO",
-    fechaRegistro: "2026-09-08",
-    fechaVencimiento: "2026-09-20",
-    referenciaTipo: "VENTA"
   }
 ];
 
@@ -2051,9 +1933,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
 
   // Las cuentas por cobrar/pagar viven en el backend real (ver cargarCuentas más abajo,
   // definida después junto a cargarIngresosCaja/cargarGastosCaja) — arranca vacío y se
-  // hidrata por useEffect cuando hay tenant activo. CUENTAS_INICIALES_COMERCIO solo se usa
-  // como demo cuando no hay sesión (modo preview sin tenant).
-  const [cuentas, setCuentas] = useState<CuentaComercio[]>(CUENTAS_INICIALES_COMERCIO);
+  // hidrata por useEffect cuando hay tenant activo (sin datos de demostración).
+  const [cuentas, setCuentas] = useState<CuentaComercio[]>([]);
 
   const guardarCuentas = (nuevas: CuentaComercio[]) => {
     setCuentas(nuevas);
@@ -2076,14 +1957,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   const [modalIaVisible, setModalIaVisible] = useState(false);
 
   // Estado del Catálogo y Clientes
-  const [productos, setProductos] = useState<ProductoComercio[]>(() => {
-    try {
-      const g = localStorage.getItem("aurora_comercio_productos");
-      return g ? JSON.parse(g) : PRODUCTOS_INICIALES;
-    } catch {
-      return PRODUCTOS_INICIALES;
-    }
-  });
+  // El catálogo arranca vacío y lo llena el servidor (cargarRepuestosBackend). Antes arrancaba
+  // con productos de demostración que, si el servidor fallaba, se podían vender en el POS.
+  const [productos, setProductos] = useState<ProductoComercio[]>([]);
 
   const productosDelRubro = useMemo(() => productos.filter((p) => p.rubro === perfilActivo), [productos, perfilActivo]);
 
@@ -2102,23 +1978,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     [productosDelRubro]
   );
 
-  const [clientes, setClientes] = useState<ClienteComercio[]>(() => {
-    try {
-      const g = localStorage.getItem("aurora_comercio_clientes");
-      return g ? JSON.parse(g) : CLIENTES_INICIALES;
-    } catch {
-      return CLIENTES_INICIALES;
-    }
-  });
+  // Solo "Consumidor Final" hasta que el servidor devuelve los clientes reales (antes aparecían
+  // clientes inventados con deudas, como "Constructora Andina").
+  const [clientes, setClientes] = useState<ClienteComercio[]>([CONSUMIDOR_FINAL]);
 
-  const [ventas, setVentas] = useState<VentaComercio[]>(() => {
-    try {
-      const g = localStorage.getItem("aurora_comercio_ventas");
-      return g ? JSON.parse(g) : VENTAS_INICIALES;
-    } catch {
-      return VENTAS_INICIALES;
-    }
-  });
+  const [ventas, setVentas] = useState<VentaComercio[]>([]);
 
   const [clienteSel, setClienteSel] = useState<ClienteComercio>(clientes[0]);
 
@@ -2332,8 +2196,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
         }
         if (cancelado) return;
 
-        const consumidorFinal = CLIENTES_INICIALES.find((c) => c.id === "c-1") || CLIENTES_INICIALES[0];
-        const listaClientes = [consumidorFinal, ...clientesFinal.map(clienteDesdeServidor)];
+        const listaClientes = [CONSUMIDOR_FINAL, ...clientesFinal.map(clienteDesdeServidor)];
         clientesSincronizados.current = new Map(listaClientes.filter((c) => c.id !== "c-1").map((c) => [c.id, firmaCliente(c)]));
         const listaVentas: VentaComercio[] = [];
         for (const v of ventasFinal) {
@@ -2412,9 +2275,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
         const previo = ubicacionPorRepuesto.get(u.repuestoId);
         ubicacionPorRepuesto.set(u.repuestoId, previo ? `${previo} · ${texto}` : texto);
       }
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         const itemsTenant = items.filter((r) => r.tenantId === user.tenantId);
-        if (itemsTenant.length > 0) {
+        {
           const mapeados: ProductoComercio[] = itemsTenant.map((r) => ({
             id: `rep-${r.id}`,
             backendId: r.id,
@@ -2450,6 +2313,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       }
     } catch (err) {
       console.warn("No se pudo conectar a /api/repuestos/items", err);
+      mostrarToast("No se pudo cargar tu inventario. Revisa la conexión y vuelve a intentar.", "error");
     } finally {
       setCargandoBackend(false);
     }
@@ -3098,7 +2962,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   };
 
   const nombreLocal = user?.empresa || (
-    esFarmacia ? "Farmacia & Droguería San Cristóbal" : "Comercio El Tornillo"
+    "Mi negocio"
   );
 
   const saludo = (() => {

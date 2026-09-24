@@ -64,31 +64,6 @@ interface Props {
   deepLinkAnimalId?: number;
 }
 
-// Datos de demostración de alto realismo para cuando el backend está sin datos o en carga
-const DEMO_POTREROS: PotreroGanaderia[] = [
-  { id: 101, tenantId: 1, codigo: "POT-01", nombre: "Potrero 1 - El Roble", areaHectareas: 14.5, capacidadAnimales: 25, tipoPasto: "Brachiaria decumbens", color: "#10B981", diasDescansoMinimo: 28, estado: "ACTIVO", ordenRotacion: 1, observaciones: "Cerca viva de matarratón, agua de morichal." },
-  { id: 102, tenantId: 1, codigo: "POT-02", nombre: "Potrero 2 - Los Samanes", areaHectareas: 18.0, capacidadAnimales: 32, tipoPasto: "Guinea Mombaza", color: "#F59E0B", diasDescansoMinimo: 35, estado: "EN_DESCANSO", ordenRotacion: 2, fechaInicioDescanso: "2026-09-01", observaciones: "Sombra natural abundante, descanso de 10 días." },
-  { id: 103, tenantId: 1, codigo: "POT-03", nombre: "Potrero 3 - La Vega", areaHectareas: 12.0, capacidadAnimales: 20, tipoPasto: "Estrella Africana", color: "#3B82F6", diasDescansoMinimo: 24, estado: "EN_DESCANSO", ordenRotacion: 3, fechaInicioDescanso: "2026-09-05", observaciones: "Borde de río, drenaje rápido." },
-  { id: 104, tenantId: 1, codigo: "POT-04", nombre: "Potrero 4 - Maternidad", areaHectareas: 6.5, capacidadAnimales: 10, tipoPasto: "Pasto Mulato II", color: "#8B5CF6", diasDescansoMinimo: 21, estado: "ACTIVO", ordenRotacion: 4, observaciones: "Junto a la vaquera para monitoreo 24/7." }
-];
-
-const DEMO_ANIMALES: AnimalGanaderia[] = [
-  { id: 201, tenantId: 1, arete: "V-042", nombre: "Mariposa", especie: "BOVINO", raza: "Gyr Lechero", sexo: "HEMBRA", tipoAnimal: "VACA", fechaNacimiento: "2021-04-12", pesoActual: 465, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1200, lote: "Lote Entrada Marzo 2026" },
-  { id: 202, tenantId: 1, arete: "V-089", nombre: "Lucero", especie: "BOVINO", raza: "Jersey", sexo: "HEMBRA", tipoAnimal: "VACA", fechaNacimiento: "2022-01-20", pesoActual: 420, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1350, lote: "Lote Entrada Marzo 2026" },
-  { id: 203, tenantId: 1, arete: "T-015", nombre: "Diamante", especie: "BOVINO", raza: "Brahman Blanco", sexo: "MACHO", tipoAnimal: "TORO", fechaNacimiento: "2020-08-15", pesoActual: 820, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 2800, lote: "Compra Feria San Cristóbal" },
-  { id: 204, tenantId: 1, arete: "N-104", nombre: "Esperanza", especie: "BOVINO", raza: "F1 Girolando", sexo: "HEMBRA", tipoAnimal: "NOVILLA", fechaNacimiento: "2024-03-10", pesoActual: 330, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 850, lote: "Lote Entrada Marzo 2026" },
-  { id: 205, tenantId: 1, arete: "C-205", nombre: "Relámpago", especie: "BOVINO", raza: "Gyr x Holstein", sexo: "MACHO", tipoAnimal: "TERNERO", fechaNacimiento: "2026-06-02", pesoActual: 98, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 400, lote: "Nacimientos Finca 2026" },
-  { id: 206, tenantId: 1, arete: "M-112", nombre: "Bandera", especie: "BOVINO", raza: "Carora", sexo: "HEMBRA", tipoAnimal: "MAUTA", fechaNacimiento: "2025-02-14", pesoActual: 240, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 650, lote: "Compra Feria San Cristóbal" },
-  { id: 207, tenantId: 1, arete: "NV-08", nombre: "Barcino", especie: "BOVINO", raza: "Brahman Rojo", sexo: "MACHO", tipoAnimal: "NOVILLO", fechaNacimiento: "2023-11-05", pesoActual: 510, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1100, lote: "Lote Entrada Marzo 2026" },
-  { id: 208, tenantId: 1, arete: "B-031", nombre: "Canela", especie: "BOVINO", raza: "Senepol", sexo: "HEMBRA", tipoAnimal: "BECERRA", fechaNacimiento: "2026-05-18", pesoActual: 85, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 380, lote: "Nacimientos Finca 2026" },
-];
-
-const DEMO_ORDENOS: RegistroOrdenoGanaderia[] = [
-  { id: 301, tenantId: 1, animal: DEMO_ANIMALES[0], fecha: "2026-09-11", turno: "MANANA", cantidadLitros: 14.5, precioVentaLitro: 0.55, montoVenta: 7.97, porcentajeGrasa: 3.8, porcentajeProteina: 3.2 },
-  { id: 302, tenantId: 1, animal: DEMO_ANIMALES[1], fecha: "2026-09-11", turno: "MANANA", cantidadLitros: 16.2, precioVentaLitro: 0.55, montoVenta: 8.91, porcentajeGrasa: 4.4, porcentajeProteina: 3.5 },
-  { id: 303, tenantId: 1, animal: DEMO_ANIMALES[0], fecha: "2026-09-10", turno: "TARDE", cantidadLitros: 9.8, precioVentaLitro: 0.55, montoVenta: 5.39, porcentajeGrasa: 3.9, porcentajeProteina: 3.1 },
-];
-
 const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
   { id: 1, tenantId: 1, nombre: "Aftosa Bivalente (A+O)", diasParaRefuerzo: 180, diasRetiroLeche: 0, diasRetiroCarne: 0 },
   { id: 2, tenantId: 1, nombre: "Rabia Paralítica Bovina", diasParaRefuerzo: 365, diasRetiroLeche: 0, diasRetiroCarne: 0 },
@@ -104,19 +79,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Tasas de cambio multi-moneda (configurables a mano y persistidas)
   const [tasaBCV, setTasaBCV] = useState<number>(() => {
     try {
-      const g = localStorage.getItem("aurora_ganaderia_tasa_bcv");
-      return g ? Number(g) || 43.50 : 43.50;
+      const g = localStorage.getItem(`aurora_ganaderia_tasa_bcv_${tenantId}`);
+      return g ? Number(g) || 0 : 0;
     } catch {
-      return 43.50;
+      return 0;
     }
   });
 
   const [tasaCOP, setTasaCOP] = useState<number>(() => {
     try {
-      const g = localStorage.getItem("aurora_ganaderia_tasa_cop");
-      return g ? Number(g) || 4150.0 : 4150.0;
+      const g = localStorage.getItem(`aurora_ganaderia_tasa_cop_${tenantId}`);
+      return g ? Number(g) || 0 : 0;
     } catch {
-      return 4150.0;
+      return 0;
     }
   });
 
@@ -148,9 +123,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [precioLecheUSD, setPrecioLecheUSD] = useState<number>(() => {
     try {
       const p = localStorage.getItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`);
-      return p ? Number(p) || 0.55 : 0.55;
+      return p ? Number(p) || 0 : 0;
     } catch {
-      return 0.55;
+      return 0;
     }
   });
   const [modalEditarPrecioLeche, setModalEditarPrecioLeche] = useState(false);
@@ -173,8 +148,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       guardarMonedasConfig(vesActivo, copActivo);
     }
     try {
-      localStorage.setItem("aurora_ganaderia_tasa_bcv", String(nuevaBcv));
-      localStorage.setItem("aurora_ganaderia_tasa_cop", String(nuevaCop));
+      localStorage.setItem(`aurora_ganaderia_tasa_bcv_${tenantId}`, String(nuevaBcv));
+      localStorage.setItem(`aurora_ganaderia_tasa_cop_${tenantId}`, String(nuevaCop));
     } catch {}
     setModalEditarTasas(false);
     // El motor financiero (caja, despachos, ventas) usa las tasas del backend:
