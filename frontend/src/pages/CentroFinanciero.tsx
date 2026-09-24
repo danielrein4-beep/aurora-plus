@@ -260,7 +260,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
           <div className="flex items-center gap-3.5">
             <button
               onClick={() => navigate('/dashboard')}
-              className="apple-glass-btn text-xs font-semibold px-3 py-1.5 rounded-full text-slate-700 dark:text-white/80 hover:text-teal-500 dark:hover:text-teal-300 border border-slate-300/70 dark:border-white/15 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="apple-glass-btn text-xs font-light uppercase tracking-wide px-3 py-1.5 rounded-full text-slate-700 dark:text-white/80 hover:text-teal-500 dark:hover:text-teal-300 border border-slate-300/70 dark:border-white/15 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
               title="Regresar al Hub Principal"
             >
               <span>←</span>
@@ -280,7 +280,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
                     Control Integral
                   </span>
                 </div>
-                <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium">
+                <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wide uppercase mt-0.5 font-light">
                   Visión operativa del negocio
                 </div>
               </div>
@@ -315,7 +315,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
               type="button"
               onClick={handleApplyPeriod}
               disabled={previewMode || loading}
-              className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer shadow-md hover:scale-105 transition-all disabled:opacity-50"
+              className="btn-cyber-neon text-white text-xs font-light uppercase tracking-wide px-4 py-2 rounded-full cursor-pointer shadow-md hover:scale-105 transition-all disabled:opacity-50"
             >
               {loading ? 'Consultando…' : 'Consultar'}
             </button>
@@ -328,10 +328,10 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
         <div className="apple-glass rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border border-slate-300/60 dark:border-white/10 shadow-sm text-xs">
           <div className="flex items-center gap-2.5">
             <span className={`w-2 h-2 rounded-full ${isDemoTab ? 'bg-amber-400 animate-pulse' : 'bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)]'}`} />
-            <span className="font-semibold text-slate-800 dark:text-white">
+            <span className="font-light uppercase tracking-wide text-slate-800 dark:text-white">
               {isDemoTab ? 'Vista de Demostración & Estructura' : 'Fuentes Operativas Consolidadas'}
             </span>
-            <span className="text-slate-500 dark:text-white/50 text-[11px] hidden md:inline">
+            <span className="text-slate-500 dark:text-white/50 text-[11px] hidden md:inline font-light uppercase tracking-wide">
               — {isDemoTab ? 'Módulo configurado para recibir datos automáticos de tus verticales' : `Moneda base: ${financeData?.moneda || 'USD'}`}
             </span>
           </div>
@@ -356,7 +356,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-light uppercase tracking-wide transition-all duration-300 cursor-pointer whitespace-nowrap ${
                   isActive
                     ? 'bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25'
                     : 'text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8'
@@ -381,7 +381,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
           {!previewMode && (activeTab === 'resumen' || activeTab === 'cobertura') && loading && (
             <div className="apple-glass rounded-3xl border border-slate-300/60 dark:border-white/10 p-12 text-center text-sm text-slate-500 dark:text-white/60 space-y-3">
               <div className="w-8 h-8 mx-auto border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-semibold">Consultando las fuentes financieras en tiempo real…</p>
+              <p className="font-light uppercase tracking-wide">Consultando las fuentes financieras en tiempo real…</p>
             </div>
           )}
 
@@ -392,7 +392,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
               <button
                 type="button"
                 onClick={() => void loadFinanceData()}
-                className="btn-electric-blue text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer shadow-md"
+                className="btn-electric-blue text-white text-xs font-light uppercase tracking-wide px-4 py-2 rounded-full cursor-pointer shadow-md"
               >
                 Reintentar
               </button>
@@ -453,7 +453,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
                 <h3 className="text-base sm:text-lg font-bold font-['Outfit'] text-slate-900 dark:text-white">
                   Detalle de Integración de Fuentes por Vertical
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-white/60 mt-1 leading-relaxed max-w-2xl">
+                <p className="text-xs text-slate-500 dark:text-white/60 mt-1 leading-relaxed max-w-2xl font-light uppercase tracking-wide">
                   Para que las cifras operativas reflejen la realidad de tu empresa, Aurora Plus clasifica cada área en estado cualitativo: <strong className="text-emerald-500">Con datos</strong>, <strong className="text-amber-500">Parcial</strong> o <strong className="text-rose-500">Sin conexión</strong>.
                 </p>
               </div>
@@ -485,7 +485,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
                   {tab.id === 'documentos' && <IconFileText size={16} />}
                   {tab.id === 'cobertura' && <IconCloud size={16} />}
                 </span>
-                <span className="truncate text-[10px] font-medium w-full text-center leading-tight">
+                <span className="truncate text-[10px] font-light uppercase tracking-wide w-full text-center leading-tight">
                   {tab.shortLabel}
                 </span>
               </button>

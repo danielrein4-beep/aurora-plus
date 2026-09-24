@@ -33,7 +33,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
           <h3 className="font-['Outfit'] text-base font-bold text-slate-900 dark:text-white">
             Registro Comercial: Ventas vs. Compras
           </h3>
-          <p className="text-xs text-slate-500 dark:text-white/60 mt-0.5 leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-white/60 mt-0.5 leading-relaxed font-light uppercase tracking-wide">
             Monitoreo en tiempo real del flujo de caja comercial en su moneda de pago original (USD, VES o COP).
           </p>
         </div>
@@ -46,7 +46,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
                 <button
                   key={type}
                   onClick={() => setFilterType(type)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 text-xs font-light uppercase tracking-wide rounded-full transition-all cursor-pointer whitespace-nowrap ${
                     filterType === type
                       ? 'bg-teal-600 text-white shadow-sm'
                       : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white'
@@ -62,7 +62,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
                 <button
                   key={curr}
                   onClick={() => setFilterCurrency(curr)}
-                  className={`px-2.5 py-1 text-xs font-bold font-mono rounded-full transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-2.5 py-1 text-xs font-light uppercase tracking-wide font-mono rounded-full transition-all cursor-pointer whitespace-nowrap ${
                     filterCurrency === curr
                       ? 'bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30'
                       : 'text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
@@ -88,7 +88,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
 
       {/* Lista de Transacciones Responsive */}
       <div className="apple-glass rounded-2xl border border-slate-200/60 dark:border-white/10 overflow-hidden shadow-sm">
-        <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-bold text-slate-400 dark:text-white/40 border-b border-slate-200/50 dark:border-white/10 uppercase tracking-wider bg-slate-100/60 dark:bg-white/[0.02]">
+        <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] font-light text-slate-400 dark:text-white/40 border-b border-slate-200/50 dark:border-white/10 uppercase tracking-wide bg-slate-100/60 dark:bg-white/[0.02]">
           <div className="col-span-4">Operación / Ref. Interna</div>
           <div className="col-span-3">Contraparte / Área</div>
           <div className="col-span-2">Método de Pago</div>
@@ -98,7 +98,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
 
         <div className="divide-y divide-slate-100 dark:divide-white/5">
           {filtered.length === 0 ? (
-            <div className="text-center py-12 text-xs text-slate-400 dark:text-white/40">
+            <div className="text-center py-12 text-xs text-slate-400 dark:text-white/40 font-light uppercase tracking-wide">
               No se encontraron transacciones con los filtros actuales.
             </div>
           ) : (
@@ -123,7 +123,7 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
                       {isSale ? '+' : '−'}
                     </div>
                     <div>
-                      <div className="text-xs font-semibold text-slate-800 dark:text-white/90 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors line-clamp-1">
+                      <div className="text-xs font-light uppercase tracking-wide text-slate-800 dark:text-white/90 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors line-clamp-1">
                         {tx.description}
                       </div>
                       <div className="text-[11px] text-slate-400 dark:text-white/40 flex items-center gap-1.5 mt-0.5 font-mono">
@@ -142,16 +142,16 @@ export const VentasComprasFinanciero: React.FC<VentasComprasFinancieroProps> = (
 
                   {/* Contraparte y Vertical */}
                   <div className="md:col-span-3">
-                    <div className="text-xs text-slate-800 dark:text-white/90 font-medium">
+                    <div className="text-xs text-slate-800 dark:text-white/90 font-light uppercase tracking-wide">
                       {tx.counterparty}
                     </div>
-                    <div className="text-[11px] text-slate-400 dark:text-white/40">
+                    <div className="text-[11px] text-slate-400 dark:text-white/40 font-light uppercase tracking-wide">
                       {tx.vertical}
                     </div>
                   </div>
 
                   {/* Método de Pago */}
-                  <div className="md:col-span-2 text-xs text-slate-600 dark:text-white/70">
+                  <div className="md:col-span-2 text-xs text-slate-600 dark:text-white/70 font-light uppercase tracking-wide">
                     <span className="md:hidden text-slate-400 mr-1">Pago:</span>
                     {tx.paymentMethod}
                   </div>

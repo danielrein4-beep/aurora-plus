@@ -49,14 +49,14 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
               <h3 className="text-base sm:text-lg font-bold font-['Outfit'] text-slate-900 dark:text-white">
                 Vista Consolidada de Documentos Operativos
               </h3>
-              <p className="text-xs text-slate-500 dark:text-white/60 mt-1 leading-relaxed max-w-2xl">
+              <p className="text-xs text-slate-500 dark:text-white/60 mt-1 leading-relaxed max-w-2xl font-light uppercase tracking-wide">
                 Consolidación centralizada de notas de entrega y documentos de venta no fiscales generados en cada vertical de tu empresa. Cada comprobante cuenta con su referencia interna y trazabilidad de origen.
               </p>
             </div>
           </div>
 
           <div className="shrink-0 bg-amber-500/10 border border-amber-500/30 px-3.5 py-1.5 rounded-full self-start sm:self-auto shadow-sm">
-            <span className="text-[11px] font-bold font-mono text-amber-600 dark:text-amber-300 tracking-wider uppercase">
+            <span className="text-[11px] font-light font-mono text-amber-600 dark:text-amber-300 tracking-wide uppercase">
               DOCUMENTO NO FISCAL
             </span>
           </div>
@@ -71,7 +71,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
                 <button
                   key={type}
                   onClick={() => setSelectedType(type)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 text-xs font-light uppercase tracking-wide rounded-full transition-all cursor-pointer whitespace-nowrap ${
                     selectedType === type
                       ? 'bg-teal-500 text-white shadow-md'
                       : 'text-slate-600 dark:text-white/70 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5'
@@ -86,7 +86,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
             <select
               value={selectedVertical}
               onChange={(e) => setSelectedVertical(e.target.value)}
-              className="apple-glass rounded-full border border-slate-300/70 dark:border-white/15 text-slate-800 dark:text-white text-xs px-3.5 py-2 outline-none cursor-pointer max-w-full font-medium"
+              className="apple-glass rounded-full border border-slate-300/70 dark:border-white/15 text-slate-800 dark:text-white text-xs px-3.5 py-2 outline-none cursor-pointer max-w-full font-light uppercase tracking-wide"
             >
               <option value="ALL">Todas las Verticales</option>
               {verticals.map((v) => (
@@ -100,7 +100,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
                 <button
                   key={curr}
                   onClick={() => setSelectedCurrency(curr)}
-                  className={`px-2.5 py-1 text-xs font-semibold font-mono rounded-full transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs font-light uppercase tracking-wide font-mono rounded-full transition-all cursor-pointer ${
                     selectedCurrency === curr
                       ? 'bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/40 shadow-xs'
                       : 'text-slate-500 dark:text-white/60 hover:text-slate-900 dark:hover:text-white'
@@ -128,7 +128,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
 
       {/* Listado de Documentos Consolidado — Apple Liquid Glass Table */}
       <div className="apple-glass rounded-3xl border border-slate-300/60 dark:border-white/10 overflow-hidden shadow-xl">
-        <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-3.5 text-[11px] font-bold text-slate-500 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10 uppercase tracking-wider bg-slate-100/50 dark:bg-white/[0.02]">
+        <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-3.5 text-[11px] font-light text-slate-500 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10 uppercase tracking-wide bg-slate-100/50 dark:bg-white/[0.02]">
           <div className="col-span-3">Referencia Interna / Tipo</div>
           <div className="col-span-3">Vertical de Origen / Receptor</div>
           <div className="col-span-3">Detalle Operativo</div>
@@ -138,7 +138,7 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
 
         <div className="divide-y divide-slate-200/60 dark:divide-white/5">
           {filtered.length === 0 ? (
-            <div className="text-center py-14 text-sm text-slate-400 dark:text-white/50 font-medium">
+            <div className="text-center py-14 text-sm text-slate-400 dark:text-white/50 font-light uppercase tracking-wide">
               No hay comprobantes operativos que coincidan con los filtros seleccionados.
             </div>
           ) : (
@@ -156,12 +156,12 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
                       <span className="font-mono text-xs font-bold text-teal-600 dark:text-teal-300">
                         {doc.referenciaInterna}
                       </span>
-                      <span className="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30 font-semibold">
+                      <span className="text-[10px] uppercase font-mono tracking-wide px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30 font-light">
                         {doc.nonFiscalNotice}
                       </span>
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-white/60 mt-1 flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-light uppercase tracking-wide border ${
                         isNotaEntrega
                           ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30'
                           : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
@@ -174,20 +174,20 @@ export const DocumentosFinancieros: React.FC<DocumentosFinancierosProps> = ({ do
 
                   {/* Vertical de Origen y Cliente */}
                   <div className="lg:col-span-3">
-                    <div className="text-xs font-semibold text-slate-900 dark:text-white">
+                    <div className="text-xs font-light uppercase tracking-wide text-slate-900 dark:text-white">
                       {doc.clientOrBeneficiary}
                     </div>
-                    <div className="text-[11px] text-teal-600 dark:text-teal-300/90 mt-0.5 font-medium">
+                    <div className="text-[11px] text-teal-600 dark:text-teal-300/90 mt-0.5 font-light uppercase tracking-wide">
                       Origen: {doc.verticalOrigin}
                     </div>
                   </div>
 
                   {/* Detalle y Pago */}
                   <div className="lg:col-span-3">
-                    <div className="text-xs text-slate-700 dark:text-white/80 line-clamp-1" title={doc.itemsSummary}>
+                    <div className="text-xs text-slate-700 dark:text-white/80 line-clamp-1 font-light uppercase tracking-wide" title={doc.itemsSummary}>
                       {doc.itemsSummary}
                     </div>
-                    <div className="text-[11px] text-slate-400 dark:text-white/50 mt-0.5">
+                    <div className="text-[11px] text-slate-400 dark:text-white/50 mt-0.5 font-light uppercase tracking-wide">
                       Cobro: {doc.paymentMethod}
                     </div>
                   </div>

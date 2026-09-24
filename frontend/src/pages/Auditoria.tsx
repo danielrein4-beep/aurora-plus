@@ -57,7 +57,7 @@ export default function Auditoria() {
         <div className="flex items-center gap-3.5">
           <button
             onClick={() => navigate('/dashboard')}
-            className="apple-glass-btn text-xs font-semibold px-3 py-1.5 rounded-full text-slate-700 dark:text-white/80 hover:text-amber-500 dark:hover:text-amber-300 border border-slate-300/70 dark:border-white/15 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="apple-glass-btn text-xs font-light uppercase tracking-wide px-3 py-1.5 rounded-full text-slate-700 dark:text-white/80 hover:text-amber-500 dark:hover:text-amber-300 border border-slate-300/70 dark:border-white/15 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <span>←</span>
             <span>Volver al Hub</span>
@@ -68,13 +68,13 @@ export default function Auditoria() {
               <AuroraLogo size={24} animated />
             </div>
             <div>
-              <div className="font-['Outfit'] font-extrabold text-base text-slate-900 dark:text-white leading-none flex items-center gap-2">
+              <div className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white leading-none flex items-center gap-2">
                 <span>Auditoría</span>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                   Solo Dueño/Admin
                 </span>
               </div>
-              <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium">
+              <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-light">
                 Quién creó, editó o eliminó cada registro
               </div>
             </div>
@@ -83,7 +83,7 @@ export default function Auditoria() {
 
         <button
           onClick={cargar}
-          className="apple-glass-btn text-xs font-semibold px-3 py-1.5 rounded-full text-slate-700 dark:text-white/80 hover:text-amber-500 dark:hover:text-amber-300 border border-slate-300/70 dark:border-white/15 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+          className="apple-glass-btn text-xs font-light uppercase tracking-wide px-3 py-1.5 rounded-full text-slate-700 dark:text-white/80 hover:text-amber-500 dark:hover:text-amber-300 border border-slate-300/70 dark:border-white/15 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
         >
           <IconRefresh size={14} />
           <span>Actualizar</span>
@@ -109,7 +109,7 @@ export default function Auditoria() {
         </div>
 
         {error && (
-          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-300 text-sm font-semibold flex items-center gap-2">
+          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-300 text-sm font-light uppercase tracking-wide flex items-center gap-2">
             <IconShield size={18} />
             <span>{error}</span>
           </div>
@@ -130,11 +130,11 @@ export default function Auditoria() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 dark:text-white/40 border-b border-slate-200/80 dark:border-white/10">
-                  <th className="px-4 py-3 font-semibold">Fecha</th>
-                  <th className="px-4 py-3 font-semibold">Usuario</th>
-                  <th className="px-4 py-3 font-semibold">Módulo</th>
-                  <th className="px-4 py-3 font-semibold">Acción</th>
-                  <th className="px-4 py-3 font-semibold">Detalle</th>
+                  <th className="px-4 py-3 font-light uppercase tracking-wide">Fecha</th>
+                  <th className="px-4 py-3 font-light uppercase tracking-wide">Usuario</th>
+                  <th className="px-4 py-3 font-light uppercase tracking-wide">Módulo</th>
+                  <th className="px-4 py-3 font-light uppercase tracking-wide">Acción</th>
+                  <th className="px-4 py-3 font-light uppercase tracking-wide">Detalle</th>
                 </tr>
               </thead>
               <tbody>
@@ -144,7 +144,7 @@ export default function Auditoria() {
                       {new Date(r.fecha).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800 dark:text-white/85">{r.usuario}</div>
+                      <div className="font-bold text-slate-800 dark:text-white/85">{r.usuario}</div>
                       {r.rolUsuario && <div className="text-[10px] text-slate-400 dark:text-white/40 uppercase">{r.rolUsuario}</div>}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-white/60 text-xs font-mono">{r.modulo}</td>
@@ -166,7 +166,7 @@ export default function Auditoria() {
             <button
               disabled={pagina === 0}
               onClick={() => setPagina((p) => Math.max(0, p - 1))}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 text-xs font-semibold disabled:opacity-40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 text-xs font-light uppercase tracking-wide disabled:opacity-40 cursor-pointer"
             >
               ← Anterior
             </button>
@@ -174,7 +174,7 @@ export default function Auditoria() {
             <button
               disabled={pagina + 1 >= datos.totalPages}
               onClick={() => setPagina((p) => p + 1)}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 text-xs font-semibold disabled:opacity-40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 text-xs font-light uppercase tracking-wide disabled:opacity-40 cursor-pointer"
             >
               Siguiente →
             </button>

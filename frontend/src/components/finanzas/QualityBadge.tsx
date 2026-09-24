@@ -37,9 +37,9 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
     }
   }[state];
 
-  const sizeClasses = size === 'sm' 
-    ? 'px-2 py-0.5 text-[10px] font-bold' 
-    : 'px-2.5 py-1 text-xs font-bold';
+  const sizeClasses = size === 'sm'
+    ? 'px-2 py-0.5 text-[10px] font-light uppercase tracking-wide'
+    : 'px-2.5 py-1 text-xs font-light uppercase tracking-wide';
 
   return (
     <div 
@@ -55,7 +55,7 @@ export const QualityBadge: React.FC<QualityBadgeProps> = ({
             {config.icon}
             <span>{config.label}</span>
           </p>
-          {explanation}
+          <span className="font-light uppercase tracking-wide">{explanation}</span>
         </span>
       )}
     </div>

@@ -12,6 +12,6 @@ export const EmptyFinanceState: React.FC<EmptyFinanceStateProps> = ({ title, des
       <IconCloud size={24} />
     </div>
     <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">{title}</h4>
-    <p className="text-xs text-slate-500 dark:text-white/50 max-w-md leading-relaxed">{description}</p>
+    <p className="text-xs text-slate-500 dark:text-white/50 max-w-md leading-relaxed font-light uppercase tracking-wide">{description}</p>
   </div>
 );

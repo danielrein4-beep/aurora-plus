@@ -140,7 +140,7 @@ export default function PortalPublicoBioanalista() {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
         <div className="w-12 h-12 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-slate-400 font-medium">Verificando orden médica en la red...</p>
+        <p className="text-slate-400 font-light uppercase tracking-wide">Verificando orden médica en la red...</p>
       </div>
     );
   }
@@ -154,7 +154,7 @@ export default function PortalPublicoBioanalista() {
             <IconWarning size={28} />
           </div>
           <h1 className="text-xl font-bold text-white">Orden Médica No Encontrada</h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-400 font-light uppercase tracking-wide">
             {error || "El código o enlace provisto no existe o ha sido revocado. Verifique con el consultorio médico emisor."}
           </p>
         </div>
@@ -171,25 +171,25 @@ export default function PortalPublicoBioanalista() {
             <IconShield size={36} />
           </div>
           <div className="space-y-2">
-            <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs font-semibold tracking-wider uppercase border border-emerald-500/30">
+            <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs font-light tracking-wide uppercase border border-emerald-500/30">
               Orden Sellada & Protegida
             </span>
             <h1 className="text-2xl font-black text-white font-['Outfit']">
               Resultados Procesados con Éxito
             </h1>
-            <p className="text-slate-300 text-sm leading-relaxed">
+            <p className="text-slate-300 text-sm font-light uppercase tracking-wide leading-relaxed">
               Esta orden médica (<span className="text-emerald-300 font-mono font-bold">{orden.codigoOrden}</span>) ha sido procesada y archivada de forma segura en el expediente clínico privado del paciente.
             </p>
           </div>
 
-          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-left space-y-2 text-xs text-slate-400">
+          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-left space-y-2 text-xs text-slate-400 font-light uppercase tracking-wide">
             <div className="flex justify-between items-center py-1 border-b border-slate-800">
               <span>Laboratorio Emisor:</span>
-              <span className="text-white font-semibold">{orden.laboratorioEmisor || nombreLaboratorio || "Laboratorio Clínico"}</span>
+              <span className="text-white">{orden.laboratorioEmisor || nombreLaboratorio || "Laboratorio Clínico"}</span>
             </div>
             <div className="flex justify-between items-center py-1 border-b border-slate-800">
               <span>Estado Criptográfico:</span>
-              <span className="text-emerald-400 font-bold">INMUTABLE (Cerrado a edición)</span>
+              <span className="text-emerald-400">INMUTABLE (Cerrado a edición)</span>
             </div>
             <div className="flex justify-between items-center py-1">
               <span>Privacidad:</span>
@@ -197,7 +197,7 @@ export default function PortalPublicoBioanalista() {
             </div>
           </div>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 font-light uppercase tracking-wide">
             Los resultados ya se encuentran disponibles en el portal médico del consultorio para revisión y diagnóstico.
           </p>
         </div>
@@ -216,7 +216,7 @@ export default function PortalPublicoBioanalista() {
               <IconFrascoLab size={18} />
             </div>
             <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-teal-400">
+              <span className="text-xs font-light uppercase tracking-wide text-teal-400">
                 Red Diagnóstica de Laboratorios
               </span>
               <h1 className="text-sm font-bold text-white flex items-center gap-2">
@@ -237,30 +237,30 @@ export default function PortalPublicoBioanalista() {
         <div className="bg-slate-900/90 border border-teal-500/30 rounded-3xl p-5 sm:p-7 shadow-xl space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
             <div>
-              <span className="text-xs text-slate-400">Paciente:</span>
+              <span className="text-xs text-slate-400 font-light uppercase tracking-wide">Paciente:</span>
               <h2 className="text-lg font-bold text-white">{orden.pacienteNombre}</h2>
               {orden.pacienteCedula && (
                 <p className="text-xs font-mono text-teal-400">C.I. / DNI: {orden.pacienteCedula}</p>
               )}
             </div>
             <div className="text-right">
-              <span className="text-xs text-slate-400">Médico Solicitante:</span>
-              <p className="text-sm font-semibold text-white">{orden.medicoNombre || "Médico Tratante"}</p>
-              <p className="text-xs text-slate-500">{new Date(orden.fechaEmision).toLocaleDateString("es-VE")}</p>
+              <span className="text-xs text-slate-400 font-light uppercase tracking-wide">Médico Solicitante:</span>
+              <p className="text-sm font-light uppercase tracking-wide text-white">{orden.medicoNombre || "Médico Tratante"}</p>
+              <p className="text-xs text-slate-500 font-light uppercase tracking-wide">{new Date(orden.fechaEmision).toLocaleDateString("es-VE")}</p>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-teal-300 uppercase tracking-wider mb-2 inline-flex items-center gap-1.5">
+            <label className="text-xs font-light text-teal-300 uppercase tracking-wide mb-2 inline-flex items-center gap-1.5">
               <IconClipboardCheck size={13} /> Exámenes Solicitados por el Médico:
             </label>
-            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 text-sm text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 text-sm text-slate-200 whitespace-pre-wrap font-light uppercase tracking-wide leading-relaxed">
               {orden.examenesSolicitados}
             </div>
           </div>
 
           {orden.indicacionesClinicas && (
-            <div className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl p-3 flex items-start gap-2">
+            <div className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl p-3 flex items-start gap-2 font-light uppercase tracking-wide">
               <IconWarning size={13} className="shrink-0 mt-0.5" />
               <span><strong>Indicaciones / Ayuno:</strong> {orden.indicacionesClinicas}</span>
             </div>
@@ -273,14 +273,14 @@ export default function PortalPublicoBioanalista() {
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <span>✍️</span> Identificación del Laboratorio & Profesional
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 font-light uppercase tracking-wide mt-1">
               No requiere registrarse ni crear cuenta. Indique el nombre de su institución para estampar la firma.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-1">
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
+              <label className="text-xs font-light uppercase tracking-wide text-slate-300 block mb-1">
                 Nombre del Laboratorio <span className="text-teal-400">*</span>
               </label>
               <input
@@ -292,7 +292,7 @@ export default function PortalPublicoBioanalista() {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
+              <label className="text-xs font-light uppercase tracking-wide text-slate-300 block mb-1">
                 Bioanalista / Responsable <span className="text-teal-400">*</span>
               </label>
               <input
@@ -304,7 +304,7 @@ export default function PortalPublicoBioanalista() {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
+              <label className="text-xs font-light uppercase tracking-wide text-slate-300 block mb-1">
                 N° de Colegiatura / Registro (Opcional)
               </label>
               <input
@@ -321,10 +321,10 @@ export default function PortalPublicoBioanalista() {
           <div className="space-y-4 pt-2 border-t border-slate-800">
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="text-xs font-bold text-white uppercase tracking-wider">
+                <label className="text-xs font-light text-white uppercase tracking-wide">
                   <IconNote size={12} className="inline mr-1" /> Informe Técnico Detallado / Microscopía / Hallazgos
                 </label>
-                <span className="text-xs text-slate-500">Recuentos, frotis, urocultivo, sedimentos</span>
+                <span className="text-xs text-slate-500 font-light uppercase tracking-wide">Recuentos, frotis, urocultivo, sedimentos</span>
               </div>
               <textarea
                 rows={5}
@@ -340,7 +340,7 @@ export default function PortalPublicoBioanalista() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                <label className="text-xs font-light uppercase tracking-wide text-slate-300 block mb-1">
                   Conclusión / Impresión Diagnóstica del Laboratorio
                 </label>
                 <input
@@ -352,7 +352,7 @@ export default function PortalPublicoBioanalista() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                <label className="text-xs font-light uppercase tracking-wide text-slate-300 block mb-1">
                   Calidad de Muestra / Condiciones Pre-analíticas
                 </label>
                 <input
@@ -376,7 +376,7 @@ export default function PortalPublicoBioanalista() {
                   onChange={(e) => setValoresCriticos(e.target.checked)}
                   className="w-5 h-5 rounded border-slate-700 text-red-500 focus:ring-red-400"
                 />
-                <span className="font-bold text-sm text-red-400 flex items-center gap-1.5">
+                <span className="font-light uppercase tracking-wide text-sm text-red-400 flex items-center gap-1.5">
                   <IconWarning size={13} /> Notificar Valores Críticos / Rango de Pánico al Médico
                 </span>
               </label>
@@ -398,14 +398,14 @@ export default function PortalPublicoBioanalista() {
           <div className="space-y-3 pt-2 border-t border-slate-800">
             <div className="flex justify-between items-center">
               <div>
-                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <h4 className="text-sm font-light uppercase tracking-wide text-white flex items-center gap-2">
                   <IconCamera size={13} /> Evidencias Fotográficas & Documentos PDF
                 </h4>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-400 font-light uppercase tracking-wide">
                   Puede subir múltiples fotos de láminas, tirillas reactivas, fotos de hojas impresas o el PDF oficial.
                 </p>
               </div>
-              <label className="cursor-pointer px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all">
+              <label className="cursor-pointer px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-light uppercase tracking-wide text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all">
                 <span>+</span> Añadir Archivos
                 <input
                   type="file"
@@ -421,10 +421,10 @@ export default function PortalPublicoBioanalista() {
             {adjuntos.length === 0 ? (
               <label className="border-2 border-dashed border-slate-800 hover:border-teal-500/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-950/40">
                 <div className="mb-2 flex justify-center text-slate-400"><IconPaperclip size={28} /></div>
-                <p className="text-sm font-semibold text-slate-300">
+                <p className="text-sm font-light uppercase tracking-wide text-slate-300">
                   Haga clic para seleccionar fotos o documentos (o arrástrelos aquí)
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 font-light uppercase tracking-wide mt-1">
                   Formatos soportados: JPG, PNG, WEBP, PDF (Sin límite de cantidad)
                 </p>
                 <input
@@ -457,7 +457,7 @@ export default function PortalPublicoBioanalista() {
                         <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">PDF</span>
                       </div>
                     )}
-                    <span className="text-[11px] text-slate-300 truncate w-full font-medium px-1">
+                    <span className="text-[11px] text-slate-300 truncate w-full font-light uppercase tracking-wide px-1">
                       {adj.nombreArchivo}
                     </span>
                     <button
@@ -480,7 +480,7 @@ export default function PortalPublicoBioanalista() {
               type="button"
               onClick={() => setConfirmarModal(true)}
               disabled={enviando}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-500 text-slate-950 font-black text-base shadow-xl hover:shadow-teal-500/25 hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-500 text-slate-950 font-light uppercase tracking-wide text-base shadow-xl hover:shadow-teal-500/25 hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
             >
               <IconLock size={14} /> Firmar, Sellar y Enviar Informe a Mediclinic
             </button>
@@ -498,7 +498,7 @@ export default function PortalPublicoBioanalista() {
             <h3 className="text-lg font-bold text-white text-center font-['Outfit']">
               ¿Confirmar Sellado Inmutable?
             </h3>
-            <p className="text-xs text-slate-300 text-center leading-relaxed">
+            <p className="text-xs text-slate-300 font-light uppercase tracking-wide text-center leading-relaxed">
               Al confirmar, los resultados se registrarán inmediatamente en la Historia Clínica del paciente y llegarán al <strong>Inbox del Médico</strong>.
               <br /><br />
               <strong className="text-amber-400">Por protocolo de seguridad:</strong> Este enlace público quedará sellado para evitar que terceras personas que tengan acceso al papel o QR físico puedan alterar la información.
@@ -509,7 +509,7 @@ export default function PortalPublicoBioanalista() {
                 type="button"
                 onClick={() => setConfirmarModal(false)}
                 disabled={enviando}
-                className="flex-1 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-all"
+                className="flex-1 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-light uppercase tracking-wide transition-all"
               >
                 Volver y Revisar
               </button>
@@ -517,7 +517,7 @@ export default function PortalPublicoBioanalista() {
                 type="button"
                 onClick={ejecutarEnvioYSellado}
                 disabled={enviando}
-                className="flex-1 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-black transition-all flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-light uppercase tracking-wide transition-all flex items-center justify-center gap-1.5"
               >
                 {enviando ? "Sellando..." : "Sí, Sellar y Enviar"}
               </button>
