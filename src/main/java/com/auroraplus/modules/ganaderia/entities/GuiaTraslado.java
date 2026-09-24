@@ -25,8 +25,13 @@ public class GuiaTraslado {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    @Column(name = "numero_guia", nullable = false, unique = true)
+    /** Número interno de la nota (NM-aaaammdd-n), único por finca (ver V105). */
+    @Column(name = "numero_guia", nullable = false)
     private String numeroGuia;
+
+    /** Número de la guía oficial de movilización del INSAI, si ya se emitió. */
+    @Column(name = "numero_guia_oficial", length = 60)
+    private String numeroGuiaOficial;
 
     @Column(nullable = false)
     private LocalDate fecha;
@@ -64,6 +69,8 @@ public class GuiaTraslado {
     public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
     public String getNumeroGuia() { return numeroGuia; }
     public void setNumeroGuia(String numeroGuia) { this.numeroGuia = numeroGuia; }
+    public String getNumeroGuiaOficial() { return numeroGuiaOficial; }
+    public void setNumeroGuiaOficial(String numeroGuiaOficial) { this.numeroGuiaOficial = numeroGuiaOficial; }
     public LocalDate getFecha() { return fecha; }
     public void setFecha(LocalDate fecha) { this.fecha = fecha; }
     public String getOrigen() { return origen; }

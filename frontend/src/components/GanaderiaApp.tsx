@@ -31,6 +31,7 @@ import ModalVentaAnimales, { type ModoVenta } from "./ganaderia/ModalVentaAnimal
 import ModalJornadaOrdeno, { vacasDeOrdeno } from "./ganaderia/ModalJornadaOrdeno";
 import ModalVacunacion, { type VacunacionAplicada } from "./ganaderia/ModalVacunacion";
 import ModalBaja from "./ganaderia/ModalBaja";
+import ModalGuiaMovilizacion from "./ganaderia/ModalGuiaMovilizacion";
 import ModalReproduccion from "./ganaderia/ModalReproduccion";
 import ModalCelo from "./ganaderia/ModalCelo";
 import ModalMastitis from "./ganaderia/ModalMastitis";
@@ -223,6 +224,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
   const [vacunaAbierta, setVacunaAbierta] = useState<{ animalId?: number } | null>(null);
   const [bajaAbierta, setBajaAbierta] = useState<{ animalId?: number } | null>(null);
+  const [guiaAbierta, setGuiaAbierta] = useState<{ animalIds?: number[] } | null>(null);
   const [reproAbierta, setReproAbierta] = useState<{ tipo?: string; resultado?: string } | null>(null);
   const [celoAbierto, setCeloAbierto] = useState(false);
   const [mastitisAbierta, setMastitisAbierta] = useState(false);
@@ -737,6 +739,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             setTab={setTab}
             setVacunaAbierta={setVacunaAbierta}
             setBajaAbierta={setBajaAbierta}
+            setGuiaAbierta={setGuiaAbierta}
           />
         )}
 
@@ -992,6 +995,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* MODAL: VACUNACIÓN & TRATAMIENTOS SANITARIOS */}
+      {guiaAbierta && (
+        <ModalGuiaMovilizacion
+          animales={animales}
+          animalIdsIniciales={guiaAbierta.animalIds}
+          nombreFinca={user?.empresa || "Mi Finca"}
+          notificar={notificar}
+          onCerrar={() => setGuiaAbierta(null)}
+        />
+      )}
+
       {bajaAbierta && (
         <ModalBaja
           animalesActivos={animalesActivos}
@@ -1059,6 +1072,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           tenantId={tenantId}
           notificar={notificar}
           onVendidos={ids => setAnimales(prev => prev.map(a => ids.includes(a.id) ? { ...a, estado: "VENDIDO", potrero: undefined } : a))}
+          onHacerGuia={ids => { setVentaAbierta(null); setGuiaAbierta({ animalIds: ids }); }}
           onCerrar={() => setVentaAbierta(null)}
         />
       )}

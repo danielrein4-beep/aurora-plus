@@ -4272,6 +4272,41 @@ export function importarHatoGanaderia(filas: FilaImportacionHato[], confirmar: b
   });
 }
 
+/**
+ * Nota de movilización de la finca: acompaña a los animales en un traslado junto con la
+ * guía oficial del INSAI (su número va en numeroGuiaOficial cuando ya se emitió).
+ */
+export interface GuiaMovilizacionGanaderia {
+  id: number;
+  /** Número interno de la nota (NM-aaaammdd-n). */
+  numeroGuia: string;
+  /** Guía oficial del INSAI, si ya se emitió. */
+  numeroGuiaOficial?: string;
+  fecha: string;
+  origen?: string;
+  destino?: string;
+  motivo?: string;
+  transportista?: string;
+  placaVehiculo?: string;
+  responsable?: string;
+  animales: { id: number; animal: AnimalGanaderia }[];
+}
+
+export function listarGuiasMovilizacion(): Promise<GuiaMovilizacionGanaderia[]> {
+  return request("/api/ganaderia/guias-traslado");
+}
+
+export function crearGuiaMovilizacion(datos: {
+  numeroGuiaOficial?: string; fecha: string; origen?: string; destino: string; motivo?: string;
+  transportista?: string; placaVehiculo?: string; responsable?: string; animalIds: number[];
+}): Promise<GuiaMovilizacionGanaderia> {
+  return request("/api/ganaderia/guias-traslado", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function descargarNotaMovilizacionPdf(id: number): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/guias-traslado/${id}/pdf`);
+}
+
 /** Baja de un animal: muerte (queda MUERTO) o robo/abigeato (queda ROBADO). */
 export interface BajaAnimalGanaderia {
   id: number;
