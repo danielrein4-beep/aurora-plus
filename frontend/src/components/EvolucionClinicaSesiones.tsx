@@ -35,7 +35,7 @@ interface SesionOdonto {
 
 // Plantillas de las sesiones mas frecuentes: llenan el formulario y el
 // odontologo solo ajusta pieza, medidas y lo propio del caso.
-const PLANTILLAS_EVOLUCION = [
+export const PLANTILLAS_EVOLUCION = [
   {
     nombre: "Endodoncia - sesion 1",
     procedimiento: "Endodoncia sesion 1: apertura cameral, localizacion de conductos, conductometria y preparacion biomecanica",

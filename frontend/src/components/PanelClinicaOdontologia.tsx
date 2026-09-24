@@ -4,11 +4,12 @@ import { abrirWhatsAppDirecto } from "../utils/pdfReports";
 
 interface PanelClinicaOdontologiaProps {
   clinicaNombre?: string;
-  onAbrirPaciente?: (pacienteId: number) => void;
+  onAbrirPaciente?: (pacienteId: number, destino?: "consulta" | "planes") => void;
 }
 
 interface CitaHoy {
   id: number;
+  paciente_id: number;
   hora_inicio: string;
   hora_fin: string;
   sillon_box: string;
@@ -149,6 +150,15 @@ export default function PanelClinicaOdontologia({ clinicaNombre, onAbrirPaciente
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{ESTADO_CITA[c.estado] || c.estado}</span>
+                    {!["COMPLETADA", "CANCELADA", "NO_ASISTIO"].includes(c.estado) && (
+                      <button
+                        type="button"
+                        onClick={() => onAbrirPaciente?.(c.paciente_id, "consulta")}
+                        className="px-2 py-1 rounded-lg bg-violet-600 text-[#FFFFFF] font-bold"
+                      >
+                        Atender
+                      </button>
+                    )}
                     {c.estado === "PROGRAMADA" && c.telefono && (
                       <button
                         type="button"

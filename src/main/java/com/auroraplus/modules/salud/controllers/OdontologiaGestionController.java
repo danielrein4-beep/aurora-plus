@@ -243,7 +243,7 @@ public class OdontologiaGestionController {
         Map<String, Object> t = new LinkedHashMap<>();
 
         t.put("citasHoy", jdbcTemplate.queryForList(
-            "SELECT c.id, c.hora_inicio, c.hora_fin, c.sillon_box, c.odontologo, c.motivo, c.estado, " +
+            "SELECT c.id, c.paciente_id, c.hora_inicio, c.hora_fin, c.sillon_box, c.odontologo, c.motivo, c.estado, " +
             "(p.nombres || ' ' || p.apellidos) AS paciente, p.telefono " +
             "FROM salud_odontologia_citas_agenda c JOIN salud_pacientes p ON p.id = c.paciente_id " +
             "WHERE c.tenant_id = ? AND c.fecha_cita = CURRENT_DATE ORDER BY c.hora_inicio",

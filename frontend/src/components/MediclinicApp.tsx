@@ -695,6 +695,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     return items;
   }, [esOdontologia]);
   const [pagina, setPagina] = useState<Pagina>("general");
+  // Al llegar a odontologia desde la historia de un paciente se abre su consulta en sillon;
+  // desde el menu lateral se abre el tablero del dia.
+  const [odontoEnConsulta, setOdontoEnConsulta] = useState(false);
+  useEffect(() => {
+    if (pagina !== "odontograma") setOdontoEnConsulta(false);
+  }, [pagina]);
   
   // Estado del perfil activo: siempre null al montar para mostrar la pantalla de selección estilo Netflix
   const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(null);
@@ -1385,13 +1391,18 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 rol={rolActivo}
                 pacienteInicialId={pacienteSeleccionadoId}
                 onVerDocumento={setVisorDocumento}
-                onIrAOdontologia={() => setPagina("odontograma")}
+                onIrAOdontologia={(id) => {
+                  if (id) setPacienteSeleccionadoId(id);
+                  setOdontoEnConsulta(true);
+                  setPagina("odontograma");
+                }}
               />
             )}
             {pagina === "odontograma" && (
               <ModuloOdontologia
                 pacientes={pacientes}
                 pacienteInicialId={pacienteSeleccionadoId}
+                abrirEnConsulta={odontoEnConsulta}
                 config={configPerfilConTasas}
                 onSeleccionarPaciente={(id) => {
                   setPacienteSeleccionadoId(id);
@@ -3100,7 +3111,7 @@ function HistoriasClinicas({
   rol: RolVista;
   pacienteInicialId?: number | null;
   onVerDocumento?: (payload: DocumentoVisorPayload) => void;
-  onIrAOdontologia?: () => void;
+  onIrAOdontologia?: (pacienteId?: number) => void;
 }) {
   // Mediclinic Odonto: el odontograma solo se muestra para tenants de esta
   // vertical — el resto (Clínica/Veterinaria) sigue exactamente igual.
@@ -3759,10 +3770,10 @@ function HistoriasClinicas({
           {onIrAOdontologia && (
             <button
               type="button"
-              onClick={onIrAOdontologia}
+              onClick={() => onIrAOdontologia(pacienteSeleccionado.id)}
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black text-xs hover:brightness-110 transition shrink-0 cursor-pointer shadow-lg shadow-emerald-500/20"
             >
-              Abrir Expediente Odontologico
+              Atender en sillon
             </button>
           )}
         </div>

@@ -22,10 +22,13 @@ import ConsentimientosOdontologicos from "./ConsentimientosOdontologicos";
 import PanelClinicaOdontologia from "./PanelClinicaOdontologia";
 import KitsInsumosOdontologia from "./KitsInsumosOdontologia";
 import PortalPacienteOdontoModal from "./PortalPacienteOdontoModal";
+import ModoConsultaOdonto from "./ModoConsultaOdonto";
 
 interface ModuloOdontologiaProps {
   pacientes: Paciente[] | null;
   pacienteInicialId?: number | null;
+  // true cuando se llega desde la historia de un paciente: abre directo su consulta en sillon.
+  abrirEnConsulta?: boolean;
   config: any;
   onSeleccionarPaciente?: (id: number) => void;
   onIrAHistorias?: (id: number) => void;
@@ -35,6 +38,7 @@ interface ModuloOdontologiaProps {
 type PestanaOdonto = 
   | "hoy"
   | "insumos"
+  | "consulta"
   | "anamnesis"
   | "odontograma" 
   | "periodonto" 
@@ -48,6 +52,7 @@ type PestanaOdonto =
 export default function ModuloOdontologia({
   pacientes,
   pacienteInicialId,
+  abrirEnConsulta = false,
   config,
   onSeleccionarPaciente,
   onIrAHistorias,
@@ -59,7 +64,7 @@ export default function ModuloOdontologia({
     return null;
   });
 
-  const [pestanaActiva, setPestanaActiva] = useState<PestanaOdonto>("hoy");
+  const [pestanaActiva, setPestanaActiva] = useState<PestanaOdonto>(() => (abrirEnConsulta && pacienteInicialId ? "consulta" : "hoy"));
   const [busqueda, setBusqueda] = useState("");
   const [portalAbierto, setPortalAbierto] = useState(false);
 
@@ -278,6 +283,17 @@ export default function ModuloOdontologia({
           <span className="w-px h-6 bg-slate-200 dark:bg-white/10 shrink-0" aria-hidden="true" />
           <button
             type="button"
+            onClick={() => setPestanaActiva("consulta")}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              pestanaActiva === "consulta"
+                ? "bg-violet-600 text-[#FFFFFF] font-black shadow-md"
+                : "bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 dark:text-violet-300"
+            }`}
+          >
+            <span>Consulta en sillon</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setPestanaActiva("anamnesis")}
             className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "anamnesis"
@@ -390,15 +406,19 @@ export default function ModuloOdontologia({
       {pestanaActiva === "hoy" ? (
         <PanelClinicaOdontologia
           clinicaNombre={config?.clinicaNombre}
-          onAbrirPaciente={(id) => {
+          onAbrirPaciente={(id, destino) => {
             seleccionarPaciente(id);
-            setPestanaActiva("planes");
+            setPestanaActiva(destino === "consulta" ? "consulta" : "planes");
           }}
         />
       ) : pestanaActiva === "insumos" ? (
         <KitsInsumosOdontologia />
       ) : pacienteSeleccionado ? (
         <>
+          {pestanaActiva === "consulta" && (
+            <ModoConsultaOdonto paciente={pacienteSeleccionado} tasaBcv={tasaBcvNum} onIrA={(p) => setPestanaActiva(p)} />
+          )}
+
           {pestanaActiva === "anamnesis" && (
             <FichaAnamnesisRiesgo
               pacienteId={pacienteSeleccionado.id}
