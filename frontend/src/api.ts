@@ -4274,6 +4274,30 @@ export function importarHatoGanaderia(filas: FilaImportacionHato[], confirmar: b
   });
 }
 
+/** Indicadores de gestión del hato; null = sin datos suficientes para calcularlo. */
+export interface IndicadoresGanaderia {
+  hembrasReproductivas: number;
+  prenadas: number;
+  porcentajePrenez: number | null;
+  vacas: number;
+  nacimientos12Meses: number;
+  natalidad12Meses: number | null;
+  intervaloEntrePartosDias: number | null;
+  intervalosMedidos: number;
+  diasAbiertos: number | null;
+  diasAbiertosMedidos: number;
+  muertes12Meses: number;
+  mortalidad12Meses: number | null;
+  litrosPorVacaDia: number | null;
+  vacasOrdenadas30Dias: number;
+  gdpPromedioKgDia: number | null;
+  animalesConGdp: number;
+}
+
+export function obtenerIndicadoresGanaderia(): Promise<IndicadoresGanaderia> {
+  return request("/api/ganaderia/indicadores");
+}
+
 export interface PrenezActualGanaderia {
   hembraId: number;
   sementalId: number | null;

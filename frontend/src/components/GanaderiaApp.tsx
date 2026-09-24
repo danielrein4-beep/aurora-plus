@@ -575,6 +575,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       {/* ── TOPBAR: SINCRONIZACIÓN, MONEDAS, LECHE, FISCAL Y TEMA ── */}
       <BarraSuperiorGanaderia
         estaOnline={estaOnline}
+        nombreFinca={user?.empresa || "Mi Finca"}
         monedasConfig={monedasConfig}
         pendientesOffline={pendientesOffline}
         precioLecheUSD={precioLecheUSD}
@@ -602,15 +603,17 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             className="w-full mb-5 flex flex-wrap sm:flex-nowrap items-center gap-4 p-4 sm:p-5 rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 via-emerald-50 to-white hover:border-teal-300 hover:shadow-sm text-left cursor-pointer transition"
           >
             <span className="w-11 h-11 rounded-xl bg-teal-700 text-[#ffffff] flex items-center justify-center flex-shrink-0"><IconCow size={22} /></span>
-            <span className="flex-1 min-w-0">
-              <span className="block font-semibold text-slate-900">Mercado ganadero</span>
+            <span className="flex-1 min-w-[12rem]">
+              <span className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+                Mercado ganadero
+                {sinLeerMercado > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-rose-500 text-[#ffffff] text-[11px] font-bold">
+                    {sinLeerMercado} {sinLeerMercado === 1 ? "mensaje nuevo" : "mensajes nuevos"}
+                  </span>
+                )}
+              </span>
               <span className="block text-sm text-slate-600">Publica tus animales y compra ganado directo a otras fincas de Aurora.</span>
             </span>
-            {sinLeerMercado > 0 && (
-              <span className="px-2.5 py-1 rounded-full bg-rose-500 text-[#ffffff] text-xs font-bold">
-                {sinLeerMercado} {sinLeerMercado === 1 ? "mensaje nuevo" : "mensajes nuevos"}
-              </span>
-            )}
             <span className="px-4 py-2 rounded-xl bg-teal-700 text-[#ffffff] text-sm font-semibold">Entrar al mercado</span>
           </button>
           <SeccionPanel

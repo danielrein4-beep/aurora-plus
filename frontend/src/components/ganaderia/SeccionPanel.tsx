@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { IconSettings } from "../../Icons";
+import { obtenerFincaGanaderia } from "../../api";
 import type { AnimalGanaderia, PotreroGanaderia, RegistroOrdenoGanaderia, VacunaGanaderia, AlertaSanitariaGanaderia, TanqueLeche, VentaLecheTanque } from "../../api";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
-import { KG_POR_UG, num } from "./formato";
+import { KG_POR_UG, num, verFecha } from "./formato";
+import TarjetaIndicadores from "./TarjetaIndicadores";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { MonedasConfig, TabGanaderia, SubPotreros } from "./tipos";
 
@@ -37,6 +40,11 @@ export default function SeccionPanel({
   setAltaAnimal, setModalAjusteTanque, setModalRotar, setModalVentaLeche, setOrdenoAbierto,
   setSubPotreros, setTab,
 }: Props) {
+  // Ubicación real de la finca (backend). Antes se miraba una clave del navegador que es de las monedas.
+  const [fincaUbicada, setFincaUbicada] = useState(false);
+  useEffect(() => {
+    obtenerFincaGanaderia().then(f => setFincaUbicada(f?.latitud != null && f?.longitud != null)).catch(() => setFincaUbicada(false));
+  }, [tenantId]);
   const vacasOrdeno = animalesActivos.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA").length;
   const totalHectareas = potreros.reduce((sum, p) => sum + (Number(p.areaHectareas) || 0), 0);
   // Carga animal en UG/ha: una unidad ganadera = 450 kg de peso vivo. Los animales sin peso
@@ -54,7 +62,6 @@ export default function SeccionPanel({
 
       {/* Checklist de Primeros Pasos (Onboarding de Finca Vacía) */}
       {(() => {
-        const fincaUbicada = typeof window !== "undefined" && !!localStorage.getItem(`aurora_finca_config_${tenantId}`);
         const tienePotreros = potreros.length > 0;
         const tieneAnimales = animales.length > 0;
         const pasosCompletados = (fincaUbicada ? 1 : 0) + (tienePotreros ? 1 : 0) + (tieneAnimales ? 1 : 0);
@@ -76,12 +83,18 @@ export default function SeccionPanel({
                     ? "¡Felicidades! Has completado la configuración esencial de tu predio."
                     : "Tres pasos para tener tu finca lista en Aurora:"}
                 </p>
+                {/* En celular los pasos hechos se resumen en una línea y solo se muestran los pendientes. */}
+                {pasosCompletados > 0 && pasosCompletados < 3 && (
+                  <p className="md:hidden text-xs font-semibold text-teal-700">
+                    Listo: {[fincaUbicada && "ubicación", tienePotreros && `${potreros.length} potreros`, tieneAnimales && `${totalAnimales} animales`].filter(Boolean).join(" · ")}
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Paso 1: Fijar Ubicación */}
-              <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+              <div className={`p-4 rounded-2xl border transition-all flex-col justify-between gap-3 ${fincaUbicada ? "hidden md:flex" : "flex"} ${
                 fincaUbicada
                   ? "bg-teal-50 border-teal-200"
                   : "bg-slate-50 border-slate-200 hover:border-teal-300"
@@ -117,7 +130,7 @@ export default function SeccionPanel({
               </div>
 
               {/* Paso 2: Crear Primer Potrero */}
-              <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+              <div className={`p-4 rounded-2xl border transition-all flex-col justify-between gap-3 ${tienePotreros ? "hidden md:flex" : "flex"} ${
                 tienePotreros
                   ? "bg-teal-50 border-teal-200"
                   : "bg-slate-50 border-slate-200 hover:border-teal-300"
@@ -153,7 +166,7 @@ export default function SeccionPanel({
               </div>
 
               {/* Paso 3: Dar de Alta Primer Animal */}
-              <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+              <div className={`p-4 rounded-2xl border transition-all flex-col justify-between gap-3 ${tieneAnimales ? "hidden md:flex" : "flex"} ${
                 tieneAnimales
                   ? "bg-teal-50 border-teal-200"
                   : "bg-slate-50 border-slate-200 hover:border-teal-300"
@@ -264,6 +277,9 @@ export default function SeccionPanel({
         </div>
       </div>
 
+      {/* Indicadores de gestión: se recalculan cuando cambia el hato o llegan ordeños. */}
+      <TarjetaIndicadores version={animales.length * 100000 + ordenos.length} />
+
       {/* Widget: Tanque de Leche Frío (Stock en Finca & Despacho a Cisterna) */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 text-left">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -333,10 +349,10 @@ export default function SeccionPanel({
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
             <div className="text-[11px] text-slate-500 font-medium">Último Despacho Registrado</div>
             <div className="font-bold text-sm text-slate-900 truncate">
-              {ventasLeche[0] ? `${ventasLeche[0].litrosVendidos} L • ${ventasLeche[0].compradorOPlanta}` : "Sin despachos recientes"}
+              {ventasLeche[0] ? `${num(ventasLeche[0].litrosVendidos, 1)} L • ${ventasLeche[0].compradorOPlanta}` : "Sin despachos recientes"}
             </div>
             <div className="text-[10px] text-slate-500">
-              {ventasLeche[0] ? `${ventasLeche[0].fecha} • $${Number(ventasLeche[0].totalUSD).toFixed(2)} USD (${ventasLeche[0].monedaPago || "USD"})` : "Tanque en fase de recolección"}
+              {ventasLeche[0] ? `${verFecha(ventasLeche[0].fecha)} • $${num(Number(ventasLeche[0].totalUSD), 2)} (cobrado en ${ventasLeche[0].monedaPago || "USD"})` : "Tanque en fase de recolección"}
             </div>
           </div>
         </div>
