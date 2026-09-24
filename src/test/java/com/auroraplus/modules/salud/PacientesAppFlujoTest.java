@@ -111,12 +111,67 @@ class PacientesAppFlujoTest extends SaludIntegrationTestBase {
         assertEquals("ACEPTADA", aceptada.getBody().get("estado").asText());
 
         ResponseEntity<JsonNode> agenda = get(clinica, "/api/salud/agenda?fecha=" + manana);
-        boolean enAgenda = false;
-        for (JsonNode cita : agenda.getBody()) enAgenda |= "V-24815678".equals(cita.get("paciente").get("identificacion").asText());
-        assertTrue(enAgenda, "La cita debe aparecer en la agenda de Mediclinic");
+        JsonNode citaEnAgenda = null;
+        for (JsonNode cita : agenda.getBody()) {
+            if ("V-24815678".equals(cita.get("paciente").get("identificacion").asText())) citaEnAgenda = cita;
+        }
+        assertNotNull(citaEnAgenda, "La cita debe aparecer en la agenda de Mediclinic");
+        long pacienteFichaId = citaEnAgenda.get("paciente").get("id").asLong();
+        long citaId = citaEnAgenda.get("id").asLong();
+
+        // 8. El paciente sube la foto de un examen: cae en la bandeja de exámenes de Mediclinic.
+        String pngMinimo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        Map<String, Object> examen = Map.of("medicoId", clinica.tenantId(), "nota", "Hematología",
+            "archivos", java.util.List.of(Map.of("nombre", "hemo.png", "tipo", "image/png", "datosBase64", pngMinimo)));
+        ResponseEntity<JsonNode> subido = rest.exchange(url("/api/pacientes/v1/examenes"), HttpMethod.POST, new HttpEntity<>(examen, hp), JsonNode.class);
+        assertEquals(HttpStatus.OK, subido.getStatusCode(), "Subir examen: " + subido.getBody());
+        assertFalse(subido.getBody().get("revisado").asBoolean());
+        long examenId = subido.getBody().get("id").asLong();
+
+        Map<String, Object> falso = Map.of("medicoId", clinica.tenantId(),
+            "archivos", java.util.List.of(Map.of("nombre", "virus.png", "tipo", "image/png", "datosBase64", "data:image/png;base64,TVqQAAMAAAAEAAAA")));
+        assertEquals(HttpStatus.BAD_REQUEST, rest.exchange(url("/api/pacientes/v1/examenes"), HttpMethod.POST, new HttpEntity<>(falso, hp), JsonNode.class).getStatusCode(),
+            "Un archivo que no es imagen ni PDF se rechaza aunque diga image/png");
+        assertEquals(HttpStatus.BAD_REQUEST, rest.exchange(url("/api/pacientes/v1/examenes"), HttpMethod.POST,
+            new HttpEntity<>(Map.of("medicoId", otra.tenantId(), "archivos", examen.get("archivos")), hp), JsonNode.class).getStatusCode(),
+            "No se pueden mandar exámenes a un consultorio sin cita con él");
+
+        ResponseEntity<JsonNode> inbox = get(clinica, "/api/salud/laboratorio/inbox/paciente/" + pacienteFichaId);
+        assertEquals(1, inbox.getBody().size(), "El examen debe aparecer en la ficha del paciente en Mediclinic");
+        assertEquals(HttpStatus.OK, post(clinica, "/api/salud/laboratorio/inbox/" + examenId + "/marcar-leido", Map.of()).getStatusCode());
+        ResponseEntity<JsonNode> misExamenes = rest.exchange(url("/api/pacientes/v1/examenes"), HttpMethod.GET, new HttpEntity<>(hp), JsonNode.class);
+        assertTrue(misExamenes.getBody().get(0).get("revisado").asBoolean(), "El paciente ve que el médico ya lo revisó");
+
+        // 9. El médico comparte el plan de la consulta; las notas privadas nunca salen.
+        Map<String, Object> consulta = new LinkedHashMap<>();
+        consulta.put("paciente", Map.of("id", pacienteFichaId));
+        consulta.put("citaId", citaId);
+        consulta.put("motivoConsulta", "Control de tensión");
+        consulta.put("descripcionDiagnostico", "Hipertensión arterial leve");
+        consulta.put("planTratamiento", "Dieta baja en sal y caminar 30 minutos diarios");
+        consulta.put("recipeMedicamentos", "Losartán 50 mg, una diaria");
+        consulta.put("anotacionesPrivadas", "NOTA PRIVADA QUE NO DEBE SALIR");
+        long consultaId = post(clinica, "/api/salud/consultas", consulta).getBody().get("id").asLong();
+
+        ResponseEntity<JsonNode> planesAntes = rest.exchange(url("/api/pacientes/v1/planes"), HttpMethod.GET, new HttpEntity<>(hp), JsonNode.class);
+        assertEquals(0, planesAntes.getBody().size(), "Nada se ve hasta que el médico lo comparte");
+
+        assertTrue(get(clinica, "/api/salud/app-pacientes/consultas/" + consultaId + "/compartido").getBody().get("pacienteUsaLaApp").asBoolean());
+        ResponseEntity<JsonNode> compartido = post(clinica, "/api/salud/app-pacientes/consultas/" + consultaId + "/compartir", Map.of("incluirDiagnostico", false));
+        assertEquals(HttpStatus.OK, compartido.getStatusCode(), "Compartir: " + compartido.getBody());
+        assertEquals(HttpStatus.BAD_REQUEST, post(otra, "/api/salud/app-pacientes/consultas/" + consultaId + "/compartir", Map.of()).getStatusCode(),
+            "Otro consultorio no puede compartir consultas ajenas");
+
+        ResponseEntity<JsonNode> planes = rest.exchange(url("/api/pacientes/v1/planes"), HttpMethod.GET, new HttpEntity<>(hp), JsonNode.class);
+        assertEquals(1, planes.getBody().size());
+        JsonNode plan = planes.getBody().get(0);
+        assertEquals("Dieta baja en sal y caminar 30 minutos diarios", plan.get("planTratamiento").asText());
+        assertTrue(plan.get("diagnostico").isNull(), "El diagnóstico solo sale si el médico lo elige");
+        assertFalse(planes.getBody().toString().contains("NOTA PRIVADA"), "Las anotaciones privadas nunca llegan a la app");
 
         ResponseEntity<JsonNode> misCitas = rest.exchange(url("/api/pacientes/v1/citas"), HttpMethod.GET, new HttpEntity<>(hp), JsonNode.class);
-        assertEquals("CONFIRMADA", misCitas.getBody().get(0).get("estado").asText());
+        // Registrar la consulta marcó la cita como atendida en Mediclinic, y la app lo refleja.
+        assertEquals("ATENDIDA", misCitas.getBody().get(0).get("estado").asText());
 
         // 7. Ya no se ofrece esa hora a nadie más.
         ResponseEntity<JsonNode> horasDespues = rest.getForEntity(url("/api/pacientes/v1/directorio/medicos/" + clinica.tenantId() + "/horarios?fecha=" + manana), JsonNode.class);

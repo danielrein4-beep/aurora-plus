@@ -2,6 +2,7 @@ package com.auroraplus.modules.pacientesapp.controllers;
 
 import com.auroraplus.modules.pacientesapp.services.AccesoPacienteService;
 import com.auroraplus.modules.pacientesapp.services.DirectorioService;
+import com.auroraplus.modules.pacientesapp.services.ExpedientePacienteService;
 import com.auroraplus.modules.pacientesapp.services.PacienteAppInterceptor;
 import com.auroraplus.modules.pacientesapp.services.SolicitudesCitaService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,10 +25,12 @@ public class PacientesAppController {
     @Autowired private AccesoPacienteService acceso;
     @Autowired private DirectorioService directorio;
     @Autowired private SolicitudesCitaService solicitudes;
+    @Autowired private ExpedientePacienteService expediente;
 
     public record PedirCodigo(String cedula, String telefono, String nombre, boolean crearCuenta) {}
     public record VerificarCodigo(String cedula, String codigo) {}
     public record SolicitarCita(Long medicoId, LocalDate fecha, String hora, String motivo) {}
+    public record SubirExamen(Long medicoId, String nota, List<ExpedientePacienteService.ArchivoSubido> archivos) {}
 
     // --- Entrada (sin sesión) ---
 
@@ -86,6 +89,24 @@ public class PacientesAppController {
     @PostMapping("/citas/{id}/cancelar")
     public SolicitudesCitaService.CitaPacienteDto cancelar(HttpServletRequest req, @PathVariable Long id) {
         return solicitudes.cancelarPorPaciente(paciente(req), id);
+    }
+
+    // --- Mi salud: exámenes que sube el paciente y planes que comparte el médico ---
+
+    @GetMapping("/examenes")
+    public List<ExpedientePacienteService.ExamenDto> misExamenes(HttpServletRequest req) {
+        return expediente.misExamenes(paciente(req));
+    }
+
+    @PostMapping("/examenes")
+    public ExpedientePacienteService.ExamenDto subirExamen(HttpServletRequest req, @RequestBody SubirExamen body) {
+        if (body.medicoId() == null) throw new RuntimeException("Elige a qué médico se lo envías");
+        return expediente.subirExamen(paciente(req), body.medicoId(), body.nota(), body.archivos());
+    }
+
+    @GetMapping("/planes")
+    public List<ExpedientePacienteService.PlanDto> misPlanes(HttpServletRequest req) {
+        return expediente.misPlanes(paciente(req));
     }
 
     private static Long paciente(HttpServletRequest req) {

@@ -5,6 +5,7 @@ import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.pacientesapp.entities.PerfilConsultorio;
 import com.auroraplus.modules.pacientesapp.repositories.PerfilConsultorioRepository;
 import com.auroraplus.modules.pacientesapp.services.DirectorioService;
+import com.auroraplus.modules.pacientesapp.services.ExpedientePacienteService;
 import com.auroraplus.modules.pacientesapp.services.PacientesAppConfig;
 import com.auroraplus.modules.pacientesapp.services.SolicitudesCitaService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ public class BandejaAppPacientesController {
     @Autowired private PacientesAppConfig config;
     @Autowired private PerfilConsultorioRepository perfiles;
     @Autowired private SolicitudesCitaService solicitudes;
+    @Autowired private ExpedientePacienteService expediente;
 
     public record PerfilDto(boolean publicado, String trato, String especialidad, String ciudad, BigDecimal precioConsulta,
                             String moneda, Integer aniosExperiencia, String bio, boolean aceptaMensajes,
@@ -39,6 +41,7 @@ public class BandejaAppPacientesController {
         }
     }
     public record Rechazo(String motivo) {}
+    public record Compartir(boolean incluirDiagnostico) {}
 
     @GetMapping("/perfil")
     public PerfilDto perfil() {
@@ -99,6 +102,29 @@ public class BandejaAppPacientesController {
         config.exigirHabilitada();
         AuthContext.exigirRol(ROLES_BANDEJA);
         return solicitudes.rechazar(TenantContext.getCurrentTenant(), id, body == null ? null : body.motivo(), AuthContext.getUsername());
+    }
+
+    // --- Compartir el plan de una consulta con el paciente ---
+
+    @GetMapping("/consultas/{consultaId}/compartido")
+    public ExpedientePacienteService.EstadoCompartido estadoCompartido(@PathVariable Long consultaId) {
+        config.exigirHabilitada();
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
+        return expediente.estadoConsulta(TenantContext.getCurrentTenant(), consultaId);
+    }
+
+    @PostMapping("/consultas/{consultaId}/compartir")
+    public ExpedientePacienteService.EstadoCompartido compartir(@PathVariable Long consultaId, @RequestBody(required = false) Compartir body) {
+        config.exigirHabilitada();
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
+        return expediente.compartir(TenantContext.getCurrentTenant(), consultaId, body != null && body.incluirDiagnostico(), AuthContext.getUsername());
+    }
+
+    @DeleteMapping("/consultas/{consultaId}/compartir")
+    public ExpedientePacienteService.EstadoCompartido dejarDeCompartir(@PathVariable Long consultaId) {
+        config.exigirHabilitada();
+        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
+        return expediente.dejarDeCompartir(TenantContext.getCurrentTenant(), consultaId);
     }
 
     private static PerfilConsultorio nuevoPerfil(Long tenantId) {

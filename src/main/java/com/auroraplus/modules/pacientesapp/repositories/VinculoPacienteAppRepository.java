@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface VinculoPacienteAppRepository extends JpaRepository<VinculoPacienteApp, Long> {
     List<VinculoPacienteApp> findByPacienteAppId(Long pacienteAppId);
     Optional<VinculoPacienteApp> findByPacienteAppIdAndTenantId(Long pacienteAppId, Long tenantId);
+    boolean existsByTenantIdAndPacienteId(Long tenantId, Long pacienteId);
 }
