@@ -39,6 +39,15 @@ public class SuperAdminController {
     private LicenciaTenantRepository licenciaTenantRepository;
 
     @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcSuperAdmin;
+
+    @Autowired
+    private com.auroraplus.core.auth.repositories.UsuarioSuperAdminRepository usuarioSuperAdminRepositoryImpersonacion;
+
+    @Autowired
+    private com.auroraplus.core.config.repositories.ComisionPlataformaRepository comisionPlataformaRepository;
+
+    @Autowired
     private ModuloTenantRepository moduloTenantRepository;
 
     @Autowired
@@ -171,6 +180,8 @@ public class SuperAdminController {
         public Integer meses; // 1, 3, 6, 12...
         public Integer dias; // libre
         public String notas;
+        /** Comisiones pendientes (p. ej. del mercado ganadero) que se cobran en este pago. */
+        public List<Long> comisionIds;
     }
 
     /**
@@ -219,8 +230,18 @@ public class SuperAdminController {
         pago.setEstado("CONFIRMADO");
         pago.setNotas(req.notas);
         pago.setRegistradoPor("superadmin");
+        PagoSuscripcionTenant guardado = pagoSuscripcionRepository.save(pago);
 
-        return ResponseEntity.ok(pagoSuscripcionRepository.save(pago));
+        if (req.comisionIds != null && !req.comisionIds.isEmpty()) {
+            for (com.auroraplus.core.config.entities.ComisionPlataforma c : comisionPlataformaRepository.findAllById(req.comisionIds)) {
+                if (!c.getTenantId().equals(licencia.getTenantId()) || Boolean.TRUE.equals(c.getPagada())) continue;
+                c.setPagada(true);
+                c.setPagoId(guardado.getId());
+                comisionPlataformaRepository.save(c);
+            }
+        }
+
+        return ResponseEntity.ok(guardado);
     }
 
     public static class RegalarTiempoRequest {
@@ -282,12 +303,15 @@ public class SuperAdminController {
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
 
-        String token = jwtService.generarTokenTenant(tenantId, "soporte-superadmin", "DUENO_ADMIN", 0);
+        String admin = com.auroraplus.core.auth.AuthContext.getUsername();
+        int versionAdmin = usuarioSuperAdminRepositoryImpersonacion.findByUsername(admin)
+            .map(com.auroraplus.core.auth.entities.UsuarioSuperAdmin::getTokenVersion).orElse(0);
+        String token = jwtService.generarTokenImpersonacion(tenantId, admin, versionAdmin);
 
         if (registroAuditoriaService != null) {
             registroAuditoriaService.registrar(
                 tenantId,
-                "super-admin",
+                "super-admin:" + admin,
                 "IMPERSONATE",
                 "LicenciaTenant",
                 tenantId,
@@ -355,7 +379,18 @@ public class SuperAdminController {
         if (request.moduloPrincipal != null) licencia.setModuloPrincipal(request.moduloPrincipal);
         if (request.emailContacto != null) licencia.setEmailContacto(request.emailContacto);
         if (request.telefonoContacto != null) licencia.setTelefonoContacto(request.telefonoContacto);
-        if (request.monedaBase != null) licencia.setMonedaBase(request.monedaBase);
+        if (request.monedaBase != null && !request.monedaBase.equals(licencia.getMonedaBase())) {
+            // Mismo candado que ModuloTenantController: con inventario o caja valorados, cambiar la
+            // moneda reinterpreta cada precio guardado sin convertirlo.
+            Integer valorados = jdbcSuperAdmin.queryForObject(
+                "SELECT (SELECT COUNT(*) FROM articulos WHERE tenant_id = ?) + (SELECT COUNT(*) FROM repuestos_items WHERE tenant_id = ?) "
+                    + "+ (SELECT COUNT(*) FROM movimientos_caja WHERE tenant_id = ?)", Integer.class, tenantId, tenantId, tenantId);
+            if (valorados != null && valorados > 0) {
+                throw new IllegalStateException("Ya hay inventario o movimientos valorados en " + licencia.getMonedaBase()
+                    + ". Cambiar la moneda requiere revisar y convertir los saldos existentes.");
+            }
+            licencia.setMonedaBase(request.monedaBase);
+        }
 
         return ResponseEntity.ok(licenciaTenantRepository.save(licencia));
     }
@@ -556,6 +591,7 @@ public class SuperAdminController {
             throw new RuntimeException("El usuario no pertenece al tenant " + tenantId);
         }
         u.setActivo(!u.isActivo());
+        if (!u.isActivo()) u.setTokenVersion(u.getTokenVersion() + 1); // cierra sus sesiones abiertas
         return ResponseEntity.ok(usuarioRepository.save(u));
     }
 

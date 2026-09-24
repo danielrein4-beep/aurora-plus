@@ -78,10 +78,19 @@ public class BinancePayWebhookController {
             try {
                 Comanda comanda = horecaService.obtenerComanda(comandaId);
                 if (comanda.getEstado() == Comanda.EstadoComanda.ABIERTA) {
+                    // Se cobra lo que Binance confirma como pagado, no el total que tenga la comanda
+                    // ahora (pudo crecer después de generar la orden). Si no alcanza, cerrarComandaMixto
+                    // lo rechaza y la comanda sigue abierta para cobrar la diferencia.
+                    String moneda = data.path("currency").asText("");
+                    java.math.BigDecimal pagado = data.hasNonNull("totalFee") ? new java.math.BigDecimal(data.path("totalFee").asText()) : null;
+                    if (pagado == null || pagado.signum() <= 0 || !java.util.Set.of("USDT", "USDC", "BUSD", "FDUSD", "USD").contains(moneda.toUpperCase())) {
+                        log.error("Pago de Binance sin monto o en moneda no soportada ({} {}) para la comanda {}", pagado, moneda, comandaId);
+                        return ResponseEntity.ok(Map.of("returnCode", "SUCCESS", "returnMessage", (Object) null));
+                    }
                     HorecaService.PagoParcialRequest pago = new HorecaService.PagoParcialRequest();
                     pago.metodoPago = "BILLETERA_DIGITAL";
-                    pago.moneda = "USD";
-                    pago.monto = comanda.getTotalConsumo();
+                    pago.moneda = "USD"; // stablecoin en dólares
+                    pago.monto = pagado;
                     horecaService.cerrarComandaMixto(comandaId, tenantId, java.util.List.of(pago), null, "binance-" + merchantTradeNo);
                 }
                 // Si ya no está ABIERTA, Binance probablemente reintentó el webhook

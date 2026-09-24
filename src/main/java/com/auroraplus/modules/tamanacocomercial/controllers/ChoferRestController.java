@@ -82,7 +82,7 @@ public class ChoferRestController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminar(@PathVariable Long id) {
         TamanacoAccessService.exigirDuenoAdmin();
-        if (!choferRepository.existsById(id)) return ResponseEntity.notFound().build();
+        if (!choferRepository.findById(id).filter(e -> String.valueOf(e.getTenantId()).equals(String.valueOf(com.auroraplus.core.config.TenantContext.getCurrentTenant()))).isPresent()) return ResponseEntity.notFound().build();
         choferRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }

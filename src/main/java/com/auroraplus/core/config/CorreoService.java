@@ -32,6 +32,11 @@ public class CorreoService {
     @Value("${mail.from.name:Aurora Plus}")
     private String fromName;
 
+    /** Hay credenciales SMTP: los correos salen de verdad (si no, enviarHtml solo los simula en el log). */
+    public boolean estaConfigurado() {
+        return mailSender != null && smtpUsername != null && !smtpUsername.isBlank();
+    }
+
     /** @return true si se envió de verdad por SMTP; false si solo se simuló (sin credenciales configuradas). */
     public boolean enviarHtml(String destinatario, String asunto, String cuerpoHtml) {
         if (destinatario == null || destinatario.isBlank()) {

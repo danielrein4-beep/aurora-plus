@@ -58,7 +58,21 @@ public class CatalogoPublicoController {
     private LicenciaTenant resolverLicencia(String identificador) {
         if (identificador == null || identificador.isBlank()) return null;
         String ident = identificador.trim().toLowerCase();
-        return licenciaTenantRepository.findBySlugCatalogo(ident).orElse(null);
+        return licenciaTenantRepository.findBySlugCatalogo(ident).filter(this::tiendaHabilitada).orElse(null);
+    }
+
+    private static final java.util.Set<String> RUBROS_CON_TIENDA =
+        java.util.Set.of("comercio", "retail", "farmacia", "ferreteria", "repuestos", "moda");
+
+    /**
+     * Todo negocio recibe un slug al crearse, pero la tienda pública solo existe para los
+     * rubros que venden al público o para quien activó su tienda: antes una clínica o un
+     * restaurante publicaban sin saberlo todos sus insumos con stock y precio.
+     */
+    private boolean tiendaHabilitada(LicenciaTenant licencia) {
+        return Long.valueOf(1L).equals(licencia.getTenantId())
+            || Boolean.TRUE.equals(licencia.isPersonalizacionTiendaActiva())
+            || (licencia.getModuloPrincipal() != null && RUBROS_CON_TIENDA.contains(licencia.getModuloPrincipal().toLowerCase()));
     }
 
     @GetMapping("/{identificador}")
@@ -69,13 +83,16 @@ public class CatalogoPublicoController {
         }
         Long tenantId = licencia.getTenantId();
 
-        BigDecimal tasaVes = BigDecimal.valueOf(50.0);
+        // Modo euro: el negocio trabaja SOLO en euros — no hay bolívares, pesos ni tasas. Con
+        // tasaVes en cero, ningún precio en Bs sale calculado y el frontend no muestra conversión.
+        boolean modoEuro = "EUR".equals(licencia.getMonedaBase());
+        BigDecimal tasaVes = BigDecimal.ZERO; // sin tasa cargada no se inventa una: en cero no se cotiza en Bs
         // COP es opcional: solo se expone si el dueño la configuró en Finanzas > Tasas
         // de Cambio (USD -> COP). Si no existe fila, se omite del todo en vez de
         // inventar una tasa — mostrar un precio en COP inventado sería peor que no
         // mostrarlo.
         BigDecimal tasaCop = null;
-        if (tasaCambioRepository != null) {
+        if (tasaCambioRepository != null && !modoEuro) {
             Optional<TasaCambio> tc = tasaCambioRepository
                 .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES");
             if (tc.isPresent() && tc.get().getTasa() != null && tc.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {
@@ -207,7 +224,8 @@ public class CatalogoPublicoController {
             resp.put("bannerBase64", licencia.getBannerBase64());
             resp.put("estiloBannerTienda", licencia.getEstiloBannerTienda());
         }
-        resp.put("tasaVes", tasaVes);
+        resp.put("monedaBase", licencia.getMonedaBase() != null ? licencia.getMonedaBase() : "USD");
+        if (!modoEuro) resp.put("tasaVes", tasaVes);
         if (tasaCop != null) {
             resp.put("tasaCop", tasaCop);
         }
@@ -413,8 +431,9 @@ public class CatalogoPublicoController {
             return ResponseEntity.badRequest().body(Map.of("error", "El pedido no tiene articulos."));
         }
 
-        BigDecimal tasaVes = BigDecimal.valueOf(50.0);
-        if (tasaCambioRepository != null) {
+        boolean modoEuro = "EUR".equals(licencia.getMonedaBase());
+        BigDecimal tasaVes = BigDecimal.ZERO; // sin tasa cargada no se inventa una: en cero no se cotiza en Bs
+        if (tasaCambioRepository != null && !modoEuro) {
             Optional<TasaCambio> tc = tasaCambioRepository
                 .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES");
             if (tc.isPresent() && tc.get().getTasa() != null && tc.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {

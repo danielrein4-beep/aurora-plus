@@ -79,11 +79,21 @@ public class TenantInterceptor implements HandlerInterceptor {
                 return false;
             }
             Integer tokenVersionClaim = claims.get("tokenVersion", Integer.class);
-            if (tokenVersionClaim != null && usuarioSuperAdminRepository != null) {
+            if (usuarioSuperAdminRepository != null) {
                 com.auroraplus.core.auth.entities.UsuarioSuperAdmin admin = usuarioSuperAdminRepository
                     .findByUsername(claims.getSubject()).orElse(null);
-                if (admin == null || !admin.isActivo() || admin.getTokenVersion() != tokenVersionClaim) {
+                if (admin == null || !admin.isActivo()
+                        || (tokenVersionClaim != null && admin.getTokenVersion() != tokenVersionClaim)) {
                     rechazar(response, "Sesion administrativa invalidada o expirada. Inicie sesion de nuevo");
+                    return false;
+                }
+                // Clave temporal (cuenta nueva o reseteada): solo puede cambiarla.
+                if (admin.isDebeCambiarClave() && !request.getRequestURI().startsWith("/api/super-admin/seguridad/")) {
+                    prohibir(response, "Debe cambiar su contraseña temporal antes de continuar");
+                    return false;
+                }
+                if (!PermisosSuperAdmin.permitido(admin.getRol(), request.getMethod(), request.getRequestURI())) {
+                    prohibir(response, "Su rol no tiene permiso para esta acción");
                     return false;
                 }
             }
@@ -133,10 +143,31 @@ public class TenantInterceptor implements HandlerInterceptor {
         // expiración natural — cambiar la clave ahora sí cierra las sesiones abiertas en otros
         // dispositivos.
         Integer tokenVersionClaim = claims.get("tokenVersion", Integer.class);
-        if (tokenVersionClaim != null && !"soporte-superadmin".equals(claims.getSubject())) {
+        String usuarioToken = claims.getSubject();
+        if (com.auroraplus.core.auth.services.JwtService.USUARIO_SOPORTE.equals(usuarioToken)) {
+            // Entrada de soporte: vale mientras el admin que la emitió siga activo y con la misma sesión.
+            String admin = claims.get("impersonadoPor", String.class);
+            Integer versionAdmin = claims.get("adminTokenVersion", Integer.class);
+            com.auroraplus.core.auth.entities.UsuarioSuperAdmin emisor = admin == null || usuarioSuperAdminRepository == null ? null
+                : usuarioSuperAdminRepository.findByUsername(admin).orElse(null);
+            if (emisor == null || !emisor.isActivo() || versionAdmin == null || emisor.getTokenVersion() != versionAdmin) {
+                rechazar(response, "La sesión de soporte expiró o fue revocada");
+                return false;
+            }
+            AuthContext.set(com.auroraplus.core.auth.services.JwtService.USUARIO_SOPORTE + ":" + admin, rol);
+            TenantContext.setCurrentTenant(tenantId);
+            entityManager.unwrap(Session.class).enableFilter("tenantFilter").setParameter("tenantId", tenantId);
+            return true;
+        }
+        if (tokenVersionClaim != null) {
             Usuario usuario = usuarioRepository.buscarPorTenantYUsername(tenantId, claims.getSubject()).orElse(null);
             if (usuario == null || usuario.getTokenVersion() != tokenVersionClaim) {
                 rechazar(response, "Sesión invalidada — la contraseña cambió, inicia sesión de nuevo");
+                return false;
+            }
+            // Un usuario desactivado (p. ej. un cajero que ya no trabaja ahí) no sigue operando con su sesión abierta.
+            if (!usuario.isActivo()) {
+                rechazar(response, "Tu usuario fue desactivado — habla con el dueño del negocio");
                 return false;
             }
         }
@@ -153,6 +184,13 @@ public class TenantInterceptor implements HandlerInterceptor {
 
     private void rechazar(HttpServletResponse response, String mensaje) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"error\":\"" + mensaje.replace("\"", "'") + "\"}");
+    }
+
+    /** 403: la sesión es válida pero no alcanza para esta acción (no debe cerrar la sesión en el panel). */
+    private void prohibir(HttpServletResponse response, String mensaje) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write("{\"error\":\"" + mensaje.replace("\"", "'") + "\"}");
     }

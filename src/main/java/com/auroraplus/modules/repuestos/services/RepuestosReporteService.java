@@ -38,11 +38,16 @@ public class RepuestosReporteService {
 
         List<MovimientoRepuesto> ventas = movimientoRepuestoRepository.findConRepuestoByTenantIdAndTipoAndFecha(
             tenantId, MovimientoRepuesto.TipoMovimiento.VENTA, desdeInicio, hastaFin);
+        // Las devoluciones restan: una venta devuelta no es venta ni utilidad.
+        ventas = new java.util.ArrayList<>(ventas);
+        ventas.addAll(movimientoRepuestoRepository.findConRepuestoByTenantIdAndTipoAndFecha(
+            tenantId, MovimientoRepuesto.TipoMovimiento.DEVOLUCION, desdeInicio, hastaFin));
 
         Map<Long, ResumenUtilidadProductoRepuesto> porProducto = new LinkedHashMap<>();
 
         for (MovimientoRepuesto m : ventas) {
             if (m.getTotal() == null || m.getRepuesto() == null) continue;
+            BigDecimal signo = m.getTipo() == MovimientoRepuesto.TipoMovimiento.DEVOLUCION ? BigDecimal.ONE.negate() : BigDecimal.ONE;
 
             ResumenUtilidadProductoRepuesto r = porProducto.computeIfAbsent(m.getRepuesto().getId(), id -> {
                 ResumenUtilidadProductoRepuesto nuevo = new ResumenUtilidadProductoRepuesto();
@@ -52,12 +57,12 @@ public class RepuestosReporteService {
                 return nuevo;
             });
 
-            r.cantidadVendida = r.cantidadVendida.add(m.getCantidad() != null ? m.getCantidad() : BigDecimal.ZERO);
-            r.ventasBrutas = r.ventasBrutas.add(m.getTotal());
+            r.cantidadVendida = r.cantidadVendida.add(m.getCantidad() != null ? m.getCantidad().multiply(signo) : BigDecimal.ZERO);
+            r.ventasBrutas = r.ventasBrutas.add(m.getTotal().multiply(signo));
 
             if (m.getCostoUnitario() != null && m.getCantidad() != null) {
-                r.ventasConCostoConocido = r.ventasConCostoConocido.add(m.getTotal());
-                r.costoVentas = r.costoVentas.add(m.getCostoUnitario().multiply(m.getCantidad()));
+                r.ventasConCostoConocido = r.ventasConCostoConocido.add(m.getTotal().multiply(signo));
+                r.costoVentas = r.costoVentas.add(m.getCostoUnitario().multiply(m.getCantidad()).multiply(signo));
             }
         }
 

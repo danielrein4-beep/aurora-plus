@@ -40,6 +40,7 @@ public class CuentaBancariaController {
 
     @PostMapping
     public ResponseEntity<CuentaBancaria> crear(@RequestParam Long tenantId, @RequestBody CrearCuentaRequest req) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         CuentaBancaria creada = cuentaBancariaService.crear(tenantId, req.nombre, req.tipo, req.moneda, req.saldoInicial);
         return ResponseEntity.status(HttpStatus.CREATED).body(creada);
     }
@@ -52,6 +53,7 @@ public class CuentaBancariaController {
 
     @PutMapping("/{id}")
     public ResponseEntity<CuentaBancaria> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody ActualizarCuentaRequest req) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(cuentaBancariaService.actualizar(tenantId, id, req.nombre, req.tipo, req.activa));
     }
 
@@ -62,11 +64,13 @@ public class CuentaBancariaController {
 
     @PostMapping("/{id}/ingresar")
     public ResponseEntity<CuentaBancaria> ingresar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody MontoConceptoRequest req) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(cuentaBancariaService.ingresar(tenantId, id, req.monto, req.concepto));
     }
 
     @PostMapping("/{id}/retirar")
     public ResponseEntity<CuentaBancaria> retirar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody MontoConceptoRequest req) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(cuentaBancariaService.retirar(tenantId, id, req.monto, req.concepto));
     }
 
@@ -78,6 +82,7 @@ public class CuentaBancariaController {
 
     @PostMapping("/transferir")
     public ResponseEntity<Void> transferir(@RequestParam Long tenantId, @RequestBody TransferirRequest req) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         cuentaBancariaService.transferir(tenantId, req.origenId, req.destinoId, req.monto);
         return ResponseEntity.ok().build();
     }
@@ -89,6 +94,7 @@ public class CuentaBancariaController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN");
         cuentaBancariaService.eliminar(tenantId, id);
         return ResponseEntity.ok().build();
     }

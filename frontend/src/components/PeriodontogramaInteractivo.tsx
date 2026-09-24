@@ -26,6 +26,14 @@ interface FilaPeriodonto {
   sondajeMl: number;
   sondajeL: number;
   sondajeDl: number;
+  // Margen gingival en mm respecto al limite amelocementario:
+  // positivo = recesion, negativo = agrandamiento. NIC = sondaje + margen.
+  margenMv: number;
+  margenV: number;
+  margenDv: number;
+  margenMl: number;
+  margenL: number;
+  margenDl: number;
   sangradoBop: boolean;
   placa: boolean;
   movilidad: number;
@@ -44,6 +52,50 @@ const esPiezaMultirradicular = (fdi: number): boolean => {
   return p >= 6 && p <= 8;
 };
 
+type Sitio = "Mv" | "V" | "Dv" | "Ml" | "L" | "Dl";
+
+const SITIOS_VESTIBULAR: { id: Sitio; nombre: string }[] = [
+  { id: "Mv", nombre: "Mesio-Vestibular" },
+  { id: "V", nombre: "Medio-Vestibular" },
+  { id: "Dv", nombre: "Disto-Vestibular" },
+];
+
+const SITIOS_LINGUAL: { id: Sitio; nombre: string }[] = [
+  { id: "Ml", nombre: "Mesio-Lingual" },
+  { id: "L", nombre: "Medio-Lingual" },
+  { id: "Dl", nombre: "Disto-Lingual" },
+];
+
+const SITIOS: Sitio[] = ["Mv", "V", "Dv", "Ml", "L", "Dl"];
+
+const sitioSnake: Record<Sitio, string> = { Mv: "mv", V: "v", Dv: "dv", Ml: "ml", L: "l", Dl: "dl" };
+
+const filaDesdeApi = (f: any): FilaPeriodonto => ({
+  dienteFdi: f.diente_fdi,
+  sondajeMv: f.sondaje_mv || 1,
+  sondajeV: f.sondaje_v || 1,
+  sondajeDv: f.sondaje_dv || 1,
+  sondajeMl: f.sondaje_ml || 1,
+  sondajeL: f.sondaje_l || 1,
+  sondajeDl: f.sondaje_dl || 1,
+  margenMv: f.margen_mv || 0,
+  margenV: f.margen_v || 0,
+  margenDv: f.margen_dv || 0,
+  margenMl: f.margen_ml || 0,
+  margenL: f.margen_l || 0,
+  margenDl: f.margen_dl || 0,
+  sangradoBop: Boolean(f.sangrado_bop),
+  placa: Boolean(f.placa),
+  movilidad: f.movilidad || 0,
+  furca: f.furca || 0,
+  notas: f.notas || "",
+});
+
+const maxSondajeDe = (d: FilaPeriodonto) => Math.max(...SITIOS.map((s) => d[`sondaje${s}` as keyof FilaPeriodonto] as number));
+
+const maxNicDe = (d: FilaPeriodonto) =>
+  Math.max(...SITIOS.map((s) => (d[`sondaje${s}` as keyof FilaPeriodonto] as number) + (d[`margen${s}` as keyof FilaPeriodonto] as number)));
+
 export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProps> = ({
   pacienteId,
   pacienteNombre,
@@ -53,6 +105,33 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
   const [cargando, setCargando] = useState<boolean>(false);
   const [guardando, setGuardando] = useState<boolean>(false);
   const [mensaje, setMensaje] = useState<string>("");
+  // Comparacion con un examen anterior: fecha elegida y el estado de cada pieza a esa fecha.
+  const [fechasHistorial, setFechasHistorial] = useState<string[]>([]);
+  const [fechaComparar, setFechaComparar] = useState<string>("");
+  const [datosPrevios, setDatosPrevios] = useState<Record<number, FilaPeriodonto>>({});
+
+  const cargarHistorial = async (fecha: string) => {
+    try {
+      const qs = fecha ? `&fecha=${fecha}` : "";
+      const res = await fetch(`/api/salud/odontologia/periodontograma/historial?pacienteId=${pacienteId}${qs}`, {
+        headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setFechasHistorial(data.fechas || []);
+      const mapa: Record<number, FilaPeriodonto> = {};
+      for (const f of data.filas || []) mapa[f.diente_fdi] = filaDesdeApi(f);
+      setDatosPrevios(mapa);
+    } catch {
+      // Sin historial disponible: la comparacion simplemente no se muestra.
+    }
+  };
+
+  useEffect(() => {
+    setFechaComparar("");
+    setDatosPrevios({});
+    cargarHistorial("");
+  }, [pacienteId]);
 
   useEffect(() => {
     cargarPeriodontograma();
@@ -70,20 +149,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
         const mapa: Record<number, FilaPeriodonto> = {};
         if (data.filas) {
           for (const f of data.filas) {
-            mapa[f.diente_fdi] = {
-              dienteFdi: f.diente_fdi,
-              sondajeMv: f.sondaje_mv || 1,
-              sondajeV: f.sondaje_v || 1,
-              sondajeDv: f.sondaje_dv || 1,
-              sondajeMl: f.sondaje_ml || 1,
-              sondajeL: f.sondaje_l || 1,
-              sondajeDl: f.sondaje_dl || 1,
-              sangradoBop: Boolean(f.sangrado_bop),
-              placa: Boolean(f.placa),
-              movilidad: f.movilidad || 0,
-              furca: f.furca || 0,
-              notas: f.notas || "",
-            };
+            mapa[f.diente_fdi] = filaDesdeApi(f);
           }
         }
         setDatos(mapa);
@@ -105,6 +171,12 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
         sondajeMl: 1,
         sondajeL: 1,
         sondajeDl: 1,
+        margenMv: 0,
+        margenV: 0,
+        margenDv: 0,
+        margenMl: 0,
+        margenL: 0,
+        margenDl: 0,
         sangradoBop: false,
         placa: false,
         movilidad: 0,
@@ -134,6 +206,18 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
     actualizarValor(dienteActivo, campo, num);
   };
 
+  // El margen admite negativos (agrandamiento gingival); "-" solo se deja pasar mientras se escribe.
+  const [margenEnEdicion, setMargenEnEdicion] = useState<{ campo: string; texto: string } | null>(null);
+  const manejarCambioMargen = (campo: keyof FilaPeriodonto, texto: string) => {
+    const limpio = texto.replace(/[^\d-]/g, "").replace(/(?!^)-/g, "");
+    setMargenEnEdicion({ campo, texto: limpio });
+    if (limpio === "" || limpio === "-") {
+      actualizarValor(dienteActivo, campo, 0);
+      return;
+    }
+    actualizarValor(dienteActivo, campo, Math.max(-10, Math.min(15, parseInt(limpio, 10))));
+  };
+
   const guardarDienteActual = async (fdi: number) => {
     setGuardando(true);
     const d = getDiente(fdi);
@@ -154,6 +238,12 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           sondajeMl: d.sondajeMl,
           sondajeL: d.sondajeL,
           sondajeDl: d.sondajeDl,
+          margenMv: d.margenMv,
+          margenV: d.margenV,
+          margenDv: d.margenDv,
+          margenMl: d.margenMl,
+          margenL: d.margenL,
+          margenDl: d.margenDl,
           sangradoBop: d.sangradoBop,
           placa: d.placa,
           movilidad: d.movilidad,
@@ -163,6 +253,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
       });
       if (res.ok) {
         setMensaje(`Pieza ${fdi} guardada.`);
+        cargarHistorial(fechaComparar);
       } else {
         setMensaje(`No se pudo guardar la pieza ${fdi} (error ${res.status}). Intenta de nuevo.`);
       }
@@ -188,6 +279,7 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
       d.sondajeDl >= 5
   ).length;
   const indiceBop = totalPiezasRegistradas > 0 ? Math.round((piezasConSangrado / totalPiezasRegistradas) * 100) : 0;
+  const nicMaximo = Object.values(datos).reduce((max, d) => Math.max(max, maxNicDe(d)), 0);
 
   const colorProfundidad = (mm: number) => {
     if (mm <= 3) return "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30";
@@ -214,7 +306,26 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
         </div>
 
         {/* Tarjetas de Diagnostico Rapido */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-center min-w-[130px]">
+            <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold">Comparar con</div>
+            <select
+              value={fechaComparar}
+              onChange={(e) => {
+                setFechaComparar(e.target.value);
+                if (e.target.value) cargarHistorial(e.target.value);
+                else setDatosPrevios({});
+              }}
+              className="mt-1 bg-transparent text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+            >
+              <option value="">Sin comparar</option>
+              {fechasHistorial.map((f) => (
+                <option key={f} value={f}>
+                  {new Date(`${f}T00:00:00`).toLocaleDateString("es-VE")}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-center min-w-[90px]">
             <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold">BOP Sangrado</div>
             <div className={`text-xl font-black font-['Outfit'] ${indiceBop > 25 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
@@ -225,6 +336,12 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
             <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold">Bolsas &ge; 5mm</div>
             <div className={`text-xl font-black font-['Outfit'] ${bolsasProfundas > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
               {bolsasProfundas}
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-center min-w-[90px]">
+            <div className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold">NIC max.</div>
+            <div className={`text-xl font-black font-['Outfit'] ${nicMaximo >= 5 ? "text-rose-600 dark:text-rose-400" : nicMaximo >= 3 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+              {nicMaximo}mm
             </div>
           </div>
           <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-center min-w-[90px]">
@@ -278,6 +395,18 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                     </span>
                   )}
                   {d.sangradoBop && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
+                  {fechaComparar && medido && datosPrevios[fdi] && (() => {
+                    const delta = maxSondaje - maxSondajeDe(datosPrevios[fdi]);
+                    if (delta === 0) return <span className="text-[9px] font-bold text-slate-400">=</span>;
+                    return (
+                      <span
+                        className={`text-[9px] font-black ${delta > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}
+                        title={`Profundidad maxima ${delta > 0 ? "aumento" : "disminuyo"} ${Math.abs(delta)} mm desde ${fechaComparar}`}
+                      >
+                        {delta > 0 ? `+${delta}` : delta}
+                      </span>
+                    );
+                  })()}
                 </button>
               );
             })}
@@ -324,6 +453,18 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
                     </span>
                   )}
                   {d.sangradoBop && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
+                  {fechaComparar && medido && datosPrevios[fdi] && (() => {
+                    const delta = maxSondaje - maxSondajeDe(datosPrevios[fdi]);
+                    if (delta === 0) return <span className="text-[9px] font-bold text-slate-400">=</span>;
+                    return (
+                      <span
+                        className={`text-[9px] font-black ${delta > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}
+                        title={`Profundidad maxima ${delta > 0 ? "aumento" : "disminuyo"} ${Math.abs(delta)} mm desde ${fechaComparar}`}
+                      >
+                        {delta > 0 ? `+${delta}` : delta}
+                      </span>
+                    );
+                  })()}
                 </button>
               );
             })}
@@ -365,85 +506,61 @@ export const PeriodontogramaInteractivo: React.FC<PeriodontogramaInteractivoProp
           </div>
         </div>
 
-        {/* Cuadricula de 6 puntos de sondaje */}
+        {/* Cuadricula de 6 puntos: sondaje, margen gingival y nivel de insercion (NIC) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Cara Vestibular (3 puntos) */}
-          <div className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block">
-              Cara Vestibular (3 Sitios)
-            </span>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Mesio-Vestibular</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={cur.sondajeMv === 0 ? "" : String(cur.sondajeMv)}
-                  onChange={(e) => manejarCambioSondaje("sondajeMv", e.target.value)}
-                  className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeMv)}`}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Medio-Vestibular</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={cur.sondajeV === 0 ? "" : String(cur.sondajeV)}
-                  onChange={(e) => manejarCambioSondaje("sondajeV", e.target.value)}
-                  className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeV)}`}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Disto-Vestibular</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={cur.sondajeDv === 0 ? "" : String(cur.sondajeDv)}
-                  onChange={(e) => manejarCambioSondaje("sondajeDv", e.target.value)}
-                  className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeDv)}`}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Cara Palatina / Lingual (3 puntos) */}
-          <div className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block">
-              Cara Lingual / Palatina (3 Sitios)
-            </span>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Mesio-Lingual</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={cur.sondajeMl === 0 ? "" : String(cur.sondajeMl)}
-                  onChange={(e) => manejarCambioSondaje("sondajeMl", e.target.value)}
-                  className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeMl)}`}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Medio-Lingual</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={cur.sondajeL === 0 ? "" : String(cur.sondajeL)}
-                  onChange={(e) => manejarCambioSondaje("sondajeL", e.target.value)}
-                  className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeL)}`}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Disto-Lingual</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={cur.sondajeDl === 0 ? "" : String(cur.sondajeDl)}
-                  onChange={(e) => manejarCambioSondaje("sondajeDl", e.target.value)}
-                  className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(cur.sondajeDl)}`}
-                />
+          {[
+            { titulo: "Cara Vestibular (3 Sitios)", sitios: SITIOS_VESTIBULAR },
+            { titulo: "Cara Lingual / Palatina (3 Sitios)", sitios: SITIOS_LINGUAL },
+          ].map((cara) => (
+            <div key={cara.titulo} className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 space-y-3">
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider block">
+                {cara.titulo}
+              </span>
+              <div className="grid grid-cols-3 gap-3">
+                {cara.sitios.map((sitio) => {
+                  const campoSondaje = `sondaje${sitio.id}` as keyof FilaPeriodonto;
+                  const campoMargen = `margen${sitio.id}` as keyof FilaPeriodonto;
+                  const ps = cur[campoSondaje] as number;
+                  const mg = cur[campoMargen] as number;
+                  const previo = datosPrevios[dienteActivo];
+                  const textoMargen =
+                    margenEnEdicion && margenEnEdicion.campo === campoMargen ? margenEnEdicion.texto : mg === 0 ? "" : String(mg);
+                  return (
+                    <div key={sitio.id} className="space-y-1">
+                      <label className="text-[10px] text-slate-500 dark:text-slate-400 block">{sitio.nombre}</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        aria-label={`Sondaje ${sitio.nombre} (mm)`}
+                        value={ps === 0 ? "" : String(ps)}
+                        onChange={(e) => manejarCambioSondaje(campoSondaje, e.target.value)}
+                        className={`w-full p-2.5 rounded-xl border text-center font-black text-lg ${colorProfundidad(ps)}`}
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        aria-label={`Margen gingival ${sitio.nombre} (mm)`}
+                        placeholder="MG 0"
+                        value={textoMargen}
+                        onChange={(e) => manejarCambioMargen(campoMargen, e.target.value)}
+                        onBlur={() => setMargenEnEdicion(null)}
+                        title="Margen gingival: + recesion, - agrandamiento"
+                        className="w-full p-1.5 rounded-lg border border-slate-300 dark:border-white/15 bg-white dark:bg-black/30 text-center text-xs font-bold text-slate-700 dark:text-slate-200"
+                      />
+                      <div className="text-[10px] text-center font-mono text-slate-500 dark:text-slate-400">
+                        NIC <span className={`font-black ${ps + mg >= 5 ? "text-rose-600 dark:text-rose-400" : ps + mg >= 3 ? "text-amber-600 dark:text-amber-400" : "text-slate-700 dark:text-slate-200"}`}>{ps + mg}</span>
+                        {fechaComparar && previo && (
+                          <span className="block text-slate-400">
+                            antes {previo[campoSondaje] as number}/{(previo[campoSondaje] as number) + (previo[campoMargen] as number)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
+          ))}
         </div>
 
         {/* Factores adicionales: BOP, Placa, Movilidad, Furca */}

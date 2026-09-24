@@ -17,6 +17,18 @@ public interface MovimientoRepuestoRepository extends JpaRepository<MovimientoRe
     @Query("SELECT m FROM MovimientoRepuesto m JOIN FETCH m.repuesto WHERE m.repuesto.id = :repuestoId ORDER BY m.fechaRegistro DESC")
     List<MovimientoRepuesto> findByRepuestoIdOrderByFechaRegistroDesc(@Param("repuestoId") Long repuestoId);
 
+    /** Líneas de un ticket del POS: el kárdex de cada línea lleva "Venta <ticket> (" o "Venta <ticket>:". */
+    @Query("SELECT m FROM MovimientoRepuesto m JOIN FETCH m.repuesto WHERE m.tenantId = :tenantId "
+        + "AND m.tipo = com.auroraplus.modules.repuestos.entities.MovimientoRepuesto.TipoMovimiento.VENTA "
+        + "AND (m.motivo LIKE :conParentesis OR m.motivo LIKE :conDosPuntos) ORDER BY m.id")
+    List<MovimientoRepuesto> buscarLineasDeTicket(@Param("tenantId") Long tenantId,
+                                                  @Param("conParentesis") String conParentesis, @Param("conDosPuntos") String conDosPuntos);
+
+    /** Cuánto ya se devolvió de una línea vendida. */
+    @Query("SELECT COALESCE(SUM(m.cantidad), 0) FROM MovimientoRepuesto m WHERE m.movimientoOrigenId = :origenId "
+        + "AND m.tipo = com.auroraplus.modules.repuestos.entities.MovimientoRepuesto.TipoMovimiento.DEVOLUCION")
+    java.math.BigDecimal sumarDevuelto(@Param("origenId") Long origenId);
+
     List<MovimientoRepuesto> findByTenantIdAndTipoAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(
         Long tenantId, MovimientoRepuesto.TipoMovimiento tipo, LocalDateTime desde, LocalDateTime hastaExclusivo);
 

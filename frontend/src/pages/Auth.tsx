@@ -21,18 +21,20 @@ interface RubroNegocioItem {
   modulo: string;
   ruta: string;
   nombreDefault: string;
+  // Rubro aun en construccion: se muestra para que se sepa que viene, pero no se puede elegir.
+  proximamente?: boolean;
 }
 
 const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "restaurante", label: "Restaurante & Cafetería", sub: "Comandas, KDS, mesas y delivery", Icon: IconRestaurant, modulo: "horeca", ruta: "/restaurante", nombreDefault: "Mi Restaurante" },
-  { id: "farmacia", label: "Farmacia & Droguería", sub: "Medicamentos, lotes y mostrador", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia" },
+  { id: "farmacia", label: "Farmacia & Droguería", sub: "Medicamentos, lotes y mostrador", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia", proximamente: true },
   // modulo:"repuestos" (no "comercio") a propósito: el backend gatea /api/repuestos/*
   // por el segmento de URL (ver LicenciaInterceptor), así que el módulo contratado
   // real DEBE ser "repuestos" para que el tenant pueda usar esos endpoints. "comercio"
   // solo existe como `industria`/user.industry, para la identidad unificada en la UI.
   { id: "comercio", label: "Comercio", sub: "POS mostrador, código de barras e inventario", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Negocio" },
   { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
-  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria" },
+  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria", proximamente: true },
   { id: "odontologia", label: "Odontología", sub: "Historia clínica y odontograma FDI", Icon: IconTooth, modulo: "odontologia", ruta: "/mediclinic", nombreDefault: "Mi Consultorio Dental" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
   { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
@@ -61,7 +63,10 @@ export default function Auth() {
     }
   };
 
-  const [mode, setMode] = useState<Mode>("login");
+  // Los botones "Probar gratis" de la web publica llegan con ?registro=1 y abren directo el alta.
+  const [mode, setMode] = useState<Mode>(() =>
+    new URLSearchParams(window.location.search).get("registro") ? "register" : "login"
+  );
   const [form, setForm] = useState(() => {
     let email = "";
     try {
@@ -70,7 +75,8 @@ export default function Auth() {
     return {
       nombre: "",
       empresa: "",
-      industry: "restaurante",
+      industry: "",
+      telefono: "",
       email,
       password: "",
       confirmar: "",
@@ -94,12 +100,15 @@ export default function Auth() {
 
   const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
-  const rubroActual = RUBROS_REGISTRO.find((r) => r.id === form.industry) || RUBROS_REGISTRO[0];
+  const rubroElegido = RUBROS_REGISTRO.find((r) => r.id === form.industry && !r.proximamente);
+  const rubroActual = rubroElegido || RUBROS_REGISTRO[0];
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.nombre.trim() && mode === "register") e.nombre = "Ingresa tu nombre completo";
     if (!form.empresa.trim() && mode === "register") e.empresa = "Indica el nombre de tu negocio o local";
+    if (mode === "register" && !rubroElegido) e.industry = "Elige de qué se trata tu negocio";
+    if (mode === "register" && form.telefono.replace(/\D/g, "").length < 10) e.telefono = "Ingresa tu número de WhatsApp (ej. 0414-1234567)";
     if (mode === "register" && !form.email.includes("@")) {
       e.email = "Ingresa un correo electrónico válido";
     } else if (!form.email.trim()) {
@@ -122,9 +131,11 @@ export default function Auth() {
         // Registra el negocio en backend / local y conecta de inmediato a la vertical correspondiente
         await completarRegistro({
           nombreEmpresa: form.empresa.trim() || rubroActual.nombreDefault,
+          nombreCompleto: form.nombre.trim(),
           moduloPrincipal: rubroActual.modulo,
           industria: rubroActual.id,
           emailContacto: form.email,
+          telefonoContacto: form.telefono.trim(),
           username: form.email,
           password: form.password,
           metodoPagoPreferido: "Pago Móvil / Efectivo",
@@ -309,6 +320,22 @@ export default function Auth() {
                   </div>
 
                   <div>
+                    <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                      WhatsApp
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="Ej. 0414-1234567"
+                      value={form.telefono}
+                      onChange={(e) => set("telefono", e.target.value)}
+                      className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                    />
+                    {errors.telefono && <p className="text-[#ff3b80] text-xs mt-1">{errors.telefono}</p>}
+                  </div>
+
+                  <div>
                     <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-2">
                       ¿De qué se trata tu negocio?
                     </label>
@@ -319,11 +346,15 @@ export default function Auth() {
                           <button
                             key={r.id}
                             type="button"
+                            disabled={r.proximamente}
+                            title={r.proximamente ? "Este rubro estará disponible pronto" : undefined}
                             onClick={() => set("industry", r.id)}
-                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                              sel
-                                ? "bg-teal-500/20 border-teal-400 text-white shadow-[0_0_15px_rgba(45,212,191,0.25)] scale-[1.02]"
-                                : "bg-white/[0.03] hover:bg-white/[0.06] border-white/10 text-white/70 hover:text-white"
+                            className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                              r.proximamente
+                                ? "bg-white/[0.02] border-white/5 text-white/30 cursor-not-allowed"
+                                : sel
+                                ? "bg-teal-500/20 border-teal-400 text-white shadow-[0_0_15px_rgba(45,212,191,0.25)] scale-[1.02] cursor-pointer"
+                                : "bg-white/[0.03] hover:bg-white/[0.06] border-white/10 text-white/70 hover:text-white cursor-pointer"
                             }`}
                           >
                             <div className="flex items-center justify-between">
@@ -332,12 +363,13 @@ export default function Auth() {
                             </div>
                             <div className="mt-1.5">
                               <div className="text-xs font-bold leading-tight">{r.label}</div>
-                              <div className="text-[10px] text-white/40 leading-snug mt-0.5 line-clamp-1">{r.sub}</div>
+                              <div className="text-[10px] text-white/40 leading-snug mt-0.5 line-clamp-1">{r.proximamente ? "Próximamente" : r.sub}</div>
                             </div>
                           </button>
                         );
                       })}
                     </div>
+                    {errors.industry && <p className="text-[#ff3b80] text-xs mt-1">{errors.industry}</p>}
                   </div>
                 </>
               )}
@@ -446,7 +478,7 @@ export default function Auth() {
                 type="submit"
                 disabled={enviando}
                 className="w-full btn-cyber-neon text-white font-bold py-3.5 rounded-full text-sm mt-4 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
-                {enviando ? "Configurando tu negocio…" : mode === "register" ? `Crear cuenta y entrar a ${rubroActual.label} →` : "Ingresar a la plataforma →"}
+                {enviando ? "Configurando tu negocio…" : mode === "register" ? (rubroElegido ? `Crear cuenta y entrar a ${rubroElegido.label} →` : "Crear cuenta →") : "Ingresar a la plataforma →"}
               </button>
             </form>
           </div>
@@ -467,7 +499,7 @@ export default function Auth() {
               <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-xs text-white/50">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>4 verticales nativas — Clínicas, Restaurantes, Comercio y Ganadería</span>
+                  <span>5 rubros especializados — Clínicas, Odontología, Restaurantes, Comercio y Ganadería</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
@@ -475,7 +507,7 @@ export default function Auth() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>POS resiliente a cortes de conexión, caja 100% idempotente</span>
+                  <span>Cobros que no se duplican aunque se caiga la conexión</span>
                 </div>
               </div>
             </div>

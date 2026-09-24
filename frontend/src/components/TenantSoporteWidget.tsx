@@ -161,7 +161,7 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
     <>
       {/* BOTON FLOTANTE DE ASISTENCIA */}
       {mostrarBurbuja && (
-        <div className="fixed bottom-5 right-5 z-40">
+        <div className="soporte-flotante fixed bottom-5 right-5 z-40">
           <button
             onClick={() => setAbierto(true)}
             className="flex items-center gap-2.5 px-4 py-3 bg-emerald-500 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 font-bold text-xs transition-all transform hover:scale-105 cursor-pointer"
@@ -183,7 +183,7 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
 
       {/* VENTANA FLOTANTE DE SOPORTE TIPO CHAT */}
       {abierto && (
-        <div className="fixed bottom-5 right-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] h-[560px] max-h-[calc(100vh-6rem)] bg-white rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden font-sans text-slate-800 animate-fadeIn">
+        <div className="soporte-flotante fixed bottom-5 right-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] h-[560px] max-h-[calc(100vh-6rem)] bg-white rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden font-sans text-slate-800 animate-fadeIn">
           {/* HEADER DEL WIDGET */}
           <div className="p-4 bg-emerald-500 text-white flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2.5">

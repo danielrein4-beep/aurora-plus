@@ -244,6 +244,7 @@ public class SaasSoporteController {
 
     @GetMapping("/api/tenant/soporte/tickets/{id:[0-9]+}/mensajes")
     public List<SaasSoporteMensaje> listarMensajesTenant(@PathVariable Long id) {
+        ticketDelTenant(id);
         List<SaasSoporteMensaje> msgs = mensajeRepository.findByTicketIdOrderByFechaEnvioAsc(id);
         // Marcar como leidos los mensajes que envió el superadmin
         for (SaasSoporteMensaje m : msgs) {
@@ -260,15 +261,16 @@ public class SaasSoporteController {
         @PathVariable Long id,
         @RequestBody Map<String, String> body
     ) {
-        SaasSoporteTicket ticket = ticketRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Ticket no encontrado"));
+        SaasSoporteTicket ticket = ticketDelTenant(id);
 
         String contenido = body.get("contenido");
         if (contenido == null || contenido.trim().isEmpty()) {
             throw new RuntimeException("El mensaje no puede estar vacio");
         }
 
-        String emisor = body.getOrDefault("emisorNombre", ticket.getUsuarioCreador());
+        // Quién escribe sale de la sesión, no del body (antes se podía firmar con cualquier nombre).
+        String usuarioSesion = com.auroraplus.core.auth.AuthContext.getUsername();
+        String emisor = usuarioSesion != null ? usuarioSesion : ticket.getUsuarioCreador();
 
         SaasSoporteMensaje msg = new SaasSoporteMensaje();
         msg.setTicketId(id);
@@ -289,5 +291,13 @@ public class SaasSoporteController {
         ticketRepository.save(ticket);
 
         return ResponseEntity.ok(guardado);
+    }
+
+    /** Un negocio solo ve y escribe en sus propios tickets (el id de la URL no basta). */
+    private SaasSoporteTicket ticketDelTenant(Long id) {
+        Long tenant = com.auroraplus.core.config.TenantContext.getCurrentTenant();
+        return ticketRepository.findById(id)
+            .filter(t -> tenant != null && String.valueOf(tenant).equals(String.valueOf(t.getTenantId())))
+            .orElseThrow(() -> new RuntimeException("Ticket no encontrado"));
     }
 }

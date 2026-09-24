@@ -13,6 +13,7 @@ import {
   IconBell, IconDoorExit, IconCamera,
 } from "../Icons";
 import ModuloOdontologia from "./ModuloOdontologia";
+import AtenderPacienteOdonto from "./AtenderPacienteOdonto";
 import ThemeToggle from "./ThemeToggle";
 import SpecularButton from "./SpecularButton";
 import CanalEndemico from "./CanalEndemico";
@@ -60,7 +61,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 
-type Pagina = "general" | "pacientes" | "historias" | "odontograma" | "laboratorio" | "procedimientos" | "sala-espera" | "agenda" | "canal-endemico" | "financiero" | "configuracion";
+type Pagina = "general" | "atender" | "pacientes" | "historias" | "odontograma" | "laboratorio" | "procedimientos" | "sala-espera" | "agenda" | "canal-endemico" | "financiero" | "configuracion";
 type RolVista = "MEDICO" | "SECRETARIA";
 
 const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; roles?: RolVista[] }[] = [
@@ -275,15 +276,19 @@ const PERFIL_ACTIVO_KEY = "aurora_mediclinic_perfil_activo";
 // ══════════════════════════════════════════════════════════════════════════
 function SelectorPerfilesNetflix({
   configPerfil,
+  esOdontologia = false,
   onSeleccionarDoctor,
   onSeleccionarSecretaria,
   onSalir,
 }: {
   configPerfil: any;
+  // Consultorios dentales ven "Mediclinic Odonto", el diente y los textos del odontologo.
+  esOdontologia?: boolean;
   onSeleccionarDoctor: () => void;
   onSeleccionarSecretaria: () => void;
   onSalir: () => void;
 }) {
+  const IconMarca = esOdontologia ? IconTooth : IconStethoscope;
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 dark:bg-[#051322] dark:text-white flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden select-none transition-colors duration-300">
       {/* Luces de fondo ambient */}
@@ -295,15 +300,15 @@ function SelectorPerfilesNetflix({
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-500 to-sky-600 dark:from-[#177E89] dark:to-[#0B3D91] flex items-center justify-center p-0.5 shadow-md">
             <div className="w-full h-full bg-white dark:bg-[#051322] rounded-[14px] flex items-center justify-center text-teal-600 dark:text-[#177E89]">
-              <IconStethoscope size={20} />
+              <IconMarca size={20} />
             </div>
           </div>
           <div>
             <div className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white tracking-tight">
-              Mediclinic <span className="text-teal-600 dark:text-[#177E89]">Pro</span>
+              Mediclinic <span className="text-teal-600 dark:text-[#177E89]">{esOdontologia ? "Odonto" : "Pro"}</span>
             </div>
             <div className="text-[10px] text-slate-500 dark:text-white/50 uppercase font-mono tracking-widest">
-              {configPerfil.clinicaNombre || "Mi Consultorio Médico"}
+              {configPerfil.clinicaNombre || (esOdontologia ? "Mi Consultorio Dental" : "Mi Consultorio Médico")}
             </div>
           </div>
         </div>
@@ -329,7 +334,7 @@ function SelectorPerfilesNetflix({
             ¿Quién está ingresando hoy?
           </h1>
           <p className="text-slate-600 dark:text-slate-400 text-sm sm:text-base max-w-md mx-auto">
-            Selecciona tu perfil de trabajo para acceder a tus herramientas clínicas
+            Selecciona tu perfil de trabajo para acceder a tus herramientas {esOdontologia ? "del consultorio dental" : "clínicas"}
           </p>
         </div>
 
@@ -348,21 +353,25 @@ function SelectorPerfilesNetflix({
             {/* Avatar Grande */}
             <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-teal-400 via-teal-600 to-indigo-700 dark:from-[#177E89] dark:via-[#177E89] dark:to-[#0B3D91] p-1 shadow-2xl group-hover:ring-4 group-hover:ring-teal-500/40 dark:group-hover:ring-[#177E89]/40 transition-all flex items-center justify-center">
               <div className="w-full h-full rounded-[22px] bg-slate-100 dark:bg-[#051322] flex items-center justify-center text-teal-600 dark:text-[#177E89]">
-                <svg width={52} height={52} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4.5 3v5a4.5 4.5 0 0 0 9 0V3" />
-                  <path d="M4.5 3H3m1.5 0H6m6 0h1.5m0 0H15" />
-                  <path d="M9 12.5v3.5a3 3 0 0 0 3 3h2" />
-                  <circle cx="17.5" cy="19" r="2.5" />
-                </svg>
+                {esOdontologia ? (
+                  <IconTooth size={52} />
+                ) : (
+                  <svg width={52} height={52} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4.5 3v5a4.5 4.5 0 0 0 9 0V3" />
+                    <path d="M4.5 3H3m1.5 0H6m6 0h1.5m0 0H15" />
+                    <path d="M9 12.5v3.5a3 3 0 0 0 3 3h2" />
+                    <circle cx="17.5" cy="19" r="2.5" />
+                  </svg>
+                )}
               </div>
             </div>
 
             <div className="space-y-1">
               <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-[#177E89] transition-colors">
-                {configPerfil.doctorNombre || "Médico Titular"}
+                {configPerfil.doctorNombre || (esOdontologia ? "Odontólogo Titular" : "Médico Titular")}
               </h3>
               <p className="text-xs text-teal-600 dark:text-teal-300/90 font-medium">
-                {configPerfil.especialidad || "Médico Titular & Administrador"}
+                {configPerfil.especialidad || (esOdontologia ? "Odontólogo Titular & Administrador" : "Médico Titular & Administrador")}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-1">
                 Acceso Total: Historias, Cierres, Configuración & Auditoría
@@ -401,7 +410,7 @@ function SelectorPerfilesNetflix({
 
             <div className="space-y-1">
               <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
-                Secretaría & Recepción
+                {esOdontologia ? "Asistente Dental & Recepción" : "Secretaría & Recepción"}
               </h3>
               <p className="text-xs text-sky-600 dark:text-sky-300/90 font-medium">
                 Atención Clínica & Sala de Espera
@@ -423,8 +432,12 @@ function SelectorPerfilesNetflix({
 
       {/* Footer */}
       <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 z-10 pt-4 border-t border-slate-200 dark:border-white/5 gap-2">
-        <div>Mediclinic Pro v2.4 · Sistema de Control Médico Multiusuario</div>
-        <div className="text-[11px] font-mono">El perfil del Doctor está protegido con encriptación y PIN</div>
+        <div>
+          {esOdontologia ? "Mediclinic Odonto v2.4 · Sistema de Control Odontológico Multiusuario" : "Mediclinic Pro v2.4 · Sistema de Control Médico Multiusuario"}
+        </div>
+        <div className="text-[11px] font-mono">
+          El perfil del {esOdontologia ? "Odontólogo" : "Doctor"} está protegido con encriptación y PIN
+        </div>
       </div>
     </div>
   );
@@ -680,6 +693,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     const items = [];
     for (const n of NAV) {
       if (n.id === "canal-endemico") continue;
+      if (n.id === "pacientes") {
+        items.push({ id: "atender" as Pagina, label: "Atender paciente", Icon: IconTooth });
+      }
       if (n.id === "agenda") {
         items.push({ ...n, label: "Agenda Dental & Calendario" });
         continue;
@@ -696,6 +712,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     return items;
   }, [esOdontologia]);
   const [pagina, setPagina] = useState<Pagina>("general");
+  // Al llegar a odontologia desde la historia de un paciente se abre su consulta en sillon;
+  // desde el menu lateral se abre el tablero del dia.
+  const [odontoEnConsulta, setOdontoEnConsulta] = useState(false);
+  useEffect(() => {
+    if (pagina !== "odontograma") setOdontoEnConsulta(false);
+  }, [pagina]);
   
   // Estado del perfil activo: siempre null al montar para mostrar la pantalla de selección estilo Netflix
   const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(null);
@@ -1065,6 +1087,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         <AuroraGradientDef />
         <SelectorPerfilesNetflix
           configPerfil={configPerfil}
+          esOdontologia={esOdontologia}
           onSeleccionarDoctor={seleccionarDoctor}
           onSeleccionarSecretaria={seleccionarSecretaria}
           onSalir={handleSalirAlHub}
@@ -1370,7 +1393,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onNavegar={setPagina}
                 onSeleccionarPacienteParaConsulta={(id) => {
                   setPacienteSeleccionadoId(id);
-                  setPagina("historias");
+                  if (esOdontologia) {
+                    setOdontoEnConsulta(true);
+                    setPagina("odontograma");
+                  } else {
+                    setPagina("historias");
+                  }
                 }}
                 onSeleccionarPacienteParaCotizacion={(id) => {
                   setPacienteSeleccionadoId(id);
@@ -1386,13 +1414,35 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 rol={rolActivo}
                 pacienteInicialId={pacienteSeleccionadoId}
                 onVerDocumento={setVisorDocumento}
-                onIrAOdontologia={() => setPagina("odontograma")}
+                onIrAOdontologia={(id) => {
+                  if (id) setPacienteSeleccionadoId(id);
+                  setOdontoEnConsulta(true);
+                  setPagina("odontograma");
+                }}
+              />
+            )}
+            {pagina === "atender" && (
+              <AtenderPacienteOdonto
+                pacientes={pacientes}
+                onAtender={(id) => {
+                  setPacienteSeleccionadoId(id);
+                  setOdontoEnConsulta(true);
+                  setPagina("odontograma");
+                }}
+                onRegistradoYAtender={(p) => {
+                  // Se agrega a la lista ya cargada para que la consulta lo encuentre sin esperar a recargar.
+                  setPacientes((prev) => (prev ? [p, ...prev.filter((x) => x.id !== p.id)] : [p]));
+                  setPacienteSeleccionadoId(p.id);
+                  setOdontoEnConsulta(true);
+                  setPagina("odontograma");
+                }}
               />
             )}
             {pagina === "odontograma" && (
               <ModuloOdontologia
                 pacientes={pacientes}
                 pacienteInicialId={pacienteSeleccionadoId}
+                abrirEnConsulta={odontoEnConsulta}
                 config={configPerfilConTasas}
                 onSeleccionarPaciente={(id) => {
                   setPacienteSeleccionadoId(id);
@@ -1431,7 +1481,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onNavegar={setPagina}
                 onSeleccionarPacienteParaConsulta={(id) => {
                   setPacienteSeleccionadoId(id);
-                  setPagina("historias");
+                  if (esOdontologia) {
+                    setOdontoEnConsulta(true);
+                    setPagina("odontograma");
+                  } else {
+                    setPagina("historias");
+                  }
                 }}
                 onVerDocumento={setVisorDocumento}
               />
@@ -3101,7 +3156,7 @@ function HistoriasClinicas({
   rol: RolVista;
   pacienteInicialId?: number | null;
   onVerDocumento?: (payload: DocumentoVisorPayload) => void;
-  onIrAOdontologia?: () => void;
+  onIrAOdontologia?: (pacienteId?: number) => void;
 }) {
   // Mediclinic Odonto: el odontograma solo se muestra para tenants de esta
   // vertical — el resto (Clínica/Veterinaria) sigue exactamente igual.
@@ -3760,10 +3815,10 @@ function HistoriasClinicas({
           {onIrAOdontologia && (
             <button
               type="button"
-              onClick={onIrAOdontologia}
+              onClick={() => onIrAOdontologia(pacienteSeleccionado.id)}
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black text-xs hover:brightness-110 transition shrink-0 cursor-pointer shadow-lg shadow-emerald-500/20"
             >
-              Abrir Expediente Odontologico
+              Atender en sillon
             </button>
           )}
         </div>

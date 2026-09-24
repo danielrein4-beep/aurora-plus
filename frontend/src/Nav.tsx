@@ -78,9 +78,9 @@ export default function Nav() {
               <button
                 key={l.path}
                 onClick={() => navigate(l.path)}
-                className={`group font-sans text-sm font-semibold transition-colors duration-200 cursor-pointer flex items-center gap-1 ${
+                className={`group font-sans text-sm font-light uppercase tracking-wide transition-colors duration-200 cursor-pointer flex items-center gap-1 ${
                   isActive
-                    ? "text-[#1D1D1F] font-black"
+                    ? "text-[#1D1D1F]"
                     : "text-[#86868B] hover:text-[#1D1D1F]"
                 }`}>
                 <span className={`text-[#177E89] font-bold transition-all duration-200 ${
@@ -98,7 +98,7 @@ export default function Nav() {
             <div className="flex items-center gap-2.5">
               <button
                 onClick={() => navigate(miSistema.ruta)}
-                className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#F5F5F7] border border-[#E5E5EA] text-[#1D1D1F] hover:bg-[#E5E5EA] transition-colors cursor-pointer"
+                className="text-xs font-light uppercase tracking-wide px-3.5 py-1.5 rounded-full bg-[#F5F5F7] border border-[#E5E5EA] text-[#1D1D1F] hover:bg-[#E5E5EA] transition-colors cursor-pointer"
                 title={`Abrir ${miSistema.label}`}
               >
                 {miSistema.label} →
@@ -112,14 +112,14 @@ export default function Nav() {
                 <span className="w-6 h-6 rounded-full bg-[#177E89] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
                   {user?.nombre?.charAt(0).toUpperCase() ?? "U"}
                 </span>
-                <span className="text-xs font-semibold text-[#1D1D1F]">
+                <span className="text-xs font-light uppercase tracking-wide text-[#1D1D1F]">
                   {user?.nombre || user?.email?.split("@")[0]}
                 </span>
               </div>
 
               <button
                 onClick={() => { logout(); navigate("/"); }}
-                className="text-xs text-[#86868B] hover:text-[#ef4444] transition-colors px-2 py-1.5 cursor-pointer font-medium"
+                className="text-xs font-light uppercase tracking-wide text-[#86868B] hover:text-[#ef4444] transition-colors px-2 py-1.5 cursor-pointer"
               >
                 Cerrar sesión
               </button>
@@ -128,7 +128,7 @@ export default function Nav() {
             <div className="flex items-center gap-3">
               <SpecularButton
                 size="sm"
-                radius={999}
+                radius={2}
                 tint="#F5F5F7"
                 tintOpacity={0.92}
                 blur={14}
@@ -140,11 +140,11 @@ export default function Nav() {
                 proximity={220}
                 onClick={() => navigate("/auth")}
               >
-                Iniciar sesión
+                <span style={{ fontWeight: 300, textTransform: "uppercase", letterSpacing: "0.05em" }}>Iniciar sesión</span>
               </SpecularButton>
               <SpecularButton
                 size="sm"
-                radius={999}
+                radius={2}
                 tint="#177E89"
                 tintOpacity={1}
                 textColor="#f5f5f5"
@@ -157,7 +157,7 @@ export default function Nav() {
                 proximity={220}
                 onClick={() => navigate("/onboarding")}
               >
-                Solicitar demo
+                <span style={{ fontWeight: 300, textTransform: "uppercase", letterSpacing: "0.05em" }}>Solicitar demo</span>
               </SpecularButton>
             </div>
           )}
@@ -186,8 +186,8 @@ export default function Nav() {
             <button
               key={l.path}
               onClick={() => { navigate(l.path); setMobileOpen(false); }}
-              className={`block w-full text-left px-4 py-3 text-sm rounded-xl font-semibold transition-colors ${
-                pathname === l.path ? "text-[#1D1D1F] font-black bg-[#F5F5F7]" : "text-[#1D1D1F] hover:bg-[#F5F5F7]"
+              className={`block w-full text-left px-4 py-3 text-sm rounded-xl font-light uppercase tracking-wide transition-colors ${
+                pathname === l.path ? "text-[#1D1D1F] bg-[#F5F5F7]" : "text-[#1D1D1F] hover:bg-[#F5F5F7]"
               }`}>
               {l.label}
             </button>
@@ -197,18 +197,18 @@ export default function Nav() {
               <>
                 <button
                   onClick={() => { navigate(miSistema.ruta); setMobileOpen(false); }}
-                  className="w-full text-sm font-semibold py-2.5 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5EA] flex items-center justify-center gap-2"
+                  className="w-full text-sm font-light uppercase tracking-wide py-2.5 rounded-xl bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5EA] flex items-center justify-center gap-2"
                 >
                   Entrar a {miSistema.label} →
                 </button>
                 <button
                   onClick={() => { navigate("/dashboard"); setMobileOpen(false); }}
-                  className="btn-deep-black w-full text-sm font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2"
+                  className="btn-deep-black w-full text-sm font-light uppercase tracking-wide py-2.5 rounded-xl flex items-center justify-center gap-2"
                 >
                   <IconBuilding size={14} /> Panel de Empresa
                 </button>
                 <button onClick={() => { logout(); navigate("/"); setMobileOpen(false); }}
-                  className="w-full text-sm text-[#86868B] hover:text-[#ef4444] py-2 font-medium">
+                  className="w-full text-sm font-light uppercase tracking-wide text-[#86868B] hover:text-[#ef4444] py-2">
                   Cerrar sesión
                 </button>
               </>
@@ -216,13 +216,13 @@ export default function Nav() {
               <>
                 <button
                   onClick={() => { navigate("/auth"); setMobileOpen(false); }}
-                  className="w-full text-sm font-semibold text-[#1D1D1F] py-2.5 rounded-xl hover:bg-[#F5F5F7]"
+                  className="w-full text-sm font-light uppercase tracking-wide text-[#1D1D1F] py-2.5 rounded-xl hover:bg-[#F5F5F7]"
                 >
                   Ingresar
                 </button>
                 <button
                   onClick={() => { navigate("/precios"); setMobileOpen(false); }}
-                  className="btn-deep-black w-full text-sm font-semibold py-3 rounded-xl"
+                  className="btn-deep-black w-full text-sm font-light uppercase tracking-wide py-3 rounded-xl"
                 >
                   Solicitar demo gratis
                 </button>

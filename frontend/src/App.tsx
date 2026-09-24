@@ -5,7 +5,10 @@ import React, { useState, useEffect } from "react";
 import SuperAdminPortal from "./components/SuperAdminPortal";
 import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
 import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
-import { BrowserRouter, Routes, Route, useNavigate, useParams } from "react-router-dom";
+import PortalOdontologiaPaciente from "./pages/PortalOdontologiaPaciente";
+import { BrowserRouter, Routes, Route, Outlet, useNavigate, useParams } from "react-router-dom";
+import TenantSoporteWidget from "./components/TenantSoporteWidget";
+import MercadoGanaderoApp from "./components/mercado/MercadoGanaderoApp";
 import Layout from "./Layout";
 import Home from "./pages/Home";
 import Soluciones from "./pages/Soluciones";
@@ -32,6 +35,17 @@ import PersonalRoute from "./components/PersonalRoute";
 import ModuleAccessBar from "./components/ModuleAccessBar";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+
+// Zona privada: el boton de soporte acompana al tenant en el panel general
+// y dentro de cada vertical, para que pueda abrir un ticket sin salir de ella.
+function ZonaPrivada() {
+  return (
+    <>
+      <Outlet />
+      <TenantSoporteWidget />
+    </>
+  );
+}
 
 function AnimatedRoute({ children }: { children: React.ReactNode }) {
   return <div className="animate-page-enter min-h-full w-full">{children}</div>;
@@ -155,6 +169,8 @@ export default function App() {
             <Route path="/lab/:token" element={<PortalPublicoBioanalista />} />
             {/* Portal público donde el PACIENTE sube sus resultados de laboratorio (QR fijo del consultorio) */}
             <Route path="/lab-paciente/:token" element={<PortalLaboratorioPaciente />} />
+            <Route path="/odonto-paciente/:token" element={<PortalOdontologiaPaciente />} />
+            <Route path="/odonto-paciente" element={<PortalOdontologiaPaciente />} />
             {/* Catalogo digital publico para Retail / Comercio */}
             <Route path="/catalogo/:tenantId" element={<CatalogoPublico />} />
             <Route path="/tienda/:tenantId" element={<CatalogoPublico />} />
@@ -165,17 +181,20 @@ export default function App() {
             {/* Protected — requiere sesión activa */}
             {/* Ruta /superadmin eliminada por seguridad: responde 404 a intrusos */}
             <Route path="/superadmin" element={<NotFound />} />
-            <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/finanzas" element={<ProtectedRoute><AnimatedRoute><CentroFinanciero /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/auditoria" element={<ProtectedRoute><AnimatedRoute><Auditoria /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/personal" element={<ProtectedRoute><PersonalRoute><AnimatedRoute><Personal /></AnimatedRoute></PersonalRoute></ProtectedRoute>} />
-            <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/veterinaria" element={<ProtectedRoute><AnimatedRoute><VeterinariaPage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />
-            <Route path="/construccion" element={<ProtectedRoute><AnimatedRoute><ConstruccionPage /></AnimatedRoute></ProtectedRoute>} />
+            <Route element={<ZonaPrivada />}>
+              <Route path="/dashboard"  element={<ProtectedRoute><AnimatedRoute><Dashboard /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/finanzas" element={<ProtectedRoute><AnimatedRoute><CentroFinanciero /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/auditoria" element={<ProtectedRoute><AnimatedRoute><Auditoria /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/personal" element={<ProtectedRoute><PersonalRoute><AnimatedRoute><Personal /></AnimatedRoute></PersonalRoute></ProtectedRoute>} />
+              <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/veterinaria" element={<ProtectedRoute><AnimatedRoute><VeterinariaPage /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/mercado" element={<ProtectedRoute><AnimatedRoute><MercadoGanaderoApp /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/construccion" element={<ProtectedRoute><AnimatedRoute><ConstruccionPage /></AnimatedRoute></ProtectedRoute>} />
+            </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
           {/* Modal Oculto de SuperAdmin (Invocado solo con Atajo Secreto Ctrl+Shift+S) */}

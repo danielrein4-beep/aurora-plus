@@ -42,6 +42,7 @@ public class ConteoFisicoController {
 
     @PostMapping("/iniciar")
     public ResponseEntity<ConteoFisico> iniciar(@RequestParam Long tenantId, @RequestParam String responsable) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(conteoFisicoService.iniciarConteo(tenantId, responsable));
     }
 
@@ -52,6 +53,7 @@ public class ConteoFisicoController {
 
     @PostMapping("/{id}/registrar")
     public ResponseEntity<DetalleConteoFisico> registrar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody RegistrarConteoRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(conteoFisicoService.registrarConteoArticulo(id, tenantId, request.articuloId, request.stockFisicoContado));
     }
 
@@ -62,6 +64,7 @@ public class ConteoFisicoController {
 
     @PostMapping("/{id}/cerrar")
     public ResponseEntity<ConteoFisico> cerrar(@PathVariable Long id, @RequestParam Long tenantId) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(conteoFisicoService.cerrarConteo(id, tenantId));
     }
 }

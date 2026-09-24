@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import jsPDF from "jspdf";
-import { listarPedidosWebComercio, cambiarEstadoPedidoWebComercio, confirmarPedidoWebComercio, ApiError } from "../api";
+import { listarPedidosWebComercio, cambiarEstadoPedidoWebComercio, confirmarPedidoWebComercio, ApiError, monedaBaseGuardada } from "../api";
 
 const METODO_PAGO_LABELS_ND: Record<string, string> = {
-  PAGO_MOVIL: "Pago Móvil", TRANSFERENCIA: "Transferencia Bancaria", EFECTIVO_USD: "Efectivo (USD)",
+  PAGO_MOVIL: "Pago Móvil", TRANSFERENCIA: "Transferencia Bancaria", EFECTIVO_USD: monedaBaseGuardada() === "EUR" ? "Efectivo (EUR)" : "Efectivo (USD)",
   EFECTIVO_BS: "Efectivo (Bs.)", ZELLE: "Zelle", BINANCE: "Binance Pay (USDT)", BANCOLOMBIA: "Bancolombia",
 };
 
@@ -87,8 +87,8 @@ function generarNotaEntregaWebPDF(pedido: PedidoWeb, nombreTienda: string): jsPD
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(80, 80, 80);
-  doc.text("Total USD:", totX, y);
-  doc.text(`$${Number(pedido.totalUsd).toFixed(2)}`, colRight - 2, y, { align: "right" });
+  doc.text(`Total ${monedaBaseGuardada() === "EUR" ? "EUR" : "USD"}:`, totX, y);
+  doc.text(`${monedaBaseGuardada() === "EUR" ? "€" : "$"}${Number(pedido.totalUsd).toFixed(2)}`, colRight - 2, y, { align: "right" });
   if (Number(pedido.totalBs) > 0) {
     y += 5;
     doc.text("Total Bs.:", totX, y);
@@ -509,7 +509,7 @@ export default function PedidosWebPanel({ tenantId, tasaVes, nombreNegocio, onPe
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-black font-mono text-slate-900 dark:text-white">
-                        ${Number(p.totalUsd).toFixed(2)} USD
+                        {monedaBaseGuardada() === "EUR" ? "€" : "$"}{Number(p.totalUsd).toFixed(2)} {monedaBaseGuardada() === "EUR" ? "EUR" : "USD"}
                       </div>
                       {Number(p.totalBs) > 0 && (
                         <div className="text-[10px] font-mono text-slate-400">

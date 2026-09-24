@@ -56,6 +56,7 @@ public class TasaCambioController {
     /** Registra una tasa nueva (queda historial — nunca se sobreescribe la anterior). */
     @PostMapping
     public ResponseEntity<TasaCambio> actualizar(@RequestParam Long tenantId, @RequestBody ActualizarTasaRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA");
         if (request.tasa == null || request.tasa.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La tasa debe ser mayor a cero");
         }
@@ -84,6 +85,7 @@ public class TasaCambioController {
     @PostMapping("/actualizar-externa")
     public ResponseEntity<TasaCambio> actualizarExterna(@RequestParam Long tenantId, @RequestParam String fuente,
                                                           @RequestParam(defaultValue = "VES") String monedaDestino) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA");
         String origenGuardado;
         BigDecimal tasa;
         switch (fuente.toUpperCase()) {
@@ -91,7 +93,11 @@ public class TasaCambioController {
             case "BINANCE" -> { tasa = tasaExternaService.obtenerBinance(); origenGuardado = "USDT"; }
             default -> throw new RuntimeException("Fuente de tasa externa no soportada: " + fuente + " (use BCV o BINANCE)");
         }
-        return ResponseEntity.ok(motorFinancieroService.actualizarTasa(tenantId, "USD", monedaDestino, tasa, origenGuardado));
+        // BCV y Binance cotizan dólar→bolívar: guardarlas como otro par (p. ej. USD→COP) cobraría mal.
+        if (!"VES".equalsIgnoreCase(monedaDestino)) {
+            throw new RuntimeException("Las tasas de " + fuente.toUpperCase() + " son de dólar a bolívar (VES)");
+        }
+        return ResponseEntity.ok(motorFinancieroService.actualizarTasa(tenantId, "USD", "VES", tasa, origenGuardado));
     }
 
     /**
