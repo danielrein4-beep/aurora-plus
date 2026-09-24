@@ -4440,6 +4440,45 @@ export function descargarMargenAnimalPdf(animalId: number, precioKg?: number): P
   return descargarPdfGanaderia(`/api/ganaderia/margen/animal/${animalId}/pdf${consultaMargen({ precioKg })}`);
 }
 
+/** Alimento, suplemento o sal mineral del depósito de la finca. costoUnitario = promedio de lo comprado. */
+export interface InsumoGanaderia {
+  id: number;
+  nombre: string;
+  tipo: string;
+  unidadMedida: string;
+  stockActual: number;
+  costoUnitario: number | null;
+}
+
+/** Ración dada en un potrero: su costo se reparte entre los animales que estaban ahí ese día. */
+export interface RacionGanaderia {
+  id: number;
+  fecha: string;
+  cantidad: number;
+  insumo: InsumoGanaderia;
+  potrero: { id: number; nombre: string };
+}
+
+export function listarInsumosGanaderia(): Promise<InsumoGanaderia[]> {
+  return request(`/api/ganaderia/alimentacion/insumos`);
+}
+
+export function crearInsumoGanaderia(datos: { nombre: string; tipo: string; unidadMedida: string }): Promise<InsumoGanaderia> {
+  return request(`/api/ganaderia/alimentacion/insumos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function registrarCompraInsumoGanaderia(datos: { insumoId: number; cantidad: number; costoTotal: number; motivo?: string }): Promise<InsumoGanaderia> {
+  return request(`/api/ganaderia/alimentacion/entradas`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function registrarRacionGanaderia(datos: { insumoId: number; potreroId: number; fecha: string; cantidad: number }): Promise<RacionGanaderia> {
+  return request(`/api/ganaderia/alimentacion/consumos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarRacionesGanaderia(dias = 90): Promise<RacionGanaderia[]> {
+  return request(`/api/ganaderia/alimentacion/consumos?dias=${dias}`);
+}
+
 async function descargarPdfGanaderia(ruta: string): Promise<Blob> {
   const sesion = leerSesion();
   const headers: Record<string, string> = {};

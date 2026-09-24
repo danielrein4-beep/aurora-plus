@@ -37,6 +37,7 @@ import { AsistenciaPersonal } from '../components/personal/AsistenciaPersonal';
 import { MetasPersonal } from '../components/personal/MetasPersonal';
 import { NominaPersonal } from '../components/personal/NominaPersonal';
 import { PerfilEmpleado } from '../components/personal/PerfilEmpleado';
+import { ContextoVocabularioPersonal, vocabularioDeRubro } from '../components/personal/vocabulario';
 
 const departamentoDe = (modulo?: string | null): Empleado['departamento'] => {
   const valor = (modulo || '').toLowerCase();
@@ -107,7 +108,9 @@ const PERIODO_VACIO: PeriodoNomina = {
   monedaPrincipal: 'USD', recibos: [], historialAjustes: [],
 };
 
-export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
+/** rubro: el vocabulario de la pantalla (en "ganaderia" se habla de obreros y jornadas). */
+export const PersonalPage: React.FC<{ embedded?: boolean; rubro?: string }> = ({ embedded = false, rubro }) => {
+  const v = vocabularioDeRubro(rubro);
   const [seccionActiva, setSeccionActiva] = useState<SeccionPersonal>('resumen');
   
   // Regla estricta: Salarios OCULTOS por defecto en la interfaz
@@ -235,8 +238,8 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
 
   const pestanas: { id: SeccionPersonal; etiqueta: string }[] = [
     { id: 'resumen', etiqueta: 'Resumen' },
-    { id: 'empleados', etiqueta: 'Empleados' },
-    { id: 'turnos', etiqueta: 'Turnos' },
+    { id: 'empleados', etiqueta: v.pestanaEmpleados },
+    { id: 'turnos', etiqueta: v.pestanaTurnos },
     { id: 'asistencia', etiqueta: 'Asistencia' },
     { id: 'metas', etiqueta: 'Metas' },
     { id: 'nomina', etiqueta: 'Nómina' },
@@ -245,6 +248,7 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
   const todosRecibos = periodosNomina.flatMap((p) => p.recibos);
 
   return (
+    <ContextoVocabularioPersonal.Provider value={v}>
     <div className={`${embedded ? 'min-h-0 bg-transparent text-slate-900' : 'min-h-screen bg-slate-50 text-slate-900'} font-sans antialiased selection:bg-[#177E89] selection:text-black`}>
       {/* Contenedor Principal Responsive (desde 360px) */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
@@ -257,14 +261,14 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
             <div className="flex flex-wrap items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#177E89]" />
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                Gestión de Personal & Aurora Nómina
+                {v.titulo}
               </h1>
               <span className="px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono text-xs font-light uppercase tracking-wide border border-[#177E89]/30">
                 PILOTO
               </span>
             </div>
             <p className="text-xs sm:text-sm font-light uppercase tracking-wide text-slate-500">
-              Tu equipo, sus turnos, su asistencia, metas y nómina en un solo lugar.
+              {v.subtitulo}
             </p>
           </div>
 
@@ -287,7 +291,7 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
 
         {/* Barra de Navegación de Secciones (Scroll Horizontal Fluido en Móvil) */}
         <div role="tablist" aria-label="Secciones de Personal" className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-200 no-scrollbar">
-          {pestanas.filter((p) => p.id !== 'nomina' || capacidades?.puedeVerMontosNomina).map((p) => {
+          {pestanas.filter((p) => (p.id !== 'nomina' || capacidades?.puedeVerMontosNomina) && (p.id !== 'metas' || v.mostrarMetas)).map((p) => {
             const esActiva = seccionActiva === p.id;
             return (
               <button
@@ -444,6 +448,7 @@ export const PersonalPage: React.FC<{ embedded?: boolean }> = ({ embedded = fals
         )}
       </div>
     </div>
+    </ContextoVocabularioPersonal.Provider>
   );
 };
 

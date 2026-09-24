@@ -1,6 +1,7 @@
 import React from 'react';
 import { Empleado, PeriodoNomina, RegistroAsistencia, AsignacionTurno, SeccionPersonal, formatearMoneda } from './types';
 import { EstadoNominaBadge } from './EstadoNominaBadge';
+import { useVocabularioPersonal } from './vocabulario';
 
 interface ResumenEquipoProps {
   empleados: Empleado[];
@@ -21,6 +22,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
   ocultarSueldo,
   nominaHabilitada,
 }) => {
+  const v = useVocabularioPersonal();
   const activosCount = empleados.filter((e) => e.estado === 'ACTIVO').length;
   const vacacionesCount = empleados.filter((e) => e.estado === 'DE_VACACIONES').length;
   const presentesHoy = asistenciasHoy.filter((a) => a.estado === 'PRESENTE' || a.estado === 'RETARDO').length;
@@ -41,7 +43,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             EN LÍNEA
           </span>
           <span className="text-slate-500 font-light uppercase tracking-wide">
-            Datos de tu negocio, según los permisos de tu usuario.
+            Datos de {v.tuNegocio}, según los permisos de tu usuario.
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -61,7 +63,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('empleados')}
         >
           <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
-            <span>Total Colaboradores</span>
+            <span>Total {v.Personas}</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-mono text-[#177E89]">
               {activosCount} Activos
             </span>
@@ -118,7 +120,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('turnos')}
         >
           <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
-            <span>Cobertura de Turnos</span>
+            <span>{v.coberturaTurnos}</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-mono text-sky-600">
               Jornada Activa
             </span>
@@ -130,7 +132,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             <span className="text-xs font-light uppercase tracking-wide text-slate-500">en puesto</span>
           </div>
           <div className="mt-2 text-xs font-light uppercase tracking-wide text-slate-500">
-            <span>Áreas clínicas, cocina y campo activas</span>
+            <span>{v.areasActivas}</span>
           </div>
         </div>
 
@@ -170,8 +172,8 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold tracking-tight text-slate-900">Distribución del Equipo</h3>
-              <p className="text-xs font-light uppercase tracking-wide text-slate-500">Colaboradores por departamento operativo</p>
+              <h3 className="text-base font-bold tracking-tight text-slate-900">{v.distribucion}</h3>
+              <p className="text-xs font-light uppercase tracking-wide text-slate-500">{v.distribucionDetalle}</p>
             </div>
             <button
               onClick={() => onNavegarSeccion('empleados')}
@@ -187,7 +189,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
               return (
                 <div key={depto} className="space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span className="text-slate-700 font-light uppercase tracking-wide">{depto}</span>
+                    <span className="text-slate-700 font-light uppercase tracking-wide">{v.nombreArea(depto)}</span>
                     <span className="font-mono text-slate-500">
                       {count} ({porcentaje}%)
                     </span>
@@ -208,14 +210,14 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold tracking-tight text-slate-900">Turnos de la Jornada</h3>
-              <p className="text-xs font-light uppercase tracking-wide text-slate-500">Personal actualmente en servicio programado</p>
+              <h3 className="text-base font-bold tracking-tight text-slate-900">{v.turnosTitulo}</h3>
+              <p className="text-xs font-light uppercase tracking-wide text-slate-500">{v.turnosDetalle}</p>
             </div>
             <button
               onClick={() => onNavegarSeccion('turnos')}
               className="text-xs text-[#177E89] hover:underline font-light uppercase tracking-wide"
             >
-              Gestionar matriz &rarr;
+              {v.turnosAccion} &rarr;
             </button>
           </div>
 
@@ -229,7 +231,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-slate-900">{t.empleadoNombre}</span>
                     <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-light uppercase tracking-wide">
-                      {t.departamento}
+                      {v.nombreArea(t.departamento)}
                     </span>
                   </div>
                   <p className="text-slate-500 text-[11px] font-light uppercase tracking-wide">{t.turnoNombre}</p>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TurnoHorario, AsignacionTurno, Empleado, DepartamentoPersonal } from './types';
+import { useVocabularioPersonal } from './vocabulario';
 
 interface TurnosPersonalProps {
   turnosHorarios: TurnoHorario[];
@@ -14,6 +15,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
   empleados,
   onAgregarAsignacion,
 }) => {
+  const v = useVocabularioPersonal();
   const [asignaciones, setAsignaciones] = useState<AsignacionTurno[]>(initialAsignaciones);
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => new Date().toISOString().slice(0, 10));
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
@@ -97,15 +99,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
     return coincideFecha && coincideDepto;
   });
 
-  const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
-    'TODOS',
-    'Atención & Salud',
-    'Cocina & Restauración',
-    'Operaciones & Campo',
-    'Administración & Finanzas',
-    'Logística & Mantenimiento',
-    'Sistemas & Soporte',
-  ];
+  const departamentos: (DepartamentoPersonal | 'TODOS')[] = ['TODOS', ...v.areas];
 
   return (
     <div className="space-y-6">
@@ -183,7 +177,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
             >
               {departamentos.map((d) => (
                 <option key={d} value={d}>
-                  {d === 'TODOS' ? 'Todas las Áreas' : d}
+                  {d === 'TODOS' ? v.todasLasAreas : v.nombreArea(d)}
                 </option>
               ))}
             </select>
@@ -222,7 +216,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="font-bold tracking-tight text-slate-900 text-sm">{asg.empleadoNombre}</span>
                     <span className="text-[10px] px-1.5 py-0.2 rounded bg-white text-slate-500 font-mono font-light uppercase tracking-wide">
-                      {asg.departamento}
+                      {v.nombreArea(asg.departamento)}
                     </span>
                   </div>
                   <p className="text-xs font-light uppercase tracking-wide text-slate-500">{asg.empleadoCargo}</p>
@@ -266,7 +260,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Colaborador:</label>
+                <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">{v.Persona}:</label>
                 <select
                   value={empleadoSeleccionado}
                   onChange={(e) => setEmpleadoSeleccionado(e.target.value)}

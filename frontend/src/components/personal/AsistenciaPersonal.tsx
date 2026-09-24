@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RegistroAsistencia, Empleado, DepartamentoPersonal, MetodoMarcaje } from './types';
+import { useVocabularioPersonal } from './vocabulario';
 
 interface AsistenciaPersonalProps {
   asistencias: RegistroAsistencia[];
@@ -20,6 +21,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
   puedeRegistrar,
   onRegistrarMarcaje,
 }) => {
+  const v = useVocabularioPersonal();
   const [asistencias, setAsistencias] = useState<RegistroAsistencia[]>(initialAsistencias);
   const [fechaFiltro, setFechaFiltro] = useState(() => new Date().toISOString().slice(0, 10));
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
@@ -87,15 +89,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
     }
   };
 
-  const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
-    'TODOS',
-    'Atención & Salud',
-    'Cocina & Restauración',
-    'Operaciones & Campo',
-    'Administración & Finanzas',
-    'Logística & Mantenimiento',
-    'Sistemas & Soporte',
-  ];
+  const departamentos: (DepartamentoPersonal | 'TODOS')[] = ['TODOS', ...v.areas];
 
   const filtradas = asistencias.filter((a) => {
     const coincideFecha = a.fecha === fechaFiltro;
@@ -148,7 +142,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
 
           <div className="flex items-center gap-2">
             <label htmlFor="depto-asistencia" className="text-xs text-slate-500 font-light uppercase tracking-wide">
-              Departamento:
+              {v.area}:
             </label>
             <select
               id="depto-asistencia"
@@ -158,7 +152,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
             >
               {departamentos.map((d) => (
                 <option key={d} value={d}>
-                  {d === 'TODOS' ? 'Todos los Departamentos' : d}
+                  {d === 'TODOS' ? v.todasLasAreas : v.nombreArea(d)}
                 </option>
               ))}
             </select>
@@ -184,15 +178,15 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
 
         {filtradas.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-xs font-light uppercase tracking-wide">
-            No se registran asistencias para esta fecha y departamento.
+            No se registran asistencias para esta fecha y {v.area.toLowerCase()}.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-white text-slate-500 border-b border-slate-200 uppercase tracking-wider font-light">
                 <tr>
-                  <th className="py-3 px-4">Colaborador</th>
-                  <th className="py-3 px-4">Departamento</th>
+                  <th className="py-3 px-4">{v.Persona}</th>
+                  <th className="py-3 px-4">{v.area}</th>
                   <th className="py-3 px-4">Horario Programado</th>
                   <th className="py-3 px-4">Entrada / Salida Real</th>
                   <th className="py-3 px-4">Horas Computadas</th>
@@ -206,7 +200,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                     <td className="py-3 px-4 font-bold tracking-tight text-slate-900">
                       {ast.empleadoNombre}
                     </td>
-                    <td className="py-3 px-4 text-slate-500 font-light uppercase tracking-wide">{ast.departamento}</td>
+                    <td className="py-3 px-4 text-slate-500 font-light uppercase tracking-wide">{v.nombreArea(ast.departamento)}</td>
                     <td className="py-3 px-4 font-mono text-slate-700">
                       {ast.horaEntradaProgramada} - {ast.horaSalidaProgramada}
                     </td>
@@ -282,7 +276,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Colaborador:</label>
+                <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">{v.Persona}:</label>
                 <select
                   value={empleadoSeleccionado}
                   onChange={(e) => setEmpleadoSeleccionado(e.target.value)}
@@ -290,7 +284,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                 >
                   {empleados.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.nombre} {e.apellidos} ({e.departamento})
+                      {e.nombre} {e.apellidos} ({v.nombreArea(e.departamento)})
                     </option>
                   ))}
                 </select>

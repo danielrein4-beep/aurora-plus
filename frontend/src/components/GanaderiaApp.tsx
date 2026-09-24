@@ -55,6 +55,7 @@ import SeccionProduccion from "./ganaderia/SeccionProduccion";
 import SeccionEventos from "./ganaderia/SeccionEventos";
 import SeccionFinanzas from "./ganaderia/SeccionFinanzas";
 import SeccionPotreros from "./ganaderia/SeccionPotreros";
+import SeccionAlimentacion from "./ganaderia/SeccionAlimentacion";
 import SeccionPanel from "./ganaderia/SeccionPanel";
 import SeccionHato from "./ganaderia/SeccionHato";
 import SeccionSanidad from "./ganaderia/SeccionSanidad";
@@ -825,6 +826,15 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           />
         )}
 
+        {tab === "alimentacion" && (
+          <SeccionAlimentacion
+            potreros={potreros}
+            animales={animales}
+            puedeComprar={puedeImportarHato}
+            notificar={notificar}
+          />
+        )}
+
         {tab === "sociedades" && (
           <SociedadesCeba
             animales={animales}
@@ -837,7 +847,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         {/* Obreros de la finca: directorio, jornadas y nómina (módulo Personal compartido). */}
         {tab === "personal" && (
           <PersonalRoute embebido>
-            <PersonalPage embedded />
+            <PersonalPage embedded rubro="ganaderia" />
           </PersonalRoute>
         )}
 

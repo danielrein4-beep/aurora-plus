@@ -4,6 +4,7 @@ import { PeriodoNomina, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { EstadoNominaBadge } from './EstadoNominaBadge';
 import { DetalleCalculoNomina } from './DetalleCalculoNomina';
 import { IconWarning } from '../../Icons';
+import { useVocabularioPersonal } from './vocabulario';
 
 interface NominaPersonalProps {
   periodos: PeriodoNomina[];
@@ -20,6 +21,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
   onToggleNominaHabilitada,
   onActualizarPeriodos,
 }) => {
+  const v = useVocabularioPersonal();
   const accionesNominaConectadas = false;
   const [periodos, setPeriodos] = useState<PeriodoNomina[]>(initialPeriodos);
   const [periodoActivo, setPeriodoActivo] = useState<PeriodoNomina>(initialPeriodos[0]);
@@ -235,7 +237,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   </div>
                   <h5 className="font-bold tracking-tight text-xs text-slate-900">{p.nombre}</h5>
                   <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 font-mono font-light uppercase tracking-wide">
-                    <span>{p.totalEmpleados} colaboradores</span>
+                    <span>{p.totalEmpleados} {v.personas}</span>
                     <span className="text-[#177E89] font-bold">
                       {ocultarSueldo ? '••••••' : formatearMoneda(p.montoTotalNeto, p.monedaPrincipal)}
                     </span>
@@ -337,7 +339,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="font-bold tracking-tight text-slate-900 text-sm">{recibo.empleadoNombre}</span>
                       <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-light uppercase tracking-wide">
-                        {recibo.departamento}
+                        {v.nombreArea(recibo.departamento)}
                       </span>
                     </div>
                     <p className="text-slate-500 text-xs font-light uppercase tracking-wide">{recibo.empleadoCargo}</p>
@@ -458,7 +460,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
 
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 font-mono">
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-light uppercase tracking-wide">Colaboradores a liquidar:</span>
+                  <span className="text-slate-500 font-light uppercase tracking-wide">{v.Personas} a liquidar:</span>
                   <span className="text-slate-900 font-bold">{periodoActivo.recibos.length}</span>
                 </div>
                 <div className="flex justify-between">

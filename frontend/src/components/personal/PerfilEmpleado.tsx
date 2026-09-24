@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Empleado, RegistroAsistencia, MetaPersonal, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { DetalleCalculoNomina } from './DetalleCalculoNomina';
+import { useVocabularioPersonal } from './vocabulario';
 
 interface PerfilEmpleadoProps {
   empleado: Empleado;
@@ -19,6 +20,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
   onCerrar,
   ocultarSueldo,
 }) => {
+  const v = useVocabularioPersonal();
   const [pestanaActiva, setPestanaActiva] = useState<'info' | 'asistencia' | 'metas' | 'recibos'>('info');
   const btnCerrarRef = useRef<HTMLButtonElement | null>(null);
   const elementoPrevioRef = useRef<HTMLElement | null>(null);
@@ -74,7 +76,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 </span>
               </div>
               <p className="text-xs font-light uppercase tracking-wide text-slate-500">
-                {empleado.cargo} &bull; <span className="text-slate-700">{empleado.departamento}</span>
+                {empleado.cargo} &bull; <span className="text-slate-700">{v.nombreArea(empleado.departamento)}</span>
               </p>
             </div>
           </div>
@@ -83,7 +85,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             ref={btnCerrarRef}
             onClick={onCerrar}
             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
-            aria-label="Cerrar ficha de colaborador"
+            aria-label={`Cerrar ficha de ${v.persona}`}
           >
             ✕
           </button>
@@ -111,7 +113,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
           >
             ⏱️ Asistencia ({asistenciasEmpleado.length})
           </button>
-          <button
+          {v.mostrarMetas && <button
             onClick={() => setPestanaActiva('metas')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'metas'
@@ -120,7 +122,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             }`}
           >
             Metas ({metasEmpleado.length})
-          </button>
+          </button>}
           <button
             onClick={() => setPestanaActiva('recibos')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
@@ -208,7 +210,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
               </h4>
               {asistenciasEmpleado.length === 0 ? (
                 <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200 font-light uppercase tracking-wide">
-                  No hay registros de marcaje recientes para este colaborador.
+                  No hay registros de marcaje recientes para este {v.persona}.
                 </div>
               ) : (
                 <div className="space-y-2">

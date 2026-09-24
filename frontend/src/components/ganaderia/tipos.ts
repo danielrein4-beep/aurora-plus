@@ -12,7 +12,7 @@ export type Notificar = (msg: string) => void;
 
 /** Secciones del menú lateral de Ganadería. */
 export type TabGanaderia =
-  | "resumen" | "potreros" | "inventario" | "engorde" | "sociedades"
+  | "resumen" | "potreros" | "alimentacion" | "inventario" | "engorde" | "sociedades"
   | "sanidad" | "eventos" | "produccion" | "reportes" | "personal" | "auditoria";
 
 export type SubPotreros = "mapa" | "lista";

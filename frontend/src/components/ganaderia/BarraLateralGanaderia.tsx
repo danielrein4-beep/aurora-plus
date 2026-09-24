@@ -1,4 +1,4 @@
-import { IconFileText, IconCalendar, IconChart, IconUsers, IconSyringe, IconMilk, IconPin, IconCow, IconTag, IconScale, IconCoins, IconDashboardGrid, IconUpload, IconClipboardCheck } from "../../Icons";
+import { IconFileText, IconCalendar, IconChart, IconUsers, IconSyringe, IconMilk, IconPin, IconCow, IconTag, IconScale, IconCoins, IconDashboardGrid, IconUpload, IconClipboardCheck, IconWheat } from "../../Icons";
 import type { AnimalGanaderia, PotreroGanaderia, AlertaSanitariaGanaderia } from "../../api";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { ModoVenta } from "./ModalVentaAnimales";
@@ -91,6 +91,7 @@ export default function BarraLateralGanaderia({
             { id: "resumen" as const, Icon: IconDashboardGrid, etiqueta: "Panel General", badge: 0 },
             { id: "inventario" as const, Icon: IconCow, etiqueta: "Hato & Inventario", badge: 0 },
             { id: "potreros" as const, Icon: IconPin, etiqueta: "Potreros", badge: 0 },
+            { id: "alimentacion" as const, Icon: IconWheat, etiqueta: "Alimento y sal", badge: 0 },
             { id: "engorde" as const, Icon: IconScale, etiqueta: "Engorde (GDP)", badge: 0 },
             { id: "sociedades" as const, Icon: IconUsers, etiqueta: "Ceba en sociedad", badge: 0 },
             { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción de leche", badge: 0 },

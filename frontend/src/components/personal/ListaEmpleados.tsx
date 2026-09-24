@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Empleado, DepartamentoPersonal, EstadoEmpleado, formatearMoneda } from './types';
+import { useVocabularioPersonal } from './vocabulario';
 
 interface ListaEmpleadosProps {
   empleados: Empleado[];
@@ -14,19 +15,12 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
   ocultarSueldo,
   onAlternarPrivacidadSueldo,
 }) => {
+  const v = useVocabularioPersonal();
   const [busqueda, setBusqueda] = useState('');
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
   const [estadoFiltro, setEstadoFiltro] = useState<string>('TODOS');
 
-  const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
-    'TODOS',
-    'Atención & Salud',
-    'Cocina & Restauración',
-    'Operaciones & Campo',
-    'Administración & Finanzas',
-    'Logística & Mantenimiento',
-    'Sistemas & Soporte',
-  ];
+  const departamentos: (DepartamentoPersonal | 'TODOS')[] = ['TODOS', ...v.areas];
 
   const filtrados = empleados.filter((emp) => {
     const coincideTexto =
@@ -108,7 +102,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
           >
             {departamentos.map((d) => (
               <option key={d} value={d}>
-                {d === 'TODOS' ? 'Todos los Departamentos' : d}
+                {d === 'TODOS' ? v.todasLasAreas : v.nombreArea(d)}
               </option>
             ))}
           </select>
@@ -167,8 +161,8 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
 
             <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-200">
               <div>
-                <span className="text-slate-500 block text-[10px] font-light uppercase tracking-wide">Departamento</span>
-                <span className="text-slate-700 truncate block font-light uppercase tracking-wide">{emp.departamento}</span>
+                <span className="text-slate-500 block text-[10px] font-light uppercase tracking-wide">{v.area}</span>
+                <span className="text-slate-700 truncate block font-light uppercase tracking-wide">{v.nombreArea(emp.departamento)}</span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px] font-light uppercase tracking-wide">Sueldo pactado</span>
@@ -186,7 +180,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
         ))}
         {filtrados.length === 0 && (
           <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl text-xs font-light uppercase tracking-wide text-slate-500">
-            No se encontraron colaboradores con los criterios seleccionados.
+            No se encontraron {v.personas} con los criterios seleccionados.
           </div>
         )}
       </div>
@@ -198,8 +192,8 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
             <thead className="bg-white text-slate-500 border-b border-slate-200 uppercase tracking-wider font-light">
               <tr>
                 <th className="py-3 px-4">Código / Cédula</th>
-                <th className="py-3 px-4">Colaborador</th>
-                <th className="py-3 px-4">Departamento / Cargo</th>
+                <th className="py-3 px-4">{v.Persona}</th>
+                <th className="py-3 px-4">{v.area} / Cargo</th>
                 <th className="py-3 px-4">Turno Asignado</th>
                 <th className="py-3 px-4">Estado</th>
                 <th className="py-3 px-4 text-right">Sueldo pactado</th>
@@ -224,7 +218,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
                     <div className="text-[11px] text-slate-500 font-light uppercase tracking-wide">{emp.email}</div>
                   </td>
                   <td className="py-3 px-4">
-                    <div className="font-bold tracking-tight text-slate-900">{emp.departamento}</div>
+                    <div className="font-bold tracking-tight text-slate-900">{v.nombreArea(emp.departamento)}</div>
                     <div className="text-[11px] text-slate-500 font-light uppercase tracking-wide">{emp.cargo}</div>
                   </td>
                   <td className="py-3 px-4 text-slate-500 font-light uppercase tracking-wide">{emp.turnoAsignado}</td>
@@ -248,7 +242,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
               {filtrados.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-500 font-light uppercase tracking-wide">
-                    No se encontraron colaboradores con los criterios seleccionados.
+                    No se encontraron {v.personas} con los criterios seleccionados.
                   </td>
                 </tr>
               )}
