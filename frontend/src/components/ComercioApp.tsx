@@ -17,6 +17,10 @@ import { useAuth } from "../context/AuthContext";
 import ThemeToggle from "./ThemeToggle";
 import { useBarcodeScanner, decodificarCodigoPesado } from "../hooks/useBarcodeScanner";
 import { comprimirImagenFactura } from "../utils/imageCompression";
+import { useNavigate } from "react-router-dom";
+import { obtenerEmpresaKpis, type EmpresaKpiResponse } from "../api";
+import PersonalPage from "../pages/Personal";
+import PersonalRoute from "./PersonalRoute";
 import {
   listarRepuestos,
   crearRepuesto,
@@ -960,6 +964,61 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
 // caja) — solo pide al backend la utilidad real (RepuestosReporteService),
 // que nadie más ya tiene cargada.
 // ══════════════════════════════════════════════════════════════════════════
+/** Ventas, costo, margen y resultado del mes, sin salir de Comercio. Son los mismos números de
+ * Aurora Finanzas (endpoint /api/empresa/kpis), filtrados a esta vertical cuando el negocio tiene
+ * varias; el consolidado de todas las verticales queda a un clic. Si el usuario no tiene permiso
+ * (solo dueño/administración), la franja no aparece. */
+function ResumenFinancieroComercio() {
+  const navigate = useNavigate();
+  const [datos, setDatos] = useState<EmpresaKpiResponse | null>(null);
+
+  useEffect(() => {
+    const hoy = new Date();
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    obtenerEmpresaKpis(iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), iso(hoy))
+      .then(setDatos)
+      .catch(() => setDatos(null));
+  }, []);
+
+  if (!datos) return null;
+  const variasVerticales = datos.porModulo.length > 1;
+  const propio = datos.porModulo.find((m) => m.modulo === "REPUESTOS");
+  const ventas = variasVerticales && propio ? propio.ventasBrutas : datos.consolidado.ventasBrutas;
+  const costo = variasVerticales && propio ? propio.costoVentas : datos.consolidado.costoVentas;
+  const margen = ventas - costo;
+  const fmt = (v: number) => `${SIM()}${Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const tarjetas = [
+    { titulo: "Ventas del mes", valor: fmt(ventas), nota: "Ventas brutas registradas" },
+    { titulo: "Costo de ventas", valor: fmt(costo), nota: "Costo de lo vendido" },
+    { titulo: "Margen bruto", valor: fmt(margen), nota: ventas > 0 ? `${((margen / ventas) * 100).toFixed(1)}% sobre ventas` : "Sin ventas aún" },
+    {
+      titulo: variasVerticales ? "Resultado del negocio" : "Resultado estimado",
+      valor: fmt(datos.consolidado.resultadoEstimado),
+      nota: variasVerticales ? "Todas tus verticales, menos gastos" : "Margen menos gastos registrados",
+    },
+  ];
+
+  return (
+    <div className="mb-4 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Resumen financiero del mes</h3>
+        <button type="button" onClick={() => navigate("/finanzas")} className="text-[11px] font-bold text-teal-700 dark:text-teal-300 hover:underline cursor-pointer">
+          Ver consolidado en Aurora Finanzas →
+        </button>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {tarjetas.map((t) => (
+          <div key={t.titulo} className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t.titulo}</div>
+            <div className="mt-1 font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{t.valor}</div>
+            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t.nota}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DashboardGeneralComercio({
   productos,
   ingresosCaja,
@@ -1948,7 +2007,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // Submódulos dentro de "Administración" — antes CXC/CXP e Ingresos&Gastos eran dos
   // entradas separadas en el sidebar; se agrupan porque ambas son la misma función de
   // negocio (control administrativo del dinero), no dos cosas distintas.
-  const [subTabAdmin, setSubTabAdmin] = useState<"cxc_cxp" | "ingresos_gastos" | "cuentas_bancarias">("ingresos_gastos");
+  const [subTabAdmin, setSubTabAdmin] = useState<"cxc_cxp" | "ingresos_gastos" | "cuentas_bancarias" | "personal">("ingresos_gastos");
 
   // Las cuentas por cobrar/pagar viven en el backend real (ver cargarCuentas más abajo,
   // definida después junto a cargarIngresosCaja/cargarGastosCaja) — arranca vacío y se
@@ -3011,6 +3070,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         { subTab: "ingresos_gastos" as const, etiqueta: "Ingresos & Gastos" },
                         { subTab: "cxc_cxp" as const, etiqueta: "Cuentas por Cobrar & Pagar" },
                         { subTab: "cuentas_bancarias" as const, etiqueta: "Cuentas Bancarias" },
+                        { subTab: "personal" as const, etiqueta: "Personal & Nómina" },
                       ]).map((sub) => (
                         <button
                           key={sub.subTab}
@@ -3143,6 +3203,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
           {/* ══════════════════════════════════════════════════════════════════
               TAB 0: VISTA GENERAL (DASHBOARD)
               ══════════════════════════════════════════════════════════════════ */}
+          {tab === "general" && <ResumenFinancieroComercio />}
           {tab === "general" && (
             <DashboardGeneralComercio
               productos={productos.filter((p) => p.rubro === perfilActivo)}
@@ -4183,7 +4244,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "administracion" && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-            {subTabAdmin === "cuentas_bancarias" && user?.tenantId ? (
+            {subTabAdmin === "personal" ? (
+              <PersonalRoute embebido>
+                <PersonalPage embedded />
+              </PersonalRoute>
+            ) : subTabAdmin === "cuentas_bancarias" && user?.tenantId ? (
               <CuentasBancariasComercio tenantId={user.tenantId} mostrarToast={mostrarToast} />
             ) : subTabAdmin === "cxc_cxp" ? (
               <CuentasPorCobrarPagarComercio

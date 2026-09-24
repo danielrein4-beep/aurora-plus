@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -133,6 +134,17 @@ public class TenantProvisioningService {
         moduloInicial.setActivo(true);
         moduloTenantRepository.save(moduloInicial);
 
+        // Comercio incluye Gestion de Personal (directorio, turnos, asistencia y metas) desde el alta.
+        if (VERTICALES_COMERCIO.contains(moduloBackend)) {
+            for (String flag : List.of("personal", "asistencia", "metas")) {
+                ModuloTenant mt = new ModuloTenant();
+                mt.setTenantId(nuevoTenantId);
+                mt.setModuloNombre(flag);
+                mt.setActivo(true);
+                moduloTenantRepository.save(mt);
+            }
+        }
+
         if (Boolean.TRUE.equals(request.accesoTotal)) {
             if (licencia.getTipoLicencia().ordinal() < LicenciaTenant.TipoLicencia.INDUSTRIAL.ordinal()) {
                 licencia.setTipoLicencia(LicenciaTenant.TipoLicencia.INDUSTRIAL);
@@ -185,6 +197,8 @@ public class TenantProvisioningService {
     }
 
     private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia");
+
+    private static final Set<String> VERTICALES_COMERCIO = Set.of("repuestos", "ferreteria", "moda", "tamanaco-comercial", "farmacia");
 
     public static final Set<String> TODOS_LOS_MODULOS = Set.of(
         "salud", "ganaderia", "horeca", "repuestos", "farmacia", "ferreteria", "moda", "minero", "tamanaco-comercial"
