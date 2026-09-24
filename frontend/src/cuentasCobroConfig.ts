@@ -32,6 +32,17 @@ export function obtenerCuentasCobro(): SaasCuentasCobroConfig {
   return DEFAULT_SAAS_CUENTAS_COBRO;
 }
 
+/** Mezcla lo que viene del servidor sobre los valores por defecto (campos vacíos no pisan nada). */
+export function combinarCuentasCobro(servidor: Record<string, string> | null | undefined): SaasCuentasCobroConfig {
+  const base = { ...DEFAULT_SAAS_CUENTAS_COBRO };
+  if (!servidor) return base;
+  for (const k of Object.keys(base) as (keyof SaasCuentasCobroConfig)[]) {
+    const v = servidor[k];
+    if (typeof v === "string" && v.trim()) base[k] = v;
+  }
+  return base;
+}
+
 export function guardarCuentasCobro(cfg: SaasCuentasCobroConfig): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));

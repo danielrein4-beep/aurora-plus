@@ -3280,19 +3280,13 @@ export function cambiarClaveSuperAdmin(actual: string, nueva: string, codigo?: s
   return requestSuperAdmin("/api/super-admin/seguridad/cambiar-clave", { method: "POST", body: JSON.stringify({ actual, nueva, codigo }) });
 }
 
+// Antes, si el servidor fallaba por cualquier motivo, el panel mostraba una lista guardada o de
+// demostración como si fueran los negocios reales. Ahora el error se muestra tal cual.
 export async function listarTenantsSuperAdmin(): Promise<LicenciaTenant[]> {
-  try {
-    const data = await requestSuperAdmin<LicenciaTenant[]>("/api/super-admin/tenants");
-    if (Array.isArray(data)) {
-      guardarTenantsLocales(data);
-      return data;
-    }
-  } catch (err: any) {
-    if (err?.message?.includes("Token") || err?.message?.includes("expirado") || err?.message?.includes("401")) {
-      throw err;
-    }
-  }
-  return obtenerTenantsLocales();
+  const data = await requestSuperAdmin<LicenciaTenant[]>("/api/super-admin/tenants");
+  if (!Array.isArray(data)) throw new Error("Respuesta inesperada al listar negocios");
+  guardarTenantsLocales(data);
+  return data;
 }
 
 // Las funciones de escritura de este panel (crear/activar/desactivar/renovar/
@@ -3351,22 +3345,11 @@ export async function cambiarPlanTenantSuperAdmin(tenantId: number, tipoLicencia
   return res;
 }
 
+// Sin respaldo inventado: si falla, el panel muestra el error en vez de módulos que no son los reales.
 export async function listarModulosTenantSuperAdmin(tenantId: number): Promise<ModuloTenant[]> {
-  try {
-    const res = await requestSuperAdmin<ModuloTenant[]>(`/api/super-admin/tenants/${tenantId}/modulos`);
-    if (Array.isArray(res)) return res;
-  } catch {}
-
-  const raw = localStorage.getItem(`aurora_super_admin_modulos_${tenantId}`);
-  if (raw) return JSON.parse(raw);
-
-  const modulosDefault: ModuloTenant[] = [
-    { tenantId, moduloNombre: "salud", activo: true },
-    { tenantId, moduloNombre: "horeca", activo: false },
-    { tenantId, moduloNombre: "repuestos", activo: false },
-    { tenantId, moduloNombre: "ganaderia", activo: false },
-  ];
-  return modulosDefault;
+  const res = await requestSuperAdmin<ModuloTenant[]>(`/api/super-admin/tenants/${tenantId}/modulos`);
+  if (!Array.isArray(res)) throw new Error("Respuesta inesperada al listar módulos");
+  return res;
 }
 
 export async function concederAccesoTotalSuperAdmin(tenantId: number): Promise<LicenciaTenant> {
@@ -6494,6 +6477,8 @@ export interface EstadoSuscripcion {
   vencida: boolean;
   enPrueba: boolean;
   pagos: PagoSuscripcionVista[];
+  /** Último día con acceso, contando los días de gracia tras el vencimiento. */
+  accesoHasta: string | null;
 }
 
 export function obtenerEstadoSuscripcion(): Promise<EstadoSuscripcion> {
@@ -6503,4 +6488,15 @@ export function obtenerEstadoSuscripcion(): Promise<EstadoSuscripcion> {
 /** Avisa al equipo de Aurora que se pagó (abre un ticket de soporte de prioridad alta). No acredita nada por sí solo. */
 export function reportarPagoSuscripcion(datos: { monto: number; moneda: string; metodo: string; referencia: string; plan?: string }): Promise<unknown> {
   return request("/api/suscripcion/reportar-pago", { method: "POST", body: JSON.stringify(datos) });
+}
+
+// --- Cuentas de cobro de la suscripción (guardadas en el servidor, V98) ---
+export function obtenerCuentasCobroServidor(): Promise<Record<string, string>> {
+  return request("/api/suscripcion/cuentas-cobro");
+}
+export function obtenerCuentasCobroSuperAdmin(): Promise<Record<string, string>> {
+  return requestSuperAdmin("/api/super-admin/tenants/finanzas/cuentas-cobro");
+}
+export function guardarCuentasCobroSuperAdmin(datos: Record<string, string>): Promise<Record<string, string>> {
+  return requestSuperAdmin("/api/super-admin/tenants/finanzas/cuentas-cobro", { method: "PUT", body: JSON.stringify(datos) });
 }

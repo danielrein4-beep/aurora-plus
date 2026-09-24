@@ -1,4 +1,5 @@
-import { obtenerCuentasCobro, guardarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { obtenerCuentasCobro, guardarCuentasCobro, combinarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { obtenerCuentasCobroSuperAdmin, guardarCuentasCobroSuperAdmin } from "../api";
 import React, { useState, useEffect, useMemo } from "react";
 import AuroraLogo from "../AuroraLogo";
 import SuperAdminActividad from "./SuperAdminActividad";
@@ -706,6 +707,12 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   };
 
   const handleCambiarPlan = async (tenantId: number, plan: TipoLicencia) => {
+    // Cambia lo que el negocio puede usar al instante: se confirma antes (antes bastaba tocar el selector).
+    const nombre = tenants.find((x) => x.tenantId === tenantId)?.nombreEmpresa || `Negocio #${tenantId}`;
+    if (!window.confirm(`¿Cambiar el plan de "${nombre}" a ${plan}? Afecta de inmediato a qué módulos puede entrar.`)) {
+      cargarTodo();
+      return;
+    }
     try {
       await cambiarPlanTenantSuperAdmin(tenantId, plan);
       avisar(`Plan actualizado a ${plan} para Tenant #${tenantId}.`);
@@ -815,6 +822,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       // ("aurora_auth_token", etc.) que nadie más leía, así que "Impersonar" no
       // dejaba realmente logueado como el tenant al entrar a /dashboard.
       guardarSesion({ token: res.token, rol: "DUENO_ADMIN", username: "soporte-superadmin", tenantId: Number(res.tenantId) });
+      // Enciende la franja "Modo soporte técnico activo" (App.tsx) para no olvidar que se está
+      // operando dentro del negocio de un cliente. Antes nadie escribía estas claves.
+      try {
+        sessionStorage.setItem("aurora_impersonando", "true");
+        sessionStorage.setItem("aurora_impersonando_tenant_nombre", res.nombreEmpresa || `Negocio #${res.tenantId}`);
+        sessionStorage.setItem("aurora_impersonando_tenant_id", String(res.tenantId));
+      } catch { /* sin sessionStorage: solo se pierde la franja */ }
       setTimeout(() => {
         window.location.href = "/dashboard";
       }, 1000);
@@ -902,6 +916,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   const handleConcederAccesoTotal = async () => {
     if (!tenantParaModulos) return;
+    if (!window.confirm(`¿Dar acceso total a "${tenantParaModulos.nombreEmpresa}"? Activa todos los módulos y extiende su licencia sin cobro.`)) return;
     setConcediendoAccesoTotal(true);
     try {
       await concederAccesoTotalSuperAdmin(tenantParaModulos.tenantId);
@@ -1785,6 +1800,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 onClick={() => {
                   setCuentasConfigForm(obtenerCuentasCobro());
                   setShowConfigCuentasModal(true);
+                  obtenerCuentasCobroSuperAdmin()
+                    .then((c) => { if (c && Object.keys(c).length) setCuentasConfigForm(combinarCuentasCobro(c)); })
+                    .catch(() => {});
                 }}
                 className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
               >
@@ -4847,11 +4865,17 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </div>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                guardarCuentasCobro(cuentasConfigForm);
-                avisar("Cuentas de cobro actualizadas exitosamente. Los clientes ya ven los datos.");
-                setShowConfigCuentasModal(false);
+                // Antes solo se guardaba en este navegador y ningún cliente veía el cambio.
+                try {
+                  await guardarCuentasCobroSuperAdmin({ ...cuentasConfigForm });
+                  guardarCuentasCobro(cuentasConfigForm);
+                  avisar("Cuentas de cobro guardadas. Todos los negocios ya ven estos datos al pagar.");
+                  setShowConfigCuentasModal(false);
+                } catch (err: any) {
+                  avisar(err?.message || "No se pudieron guardar las cuentas de cobro.", "error");
+                }
               }}
               className="space-y-4 text-xs"
             >

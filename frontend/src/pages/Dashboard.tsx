@@ -1,4 +1,4 @@
-import { obtenerCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { obtenerCuentasCobro, combinarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
@@ -38,6 +38,7 @@ import {
   type MapaMesaEntrada,
   obtenerCapacidadesPersonal,
   obtenerEstadoSuscripcion,
+  obtenerCuentasCobroServidor,
   reportarPagoSuscripcion,
   tasaVigente,
   type EstadoSuscripcion,
@@ -381,6 +382,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user?.tenantId) return;
     obtenerEstadoSuscripcion().then(setSuscripcion).catch(() => setSuscripcion(null));
+    // Las cuentas que configuró el equipo de Aurora en el servidor; si no hay, quedan las de siempre.
+    obtenerCuentasCobroServidor().then((c) => setCuentasCobro(combinarCuentasCobro(c))).catch(() => {});
     tasaVigente(user.tenantId, "USD", "VES")
       .then((t) => setTasaBcv(t && Number(t.tasa) > 0 ? Number(t.tasa) : null))
       .catch(() => setTasaBcv(null));
@@ -884,8 +887,23 @@ export default function Dashboard() {
       {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10 space-y-8">
         
+        {/* Plan vencido: sigue trabajando unos días de gracia, pero hay que avisarle con claridad */}
+        {suscripcion?.vencida && (
+          <div className="rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-rose-300 bg-rose-50 text-rose-900">
+            <div>
+              <h4 className="font-bold text-sm">Tu plan venció el {suscripcion.fechaVencimiento ? new Date(suscripcion.fechaVencimiento + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long" }) : ""}</h4>
+              <p className="text-xs mt-0.5">
+                Puedes seguir trabajando hasta el {suscripcion.accesoHasta ? new Date(suscripcion.accesoHasta + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long" }) : "final del período de gracia"}. Después el acceso se pausa hasta que se confirme tu pago; tus datos no se borran.
+              </p>
+            </div>
+            <button onClick={() => setShowPaymentModal(true)} className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer">
+              Reportar mi pago →
+            </button>
+          </div>
+        )}
+
         {/* BARRA DE RECORDATORIO DE TRIAL / PAGO (DISEÑO PREMIUM EN 1 LÍNEA) */}
-        {isTrial && (
+        {isTrial && !suscripcion?.vencida && (
           <div className="apple-glass rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-teal-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.06)] bg-gradient-to-r from-teal-500/10 via-transparent to-purple-500/10 backdrop-blur-xl">
             <div className="flex items-center gap-3.5">
               <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-300 flex items-center justify-center shadow-inner flex-shrink-0">

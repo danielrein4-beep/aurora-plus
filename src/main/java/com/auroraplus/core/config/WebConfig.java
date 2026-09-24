@@ -21,6 +21,9 @@ public class WebConfig implements WebMvcConfigurer {
     @Autowired
     private AuditoriaAutoInterceptor auditoriaAutoInterceptor;
 
+    @Autowired
+    private SuperAdminAuditoriaInterceptor superAdminAuditoriaInterceptor;
+
     // SOLO estas dos rutas de /api/auth/** son públicas — es donde se consigue
     // el token en primer lugar. Todo lo demás bajo /api/auth/** (ej.
     // /api/auth/usuarios, gestión de usuarios del propio tenant) SÍ debe pasar
@@ -72,5 +75,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(auditoriaAutoInterceptor)
             .addPathPatterns("/api/**")
             .excludePathPatterns("/api/super-admin/**", "/api/public/**", "/api/auditoria/**");
+        // Las acciones del super admin van a su propia auditoría, con el nombre de quien las hizo.
+        registry.addInterceptor(superAdminAuditoriaInterceptor)
+            .addPathPatterns("/api/super-admin/**");
     }
 }

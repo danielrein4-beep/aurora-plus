@@ -41,7 +41,9 @@ public class SuscripcionTenantController {
 
     public record EstadoSuscripcion(String nombreEmpresa, String tipoLicencia, String planSolicitado,
                                     LocalDate fechaVencimiento, long diasRestantes, boolean vencida,
-                                    boolean enPrueba, List<PagoVista> pagos) {}
+                                    boolean enPrueba, List<PagoVista> pagos,
+                                    /** Último día con acceso contando los días de gracia. */
+                                    LocalDate accesoHasta) {}
 
     @GetMapping("/estado")
     public EstadoSuscripcion estado() {
@@ -58,7 +60,7 @@ public class SuscripcionTenantController {
         boolean enPrueba = pagos.isEmpty() && dias <= com.auroraplus.core.auth.controllers.AuthController.DIAS_PRUEBA_GRATIS;
         return new EstadoSuscripcion(licencia.getNombreEmpresa(), licencia.getTipoLicencia().name(),
             licencia.getPlanSolicitado(), vence, Math.max(0, dias), vence != null && vence.isBefore(LocalDate.now()),
-            enPrueba, pagos);
+            enPrueba, pagos, vence == null ? null : vence.plusDays(LicenciaService.DIAS_GRACIA));
     }
 
     public static class ReportePagoRequest {

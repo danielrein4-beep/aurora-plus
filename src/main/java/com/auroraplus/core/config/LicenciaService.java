@@ -93,6 +93,12 @@ public class LicenciaService {
      * Valida la licencia del tenant para acceder al módulo indicado por la
      * ruta (ej: "/api/minero/..." -> módulo "minero").
      */
+    /**
+     * Días que el negocio sigue trabajando después de la fecha de vencimiento, para que un pago
+     * que se retrasa un par de días no le corte la operación de golpe. El Hub se lo avisa.
+     */
+    public static final int DIAS_GRACIA = 3;
+
     public ResultadoValidacion validarAcceso(Long tenantId, String pathModulo) {
         LicenciaTenant.TipoLicencia nivelRequerido = NIVEL_REQUERIDO_POR_MODULO.getOrDefault(pathModulo, LicenciaTenant.TipoLicencia.BASICA);
         if (nivelRequerido == null) {
@@ -112,9 +118,9 @@ public class LicenciaService {
                 "La licencia de este tenant está desactivada. Regularice su suscripción para continuar.");
         }
 
-        if (licencia.getFechaVencimientoPago() != null && licencia.getFechaVencimientoPago().isBefore(LocalDate.now())) {
+        if (licencia.getFechaVencimientoPago() != null && licencia.getFechaVencimientoPago().plusDays(DIAS_GRACIA).isBefore(LocalDate.now())) {
             return ResultadoValidacion.bloqueado(402,
-                "La licencia de este tenant venció el " + licencia.getFechaVencimientoPago() + ". Renueve el pago para reactivar el acceso.");
+                "Tu plan venció el " + licencia.getFechaVencimientoPago() + ". Reporta tu pago desde Aurora Hub > Facturación & Pagos para reactivar el acceso.");
         }
 
         if (licencia.getTipoLicencia().ordinal() < nivelRequerido.ordinal()) {

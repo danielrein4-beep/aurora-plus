@@ -229,7 +229,8 @@ public class SuperAdminController {
         pago.setFechaRegistro(LocalDateTime.now());
         pago.setEstado("CONFIRMADO");
         pago.setNotas(req.notas);
-        pago.setRegistradoPor("superadmin");
+        String quien = com.auroraplus.core.auth.AuthContext.getUsername();
+        pago.setRegistradoPor(quien != null ? quien : "superadmin");
         PagoSuscripcionTenant guardado = pagoSuscripcionRepository.save(pago);
 
         if (req.comisionIds != null && !req.comisionIds.isEmpty()) {
@@ -289,7 +290,7 @@ public class SuperAdminController {
         cortesía.setFechaRegistro(LocalDateTime.now());
         cortesía.setEstado("CONFIRMADO");
         cortesía.setNotas(req.motivo != null ? req.motivo : "Días de cortesía otorgados por SuperAdmin");
-        cortesía.setRegistradoPor("superadmin");
+        cortesía.setRegistradoPor(com.auroraplus.core.auth.AuthContext.getUsername() != null ? com.auroraplus.core.auth.AuthContext.getUsername() : "superadmin");
         pagoSuscripcionRepository.save(cortesía);
 
         return ResponseEntity.ok(guardada);
@@ -404,7 +405,7 @@ public class SuperAdminController {
         if (registroAuditoriaService != null) {
             registroAuditoriaService.registrar(
                 tenantId,
-                "SUPER_ADMIN",
+                "super-admin:" + com.auroraplus.core.auth.AuthContext.getUsername(),
                 "ACTIVAR",
                 "LicenciaTenant",
                 tenantId,
@@ -423,7 +424,7 @@ public class SuperAdminController {
         if (registroAuditoriaService != null) {
             registroAuditoriaService.registrar(
                 tenantId,
-                "SUPER_ADMIN",
+                "super-admin:" + com.auroraplus.core.auth.AuthContext.getUsername(),
                 "SUSPENDER",
                 "LicenciaTenant",
                 tenantId,
@@ -717,7 +718,7 @@ public class SuperAdminController {
         mov.setMetodoPago(gf.getMetodoPago() != null ? gf.getMetodoPago() : "TARJETA_CREDITO");
         mov.setReferenciaComprobante(referencia);
         mov.setGastoFijoId(gf.getId());
-        mov.setRegistradoPor("superadmin");
+        mov.setRegistradoPor(com.auroraplus.core.auth.AuthContext.getUsername() != null ? com.auroraplus.core.auth.AuthContext.getUsername() : "superadmin");
         mov.setFechaCreacion(LocalDateTime.now());
         return ResponseEntity.ok(saasMovimientoRepository.save(mov));
     }
@@ -761,7 +762,7 @@ public class SuperAdminController {
         if (mov.getCategoria() == null) mov.setCategoria("OTRO");
         if (mov.getFechaMovimiento() == null) mov.setFechaMovimiento(LocalDate.now());
         if (mov.getMetodoPago() == null) mov.setMetodoPago("TRANSFERENCIA_BANCARIA");
-        mov.setRegistradoPor("superadmin");
+        mov.setRegistradoPor(com.auroraplus.core.auth.AuthContext.getUsername() != null ? com.auroraplus.core.auth.AuthContext.getUsername() : "superadmin");
         mov.setFechaCreacion(LocalDateTime.now());
         return ResponseEntity.ok(saasMovimientoRepository.save(mov));
     }
@@ -826,6 +827,8 @@ public class SuperAdminController {
 
         List<PagoSuscripcionTenant> pagosConfirmados = todosPagos.stream()
             .filter(p -> "CONFIRMADO".equalsIgnoreCase(p.getEstado()))
+            // Las métricas son en dólares: un pago en bolívares o pesos no se suma como si fuera USD.
+            .filter(p -> p.getMoneda() == null || "USD".equalsIgnoreCase(p.getMoneda()) || "USDT".equalsIgnoreCase(p.getMoneda()))
             .collect(Collectors.toList());
 
         final LocalDateTime fDesde = desde;

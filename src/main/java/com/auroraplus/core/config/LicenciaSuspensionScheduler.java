@@ -39,7 +39,8 @@ public class LicenciaSuspensionScheduler {
      */
     public int suspenderLicenciasVencidas() {
         LocalDate hoy = LocalDate.now();
-        List<LicenciaTenant> vencidas = licenciaTenantRepository.buscarVencidasActivas(hoy);
+        // Se respetan los días de gracia: solo se suspende cuando ya pasaron también esos días.
+        List<LicenciaTenant> vencidas = licenciaTenantRepository.buscarVencidasActivas(hoy.minusDays(LicenciaService.DIAS_GRACIA));
         int contador = 0;
 
         for (LicenciaTenant l : vencidas) {
