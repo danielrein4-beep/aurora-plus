@@ -63,10 +63,12 @@ public class TesoreriaController {
 
     /** Cierre de caja: el cajero declara lo que tiene físicamente, el sistema calcula el descuadre. */
     @PostMapping("/cerrar-caja")
-    public ResponseEntity<ArqueoCaja> cerrarCaja(@RequestParam Long tenantId, @RequestParam String idCajero,
+    public ResponseEntity<ArqueoCaja> cerrarCaja(@RequestParam Long tenantId, @RequestParam(required = false) String idCajero,
                                                   @RequestParam BigDecimal montoDeclarado, @RequestParam String moneda) {
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
-        return ResponseEntity.ok(tesoreriaService.procesarArqueoCiego(tenantId, idCajero, montoDeclarado, moneda));
+        // Quién cierra sale de la sesión: antes el navegador podía poner el nombre de cualquier cajero.
+        String cajero = com.auroraplus.core.auth.AuthContext.getUsername();
+        return ResponseEntity.ok(tesoreriaService.procesarArqueoCiego(tenantId, cajero != null ? cajero : idCajero, montoDeclarado, moneda));
     }
 
     /** Historial de cierres del tenant, más recientes primero — antes devolvía TODOS los tenants sin filtrar. */

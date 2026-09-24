@@ -71,6 +71,28 @@ public class JwtService {
             .compact();
     }
 
+    /** Nombre reservado del usuario con que el super-admin entra a un negocio (ningún negocio puede usarlo). */
+    public static final String USUARIO_SOPORTE = "soporte-superadmin";
+
+    /**
+     * Token para entrar como soporte a un negocio: dura 30 minutos (no 12 horas) y lleva quién lo
+     * emitió y la versión de su sesión, para revocarlo si ese admin se desactiva o cambia su clave.
+     */
+    public String generarTokenImpersonacion(Long tenantId, String adminUsername, int adminTokenVersion) {
+        Instant ahora = Instant.now();
+        return Jwts.builder()
+            .subject(USUARIO_SOPORTE)
+            .claim("tipo", "TENANT")
+            .claim("tenantId", tenantId)
+            .claim("rol", "DUENO_ADMIN")
+            .claim("impersonadoPor", adminUsername)
+            .claim("adminTokenVersion", adminTokenVersion)
+            .issuedAt(Date.from(ahora))
+            .expiration(Date.from(ahora.plusSeconds(30 * 60)))
+            .signWith(signingKey())
+            .compact();
+    }
+
     public String generarTokenSuperAdmin(String username) {
         return generarTokenSuperAdmin(username, 0);
     }

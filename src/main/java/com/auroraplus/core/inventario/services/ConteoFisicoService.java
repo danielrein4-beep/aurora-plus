@@ -73,9 +73,11 @@ public class ConteoFisicoService {
         if (existente.isEmpty()) {
             detalle.setTenantId(tenantId);
             detalle.setArticulo(articulo);
-            detalle.setStockTeorico(articulo.getStockActual());
             conteo.addDetalle(detalle);
         }
+        // Se toma el stock del sistema al momento de CADA conteo: si entre dos recuentos se vendieron
+        // unidades, compararlas contra el teórico viejo daba una merma falsa.
+        detalle.setStockTeorico(articulo.getStockActual());
         detalle.setStockFisicoContado(stockFisicoContado);
 
         return detalleConteoFisicoRepository.save(detalle);

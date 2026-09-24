@@ -143,7 +143,23 @@ public class TenantInterceptor implements HandlerInterceptor {
         // expiración natural — cambiar la clave ahora sí cierra las sesiones abiertas en otros
         // dispositivos.
         Integer tokenVersionClaim = claims.get("tokenVersion", Integer.class);
-        if (tokenVersionClaim != null && !"soporte-superadmin".equals(claims.getSubject())) {
+        String usuarioToken = claims.getSubject();
+        if (com.auroraplus.core.auth.services.JwtService.USUARIO_SOPORTE.equals(usuarioToken)) {
+            // Entrada de soporte: vale mientras el admin que la emitió siga activo y con la misma sesión.
+            String admin = claims.get("impersonadoPor", String.class);
+            Integer versionAdmin = claims.get("adminTokenVersion", Integer.class);
+            com.auroraplus.core.auth.entities.UsuarioSuperAdmin emisor = admin == null || usuarioSuperAdminRepository == null ? null
+                : usuarioSuperAdminRepository.findByUsername(admin).orElse(null);
+            if (emisor == null || !emisor.isActivo() || versionAdmin == null || emisor.getTokenVersion() != versionAdmin) {
+                rechazar(response, "La sesión de soporte expiró o fue revocada");
+                return false;
+            }
+            AuthContext.set(com.auroraplus.core.auth.services.JwtService.USUARIO_SOPORTE + ":" + admin, rol);
+            TenantContext.setCurrentTenant(tenantId);
+            entityManager.unwrap(Session.class).enableFilter("tenantFilter").setParameter("tenantId", tenantId);
+            return true;
+        }
+        if (tokenVersionClaim != null) {
             Usuario usuario = usuarioRepository.buscarPorTenantYUsername(tenantId, claims.getSubject()).orElse(null);
             if (usuario == null || usuario.getTokenVersion() != tokenVersionClaim) {
                 rechazar(response, "Sesión invalidada — la contraseña cambió, inicia sesión de nuevo");

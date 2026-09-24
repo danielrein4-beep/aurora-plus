@@ -28,6 +28,26 @@ public class WhatsAppWebhookController {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /** Secreto de la app de Meta (el mismo para todos los negocios que usan la app de Aurora). */
+    @org.springframework.beans.factory.annotation.Value("${WHATSAPP_APP_SECRET:}")
+    private String appSecret;
+
+    private volatile boolean avisoSinSecreto;
+
+    private boolean firmaValida(String cuerpo, String firma) {
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(new javax.crypto.spec.SecretKeySpec(appSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] h = mac.doFinal(cuerpo.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder esperado = new StringBuilder("sha256=");
+            for (byte b : h) esperado.append(String.format("%02x", b));
+            return java.security.MessageDigest.isEqual(esperado.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                firma.trim().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /**
      * Verificacion del Webhook exigida por Meta (Hub Challenge).
      */
@@ -61,7 +81,20 @@ public class WhatsAppWebhookController {
     @PostMapping("/{tenantId:[0-9]+}/webhook")
     public ResponseEntity<?> recibirMensajeMeta(
             @PathVariable Long tenantId,
+            @RequestHeader(value = "X-Hub-Signature-256", required = false) String firma,
             @RequestBody String payloadJson) {
+
+        // Meta firma cada evento con el secreto de la app. Sin verificarlo, cualquiera podía
+        // simular mensajes y hacer que el negocio enviara WhatsApp (con costo) a números ajenos.
+        if (appSecret != null && !appSecret.isBlank()) {
+            if (firma == null || !firmaValida(payloadJson, firma)) {
+                return ResponseEntity.status(401).body("Firma inválida");
+            }
+        } else if (!avisoSinSecreto) {
+            avisoSinSecreto = true;
+            org.slf4j.LoggerFactory.getLogger(WhatsAppWebhookController.class)
+                .warn("WHATSAPP_APP_SECRET no está configurado: el webhook de WhatsApp acepta eventos sin verificar su firma.");
+        }
 
         try {
             JsonNode root = JSON.readTree(payloadJson);

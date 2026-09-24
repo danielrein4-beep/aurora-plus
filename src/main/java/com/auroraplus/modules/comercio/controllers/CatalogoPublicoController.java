@@ -58,7 +58,21 @@ public class CatalogoPublicoController {
     private LicenciaTenant resolverLicencia(String identificador) {
         if (identificador == null || identificador.isBlank()) return null;
         String ident = identificador.trim().toLowerCase();
-        return licenciaTenantRepository.findBySlugCatalogo(ident).orElse(null);
+        return licenciaTenantRepository.findBySlugCatalogo(ident).filter(this::tiendaHabilitada).orElse(null);
+    }
+
+    private static final java.util.Set<String> RUBROS_CON_TIENDA =
+        java.util.Set.of("comercio", "retail", "farmacia", "ferreteria", "repuestos", "moda");
+
+    /**
+     * Todo negocio recibe un slug al crearse, pero la tienda pública solo existe para los
+     * rubros que venden al público o para quien activó su tienda: antes una clínica o un
+     * restaurante publicaban sin saberlo todos sus insumos con stock y precio.
+     */
+    private boolean tiendaHabilitada(LicenciaTenant licencia) {
+        return Long.valueOf(1L).equals(licencia.getTenantId())
+            || Boolean.TRUE.equals(licencia.isPersonalizacionTiendaActiva())
+            || (licencia.getModuloPrincipal() != null && RUBROS_CON_TIENDA.contains(licencia.getModuloPrincipal().toLowerCase()));
     }
 
     @GetMapping("/{identificador}")

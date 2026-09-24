@@ -109,9 +109,9 @@ public class RepuestoConversionService {
      * referenciaTipo del movimiento — es lo que le permite a Vista General y a los reportes
      * decir de dónde vino cada venta sin adivinar por el texto del concepto.
      */
-    private void registrarIngresoCaja(Long tenantId, BigDecimal montoBase, String monedaPago, BigDecimal montoRecibido,
+    private MovimientoCaja registrarIngresoCaja(Long tenantId, BigDecimal montoBase, String monedaPago, BigDecimal montoRecibido,
                                        String concepto, String canalVenta, Long movimientoRepuestoId) {
-        motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
+        return motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
             montoBase, monedaPago, montoRecibido, concepto,
             "COMERCIO", canalVenta != null ? canalVenta : "POS", movimientoRepuestoId);
     }
@@ -125,12 +125,20 @@ public class RepuestoConversionService {
     private void registrarCobroVenta(Long tenantId, BigDecimal total, String monedaPago, BigDecimal montoRecibido,
                                       BigDecimal montoPagadoAhora, Integer diasCredito, Long clienteId, String nombreClienteManual,
                                       String conceptoBase, Long movimientoRepuestoId, String canalVenta) {
+        registrarCobroVenta(tenantId, total, monedaPago, montoRecibido, montoPagadoAhora, diasCredito, clienteId,
+            nombreClienteManual, conceptoBase, movimientoRepuestoId, canalVenta, true);
+    }
+
+    /** @param registrarIngreso false cuando quien llama ya asentó el ingreso (p. ej. con su método de pago). */
+    private void registrarCobroVenta(Long tenantId, BigDecimal total, String monedaPago, BigDecimal montoRecibido,
+                                      BigDecimal montoPagadoAhora, Integer diasCredito, Long clienteId, String nombreClienteManual,
+                                      String conceptoBase, Long movimientoRepuestoId, String canalVenta, boolean registrarIngreso) {
         BigDecimal montoAPagar = montoPagadoAhora != null ? montoPagadoAhora : total;
         if (montoAPagar.compareTo(BigDecimal.ZERO) < 0 || montoAPagar.compareTo(total) > 0) {
             throw new RuntimeException("El monto pagado ahora (" + montoAPagar + ") no puede ser negativo ni mayor al total de la venta (" + total + ")");
         }
 
-        if (montoAPagar.compareTo(BigDecimal.ZERO) > 0) {
+        if (registrarIngreso && montoAPagar.compareTo(BigDecimal.ZERO) > 0) {
             registrarIngresoCaja(tenantId, montoAPagar, monedaPago, montoRecibido, conceptoBase, canalVenta, movimientoRepuestoId);
         }
 
@@ -445,5 +453,137 @@ public class RepuestoConversionService {
         public BigDecimal getPrecioUnitarioAplicado() { return precioUnitarioAplicado; }
         public BigDecimal getTotal() { return total; }
         public boolean isEsMayorista() { return esMayorista; }
+    }
+
+    // ─────────────────────────── cobro del ticket completo (POS) ───────────────────────────
+
+    /** Una línea del ticket: un repuesto en su unidad base, o una presentación fraccionada. */
+    public record LineaTicket(Long repuestoId, Long presentacionId, BigDecimal cantidad) {}
+
+    /** Un pago del cliente en la moneda en que entregó el dinero (pago mixto: varias). */
+    public record PagoTicket(String moneda, BigDecimal monto, String metodo) {}
+
+    public record ResultadoTicket(boolean yaProcesado, BigDecimal total) {}
+
+    /**
+     * Cobra el ticket completo del POS en UNA transacción. Antes el POS mandaba cada línea
+     * por separado: si la línea 3 fallaba por stock, las líneas 1 y 2 ya habían descontado
+     * stock y cobrado, y al reintentar (con claves nuevas) se cobraban dos veces.
+     *
+     * - Si cualquier línea falla, no queda nada: ni stock descontado ni caja.
+     * - El número de ticket es la clave de idempotencia: si el ticket ya se cobró (la
+     *   respuesta se perdió en la red y el cajero reintenta), devuelve yaProcesado=true en
+     *   vez de cobrar otra vez.
+     * - Pago mixto: cada pago entra a caja en su propia moneda (antes todo quedaba en una).
+     * - Crédito: aplica a cualquier línea, también a presentaciones fraccionadas.
+     */
+    @Transactional
+    public ResultadoTicket venderTicket(Long tenantId, String numeroTicket, java.util.List<LineaTicket> lineas,
+                                        String monedaPago, BigDecimal montoRecibido, java.util.List<PagoTicket> pagos,
+                                        BigDecimal vuelto, String monedaVuelto, String metodoPago,
+                                        BigDecimal montoPagadoAhora, Integer diasCredito, Long clienteId, String nombreClienteManual) {
+        if (numeroTicket == null || numeroTicket.isBlank()) throw new RuntimeException("Falta el número del ticket");
+        if (lineas == null || lineas.isEmpty()) throw new RuntimeException("El ticket no tiene productos");
+        String claveTicket = "pos-ticket:" + numeroTicket.trim();
+        if (idempotenciaService.obtenerSiYaProcesada(tenantId, claveTicket).isPresent()) {
+            return new ResultadoTicket(true, null);
+        }
+
+        BigDecimal total = BigDecimal.ZERO;
+        Long primerMovimiento = null;
+        for (LineaTicket linea : lineas) {
+            MovimientoRepuesto mov = linea.presentacionId() != null
+                ? descontarPresentacion(tenantId, linea.presentacionId(), linea.cantidad(), clienteId, numeroTicket)
+                : descontarUnidadBase(tenantId, linea.repuestoId(), linea.cantidad(), clienteId, numeroTicket);
+            total = total.add(mov.getTotal());
+            if (primerMovimiento == null) primerMovimiento = mov.getId();
+        }
+        String concepto = "Venta POS ticket " + numeroTicket.trim() + " (" + lineas.size() + " línea" + (lineas.size() == 1 ? "" : "s") + ")";
+
+        boolean esMixto = pagos != null && !pagos.isEmpty();
+        boolean esCredito = montoPagadoAhora != null && montoPagadoAhora.compareTo(total) < 0;
+        if (esMixto && !esCredito) {
+            // Cada pago se convierte a la moneda base solo para validar que alcanza; en caja
+            // entra en la moneda real en que se recibió.
+            BigDecimal pagadoBase = BigDecimal.ZERO;
+            for (PagoTicket p : pagos) {
+                if (p.monto() == null || p.monto().signum() <= 0) continue;
+                pagadoBase = pagadoBase.add(motorFinancieroService.convertirAMonedaBase(tenantId, p.monto(), p.moneda()));
+            }
+            BigDecimal tolerancia = total.multiply(new BigDecimal("0.005")).max(new BigDecimal("0.05"));
+            if (pagadoBase.add(tolerancia).compareTo(total) < 0) {
+                throw new RuntimeException("Los pagos (" + pagadoBase.setScale(2, RoundingMode.HALF_UP) + ") no cubren el total ("
+                    + total + ") en la moneda base");
+            }
+            for (PagoTicket p : pagos) {
+                if (p.monto() == null || p.monto().signum() <= 0) continue;
+                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO, p.monto(), p.moneda(),
+                    concepto + (p.metodo() != null ? " · " + p.metodo() : ""), "COMERCIO", "POS", primerMovimiento)
+                    .setMetodoPago(p.metodo());
+            }
+            if (vuelto != null && vuelto.signum() > 0 && monedaVuelto != null) {
+                motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.EGRESO, vuelto, monedaVuelto,
+                    "Vuelto " + concepto, "COMERCIO", "POS", primerMovimiento)
+                    .setMetodoPago("EFECTIVO");
+            }
+        } else {
+            BigDecimal pagaAhora = montoPagadoAhora != null ? montoPagadoAhora : total;
+            if (pagaAhora.signum() > 0) {
+                MovimientoCaja ingreso = registrarIngresoCaja(tenantId, pagaAhora, monedaPago, montoRecibido, concepto, "POS", primerMovimiento);
+                ingreso.setMetodoPago(metodoPago);
+            }
+            registrarCobroVenta(tenantId, total, monedaPago, montoRecibido, pagaAhora, diasCredito, clienteId,
+                nombreClienteManual, concepto, primerMovimiento, "POS", false);
+        }
+
+        idempotenciaService.registrar(tenantId, claveTicket, "venta_pos_ticket", primerMovimiento);
+        return new ResultadoTicket(false, total);
+    }
+
+    /** Descuenta una línea en unidad base (con bloqueo y precio por volumen) y deja su kárdex; no toca caja. */
+    private MovimientoRepuesto descontarUnidadBase(Long tenantId, Long repuestoId, BigDecimal cantidad, Long clienteId, String ticket) {
+        if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) throw new RuntimeException("La cantidad debe ser mayor a cero");
+        RepuestoItem repuesto = repuestoItemRepository.buscarConBloqueoPesimista(repuestoId)
+            .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
+        if (!repuesto.getTenantId().equals(tenantId)) throw new RuntimeException("Violación de seguridad: Repuesto no pertenece a este tenant");
+        if (repuesto.getStockActual().compareTo(cantidad) < 0) {
+            throw new RuntimeException("Stock insuficiente de " + repuesto.getCodigoSku() + ": disponible " + repuesto.getStockActual() + " " + repuesto.getUnidadBase());
+        }
+        BigDecimal precio = aplicarDescuentoClienteMayorista(calcularPrecioUnitarioPorVolumen(repuesto, cantidad), clienteId, tenantId);
+        boolean esMayorista = precio.compareTo(repuesto.getPrecioVenta()) != 0;
+        BigDecimal total = cantidad.multiply(precio).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal stockAnterior = repuesto.getStockActual();
+        BigDecimal stockNuevo = stockAnterior.subtract(cantidad);
+        repuesto.setStockActual(stockNuevo);
+        repuestoItemRepository.save(repuesto);
+        MovimientoRepuesto mov = registrarMovimientoVenta(repuesto, cantidad, stockAnterior, stockNuevo,
+            "Venta " + ticket + (esMayorista ? " (tarifa Mayorista)" : " (tarifa Detal)"), clienteId, total);
+        intentarGenerarBorrador(repuesto);
+        return mov;
+    }
+
+    /** Descuenta una línea vendida en presentación fraccionada (convertida a unidad base) y deja su kárdex; no toca caja. */
+    private MovimientoRepuesto descontarPresentacion(Long tenantId, Long presentacionId, BigDecimal cantidad, Long clienteId, String ticket) {
+        if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) throw new RuntimeException("La cantidad vendida debe ser mayor a cero");
+        PresentacionRepuesto presentacion = presentacionRepuestoRepository.findById(presentacionId)
+            .orElseThrow(() -> new RuntimeException("Presentación no encontrada"));
+        if (!presentacion.getTenantId().equals(tenantId)) throw new RuntimeException("Violación de seguridad: Presentación no pertenece a este tenant");
+        RepuestoItem repuesto = repuestoItemRepository.buscarConBloqueoPesimista(presentacion.getRepuesto().getId())
+            .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
+        BigDecimal enUnidadBase = calcularEquivalenciaEnUnidadBase(presentacion, cantidad);
+        if (repuesto.getStockActual().compareTo(enUnidadBase) < 0) {
+            throw new RuntimeException("Stock insuficiente en unidad base (" + repuesto.getUnidadBase() + ") para despachar "
+                + cantidad + " " + presentacion.getNombrePresentacion());
+        }
+        BigDecimal precio = aplicarDescuentoClienteMayorista(presentacion.getPrecioVenta(), clienteId, tenantId);
+        BigDecimal total = cantidad.multiply(precio).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal stockAnterior = repuesto.getStockActual();
+        BigDecimal stockNuevo = stockAnterior.subtract(enUnidadBase);
+        repuesto.setStockActual(stockNuevo);
+        repuestoItemRepository.save(repuesto);
+        MovimientoRepuesto mov = registrarMovimientoVenta(repuesto, enUnidadBase, stockAnterior, stockNuevo,
+            "Venta " + ticket + ": " + cantidad + " " + presentacion.getNombrePresentacion(), clienteId, total);
+        intentarGenerarBorrador(repuesto);
+        return mov;
     }
 }

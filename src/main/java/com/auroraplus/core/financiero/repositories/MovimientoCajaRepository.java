@@ -31,6 +31,17 @@ public interface MovimientoCajaRepository extends JpaRepository<MovimientoCaja, 
     BigDecimal sumarMontoPorTipoYMonedaEntreFechas(@Param("tenantId") Long tenantId, @Param("moneda") String moneda,
         @Param("tipo") MovimientoCaja.TipoMovimiento tipo, @Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 
+    /**
+     * Igual que la suma de arriba, pero solo el dinero físico: lo que el cajero puede contar.
+     * Los pagos electrónicos (pago móvil, tarjeta, Zelle...) no están en la gaveta. Los
+     * movimientos sin método (anteriores a este campo) se cuentan como efectivo, como antes.
+     */
+    @Query("SELECT COALESCE(SUM(m.monto), 0) FROM MovimientoCaja m WHERE m.tenantId = :tenantId AND m.moneda = :moneda "
+        + "AND m.tipo = :tipo AND m.fechaRegistro > :desde AND m.fechaRegistro <= :hasta "
+        + "AND (m.metodoPago IS NULL OR UPPER(m.metodoPago) LIKE '%EFECTIVO%' OR UPPER(m.metodoPago) = 'CASH')")
+    BigDecimal sumarEfectivoPorTipoYMonedaEntreFechas(@Param("tenantId") Long tenantId, @Param("moneda") String moneda,
+        @Param("tipo") MovimientoCaja.TipoMovimiento tipo, @Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
+
     List<MovimientoCaja> findByTenantIdAndMonedaAndFechaRegistroBetweenOrderByFechaRegistroAsc(
         Long tenantId, String moneda, LocalDateTime desde, LocalDateTime hasta);
 

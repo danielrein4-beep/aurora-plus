@@ -3729,6 +3729,31 @@ export function crearPresentacionRepuesto(
   });
 }
 
+export interface TicketPosRequest {
+  numeroTicket: string;
+  lineas: { repuestoId: number; presentacionId: number | null; cantidad: number }[];
+  monedaPago?: string;
+  /** EFECTIVO, PAGO_MOVIL, TARJETA...: el arqueo de caja solo cuenta el efectivo. */
+  metodoPago?: string;
+  montoRecibido?: number;
+  pagos?: { moneda: string; monto: number; metodo?: string }[];
+  vuelto?: number;
+  monedaVuelto?: string;
+  /** Venta a crédito: cuánto paga ahora (0 = todo a crédito). */
+  montoPagadoAhora?: number;
+  diasCredito?: number;
+  clienteId?: number;
+  nombreCliente?: string;
+}
+
+/**
+ * Cobra el ticket completo del POS en una sola transacción: si una línea falla no queda nada
+ * a medias, y si el ticket ya se cobró (reintento tras un corte de red) devuelve yaProcesado.
+ */
+export function cobrarTicketPos(datos: TicketPosRequest): Promise<{ yaProcesado: boolean; total: number | null }> {
+  return request(`/api/repuestos/ventas/ticket`, { method: "POST", body: JSON.stringify(datos) });
+}
+
 export function despacharPorPresentacion(
   presentacionId: number,
   tenantId: number,

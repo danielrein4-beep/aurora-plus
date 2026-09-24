@@ -99,9 +99,10 @@ public class TurnoService {
         }
 
         LocalDateTime ahora = LocalDateTime.now();
-        BigDecimal ingresos = movimientoCajaRepository.sumarMontoPorTipoYMonedaEntreFechas(
+        // Solo efectivo: lo que el cajero puede contar físicamente al cerrar el turno.
+        BigDecimal ingresos = movimientoCajaRepository.sumarEfectivoPorTipoYMonedaEntreFechas(
             tenantId, turno.getMoneda(), MovimientoCaja.TipoMovimiento.INGRESO, turno.getFechaApertura(), ahora);
-        BigDecimal egresos = movimientoCajaRepository.sumarMontoPorTipoYMonedaEntreFechas(
+        BigDecimal egresos = movimientoCajaRepository.sumarEfectivoPorTipoYMonedaEntreFechas(
             tenantId, turno.getMoneda(), MovimientoCaja.TipoMovimiento.EGRESO, turno.getFechaApertura(), ahora);
 
         BigDecimal montoEsperado = turno.getMontoBase().add(ingresos).subtract(egresos);

@@ -330,7 +330,8 @@ public class HorecaService {
             guardados.add(pagoVentaRepository.save(pago));
 
             motorFinancieroService.registrarMovimientoEnMoneda(tenantId, MovimientoCaja.TipoMovimiento.INGRESO,
-                p.monto, p.moneda, "Comanda " + descripcionComanda(comanda) + " (" + p.metodoPago + ")");
+                p.monto, p.moneda, "Comanda " + descripcionComanda(comanda) + " (" + p.metodoPago + ")")
+                .setMetodoPago(p.metodoPago);
         }
 
         BigDecimal faltante = totalBase.subtract(totalRecibidoBase).setScale(2, RoundingMode.HALF_UP);

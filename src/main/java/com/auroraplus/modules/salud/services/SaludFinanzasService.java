@@ -87,6 +87,7 @@ public class SaludFinanzasService {
                 montoRecibido,
                 conceptoCaja
             );
+        if (req.metodoPago != null) movCaja.setMetodoPago(req.metodoPago.name());
 
         // 3. Registrar el Cobro en la Vertical de Salud enlazado al movimiento de caja
         CobroConsulta cobro = new CobroConsulta();

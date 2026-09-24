@@ -85,6 +85,7 @@ public class CobroVeterinariaService {
                 montoRecibido,
                 conceptoCaja
             );
+        if (req.metodoPago != null) movCaja.setMetodoPago(req.metodoPago.name());
 
         // 3. Registrar el Cobro en la vertical veterinaria
         CobroConsultaVet cobro = new CobroConsultaVet();

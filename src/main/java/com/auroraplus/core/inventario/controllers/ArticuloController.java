@@ -177,7 +177,7 @@ public class ArticuloController {
                         throw new IllegalArgumentException("Indique cuántas unidades de la moneda de compra equivalen a 1 " + base);
                     normalizado = request.costoUnitario.divide(request.unidadesOrigenPorBase, 4, java.math.RoundingMode.HALF_UP);
                 }
-                if (!List.of("USD", "COP", "VES").contains(request.monedaCosto)) throw new IllegalArgumentException("Moneda inválida");
+                if (!List.of("USD", "COP", "VES", "EUR").contains(request.monedaCosto)) throw new IllegalArgumentException("Moneda inválida");
                 articulo.setCostoUnitario(normalizado);
                 articulo.setMonedaValoracion(base);
                 articulo.setCostoUnitarioOriginal(request.costoUnitario);
@@ -355,7 +355,7 @@ public class ArticuloController {
 
     private BigDecimal costoCompra(Long tenant, BigDecimal original, String moneda, BigDecimal unidadesPorBase) {
         if (original == null || original.signum() < 0) throw new IllegalArgumentException("El costo no puede ser negativo");
-        if (!List.of("USD", "COP", "VES").contains(moneda)) throw new IllegalArgumentException("Moneda inválida");
+        if (!List.of("USD", "COP", "VES", "EUR").contains(moneda)) throw new IllegalArgumentException("Moneda inválida");
         if (unidadesPorBase == null) return motorFinancieroService.convertirCostoAMonedaBase(tenant, original, moneda);
         if (unidadesPorBase.signum() <= 0) throw new IllegalArgumentException("La tasa debe ser mayor a cero");
         if (moneda.equals(motorFinancieroService.obtenerMonedaBase(tenant))) return original;
