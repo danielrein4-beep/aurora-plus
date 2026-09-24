@@ -35,6 +35,7 @@ import {
   contadorInboxExamenesRecibidos, listarExamenesRecibidosPorPaciente, type ExamenRecibidoPaciente,
   listarPacientes, crearPaciente, actualizarPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
+  listarCierresCajaSalud, guardarCierreCajaSalud, eliminarCierreCajaSalud, vaciarCierresCajaSalud, type CobroConsultaDetalle,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, llamarAConsultorioSalaEspera, procesarCobro,
   listarCierresCaja, registrarCierreCaja,
   estadoPinDoctor, verificarPinDoctor, configurarPinDoctor,
@@ -271,6 +272,8 @@ function EstiloClasico() {
 }
 
 const PERFIL_ACTIVO_KEY = "aurora_mediclinic_perfil_activo";
+/** Perfil elegido en ESTA pestaña (sessionStorage): sobrevive a recargas, no a cerrar el navegador. */
+const PERFIL_SESION_KEY = "aurora_mediclinic_perfil_sesion";
 
 // ══════════════════════════════════════════════════════════════════════════
 // SELECTOR DE PERFILES ESTILO NETFLIX (QUIÉN ESTÁ INGRESANDO A MEDICLINIC)
@@ -720,12 +723,28 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     if (pagina !== "odontograma") setOdontoEnConsulta(false);
   }, [pagina]);
   
-  // Estado del perfil activo: siempre null al montar para mostrar la pantalla de selección estilo Netflix
-  const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(null);
+  // Perfil activo: se recuerda en la pestaña; si no hay, se muestra la pantalla de selección de perfil.
+  const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(() => {
+    try { const p = sessionStorage.getItem(PERFIL_SESION_KEY); return p === "MEDICO" || p === "SECRETARIA" ? p : null; } catch { return null; }
+  });
+  useEffect(() => {
+    try {
+      if (perfilActivo) sessionStorage.setItem(PERFIL_SESION_KEY, perfilActivo);
+      else sessionStorage.removeItem(PERFIL_SESION_KEY);
+    } catch { /* sin sessionStorage: se vuelve a elegir al recargar */ }
+  }, [perfilActivo]);
   // En teléfono el menú lateral fijo tapaba media pantalla: ahora es un cajón (igual que en Comercio).
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
 
-  const [rolActivo, setRolActivo] = useState<RolVista>("MEDICO");
+  // El perfil (médico o secretaria) se recuerda mientras la pestaña esté abierta, para no volver
+  // a elegirlo en cada recarga. Se usa sessionStorage y no localStorage a propósito: en una
+  // computadora compartida, cerrar el navegador obliga a elegir perfil (y PIN) de nuevo.
+  const [rolActivo, setRolActivo] = useState<RolVista>(() => {
+    try { const r = sessionStorage.getItem(PERFIL_SESION_KEY + "_rol"); return r === "SECRETARIA" ? "SECRETARIA" : "MEDICO"; } catch { return "MEDICO"; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(PERFIL_SESION_KEY + "_rol", rolActivo); } catch { /* sin sessionStorage */ }
+  }, [rolActivo]);
   const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
   const [accionPendienteDoctor, setAccionPendienteDoctor] = useState<(() => void) | null>(null);
 
@@ -797,7 +816,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   useEffect(() => {
     if (!tenantId) return;
-    obtenerPerfilMedicoDocumentos().then(setPerfilDocs).catch(() => setPerfilDocs(null));
+    obtenerPerfilMedicoDocumentos().then(setPerfilDocs)
+      .catch(() => { setPerfilDocs(null); avisar("No se pudieron cargar tus datos de documentos (logo, firma, sello). Los PDF pueden salir incompletos.", "error"); });
     obtenerMiNegocio().then((r) => setLogoBase64(r.logoBase64)).catch(() => setLogoBase64(null));
   }, [tenantId]);
 
@@ -904,6 +924,10 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const claveCobrosLocales = () => `aurora_mediclinic_cobros_locales_${tenantId}_${hoy()}`;
 
+  // La caja del día sale de los cobros guardados en el servidor (antes se armaba en el navegador:
+  // otro equipo no la veía y un cobro que el servidor rechazaba igual aparecía). Lo local solo se
+  // usa mientras responde el servidor. "Reiniciar caja" marca desde qué hora se cuenta el turno.
+  const claveCajaDesde = () => `aurora_mediclinic_caja_desde_${tenantId}_${hoy()}`;
   const [cobrosLocales, setCobrosLocales] = useState<CobroItem[]>(() => {
     try {
       const raw = localStorage.getItem(claveCobrosLocales());
@@ -911,12 +935,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     } catch { return []; }
   });
 
-  const [historialCierres, setHistorialCierres] = useState<CierreCajaData[]>(() => {
-    try {
-      const raw = localStorage.getItem(claveHistorialCierres(tenantId));
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  });
+  // Historial de cierres: en el servidor (V103). Cada cierre lleva su id del servidor para borrarlo.
+  const [historialCierres, setHistorialCierres] = useState<(CierreCajaData & { serverId?: number })[]>([]);
 
   const [modalTasasRapidas, setModalTasasRapidas] = useState(false);
   const [tasaCOPInput, setTasaCOPInput] = useState<string>("");
@@ -999,45 +1019,54 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   }, [cobrosLocales, tenantId]);
 
   useEffect(() => {
-    try { localStorage.setItem(claveHistorialCierres(tenantId), JSON.stringify(historialCierres)); } catch {}
-  }, [historialCierres, tenantId]);
+    if (!user?.tenantId) return;
+    listarCierresCajaSalud<CierreCajaData>()
+      .then((lista) => setHistorialCierres(lista.map((c) => ({ ...c.datos, serverId: c.id }))))
+      .catch(() => avisar("No se pudo cargar el historial de cierres de caja. Revisa la conexión.", "error"));
+  }, [user?.tenantId]);
 
   const agregarCobroLocal = (item: CobroItem) => {
     setCobrosLocales((prev) => [item, ...prev]);
   };
 
-  const eliminarCobroLocal = (index: number) => {
-    setCobrosLocales((prev) => {
-      const nuevas = prev.filter((_, i) => i !== index);
-      try { localStorage.setItem(claveCobrosLocales(), JSON.stringify(nuevas)); } catch {}
-      return nuevas;
-    });
-    setToastTasa("✓ Cobro eliminado de la auditoría.");
-    setTimeout(() => setToastTasa(null), 3000);
+  // Un cobro ya registrado en el servidor no se borra desde aquí (volvería al recargar y la caja
+  // no cuadraría con la contabilidad): se explica cómo corregirlo.
+  const eliminarCobroLocal = (_index: number) => {
+    avisar("Los cobros registrados no se borran para que la caja cuadre. Si hubo un error, registra la corrección como egreso en Finanzas.", "info");
   };
 
   const limpiarCobrosLocales = () => {
     setCobrosLocales([]);
-    try { localStorage.removeItem(claveCobrosLocales()); } catch {}
+    try { localStorage.removeItem(claveCobrosLocales()); localStorage.setItem(claveCajaDesde(), new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19)); } catch {}
     setToastTasa("✓ Caja de hoy reiniciada correctamente.");
     setTimeout(() => setToastTasa(null), 3000);
   };
 
   const agregarCierreAuditado = (cierre: CierreCajaData) => {
-    setHistorialCierres((prev) => [cierre, ...prev]);
+    guardarCierreCajaSalud(cierre)
+      .then((g) => setHistorialCierres((prev) => [{ ...cierre, serverId: g.id }, ...prev]))
+      .catch((err) => avisar(`El cierre se generó, pero no se guardó en el historial: ${err instanceof Error ? err.message : "error del servidor"}`, "error"));
   };
 
-  const eliminarCierreAuditado = (index: number) => {
-    setHistorialCierres((prev) => {
-      const nuevas = prev.filter((_, i) => i !== index);
-      try { localStorage.setItem(claveHistorialCierres(tenantId), JSON.stringify(nuevas)); } catch {}
-      return nuevas;
-    });
-    setToastTasa("✓ Cierre auditado eliminado del historial.");
-    setTimeout(() => setToastTasa(null), 3000);
+  const eliminarCierreAuditado = async (index: number) => {
+    const cierre = historialCierres[index];
+    try {
+      if (cierre?.serverId) await eliminarCierreCajaSalud(cierre.serverId);
+      setHistorialCierres((prev) => prev.filter((_, i) => i !== index));
+      setToastTasa("✓ Cierre auditado eliminado del historial.");
+      setTimeout(() => setToastTasa(null), 3000);
+    } catch (err) {
+      avisar(`No se pudo eliminar el cierre: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
+    }
   };
 
-  const limpiarHistorialCierres = () => {
+  const limpiarHistorialCierres = async () => {
+    try {
+      await vaciarCierresCajaSalud();
+    } catch (err) {
+      avisar(`No se pudo vaciar el historial: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
+      return;
+    }
     setHistorialCierres([]);
     try { localStorage.removeItem(claveHistorialCierres(tenantId)); } catch {}
     setToastTasa("✓ Historial de auditorías vaciado.");
@@ -1046,19 +1075,47 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const recargarTodo = () => {
     cargarContadorLab();
-    listarPacientes().then(setPacientes).catch(() => setPacientes([]));
-    listarCitasDelDia(hoy()).then(setCitasHoy).catch(() => setCitasHoy([]));
-    listarSalaEspera().then(setSalaEspera).catch(() => setSalaEspera([]));
-    listarProcedimientos(tenantId).then(setProcedimientos).catch(() => setProcedimientos([]));
+    // Antes, si algo fallaba, la pantalla quedaba vacía como si no hubiera pacientes o citas.
+    const noCargo: string[] = [];
+    const fallo = (que: string, vaciar: () => void) => () => {
+      vaciar();
+      noCargo.push(que);
+      if (noCargo.length === 1) setTimeout(() => avisar(`No se pudo cargar ${noCargo.join(", ")}. Lo que ves puede estar incompleto; revisa la conexión.`, "error"), 300);
+    };
+    listarPacientes().then(setPacientes).catch(fallo("los pacientes", () => setPacientes([])));
+    listarCitasDelDia(hoy()).then(setCitasHoy).catch(fallo("las citas de hoy", () => setCitasHoy([])));
+    listarSalaEspera().then(setSalaEspera).catch(fallo("la sala de espera", () => setSalaEspera([])));
+    listarProcedimientos(tenantId).then(setProcedimientos).catch(fallo("los procedimientos", () => setProcedimientos([])));
     listarCobrosDelDia(`${hoy()}T00:00:00`, `${hoy()}T23:59:59`)
       .then((c) => {
-        const totalApi = c.reduce((s, x) => s + Number(x.montoTotal), 0);
-        const totalLocal = cobrosLocales.reduce((s, x) => s + Number(x.montoUSD), 0);
-        setIngresosHoy(Math.max(totalApi, totalLocal));
+        const validos = (c as unknown as CobroConsultaDetalle[]).filter((x) => x.estado !== "ANULADO");
+        setIngresosHoy(validos.reduce((s, x) => s + Number(x.montoTotal), 0));
+        // La caja del turno: cobros del servidor desde el último "reiniciar caja" de hoy
+        let desde = "";
+        try { desde = localStorage.getItem(claveCajaDesde()) || ""; } catch { /* sin almacenamiento: se cuenta todo el día */ }
+        const delTurno = validos.filter((x) => !desde || (x.fechaHora || "") >= desde);
+        setCobrosLocales(delTurno.map((x, i) => {
+          const moneda = (x.monedaCobrada || "USD").toUpperCase();
+          const monto = Number(x.montoTotal) || 0;
+          return {
+            turno: delTurno.length - i,
+            pacienteNombre: x.paciente?.nombreCompleto || "Paciente sin ficha",
+            identificacion: x.paciente?.identificacion || "S/C",
+            concepto: x.concepto || "Consulta",
+            metodoPago: x.metodoPago || "",
+            referencia: x.referenciaPago || "N/A",
+            moneda,
+            montoCobrado: monto,
+            montoUSD: moneda === "USD" ? monto : 0,
+            montoVES: moneda === "VES" ? monto : 0,
+            montoCOP: moneda === "COP" ? monto : 0,
+            hora: x.fechaHora ? new Date(x.fechaHora).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+          } as CobroItem;
+        }));
       })
       .catch(() => {
-        const totalLocal = cobrosLocales.reduce((s, x) => s + Number(x.montoUSD), 0);
-        setIngresosHoy(totalLocal);
+        setIngresosHoy(null);
+        avisar("No se pudieron cargar los cobros de hoy. La caja puede estar incompleta.", "error");
       });
   };
 
@@ -1945,7 +2002,7 @@ function VistaGeneral({
         const rawC = localStorage.getItem(claveCotizaciones(tenantId));
         if (rawC) setCotizacionesVivas(JSON.parse(rawC));
         else setCotizacionesVivas([]);
-      } catch {}
+      } catch { /* caché local ilegible: se ignora */ }
     };
     refrescarDatos();
     window.addEventListener("storage", refrescarDatos);
@@ -3098,7 +3155,7 @@ function LaboratoriosRecibidosPaciente({ tenantId, pacienteId }: { tenantId: num
     setExamenes(null);
     listarExamenesRecibidosPorPaciente(tenantId, pacienteId)
       .then(setExamenes)
-      .catch(() => setExamenes([]));
+      .catch(() => { setExamenes([]); avisar("No se pudieron cargar los exámenes de laboratorio de este paciente.", "error"); });
   }, [tenantId, pacienteId]);
 
   if (!examenes || examenes.length === 0) return null;
@@ -3243,7 +3300,8 @@ function HistoriasClinicas({
     }
     historialConsultasPaciente(Number(pacienteSeleccionado.id))
       .then(setHistorial)
-      .catch(() => setHistorial([]));
+      // Una historia clínica vacía por un error de red es peligrosa: se avisa claramente.
+      .catch(() => { setHistorial([]); avisar("No se pudo cargar el historial de consultas de este paciente. No asumas que no tiene consultas previas.", "error"); });
   }, [pacienteSeleccionado]);
 
   const handleBuscarPaciente = (e?: React.FormEvent) => {
@@ -3471,7 +3529,9 @@ function HistoriasClinicas({
     if (c.recipeMedicamentos) {
       try {
         itemsParsed = JSON.parse(c.recipeMedicamentos);
-      } catch {}
+      } catch {
+        avisar("El récipe guardado de esta consulta está dañado; revisa los medicamentos antes de reimprimirlo.", "error");
+      }
     }
     const recipeData = construirRecipeReportData(itemsParsed, c);
     if (recipeData) {
@@ -4953,6 +5013,36 @@ function Procedimientos({
     return [];
   });
 
+  // Las cotizaciones de pacientes con ficha se cargan del servidor (se ven desde cualquier equipo);
+  // en el navegador solo quedan las de prospectos sin ficha, que el servidor no puede guardar.
+  useEffect(() => {
+    if (!tenantId) return;
+    listarCotizaciones()
+      .then((lista) => {
+        const delServidor: CotizacionGuardada[] = lista.map((c) => ({
+          id: `srv-${c.id}`,
+          backendId: c.id,
+          pacienteId: c.paciente?.id ?? null,
+          pacienteNombre: c.paciente?.nombreCompleto || "Paciente",
+          pacienteCedula: c.paciente?.identificacion || "S/C",
+          pacienteTelefono: c.paciente?.telefono || undefined,
+          procedimientoNombre: c.procedimientoNombre,
+          descripcion: c.descripcion || undefined,
+          costoUSD: Number(c.costoUSD) || 0,
+          costoVES: Number(c.costoVES) || 0,
+          costoCOP: Number(c.costoCOP) || 0,
+          tasaBCV: Number(c.tasaBCV) || 0,
+          tasaCOP: Number(c.tasaCOP) || 0,
+          estado: c.estado,
+          fecha: (c.fecha || "").slice(0, 10),
+          fechaPlanificada: c.fechaPlanificada || undefined,
+        }));
+        setCotizaciones((prev) => [...prev.filter((c) => !c.backendId), ...delServidor]
+          .sort((x, y) => (y.fecha || "").localeCompare(x.fecha || "")));
+      })
+      .catch(() => avisar("No se pudieron cargar las cotizaciones del servidor; ves solo las guardadas en este equipo.", "error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
   // Guardar en localStorage cuando cambie
   useEffect(() => {
     try {
@@ -5066,40 +5156,43 @@ function Procedimientos({
         fechaPlanificada: fechaPlanificada || undefined,
       };
 
-      // Si no existe en el catálogo del backend, guardarlo en background
-      if (tenantId) {
+      // Con paciente registrado, la cotización se guarda en el servidor ANTES de mostrarse como
+      // hecha (antes decía "registrado" aunque el servidor la rechazara).
+      if (pacienteSeleccionado) {
+        try {
+          const creada = await crearCotizacion({
+            pacienteId: pacienteSeleccionado.id,
+            procedimientoNombre: nombreProcedimiento.trim(),
+            descripcion: descripcionClinica.trim() || undefined,
+            costoUSD: usdNum,
+            costoVES: vesNum,
+            costoCOP: copNum,
+            tasaBCV,
+            tasaCOP,
+            fechaPlanificada: fechaPlanificada || undefined,
+          });
+          nuevaCot.backendId = creada.id;
+        } catch (err) {
+          avisar(`La cotización NO se guardó: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
+          return;
+        }
+      }
+
+      // Si el procedimiento no está en el catálogo, se agrega (sin inventar duración: 30 min por defecto del catálogo)
+      if (tenantId && !(procedimientos || []).some((p) => p.nombre.trim().toLowerCase() === nombreProcedimiento.trim().toLowerCase())) {
         crearProcedimiento(tenantId, {
           nombre: nombreProcedimiento.trim(),
           descripcion: descripcionClinica.trim() || null,
           costo: usdNum,
           moneda: "USD",
-          duracionMinutos: 45,
-        }).catch(() => {});
+          duracionMinutos: 30,
+        }).catch(() => avisar("La cotización se guardó, pero el procedimiento no se agregó al catálogo.", "error"));
       }
 
       setCotizaciones((prev) => [nuevaCot, ...prev]);
-      dispararToast("¡Cotización / Procedimiento registrado exitosamente!");
-
-      // Persistir en el backend real cuando la cotización está vinculada a un paciente
-      // registrado (la tabla exige un paciente real — un prospecto sin ficha se queda
-      // como registro local hasta que se le cree su ficha).
-      if (pacienteSeleccionado) {
-        crearCotizacion({
-          pacienteId: pacienteSeleccionado.id,
-          procedimientoNombre: nombreProcedimiento.trim(),
-          descripcion: descripcionClinica.trim() || undefined,
-          costoUSD: usdNum,
-          costoVES: vesNum,
-          costoCOP: copNum,
-          tasaBCV,
-          tasaCOP,
-          fechaPlanificada: fechaPlanificada || undefined,
-        }).then((creada) => {
-          setCotizaciones((prev) => prev.map((c) => (c.id === nuevaCot.id ? { ...c, backendId: creada.id } : c)));
-        }).catch((err) => {
-          dispararToast(`⚠️ Cotización guardada localmente, pero no en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-        });
-      }
+      dispararToast(pacienteSeleccionado
+        ? "¡Cotización registrada!"
+        : "Cotización guardada solo en este equipo: el paciente no tiene ficha. Créale la ficha para guardarla en el servidor.");
 
       if (generarPdfDespues) {
         ejecutarPdfCotizacion(nuevaCot);
@@ -5186,28 +5279,29 @@ function Procedimientos({
   };
 
   // Cambiar estado de una cotización en el historial
-  const cambiarEstado = (id: string, nuevoEstado: CotizacionGuardada["estado"]) => {
-    setCotizaciones((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, estado: nuevoEstado } : c))
-    );
-    dispararToast(`Estado actualizado a: ${nuevoEstado}`);
+  const cambiarEstado = async (id: string, nuevoEstado: CotizacionGuardada["estado"]) => {
     const cot = cotizaciones.find((c) => c.id === id);
     if (cot?.backendId) {
-      actualizarEstadoCotizacion(cot.backendId, nuevoEstado).catch((err) => {
-        dispararToast(`⚠️ Estado actualizado localmente, pero no en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-      });
+      try {
+        await actualizarEstadoCotizacion(cot.backendId, nuevoEstado);
+      } catch (err) {
+        avisar(`No se pudo cambiar el estado: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
+        return;
+      }
     }
+    setCotizaciones((prev) => prev.map((c) => (c.id === id ? { ...c, estado: nuevoEstado } : c)));
+    dispararToast(`Estado actualizado a: ${nuevoEstado}`);
   };
 
   // Eliminar una cotización
   const eliminarCotizacion = (id: string) => {
     if (confirm("¿Estás seguro de eliminar este registro del historial?")) {
       const cot = cotizaciones.find((c) => c.id === id);
-      setCotizaciones((prev) => prev.filter((c) => c.id !== id));
-      dispararToast("Registro eliminado.");
-      if (cot?.backendId) {
-        eliminarCotizacionApi(cot.backendId).catch((err) => {
-          dispararToast(`⚠️ Se quitó de la lista, pero no se pudo eliminar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+      const quitar = () => { setCotizaciones((prev) => prev.filter((c) => c.id !== id)); dispararToast("Registro eliminado."); };
+      if (!cot?.backendId) { quitar(); return; }
+      {
+        eliminarCotizacionApi(cot.backendId).then(quitar).catch((err) => {
+          avisar(`No se pudo eliminar: ${err instanceof Error ? err.message : "error desconocido"}`);
         });
       }
     }
@@ -6155,7 +6249,6 @@ function SalaEspera({
           montoCOP: montoCOPNum,
           hora: nuevoTurno.horaLlegada,
         };
-        onAgregarCobro(cobroItem);
         try {
           await procesarCobro({
             pacienteId: pacienteIdResuelto,
@@ -6167,8 +6260,11 @@ function SalaEspera({
             metodoPago: metodoPagoBackend(admitirMetodoPago),
             referenciaPago: admitirReferencia.trim() || undefined,
           });
+          onAgregarCobro(cobroItem);
         } catch (err) {
-          dispararToast(`⚠️ El pago se registró en caja pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+          // Antes el pago quedaba en la caja de la pantalla aunque el servidor lo rechazara.
+          Object.assign(nuevoTurno, { estadoPago: "PENDIENTE", metodoPago: undefined, montoCobrado: 0, montoUSD: 0, montoVES: 0, montoCOP: 0 });
+          avisar(`El paciente quedó admitido, pero el pago NO se registró: ${err instanceof Error ? err.message : "error del servidor"}. Cóbralo de nuevo desde la sala de espera.`, "error");
         }
       }
 
@@ -6252,6 +6348,41 @@ function SalaEspera({
       montoUSDNum = montoNum;
     }
 
+
+    if (montoNum > 0) {
+      const cobroItem: CobroItem = {
+        turno: modalPago.turnoNumero,
+        pacienteNombre: modalPago.pacienteNombre,
+        identificacion: modalPago.pacienteCedula,
+        concepto: modalPago.motivo || "Consulta Médica",
+        metodoPago: pagoMetodo,
+        referencia: pagoReferencia.trim() || "N/A",
+        moneda: monedaCobro,
+        montoCobrado: montoNum,
+        montoUSD: montoUSDNum,
+        montoVES: montoVESNum,
+        montoCOP: montoCOPNum,
+        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      try {
+        await procesarCobro({
+          pacienteId: modalPago.pacienteId ?? undefined,
+          concepto: modalPago.motivo || "Consulta Médica",
+          montoTotal: montoNum,
+          monedaCobrada: monedaCobro,
+          montoRecibido: montoNum,
+          monedaPago: monedaCobro,
+          metodoPago: metodoPagoBackend(pagoMetodo),
+          referenciaPago: pagoReferencia.trim() || undefined,
+        });
+        onAgregarCobro(cobroItem);
+      } catch (err) {
+        // Si el servidor no lo guardó, el turno sigue pendiente y el modal queda abierto para reintentar.
+        avisar(`El pago NO se registró: ${err instanceof Error ? err.message : "error del servidor"}. Intenta de nuevo.`, "error");
+        return;
+      }
+    }
+
     setTurnos((prev) =>
       prev.map((t) =>
         t.id === modalPago.id
@@ -6269,38 +6400,6 @@ function SalaEspera({
           : t
       )
     );
-
-    if (montoNum > 0) {
-      const cobroItem: CobroItem = {
-        turno: modalPago.turnoNumero,
-        pacienteNombre: modalPago.pacienteNombre,
-        identificacion: modalPago.pacienteCedula,
-        concepto: modalPago.motivo || "Consulta Médica",
-        metodoPago: pagoMetodo,
-        referencia: pagoReferencia.trim() || "N/A",
-        moneda: monedaCobro,
-        montoCobrado: montoNum,
-        montoUSD: montoUSDNum,
-        montoVES: montoVESNum,
-        montoCOP: montoCOPNum,
-        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      onAgregarCobro(cobroItem);
-      try {
-        await procesarCobro({
-          pacienteId: modalPago.pacienteId ?? undefined,
-          concepto: modalPago.motivo || "Consulta Médica",
-          montoTotal: montoNum,
-          monedaCobrada: monedaCobro,
-          montoRecibido: montoNum,
-          monedaPago: monedaCobro,
-          metodoPago: metodoPagoBackend(pagoMetodo),
-          referenciaPago: pagoReferencia.trim() || undefined,
-        });
-      } catch (err) {
-        dispararToast(`⚠️ El pago se registró en caja pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-      }
-    }
 
     dispararToast("Pago registrado exitosamente.");
     setModalPago(null);
