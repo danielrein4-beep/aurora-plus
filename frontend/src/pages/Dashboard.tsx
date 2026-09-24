@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
-  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconCard, IconUsers, IconCustomize,
+  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconSparkles, IconHardware, IconCard, IconUsers, IconCustomize,
   IconStethoscope, IconCalendar, IconPrescription, IconRocket, IconDownload, IconKey,
   IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
   IconRestaurant, IconFarm, IconShield,
@@ -50,6 +50,7 @@ const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNod
   farmacia: IconPrescription,
   veterinaria: IconVet,
   odontologia: IconTooth,
+  estetica: IconSparkles,
   comercio: IconHardware,
   ferreteria: IconHardware,
   repuestos: IconHardware,
@@ -68,6 +69,8 @@ const ACTION_ICON: Record<string, (props: { size?: number }) => React.ReactNode>
   "Ficha Mascota": IconVet,
   "Plan Vacunación": IconPrescription,
   "Venta PetShop": IconCard,
+  "Ficha de Piel": IconSparkles,
+  "Vender Paquete": IconCard,
   "Cirugías": IconClinic,
   "Abrir Caja / POS": IconCard,
   "Consultar Kardex": IconHardware,
@@ -142,6 +145,24 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Plan Vacunación", desc: "Recordatorios automáticos" },
       { label: "Venta PetShop", desc: "Cobro rápido por mostrador" },
       { label: "Cirugías", desc: "Registro pre y post operatorio" },
+    ],
+    defaultPatients: [],
+  },
+  estetica: {
+    name: "Aurora Estética",
+    badge: "ESTÉTICA & COSMIATRÍA",
+    desc: "Fichas de piel, sesiones con fotos de antes y después, paquetes de sesiones, consentimientos firmados y caja.",
+    stats: [
+      { label: "Clientas Registradas", val: "0", change: "Sin clientas aún", color: "text-rose-500 dark:text-rose-300" },
+      { label: "Citas de Hoy", val: "0", change: "Sin citas agendadas", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Ingresos del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Por Atender Hoy", val: "0", change: "Sin citas pendientes", color: "text-amber-500 dark:text-amber-400" },
+    ],
+    actions: [
+      { label: "Ficha de Piel", desc: "Biotipo, fototipo y contraindicaciones" },
+      { label: "Agendar Cita", desc: "Con duración según el servicio" },
+      { label: "Vender Paquete", desc: "Bonos de sesiones con saldo" },
+      { label: "Cobrar Factura", desc: "Caja multi-moneda" },
     ],
     defaultPatients: [],
   },
@@ -425,7 +446,7 @@ export default function Dashboard() {
   // (ver ComercioApp.tsx); Farmacia comparte la misma app/ruta pero sigue
   // siendo su propio rubro visualmente.
   const esRubroComercio = userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "comercio";
-  const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia") && !!user?.tenantId;
+  const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia" || userIndustry === "estetica") && !!user?.tenantId;
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
   const esComercioReal = (esRubroComercio || userIndustry === "farmacia") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
@@ -438,7 +459,9 @@ export default function Dashboard() {
           ? "/ganaderia"
           : userIndustry === "veterinaria"
             ? "/veterinaria"
-            : "/mediclinic";
+            : userIndustry === "estetica"
+              ? "/estetica"
+              : "/mediclinic";
   const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal;
 
   useEffect(() => {
@@ -722,9 +745,9 @@ export default function Dashboard() {
 
         setMetricasEnVivo([
           {
-            label: "Pacientes Registrados",
+            label: userIndustry === "estetica" ? "Clientas Registradas" : "Pacientes Registrados",
             val: String(pacientes.length),
-            change: pacientes.length > 0 ? "Total en consultorio" : "Sin pacientes aún",
+            change: pacientes.length > 0 ? (userIndustry === "estetica" ? "Total en el centro" : "Total en consultorio") : (userIndustry === "estetica" ? "Sin clientas aún" : "Sin pacientes aún"),
             color: "text-teal-400",
           },
           {
@@ -740,9 +763,9 @@ export default function Dashboard() {
             color: "text-purple-400",
           },
           {
-            label: "Sala de Espera",
-            val: String(enEspera),
-            change: enEspera > 0 ? "Pacientes en espera" : "Sin pacientes en espera",
+            label: userIndustry === "estetica" ? "Por Atender Hoy" : "Sala de Espera",
+            val: String(userIndustry === "estetica" ? citas.filter(c => !["ATENDIDA", "CANCELADA", "NO_ASISTIO"].includes(c.estado)).length : enEspera),
+            change: userIndustry === "estetica" ? "Citas pendientes del día" : enEspera > 0 ? "Pacientes en espera" : "Sin pacientes en espera",
             color: "text-amber-400",
           },
         ]);
@@ -1138,6 +1161,7 @@ export default function Dashboard() {
                        esRubroComercio ? "Espacio de Comercio en Vivo" :
                        userIndustry === "finca" || userIndustry === "ganaderia" ? "Espacio Agropecuario & Ganadería en Vivo" :
                        userIndustry === "veterinaria" ? "Espacio Veterinario & Mascotas en Vivo" :
+                       userIndustry === "estetica" ? "Espacio de Estética & Cosmiatría en Vivo" :
                        "Espacio de Trabajo Clínico en Vivo"}
                     </h3>
                     <p className="text-slate-500 dark:text-white/40 text-xs">
@@ -1146,6 +1170,7 @@ export default function Dashboard() {
                        esRubroComercio ? "Kardex multi-unidad, código de barras, compras y cuentas por cobrar." :
                        userIndustry === "finca" || userIndustry === "ganaderia" ? "Rotación agronómica de potreros, control de hato, producción lechera y trazabilidad." :
                        userIndustry === "veterinaria" ? "Expedientes por mascota, plan de vacunas, cirugías e inventario veterinario." :
+                       userIndustry === "estetica" ? "Clientas, fichas de piel, sesiones con fotos, paquetes y caja." :
                        "Base de datos PostgreSQL Multi-tenant sincronizada en tiempo real."}
                     </p>
                   </div>
@@ -1169,6 +1194,7 @@ export default function Dashboard() {
                      userIndustry === "restaurante" ? "Mesas & Comandas" :
                      esRubroComercio || userIndustry === "farmacia" ? "Kárdex & Stock" :
                      userIndustry === "veterinaria" ? "Expedientes Mascotas" :
+                     userIndustry === "estetica" ? "Clientas & Fichas" :
                      "Expedientes & Triaje"}
                   </button>
                   <button
@@ -1193,6 +1219,7 @@ export default function Dashboard() {
                        userIndustry === "restaurante" ? "Mesas y Comandas en el Salón" :
                        esRubroComercio || userIndustry === "farmacia" ? "Artículos en Catálogo & Kárdex" :
                        userIndustry === "veterinaria" ? "Expedientes Veterinarios & Pacientes" :
+                       userIndustry === "estetica" ? "Clientas Registradas" :
                        "Lista de Pacientes en Consulta / Triaje"}
                     </h4>
                     <button
@@ -1201,6 +1228,7 @@ export default function Dashboard() {
                       {userIndustry === "finca" || userIndustry === "ganaderia" ? "+ Registrar Animal" :
                        userIndustry === "restaurante" ? "+ Abrir Mesa" :
                        esRubroComercio || userIndustry === "farmacia" ? "+ Nuevo Artículo" :
+                       userIndustry === "estetica" ? "+ Nueva Clienta" :
                        "+ Ingresar Paciente"}
                     </button>
                   </div>
@@ -1407,7 +1435,7 @@ export default function Dashboard() {
                         No hay tareas sanitarias ni partos próximos programados para hoy en el hato.
                       </p>
                     )
-                  ) : (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia") ? (
+                  ) : (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia" || userIndustry === "estetica") ? (
                     citasReales === null ? (
                       <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">Cargando…</p>
                     ) : citasReales.length === 0 ? (

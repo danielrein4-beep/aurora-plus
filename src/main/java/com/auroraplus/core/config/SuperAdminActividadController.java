@@ -36,7 +36,7 @@ public class SuperAdminActividadController {
     private record Vertical(String id, List<String> modulosPrincipales, List<Metrica> metricas) {}
 
     private static final List<Vertical> VERTICALES = List.of(
-        new Vertical("salud", List.of("salud", "odontologia"), List.of(
+        new Vertical("salud", List.of("salud", "odontologia", "estetica"), List.of(
             new Metrica("consultas", "Consultas médicas", "salud_consultas", "fecha_hora"),
             new Metrica("pacientes", "Pacientes registrados", "salud_pacientes", null),
             new Metrica("citas", "Citas agendadas", "salud_citas", "fecha"),
@@ -44,7 +44,8 @@ public class SuperAdminActividadController {
             new Metrica("consultasVet", "Consultas veterinarias", "consultas_veterinarias", "fecha_hora"),
             new Metrica("mascotas", "Mascotas registradas", "mascotas", null),
             new Metrica("planesOdonto", "Planes odontológicos", "salud_odontologia_planes_tratamiento", "fecha_creacion"),
-            new Metrica("sesionesOdonto", "Sesiones odontológicas", "salud_odontologia_evolucion_sesiones", "fecha_sesion")
+            new Metrica("sesionesOdonto", "Sesiones odontológicas", "salud_odontologia_evolucion_sesiones", "fecha_sesion"),
+            new Metrica("sesionesEstetica", "Sesiones de estética", "salud_estetica_sesiones", "fecha_sesion")
         )),
         new Vertical("ganaderia", List.of("ganaderia"), List.of(
             new Metrica("ordenos", "Registros de ordeño", "registros_ordeno", "fecha"),
@@ -299,7 +300,7 @@ public class SuperAdminActividadController {
 
     private static boolean esColumnaDate(Metrica m) {
         return switch (m.tabla() + "." + m.columnaFecha()) {
-            case "salud_citas.fecha", "salud_odontologia_evolucion_sesiones.fecha_sesion", "registros_ordeno.fecha",
+            case "salud_citas.fecha", "salud_odontologia_evolucion_sesiones.fecha_sesion", "salud_estetica_sesiones.fecha_sesion", "registros_ordeno.fecha",
                  "registros_peso.fecha", "facturas_comercial.fecha_emision",
                  "valuaciones_construccion.fecha_emision", "bitacora_construccion.fecha" -> true;
             default -> false;

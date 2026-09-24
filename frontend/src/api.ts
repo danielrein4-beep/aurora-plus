@@ -6502,3 +6502,178 @@ export function obtenerCuentasCobroSuperAdmin(): Promise<Record<string, string>>
 export function guardarCuentasCobroSuperAdmin(datos: Record<string, string>): Promise<Record<string, string>> {
   return requestSuperAdmin("/api/super-admin/tenants/finanzas/cuentas-cobro", { method: "PUT", body: JSON.stringify(datos) });
 }
+
+// --- Estética y Cosmiatría (/api/salud/estetica, V99) ---
+// La clienta es un Paciente de salud: agenda, servicios (procedimientos) y caja se reutilizan tal cual.
+export interface FichaEstetica {
+  paciente_id: number;
+  nivel: "BASICO" | "DETALLADO";
+  fototipo?: string | null;
+  biotipo?: string | null;
+  sensibilidad?: string | null;
+  lesiones?: string | null;
+  zonas_afectadas?: string | null;
+  objetivo?: string | null;
+  rutina_domiciliaria?: string | null;
+  exposicion_solar?: string | null;
+  medicacion_actual?: string | null;
+  alergias_cosmeticos?: string | null;
+  usa_isotretinoina: boolean;
+  embarazo_lactancia: boolean;
+  herpes_recurrente: boolean;
+  marcapasos_implantes: boolean;
+  derivar_dermatologo: boolean;
+  observaciones?: string | null;
+  fecha_actualizacion?: string;
+  /** true cuando la clienta todavía no tiene ficha guardada. */
+  nueva?: boolean;
+}
+
+export function obtenerFichaEstetica(pacienteId: number): Promise<FichaEstetica> {
+  return request(`/api/salud/estetica/ficha?pacienteId=${pacienteId}`);
+}
+
+export function guardarFichaEstetica(datos: {
+  pacienteId: number; nivel: string; fototipo?: string; biotipo?: string; sensibilidad?: string; lesiones?: string;
+  zonasAfectadas?: string; objetivo?: string; rutinaDomiciliaria?: string; exposicionSolar?: string;
+  medicacionActual?: string; alergiasCosmeticos?: string; usaIsotretinoina: boolean; embarazoLactancia: boolean;
+  herpesRecurrente: boolean; marcapasosImplantes: boolean; derivarDermatologo: boolean; observaciones?: string;
+}): Promise<{ mensaje: string }> {
+  return request(`/api/salud/estetica/ficha`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface PaqueteEstetica {
+  id: number;
+  paciente_id: number;
+  paciente_nombre: string;
+  paciente_telefono: string | null;
+  nombre: string;
+  sesiones_total: number;
+  sesiones_usadas: number;
+  precio: number;
+  moneda: string;
+  fecha_compra: string;
+  fecha_vencimiento: string | null;
+  estado: "ACTIVO" | "AGOTADO" | "VENCIDO" | "ANULADO";
+  cobro_id: number | null;
+  notas: string | null;
+}
+
+/** Con pacienteId: todos los paquetes de la clienta. Sin él: los activos del negocio. */
+export function listarPaquetesEstetica(pacienteId?: number): Promise<PaqueteEstetica[]> {
+  return request(`/api/salud/estetica/paquetes${pacienteId ? `?pacienteId=${pacienteId}` : ""}`);
+}
+
+export function crearPaqueteEstetica(datos: {
+  pacienteId: number; nombre: string; sesionesTotal: number; precio: number; moneda: string;
+  fechaVencimiento?: string; cobroId?: number; notas?: string;
+}): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/paquetes`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function vincularCobroPaqueteEstetica(paqueteId: number, cobroId: number): Promise<unknown> {
+  return request(`/api/salud/estetica/paquetes/${paqueteId}/cobro?cobroId=${cobroId}`, { method: "PATCH" });
+}
+
+export function anularPaqueteEstetica(paqueteId: number): Promise<unknown> {
+  return request(`/api/salud/estetica/paquetes/${paqueteId}/anular`, { method: "PATCH" });
+}
+
+export interface SesionEstetica {
+  id: number;
+  paciente_id: number;
+  paquete_id: number | null;
+  paquete_nombre: string | null;
+  fecha_sesion: string;
+  servicio: string;
+  zona: string | null;
+  parametros: string | null;
+  productos: string | null;
+  reaccion: string | null;
+  indicaciones: string | null;
+  proxima_sesion: string | null;
+  profesional: string | null;
+  tiene_foto_antes: boolean;
+  tiene_foto_despues: boolean;
+}
+
+export function listarSesionesEstetica(pacienteId: number): Promise<SesionEstetica[]> {
+  return request(`/api/salud/estetica/sesiones?pacienteId=${pacienteId}`);
+}
+
+export function fotosSesionEstetica(sesionId: number): Promise<{ antes: string | null; despues: string | null }> {
+  return request(`/api/salud/estetica/sesiones/${sesionId}/fotos`);
+}
+
+export function registrarSesionEstetica(datos: {
+  pacienteId: number; paqueteId?: number; fechaSesion?: string; servicio: string; zona?: string; parametros?: string;
+  productos?: string; reaccion?: string; indicaciones?: string; proximaSesion?: string; fotoAntes?: string; fotoDespues?: string;
+}): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/sesiones`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function eliminarSesionEstetica(sesionId: number): Promise<unknown> {
+  return request(`/api/salud/estetica/sesiones/${sesionId}`, { method: "DELETE" });
+}
+
+export interface ConsentimientoEstetica {
+  id: number;
+  paciente_id: number;
+  procedimiento: string;
+  texto?: string;
+  nombre_firmante: string;
+  identificacion_firmante: string | null;
+  firma?: string;
+  profesional: string | null;
+  fecha_firma: string;
+}
+
+export function listarConsentimientosEstetica(pacienteId: number): Promise<ConsentimientoEstetica[]> {
+  return request(`/api/salud/estetica/consentimientos?pacienteId=${pacienteId}`);
+}
+
+export function obtenerConsentimientoEstetica(id: number): Promise<ConsentimientoEstetica> {
+  return request(`/api/salud/estetica/consentimientos/${id}`);
+}
+
+export function firmarConsentimientoEstetica(datos: {
+  pacienteId: number; procedimiento: string; texto: string; nombreFirmante: string; identificacionFirmante?: string; firma: string;
+}): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/consentimientos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface ResumenEstetica {
+  paquetes_activos: number;
+  sesiones_pendientes: number;
+  paquetes_por_vencer: number;
+  sesiones_mes: number;
+  derivaciones: number;
+  proximas_sesiones: { paciente_id: number; proxima_sesion: string; servicio: string; paciente_nombre: string; paciente_telefono: string | null }[];
+}
+
+export function resumenEstetica(): Promise<ResumenEstetica> {
+  return request(`/api/salud/estetica/resumen`);
+}
+
+export interface CobroSaludDetalle {
+  id: number;
+  paciente: Paciente | null;
+  concepto: string;
+  montoTotal: number;
+  monedaCobrada: string;
+  montoRecibido: number;
+  monedaPago: string;
+  metodoPago: string;
+  referenciaPago: string | null;
+  fechaHora: string;
+  estado: string;
+}
+
+/** Cobros de salud en un rango. A diferencia de listarCobrosDelDia, un error llega a la pantalla. */
+export function reporteCobrosSalud(inicioIso: string, finIso: string): Promise<CobroSaludDetalle[]> {
+  return request(`/api/salud/cobros/reporte?inicio=${encodeURIComponent(inicioIso)}&fin=${encodeURIComponent(finIso)}`);
+}
+
+export function actualizarProcedimiento(tenantId: number, id: number, datos: Omit<ProcedimientoMedico, "id">): Promise<ProcedimientoMedico> {
+  return request(`/api/salud/procedimientos/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}

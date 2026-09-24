@@ -211,7 +211,7 @@ public class TenantProvisioningService {
         return base + "-" + tenantId;
     }
 
-    private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia");
+    private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia", "estetica");
 
     private static final Set<String> VERTICALES_COMERCIO = Set.of("repuestos", "ferreteria", "moda", "tamanaco-comercial", "farmacia");
 

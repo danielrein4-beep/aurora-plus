@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
-  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm,
+  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconSparkles, IconHardware, IconRestaurant, IconFarm,
   IconEducation, IconConstruction, IconWarning, IconClose, IconCheck, IconLock,
   IconCard, IconBank, IconPrescription,
 } from "../Icons";
@@ -77,6 +77,15 @@ const INDUSTRIES: IndustryItem[] = [
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
     tagline: "Vertical: Mediclinic Odonto",
+  },
+  {
+    id: "estetica",
+    label: "Estética & Cosmiatría",
+    Icon: IconSparkles,
+    desc: "Fichas de piel, sesiones con fotos antes/después, paquetes de sesiones y consentimientos",
+    badge: "100% DISPONIBLE (Listo)",
+    isReady: true,
+    tagline: "Vertical: Aurora Estética",
   },
   {
     id: "finca",
@@ -193,6 +202,7 @@ const INDUSTRIA_A_MODULO: Record<string, string> = {
   retail: "repuestos",
   veterinaria: "salud",
   odontologia: "odontologia",
+  estetica: "estetica",
   finca: "ganaderia",
   construccion: "construccion",
   otro: "horeca",
@@ -208,6 +218,7 @@ const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   retail: RETAIL_MODULES,
   veterinaria: CLINIC_MODULES,
   odontologia: CLINIC_MODULES,
+  estetica: CLINIC_MODULES,
   finca: GANADERIA_MODULES,
   construccion: CONSTRUCTION_MODULES,
   otro: RESTAURANT_MODULES,
@@ -223,6 +234,7 @@ const NOMBRE_POR_DEFECTO: Record<string, string> = {
   retail: "Mi Tienda",
   veterinaria: "Mi Veterinaria",
   odontologia: "Mi Consultorio Dental",
+  estetica: "Mi Centro de Estética",
   finca: "Mi Finca",
   construccion: "Constructora & Proyectos Civiles",
   otro: "Mi Negocio",
@@ -238,6 +250,7 @@ const VERTICAL_LABEL: Record<string, string> = {
   retail: "Aurora Comercio (Ferretería, Repuestos & Tiendas)",
   veterinaria: "Mediclinic Vet",
   odontologia: "Mediclinic Odonto",
+  estetica: "Aurora Estética (Estética & Cosmiatría)",
   finca: "Aurora Ganadería (Control de Fincas & Ganado)",
   otro: "Aurora Suite Comercial",
 };
@@ -303,6 +316,8 @@ export default function Onboarding() {
         ? "/construccion"
         : selectedIndustry === "veterinaria"
         ? "/veterinaria"
+        : selectedIndustry === "estetica"
+        ? "/estetica"
         : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "odontologia"
         ? "/mediclinic"
         : "/dashboard";

@@ -1029,3 +1029,14 @@ export function IconBulb({ size = 24, className }: IconProps) {
     </svg>
   );
 }
+
+// Estética y Cosmiatría: destellos (cuidado de la piel).
+export function IconSparkles({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M10 3.5l1.6 4.4 4.4 1.6-4.4 1.6L10 15.5l-1.6-4.4L4 9.5l4.4-1.6L10 3.5z" />
+      <path d="M18 13.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
+      <path d="M17.5 3v3M16 4.5h3" />
+    </svg>
+  );
+}
