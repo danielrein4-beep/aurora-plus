@@ -308,8 +308,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         setAlertas(resAlertas.value);
       }
 
-      const hoy = new Date().toISOString().slice(0, 10);
-      const hace30d = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const hoy = fechaLocalISO();
+      const hace30d = fechaLocalISO(new Date(Date.now() - 30 * 86400000));
       try {
         const repOrdeno = await obtenerReporteOrdenoGanaderia(tenantId, hace30d, hoy);
         setOrdenos(repOrdeno?.registros ?? []);
@@ -456,15 +456,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             animalId: acc.payload.animalId,
             cantidadLitros: acc.payload.litros,
             turno: acc.payload.sesion,
-            fecha: new Date().toISOString().slice(0, 10),
-            precioVentaLitro: 0.5,
+            // El día en que se ordeñó sin señal, no el día en que se sincroniza; y el precio configurado, nunca uno fijo.
+            fecha: fechaLocalISO(new Date(acc.creadaEn)),
+            precioVentaLitro: precioLecheUSD > 0 ? precioLecheUSD : undefined,
           });
         },
         aplicar_vacuna: async (acc) => {
           await aplicarVacunaGanaderia(tenantId, {
             animalId: acc.payload.animalId || 0,
             vacunaId: acc.payload.vacunaId,
-            fechaAplicacion: new Date(acc.creadaEn).toISOString().slice(0, 10),
+            fechaAplicacion: fechaLocalISO(new Date(acc.creadaEn)),
           });
         }
       });
