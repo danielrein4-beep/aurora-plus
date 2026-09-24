@@ -21,12 +21,13 @@ export const ROJO: RGB = [239, 68, 68];
 export const MARGEN = 14;
 
 /**
- * Colores de las gráficas: variados y sobrios (índigo suave, verde salvia, dorado,
- * lavanda, azul claro, gris azulado). El color de cada vertical queda para su cabecera.
+ * Colores con significado (los mismos de utils/coloresSignificado.ts): verde = dinero,
+ * violeta = operaciones y cantidades, azul = negocios y personas, rojo/ámbar = alertas.
+ * El color de cada vertical queda solo para su cabecera.
  */
-export const PALETA_GRAFICAS: RGB[] = [
-  [108, 127, 216], [95, 180, 156], [217, 169, 78], [167, 139, 218], [90, 169, 201], [143, 163, 184],
-];
+export const DINERO: RGB = [63, 158, 120];
+export const OPERACIONES: RGB = [126, 107, 196];
+export const PERSONAS: RGB = [79, 124, 172];
 
 export function hexARgb(hex: string): RGB {
   const h = hex.replace("#", "");
@@ -173,7 +174,7 @@ function escalaBonita(max: number): number {
 /** Ranking con barras horizontales. Devuelve la Y final. */
 export function barrasHorizontales(
   doc: jsPDF, filas: { etiqueta: string; valor: number; texto?: string }[], x: number, y: number, w: number,
-  color: RGB | RGB[] = PALETA_GRAFICAS, maxFilas = 8,
+  color: RGB = OPERACIONES, maxFilas = 8,
 ): number {
   if (filas.length === 0) {
     doc.setFont("helvetica", "normal");
@@ -183,8 +184,7 @@ export function barrasHorizontales(
     return y + 6;
   }
   const max = Math.max(1, ...filas.map((f) => f.valor));
-  const colorFila = (i: number): RGB => (Array.isArray(color[0]) ? (color as RGB[])[i % (color as RGB[]).length] : (color as RGB));
-  for (const [i, f] of filas.slice(0, maxFilas).entries()) {
+  for (const f of filas.slice(0, maxFilas)) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.2);
     doc.setTextColor(30, 41, 59);
@@ -194,7 +194,7 @@ export function barrasHorizontales(
     doc.setFillColor(241, 245, 249);
     doc.roundedRect(x, y + 4.4, w, 2, 1, 1, "F");
     if (f.valor > 0) {
-      doc.setFillColor(...colorFila(i));
+      doc.setFillColor(...color);
       doc.roundedRect(x, y + 4.4, Math.max(1.2, (w * f.valor) / max), 2, 1, 1, "F");
     }
     y += 9;
@@ -279,4 +279,21 @@ export function vinetas(doc: jsPDF, items: { texto: string; color: RGB }[], x: n
     y += lineas.length * 3.8 + 3.5;
   }
   return y;
+}
+
+/** Línea que explica qué significa cada color. */
+export function leyendaColores(doc: jsPDF, x: number, y: number) {
+  const items: [RGB, string][] = [[DINERO, "Dinero"], [OPERACIONES, "Operaciones y cantidades"], [PERSONAS, "Negocios y personas"], [ROJO, "Alertas"]];
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(...GRIS);
+  doc.text("COLORES:", x, y);
+  x += doc.getTextWidth("COLORES:") + 4;
+  doc.setFont("helvetica", "normal");
+  for (const [c, t] of items) {
+    doc.setFillColor(...c);
+    doc.circle(x + 1.1, y - 1, 1.1, "F");
+    doc.text(t, x + 3.5, y);
+    x += doc.getTextWidth(t) + 10;
+  }
 }

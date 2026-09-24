@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { obtenerPanoramaVerticales, type PanoramaVertical } from "../api";
-import { VERTICALES_SUPERADMIN } from "./SuperAdminVertical";
+import { VERTICALES_SUPERADMIN, LeyendaColores } from "./SuperAdminVertical";
+import { COLOR, TEXTO } from "../utils/coloresSignificado";
 
 const PERIODOS = [
   { dias: 7, label: "7 días" },
@@ -49,11 +50,12 @@ export default function SuperAdminPanorama({ onAbrirVertical }: { onAbrirVertica
       </div>
       {error && <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">{error}</div>}
 
+      <LeyendaColores />
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Kpi titulo="Negocios en total" valor={numero.format(total.negocios)} nota={`${total.activos} activos`} />
-        <Kpi titulo="Usándolo de verdad" valor={numero.format(total.uso)} nota="Con registros en el período" color="text-emerald-600" />
+        <Kpi titulo="Usándolo de verdad" valor={numero.format(total.uso)} nota="Con registros en el período" color={TEXTO.personas} />
         <Kpi titulo="En riesgo de abandono" valor={numero.format(total.riesgo)} nota="Activos sin uso en 14+ días" color="text-rose-600" />
-        <Kpi titulo="Ingresos del período" valor={`$${dinero.format(total.ingresos)}`} nota="Suscripciones cobradas" color="text-sky-600" />
+        <Kpi titulo="Ingresos del período" valor={`$${dinero.format(total.ingresos)}`} nota="Suscripciones cobradas" color={TEXTO.dinero} />
         <Kpi titulo="Verticales con negocios" valor={String(filas.filter((f) => f.negocios > 0).length)} nota={`de ${filas.length}`} />
       </div>
 
@@ -104,8 +106,8 @@ export default function SuperAdminPanorama({ onAbrirVertical }: { onAbrirVertica
                 <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#64748b" }} />
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="En uso" stackId="a" fill="#10b981" />
-                <Bar dataKey="Sin actividad" stackId="a" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="En uso" stackId="a" fill={COLOR.personas} />
+                <Bar dataKey="Sin actividad" stackId="a" fill={COLOR.neutro} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

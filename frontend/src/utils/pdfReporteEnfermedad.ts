@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import { construirDocCanalEndemico, type PuntoCanalPdf } from "./pdfReports";
 import type { CanalEndemico, ReporteEnfermedad, MedicoReporteEnfermedad } from "../api";
 import {
-  type RGB, CIELO, ESMERALDA, VIOLETA, AMBAR, ROJO, GRIS, GRIS_CLARO, TINTA, MARGEN,
+  type RGB, AMBAR, ROJO, GRIS, GRIS_CLARO, TINTA, MARGEN, OPERACIONES, PERSONAS,
   encabezado, pie, numerarPaginas, tarjetas, tituloSeccion, barrasMensuales, tabla, vinetas, recortar,
 } from "./pdfComun";
 
@@ -90,17 +90,17 @@ function dibujarPortada(doc: jsPDF, datos: DatosPdfReporteEnfermedad, alcance: s
   const anterior = medico ? medico.casosAnioAnterior : reporte.totalAnioAnterior;
   const variacion = anterior > 0 ? Math.round(((casos - anterior) / anterior) * 100) : null;
   tarjetas(doc, y0, [
-    { label: `CASOS EN ${reporte.anio}`, val: String(casos), color: CIELO, nota: `${anterior} en ${reporte.anio - 1}` },
+    { label: `CASOS EN ${reporte.anio}`, val: String(casos), color: OPERACIONES, nota: `${anterior} en ${reporte.anio - 1}` },
     {
       label: "VARIACIÓN VS AÑO ANTERIOR",
       val: variacion === null ? "—" : `${variacion > 0 ? "+" : ""}${variacion}%`,
-      color: variacion === null ? GRIS : variacion > 0 ? ROJO : ESMERALDA,
+      color: variacion === null ? GRIS : variacion > 0 ? ROJO : TINTA,
       nota: variacion === null ? "sin casos el año anterior" : variacion > 0 ? "más casos" : "menos casos",
     },
     medico
-      ? { label: "PARTICIPACIÓN EN LA RED", val: `${medico.participacionPct}%`, color: VIOLETA, nota: `de ${reporte.totalAnio} casos de la red` }
-      : { label: "MÉDICOS CON CASOS", val: String(reporte.medicosConCasos), color: VIOLETA, nota: `${reporte.medicos.length} con historial` },
-    { label: "PACIENTES DISTINTOS", val: String(medico ? medico.pacientesDistintos : reporte.pacientesDistintos), color: ESMERALDA, nota: "consultas registradas" },
+      ? { label: "PARTICIPACIÓN EN LA RED", val: `${medico.participacionPct}%`, color: OPERACIONES, nota: `de ${reporte.totalAnio} casos de la red` }
+      : { label: "MÉDICOS CON CASOS", val: String(reporte.medicosConCasos), color: PERSONAS, nota: `${reporte.medicos.length} con historial` },
+    { label: "PACIENTES DISTINTOS", val: String(medico ? medico.pacientesDistintos : reporte.pacientesDistintos), color: PERSONAS, nota: "consultas registradas" },
   ]);
 
   // Gráfico de barras por mes.
@@ -108,8 +108,8 @@ function dibujarPortada(doc: jsPDF, datos: DatosPdfReporteEnfermedad, alcance: s
   const serieAnterior = medico ? null : reporte.porMesAnterior;
   const chartX = 22, chartY = y0 + 34, chartW = W * 0.58, chartH = H - chartY - 30;
   tituloSeccion(doc, medico ? `Casos por mes en ${reporte.anio} — ${alcance}` : `Casos por mes: ${reporte.anio} contra ${reporte.anio - 1}`, MARGEN, chartY - 5);
-  barrasMensuales(doc, serieActual, serieAnterior, chartX, chartY, chartW, chartH, CIELO, MESES);
-  leyenda(doc, chartX, chartY + chartH + 11, [[CIELO, `Casos ${reporte.anio}`], ...(serieAnterior ? [[GRIS_CLARO, `Casos ${reporte.anio - 1}`] as [RGB, string]] : [])]);
+  barrasMensuales(doc, serieActual, serieAnterior, chartX, chartY, chartW, chartH, OPERACIONES, MESES);
+  leyenda(doc, chartX, chartY + chartH + 11, [[OPERACIONES, `Casos ${reporte.anio}`], ...(serieAnterior ? [[GRIS_CLARO, `Casos ${reporte.anio - 1}`] as [RGB, string]] : [])]);
 
   // Hallazgos en palabras.
   const hx = chartX + chartW + 12;
@@ -131,7 +131,7 @@ function dibujarPortada(doc: jsPDF, datos: DatosPdfReporteEnfermedad, alcance: s
       const bx = hx + hw * 0.58, bw = hw * 0.3;
       doc.setFillColor(241, 245, 249);
       doc.roundedRect(bx, hy, bw, 3.6, 1, 1, "F");
-      doc.setFillColor(...CIELO);
+      doc.setFillColor(...OPERACIONES);
       if (m.casosAnio > 0) doc.roundedRect(bx, hy, Math.max(1.5, (bw * m.casosAnio) / max), 3.6, 1, 1, "F");
       doc.setFont("helvetica", "bold");
       doc.text(String(m.casosAnio), hx + hw, hy + 3, { align: "right" });
@@ -152,7 +152,7 @@ function hallazgos(datos: DatosPdfReporteEnfermedad): { texto: string; color: RG
     return salida;
   }
   const pico = serie.indexOf(Math.max(...serie));
-  salida.push({ texto: `Mes con más casos: ${MESES_LARGOS[pico]}, con ${serie[pico]} caso(s) (${Math.round((serie[pico] * 100) / total)}% del año).`, color: CIELO });
+  salida.push({ texto: `Mes con más casos: ${MESES_LARGOS[pico]}, con ${serie[pico]} caso(s) (${Math.round((serie[pico] * 100) / total)}% del año).`, color: OPERACIONES });
 
   const casos = medico ? medico.casosAnio : reporte.totalAnio;
   const anterior = medico ? medico.casosAnioAnterior : reporte.totalAnioAnterior;
@@ -161,19 +161,19 @@ function hallazgos(datos: DatosPdfReporteEnfermedad): { texto: string; color: RG
     salida.push({
       texto: v === 0 ? `Mismo número de casos que en ${reporte.anio - 1}.`
         : `${v > 0 ? "Aumento" : "Disminución"} del ${Math.abs(v)}% frente a ${reporte.anio - 1} (${anterior} caso(s)).`,
-      color: v > 0 ? ROJO : ESMERALDA,
+      color: v > 0 ? ROJO : TINTA,
     });
   }
 
   if (medico) {
     const posicion = reporte.medicos.findIndex((m) => m.tenantId === medico.tenantId) + 1;
-    salida.push({ texto: `Ocupa el puesto ${posicion} de ${reporte.medicos.length} médicos de la red en casos de esta enfermedad (${medico.participacionPct}% del total).`, color: VIOLETA });
+    salida.push({ texto: `Ocupa el puesto ${posicion} de ${reporte.medicos.length} médicos de la red en casos de esta enfermedad (${medico.participacionPct}% del total).`, color: PERSONAS });
   } else {
     const conCasos = reporte.medicos.filter((m) => m.casosAnio > 0);
     if (conCasos.length > 0) {
       let acumulado = 0, n = 0;
       for (const m of conCasos) { acumulado += m.casosAnio; n++; if (acumulado * 2 >= reporte.totalAnio) break; }
-      salida.push({ texto: `La mitad de los casos se concentra en ${n} de ${conCasos.length} médico(s) con casos.`, color: VIOLETA });
+      salida.push({ texto: `La mitad de los casos se concentra en ${n} de ${conCasos.length} médico(s) con casos.`, color: PERSONAS });
     }
     const conCinco = conCasos.filter((m) => m.casosAnio >= 5).length;
     salida.push({ texto: `${conCinco} médico(s) registran 5 casos o más en el año.`, color: AMBAR });
@@ -226,7 +226,7 @@ function dibujarTablaMedicos(doc: jsPDF, reporte: ReporteEnfermedad, descripcion
   ], reporte.medicos.map((m, i) => {
     const variacion = m.casosAnioAnterior > 0 ? Math.round(((m.casosAnio - m.casosAnioAnterior) / m.casosAnioAnterior) * 100) : null;
     const colores: Record<number, RGB> = {};
-    if (variacion !== null) colores[6] = variacion > 0 ? ROJO : variacion < 0 ? ESMERALDA : GRIS;
+    if (variacion !== null) colores[6] = variacion > 0 ? ROJO : variacion < 0 ? TINTA : GRIS;
     if (m.casosAnio >= 5) colores[4] = AMBAR;
     return {
       celdas: [

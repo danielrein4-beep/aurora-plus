@@ -18,6 +18,7 @@ import {
 import SuperAdminReporteEnfermedad from "./SuperAdminReporteEnfermedad";
 import { VistaSalud, VistaComercio, VistaMercado } from "./SuperAdminInteligencia";
 import { generarPdfInformeVertical } from "../utils/pdfInformeVertical";
+import { COLOR, TEXTO, colorDeMetrica } from "../utils/coloresSignificado";
 
 /** Verticales con página propia en el menú. "otras" agrupa las de pocos negocios. */
 export const VERTICALES_SUPERADMIN: { id: string; nombre: string; descripcion: string; color: string; icono: string }[] = [
@@ -49,12 +50,6 @@ const PERIODOS = [
   { dias: 90, label: "90 días" },
   { dias: 365, label: "12 meses" },
 ];
-
-/**
- * Colores de las gráficas: variados y sobrios, a propósito distintos del color de la
- * vertical (que queda solo para su identidad: cabecera, ícono, pestañas y botones).
- */
-const PALETA = ["#6C7FD8", "#5FB49C", "#D9A94E", "#A78BDA", "#5AA9C9", "#8FA3B8"];
 
 const MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -264,18 +259,19 @@ function Resumen({ datos, onAbrirFicha }: { datos: DetalleVertical; onAbrirFicha
 
   return (
     <div className="space-y-6">
+      <LeyendaColores />
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <Kpi titulo="Negocios" valor={numero.format(kpis.negocios)} nota={`${kpis.activos} activos · ${kpis.suspendidos} suspendidos`} />
-        <Kpi titulo="Usándolo de verdad" valor={numero.format(kpis.conActividad)} nota={`de ${kpis.activos} activos, en el período`} color="text-emerald-600" />
+        <Kpi titulo="Usándolo de verdad" valor={numero.format(kpis.conActividad)} nota={`de ${kpis.activos} activos, en el período`} color={TEXTO.personas} />
         <Kpi titulo="En riesgo de abandono" valor={numero.format(kpis.enRiesgo)} nota="Activos sin uso en 14+ días" color={kpis.enRiesgo > 0 ? "text-rose-600" : "text-slate-900"} />
         <Kpi titulo="Por vencer" valor={numero.format(kpis.porVencer)} nota="Licencias en los próximos 7 días" color={kpis.porVencer > 0 ? "text-amber-600" : "text-slate-900"} />
-        <Kpi titulo="Ingresos del período" valor={`$${dinero.format(kpis.ingresosPeriodo)}`} nota={`$${dinero.format(kpis.ingresosHistorico)} históricos`} color="text-sky-600" />
-        <Kpi titulo="Usuarios" valor={numero.format(kpis.usuarios)} nota={`${kpis.altasPeriodo} negocio(s) nuevo(s) en el período`} />
+        <Kpi titulo="Ingresos del período" valor={`$${dinero.format(kpis.ingresosPeriodo)}`} nota={`$${dinero.format(kpis.ingresosHistorico)} históricos`} color={TEXTO.dinero} />
+        <Kpi titulo="Usuarios" valor={numero.format(kpis.usuarios)} nota={`${kpis.altasPeriodo} negocio(s) nuevo(s) en el período`} color={TEXTO.personas} />
       </div>
 
       {/* MÉTRICAS OPERATIVAS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {datos.metricas.map((m, i) => <TarjetaMetrica key={m.clave} m={m} color={PALETA[i % PALETA.length]} meses={datos.meses} />)}
+        {datos.metricas.map((m) => <TarjetaMetrica key={m.clave} m={m} color={colorDeMetrica(m)} meses={datos.meses} />)}
         {datos.metricas.length === 0 && <div className="text-sm text-slate-400">Esta vertical todavía no tiene métricas operativas.</div>}
       </div>
 
@@ -292,7 +288,7 @@ function Resumen({ datos, onAbrirFicha }: { datos: DetalleVertical; onAbrirFicha
                 <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#64748b" }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#64748b" }} />
                 <Tooltip formatter={(v, k) => k === "suma" ? [formatoSuma(Number(v), elegida?.unidadSuma ?? null), elegida?.unidadSuma === "USD" ? "Monto" : "Total"] : [numero.format(Number(v)), elegida?.etiqueta ?? ""]} />
-                <Bar dataKey={verSuma ? "suma" : "cantidad"} fill={PALETA[0]} radius={[4, 4, 0, 0]} />
+                <Bar dataKey={verSuma ? "suma" : "cantidad"} fill={elegida ? colorDeMetrica(elegida) : COLOR.operaciones} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -307,14 +303,14 @@ function Resumen({ datos, onAbrirFicha }: { datos: DetalleVertical; onAbrirFicha
                 <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#64748b" }} />
                 <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
                 <Tooltip formatter={(v, k) => k === "ingresos" ? [`$${dinero.format(Number(v))}`, "Ingresos"] : [numero.format(Number(v)), "Negocios nuevos"]} />
-                <Area type="monotone" dataKey="ingresos" stroke={PALETA[1]} fill={PALETA[1]} fillOpacity={0.15} strokeWidth={2} />
-                <Area type="monotone" dataKey="altas" stroke="#a855f7" fill="#a855f7" fillOpacity={0.08} strokeWidth={2} />
+                <Area type="monotone" dataKey="ingresos" stroke={COLOR.dinero} fill={COLOR.dinero} fillOpacity={0.15} strokeWidth={2} />
+                <Area type="monotone" dataKey="altas" stroke={COLOR.personas} fill={COLOR.personas} fillOpacity={0.08} strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="flex gap-4 text-[11px] text-slate-500 mt-2">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PALETA[1] }} /> Ingresos</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-violet-500" /> Negocios nuevos</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLOR.dinero }} /> Ingresos</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLOR.personas }} /> Negocios nuevos</span>
           </div>
         </Panel>
       </div>
@@ -508,9 +504,9 @@ function OperacionRestaurantesVista({ dias, onAbrirFicha }: { dias: number; onAb
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi titulo="Comandas" valor={numero.format(datos.comandas)} nota="Sin anuladas, en el período" />
-        <Kpi titulo="Ventas de los restaurantes" valor={`$${dinero.format(datos.ventas)}`} nota="Consumo registrado" color="text-emerald-600" />
-        <Kpi titulo="Ticket promedio" valor={`$${dinero.format(datos.ticketPromedio)}`} nota="Por comanda" />
+        <Kpi titulo="Comandas" valor={numero.format(datos.comandas)} nota="Sin anuladas, en el período" color={TEXTO.operaciones} />
+        <Kpi titulo="Ventas de los restaurantes" valor={`$${dinero.format(datos.ventas)}`} nota="Consumo registrado" color={TEXTO.dinero} />
+        <Kpi titulo="Ticket promedio" valor={`$${dinero.format(datos.ticketPromedio)}`} nota="Por comanda" color={TEXTO.dinero} />
         <Kpi titulo="Hora pico" valor={datos.comandas ? `${String(horaPico).padStart(2, "0")}:00` : "-"} nota={datos.comandas ? `${datos.porHora[horaPico]} comandas` : "Sin comandas"} />
       </div>
       <div className="grid lg:grid-cols-3 gap-6">
@@ -522,7 +518,7 @@ function OperacionRestaurantesVista({ dias, onAbrirFicha }: { dias: number; onAb
                 <XAxis dataKey="hora" tick={{ fontSize: 10, fill: "#64748b" }} interval={1} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#64748b" }} />
                 <Tooltip formatter={(v, k) => k === "ventas" ? [`$${dinero.format(Number(v))}`, "Ventas"] : [v, "Comandas"]} />
-                <Bar dataKey="comandas" fill={PALETA[0]} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="comandas" fill={COLOR.operaciones} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -535,7 +531,7 @@ function OperacionRestaurantesVista({ dias, onAbrirFicha }: { dias: number; onAb
                 <XAxis dataKey="dia" tick={{ fontSize: 10, fill: "#64748b" }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#64748b" }} />
                 <Tooltip />
-                <Bar dataKey="comandas" name="Comandas" fill={PALETA[1]} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="comandas" name="Comandas" fill={COLOR.operaciones} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -550,6 +546,7 @@ function OperacionRestaurantesVista({ dias, onAbrirFicha }: { dias: number; onAb
       </div>
       <Panel titulo="Restaurantes que más venden">
         <Barras
+          color={COLOR.dinero}
           filas={datos.topRestaurantes.map((r) => ({ etiqueta: r.nombre, n: Number(r.ventas), detalle: `${r.comandas} comandas`, formato: (v: number) => `$${dinero.format(v)}`, alTocar: () => onAbrirFicha(r.tenantId) }))}
         />
       </Panel>
@@ -565,7 +562,7 @@ function ProduccionGanaderiaVista({ dias, datos: detalle, onAbrirFicha }: { dias
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Kpi titulo="Leche ordeñada" valor={`${numero.format(datos.litros)} L`} nota="En el período" color="text-emerald-600" />
+        <Kpi titulo="Leche ordeñada" valor={`${numero.format(datos.litros)} L`} nota="En el período" color={TEXTO.operaciones} />
         <Kpi titulo="Ordeños" valor={numero.format(datos.ordenos)} nota={`${datos.vacasOrdenadas} vaca(s)`} />
         <Kpi titulo="Promedio por ordeño" valor={`${numero.format(datos.promedioPorOrdeno)} L`} nota="Por registro" />
         <Kpi titulo="Grasa promedio" valor={`${numero.format(datos.grasaPromedio)}%`} nota="Calidad de la leche" />
@@ -580,7 +577,7 @@ function ProduccionGanaderiaVista({ dias, datos: detalle, onAbrirFicha }: { dias
               <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#64748b" }} />
               <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
               <Tooltip formatter={(v) => [`${numero.format(Number(v))} L`, "Leche"]} />
-              <Bar dataKey="litros" fill={PALETA[1]} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="litros" fill={COLOR.operaciones} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -607,8 +604,8 @@ function ClinicaOdontologiaVista({ dias }: { dias: number }) {
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Kpi titulo="Planes de tratamiento" valor={numero.format(datos.planesPorEstado.reduce((s, p) => s + Number(p.n), 0))} nota="Todos los consultorios" />
-        <Kpi titulo="Cartera total" valor={`$${dinero.format(datos.carteraTotal)}`} nota="Suma de los planes" />
-        <Kpi titulo="Cobrado" valor={`$${dinero.format(datos.carteraPagada)}`} nota="Abonos recibidos" color="text-emerald-600" />
+        <Kpi titulo="Cartera total" valor={`$${dinero.format(datos.carteraTotal)}`} nota="Suma de los planes" color={TEXTO.dinero} />
+        <Kpi titulo="Cobrado" valor={`$${dinero.format(datos.carteraPagada)}`} nota="Abonos recibidos" color={TEXTO.dinero} />
         <Kpi titulo="Por cobrar" valor={`$${dinero.format(pendiente)}`} nota="Saldo pendiente de los pacientes" color={pendiente > 0 ? "text-amber-600" : "text-slate-900"} />
       </div>
       <div className="grid lg:grid-cols-2 gap-6">
@@ -650,7 +647,7 @@ function Panel({ titulo, nota, accion, className = "", children }: { titulo: str
   );
 }
 
-function Barras({ filas }: { filas: (ConteoEtiqueta & { detalle?: string; formato?: (v: number) => string; alTocar?: () => void })[] }) {
+function Barras({ filas, color = COLOR.operaciones }: { filas: (ConteoEtiqueta & { detalle?: string; formato?: (v: number) => string; alTocar?: () => void })[]; color?: string }) {
   if (filas.length === 0) return <p className="text-xs text-slate-400">Sin datos en el período.</p>;
   const max = Math.max(1, ...filas.map((f) => Number(f.n)));
   return (
@@ -662,7 +659,7 @@ function Barras({ filas }: { filas: (ConteoEtiqueta & { detalle?: string; format
             <span className="font-mono font-bold text-slate-900 shrink-0">{f.formato ? f.formato(Number(f.n)) : numero.format(Number(f.n))}</span>
           </div>
           <div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1">
-            <div className="h-full rounded-full" style={{ width: `${(Number(f.n) / max) * 100}%`, backgroundColor: PALETA[i % PALETA.length] }} />
+            <div className="h-full rounded-full" style={{ width: `${(Number(f.n) / max) * 100}%`, backgroundColor: color }} />
           </div>
           {f.detalle && <div className="text-[10px] text-slate-500 mt-0.5">{f.detalle}</div>}
         </button>
@@ -683,6 +680,26 @@ function ListaNegocios({ filas, vacio, onAbrirFicha }: { filas: { n: NegocioVert
           </div>
           <span className={`text-xs font-bold shrink-0 ${tono}`}>{detalle}</span>
         </button>
+      ))}
+    </div>
+  );
+}
+
+/** Explica qué significa cada color de las gráficas. */
+export function LeyendaColores() {
+  const items: [string, string][] = [
+    [COLOR.dinero, "Dinero"],
+    [COLOR.operaciones, "Operaciones y cantidades"],
+    [COLOR.personas, "Negocios y personas"],
+    [COLOR.alerta, "Alertas"],
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-slate-500">
+      <span className="font-bold uppercase tracking-wide">Colores:</span>
+      {items.map(([c, t]) => (
+        <span key={t} className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c }} /> {t}
+        </span>
       ))}
     </div>
   );

@@ -9,6 +9,7 @@ import {
 import CanalEndemico from "./CanalEndemico";
 import Cie10Buscador from "./Cie10Buscador";
 import { generarPdfReporteEnfermedad } from "../utils/pdfReporteEnfermedad";
+import { COLOR, TEXTO } from "../utils/coloresSignificado";
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const numero = new Intl.NumberFormat("es-VE");
@@ -152,19 +153,19 @@ export default function SuperAdminReporteEnfermedad({ cie10Inicial, tenantInicia
         <>
           {/* RESUMEN */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Tarjeta titulo={`Casos en ${anio}`} valor={numero.format(casos)} nota={`${numero.format(anterior)} en ${anio - 1}`} color="text-sky-600" />
+            <Tarjeta titulo={`Casos en ${anio}`} valor={numero.format(casos)} nota={`${numero.format(anterior)} en ${anio - 1}`} color={TEXTO.operaciones} />
             <Tarjeta
               titulo="Variación vs año anterior"
               valor={variacion === null ? "—" : `${variacion > 0 ? "+" : ""}${variacion}%`}
               nota={variacion === null ? "sin casos el año anterior" : variacion > 0 ? "más casos" : "menos casos"}
-              color={variacion === null ? "text-slate-500" : variacion > 0 ? "text-rose-600" : "text-emerald-600"}
+              color={variacion === null ? "text-slate-500" : variacion > 0 ? TEXTO.alerta : "text-slate-600"}
             />
             {medico ? (
-              <Tarjeta titulo="Participación en la red" valor={`${medico.participacionPct}%`} nota={`de ${numero.format(reporte.totalAnio)} casos`} color="text-violet-600" />
+              <Tarjeta titulo="Participación en la red" valor={`${medico.participacionPct}%`} nota={`de ${numero.format(reporte.totalAnio)} casos`} color={TEXTO.operaciones} />
             ) : (
-              <Tarjeta titulo="Médicos con casos" valor={String(reporte.medicosConCasos)} nota={`${reporte.medicos.length} con historial`} color="text-violet-600" />
+              <Tarjeta titulo="Médicos con casos" valor={String(reporte.medicosConCasos)} nota={`${reporte.medicos.length} con historial`} color={TEXTO.personas} />
             )}
-            <Tarjeta titulo="Pacientes distintos" valor={numero.format(medico ? medico.pacientesDistintos : reporte.pacientesDistintos)} nota="consultas registradas" color="text-emerald-600" />
+            <Tarjeta titulo="Pacientes distintos" valor={numero.format(medico ? medico.pacientesDistintos : reporte.pacientesDistintos)} nota="consultas registradas" color={TEXTO.personas} />
           </div>
 
           {/* POR MES */}
@@ -181,7 +182,7 @@ export default function SuperAdminReporteEnfermedad({ cie10Inicial, tenantInicia
                   <Tooltip />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   {!medico && <Bar dataKey="anterior" name={`${anio - 1}`} fill="#cbd5e1" radius={[4, 4, 0, 0]} />}
-                  <Bar dataKey="actual" name={`${anio}`} fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="actual" name={`${anio}`} fill={COLOR.operaciones} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -229,7 +230,7 @@ export default function SuperAdminReporteEnfermedad({ cie10Inicial, tenantInicia
                         <td className="px-3 py-3 text-xs text-slate-600">{m.clinica || "—"}</td>
                         <td className={`px-3 py-3 text-right font-mono font-bold ${m.casosAnio >= 5 ? "text-amber-600" : "text-slate-900"}`}>{m.casosAnio}</td>
                         <td className="px-3 py-3 text-right font-mono text-slate-500">{m.casosAnioAnterior}</td>
-                        <td className={`px-3 py-3 text-right font-mono text-xs ${v === null ? "text-slate-400" : v > 0 ? "text-rose-600" : v < 0 ? "text-emerald-600" : "text-slate-500"}`}>
+                        <td className={`px-3 py-3 text-right font-mono text-xs ${v === null ? "text-slate-400" : v > 0 ? TEXTO.alerta : "text-slate-500"}`}>
                           {v === null ? "—" : `${v > 0 ? "+" : ""}${v}%`}
                         </td>
                         <td className="px-3 py-3 text-right font-mono">{m.pacientesDistintos}</td>
@@ -237,7 +238,7 @@ export default function SuperAdminReporteEnfermedad({ cie10Inicial, tenantInicia
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
-                              <div className="h-full bg-sky-500 rounded-full" style={{ width: `${Math.min(100, m.participacionPct)}%` }} />
+                              <div className="h-full rounded-full" style={{ width: `${Math.min(100, m.participacionPct)}%`, backgroundColor: COLOR.operaciones }} />
                             </div>
                             <span className="text-[11px] font-mono text-slate-500 w-10 text-right">{m.participacionPct}%</span>
                           </div>
