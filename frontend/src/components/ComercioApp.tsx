@@ -8708,6 +8708,9 @@ function ModalCompraProveedorComercio({
   // lo que el usuario indique (o nada) y el resto queda como Cuenta por
   // Pagar (CXP) — mismo patrón que Registrar Compra de Horeca.
   const [pagoDeContado, setPagoDeContado] = useState(true);
+  // Datos de la factura fiscal del proveedor, para el libro de compras (opcional).
+  const [facturaFiscal, setFacturaFiscal] = useState(false);
+  const [fiscalCompra, setFiscalCompra] = useState({ numeroControl: "", baseImponible: "", montoExento: "", alicuotaIva: "16", montoIva: "", ivaRetenido: "" });
   const [montoPagadoParcial, setMontoPagadoParcial] = useState("");
   const [monedaPago, setMonedaPago] = useState("USD");
   const [diasCredito, setDiasCredito] = useState("");
@@ -8965,6 +8968,14 @@ function ModalCompraProveedorComercio({
         montoPagadoAhora: montoPagadoAhora && montoPagadoAhora > 0 ? montoPagadoAhora : undefined,
         monedaPago: montoPagadoAhora && montoPagadoAhora > 0 ? monedaPago : undefined,
         diasCredito: !pagoDeContado && diasCredito ? Number(diasCredito) : undefined,
+        ...(facturaFiscal ? {
+          numeroControl: fiscalCompra.numeroControl.trim() || undefined,
+          baseImponible: Number(fiscalCompra.baseImponible) || 0,
+          montoExento: Number(fiscalCompra.montoExento) || 0,
+          alicuotaIva: Number(fiscalCompra.alicuotaIva) || 0,
+          montoIva: Number(fiscalCompra.montoIva) || 0,
+          ivaRetenido: Number(fiscalCompra.ivaRetenido) || 0,
+        } : {}),
       });
       onCompraExitosa();
     } catch (err: any) {
@@ -9318,6 +9329,80 @@ function ModalCompraProveedorComercio({
             </tbody>
           </table>
         </div>
+
+        {/* Factura fiscal del proveedor — solo alimenta el libro de compras; no cambia stock ni pagos */}
+        {!modoEuro() && (
+          <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2.5">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox" checked={facturaFiscal} className="w-4 h-4 accent-teal-600 cursor-pointer"
+                onChange={(e) => {
+                  setFacturaFiscal(e.target.checked);
+                  if (e.target.checked && !fiscalCompra.baseImponible && totalFactura > 0) {
+                    const alic = Number(fiscalCompra.alicuotaIva) || 0;
+                    setFiscalCompra((f) => ({ ...f, baseImponible: totalFactura.toFixed(2), montoIva: (totalFactura * alic / 100).toFixed(2) }));
+                  }
+                }}
+              />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Es factura fiscal con IVA (va al libro de compras)</span>
+            </label>
+            {facturaFiscal && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  N° de control
+                  <input
+                    type="text" value={fiscalCompra.numeroControl} placeholder="00-000123"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, numeroControl: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  Base imponible
+                  <input
+                    type="number" value={fiscalCompra.baseImponible} placeholder="0.00"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, baseImponible: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  Exento
+                  <input
+                    type="number" value={fiscalCompra.montoExento} placeholder="0.00"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, montoExento: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  Alícuota %
+                  <input
+                    type="number" value={fiscalCompra.alicuotaIva} placeholder="16"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, alicuotaIva: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  IVA
+                  <input
+                    type="number" value={fiscalCompra.montoIva} placeholder="0.00"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, montoIva: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  IVA retenido
+                  <input
+                    type="number" value={fiscalCompra.ivaRetenido} placeholder="0.00"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, ivaRetenido: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <p className="col-span-2 sm:col-span-3 text-[10.5px] text-slate-500 dark:text-slate-400">
+                  Copia los montos tal como están en la factura del proveedor, en {CODIGO()}. El libro los pasa a bolívares con la tasa BCV del día.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Forma de pago — de contado (sale de caja como EGRESO) o a crédito (Cuenta por Pagar) */}
         <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2.5">

@@ -82,7 +82,9 @@ public class LibroFiscalService {
             renglones.add(new RenglonCompra(c.getFechaCompra(), c.getProveedor().getNombre(), c.getProveedor().getRif(),
                 c.getNumeroFactura(), c.getNumeroControl(), tasa, c.getTasaBcv() == null, sinFactura,
                 sinFactura ? BigDecimal.ZERO : cero(c.getMontoExento()), cero(c.getBaseImponible()), cero(c.getAlicuotaIva()),
-                cero(c.getMontoIva()), cero(c.getIvaRetenido()), c.getTotal()));
+                cero(c.getMontoIva()), cero(c.getIvaRetenido()),
+                // Con factura fiscal el total es el de la factura (base + exento + IVA); sin ella, el costo registrado.
+                sinFactura ? c.getTotal() : cero(c.getMontoExento()).add(cero(c.getBaseImponible())).add(cero(c.getMontoIva()))));
         }
         return new Libro<>(monedaBase, desde, hasta, renglones);
     }
