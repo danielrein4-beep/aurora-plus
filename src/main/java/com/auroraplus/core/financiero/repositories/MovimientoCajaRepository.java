@@ -14,6 +14,12 @@ import java.util.Optional;
 @Repository
 public interface MovimientoCajaRepository extends JpaRepository<MovimientoCaja, Long> {
 
+    /** Lee la cuenta bloqueando la fila hasta terminar la transacción: dos abonos simultáneos no pueden pasar ambos. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM MovimientoCaja m WHERE m.id = :id")
+    Optional<MovimientoCaja> buscarConBloqueo(@Param("id") Long id);
+
+
     Optional<MovimientoCaja> findByIdAndTenantId(Long id, Long tenantId);
 
     @Query("SELECT COALESCE(SUM(m.monto), 0) FROM MovimientoCaja m WHERE m.tenantId = :tenantId AND m.moneda = :moneda AND m.tipo = :tipo")

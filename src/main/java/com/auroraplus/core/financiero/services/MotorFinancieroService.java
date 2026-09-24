@@ -335,7 +335,7 @@ public class MotorFinancieroService {
      */
     @Transactional
     public MovimientoCaja abonarMovimiento(Long tenantId, Long movimientoId, BigDecimal montoAbono, String monedaAbono) {
-        MovimientoCaja cuenta = movimientoCajaRepository.findById(movimientoId)
+        MovimientoCaja cuenta = movimientoCajaRepository.buscarConBloqueo(movimientoId)
             .orElseThrow(() -> new RuntimeException("Movimiento no encontrado"));
         if (!cuenta.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: movimiento no pertenece a este tenant");

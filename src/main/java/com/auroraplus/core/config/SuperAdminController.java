@@ -571,6 +571,7 @@ public class SuperAdminController {
             throw new RuntimeException("El usuario no pertenece al tenant " + tenantId);
         }
         u.setActivo(!u.isActivo());
+        if (!u.isActivo()) u.setTokenVersion(u.getTokenVersion() + 1); // cierra sus sesiones abiertas
         return ResponseEntity.ok(usuarioRepository.save(u));
     }
 

@@ -95,7 +95,7 @@ public class TesoreriaController {
     @DeleteMapping("/ingresos/{id}")
     public ResponseEntity<?> eliminarIngreso(@PathVariable Long id) {
         TamanacoAccessService.exigirDuenoAdmin();
-        if (!ingresoRepository.existsById(id)) {
+        if (!ingresoRepository.findById(id).filter(e -> String.valueOf(e.getTenantId()).equals(String.valueOf(com.auroraplus.core.config.TenantContext.getCurrentTenant()))).isPresent()) {
             return ResponseEntity.notFound().build();
         }
         ingresoRepository.deleteById(id);
@@ -154,7 +154,7 @@ public class TesoreriaController {
     @DeleteMapping("/cambios/{id}")
     public ResponseEntity<?> eliminarCambio(@PathVariable Long id) {
         TamanacoAccessService.exigirDuenoAdmin();
-        if (!cambioMonedaRepository.existsById(id))
+        if (!cambioMonedaRepository.findById(id).filter(e -> String.valueOf(e.getTenantId()).equals(String.valueOf(com.auroraplus.core.config.TenantContext.getCurrentTenant()))).isPresent())
             return ResponseEntity.notFound().build();
         cambioMonedaRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("mensaje", "Cambio eliminado correctamente"));

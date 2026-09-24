@@ -149,6 +149,11 @@ public class TenantInterceptor implements HandlerInterceptor {
                 rechazar(response, "Sesión invalidada — la contraseña cambió, inicia sesión de nuevo");
                 return false;
             }
+            // Un usuario desactivado (p. ej. un cajero que ya no trabaja ahí) no sigue operando con su sesión abierta.
+            if (!usuario.isActivo()) {
+                rechazar(response, "Tu usuario fue desactivado — habla con el dueño del negocio");
+                return false;
+            }
         }
 
         AuthContext.set(claims.getSubject(), rol);

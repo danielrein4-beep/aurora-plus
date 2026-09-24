@@ -71,14 +71,20 @@ public class CobroVeterinariaService {
             : "VET: Cobro de servicio veterinario - Paciente: " + (mascota != null ? mascota.getNombre() : "General");
 
         // 2. Integración al Motor Financiero Central
-        MovimientoCaja movCaja = motorFinancieroService.registrarMovimientoMultiMoneda(
-            tenantId,
-            MovimientoCaja.TipoMovimiento.INGRESO,
-            req.montoTotal,
-            monedaPago,
-            montoRecibido,
-            conceptoCaja
-        );
+        // montoTotal viene en la moneda en que se cobró (no necesariamente la base del negocio).
+        // Si se paga en esa misma moneda, se asienta tal cual; si se paga en otra, el motor
+        // convierte desde la base y valida que lo recibido alcance.
+        MovimientoCaja movCaja = monedaPago.equalsIgnoreCase(monedaCobrada)
+            ? motorFinancieroService.registrarMovimientoEnMoneda(
+                tenantId, MovimientoCaja.TipoMovimiento.INGRESO, req.montoTotal, monedaCobrada, conceptoCaja)
+            : motorFinancieroService.registrarMovimientoMultiMoneda(
+                tenantId,
+                MovimientoCaja.TipoMovimiento.INGRESO,
+                motorFinancieroService.convertirAMonedaBase(tenantId, req.montoTotal, monedaCobrada),
+                monedaPago,
+                montoRecibido,
+                conceptoCaja
+            );
 
         // 3. Registrar el Cobro en la vertical veterinaria
         CobroConsultaVet cobro = new CobroConsultaVet();

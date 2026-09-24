@@ -281,7 +281,7 @@ public class HorecaService {
             return resultado;
         }
 
-        Comanda comanda = comandaRepository.findById(comandaId)
+        Comanda comanda = comandaRepository.buscarConBloqueo(comandaId)
             .orElseThrow(() -> new RuntimeException("Comanda no encontrada"));
         if (!comanda.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Comanda no pertenece a este tenant");
@@ -421,11 +421,19 @@ public class HorecaService {
         // stock ocurre al agregar el ítem, no al cerrar la comanda.
         List<ItemComanda> items = itemComandaRepository.findByComandaId(comandaId);
         for (ItemComanda item : items) {
+            // Un ítem ya anulado devolvió su stock en su momento: devolverlo otra vez lo duplicaría.
+            if (item.getEstadoItem() == ItemComanda.EstadoItem.ANULADO) continue;
             if (item.getEscandallo() != null) {
                 escandalloService.revertirVentaPlato(item.getEscandallo().getId(), tenantId, item.getCantidad());
             } else if (item.getArticulo() != null) {
                 inventarioService.registrarMovimientoKardex(item.getArticulo().getId(), tenantId, Kardex.TipoOperacion.ENTRADA,
                     item.getCantidad(), item.getCostoUnitario(), "Anulación de venta: " + item.getNombrePlato());
+            } else if (item.getFastBarTrago() != null) {
+                articuloRepository.findBySkuAndTenantId(item.getFastBarTrago().getBotellaSku(), tenantId).ifPresent(botella -> {
+                    BigDecimal mililitros = item.getFastBarTrago().getMililitrosPorTrago().multiply(item.getCantidad());
+                    inventarioService.registrarMovimientoKardex(botella.getId(), tenantId, Kardex.TipoOperacion.ENTRADA,
+                        mililitros, botella.getCostoUnitario(), "Anulación de venta: " + item.getNombrePlato());
+                });
             }
         }
 

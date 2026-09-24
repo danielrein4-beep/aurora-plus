@@ -137,7 +137,7 @@ public class RepuestoConversionService {
         BigDecimal saldoPendiente = total.subtract(montoAPagar);
         if (saldoPendiente.compareTo(BigDecimal.ZERO) > 0) {
             String nombreCliente = clienteId != null
-                ? clienteRepository.findById(clienteId).map(Cliente::getNombre).orElse("Cliente de mostrador")
+                ? clienteRepository.findById(clienteId).filter(c -> tenantId.equals(c.getTenantId())).map(Cliente::getNombre).orElse("Cliente de mostrador")
                 : (nombreClienteManual != null && !nombreClienteManual.isBlank() ? nombreClienteManual : "Cliente de mostrador");
             LocalDate fechaVencimiento = (diasCredito != null && diasCredito > 0) ? LocalDate.now().plusDays(diasCredito) : null;
             motorFinancieroService.registrarMovimientoMultiMoneda(tenantId, MovimientoCaja.TipoMovimiento.CXC,

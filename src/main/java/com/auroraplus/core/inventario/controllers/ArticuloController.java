@@ -154,6 +154,7 @@ public class ArticuloController {
     @PutMapping("/{id}")
     @Transactional
     public ResponseEntity<Articulo> editar(@PathVariable Long id, @RequestBody EditarArticuloRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO", "ADMINISTRADOR_FINCA");
         Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {
@@ -216,6 +217,7 @@ public class ArticuloController {
      */
     @PostMapping("/{id}/ajustar-stock")
     public ResponseEntity<Articulo> ajustarStock(@PathVariable Long id, @RequestBody AjustarStockRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO", "ADMINISTRADOR_FINCA");
         Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(id).orElseThrow(() -> new RuntimeException("Artículo no encontrado"));
         if (!articulo.getTenantId().equals(tenantId)) {

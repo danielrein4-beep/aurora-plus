@@ -56,6 +56,7 @@ public class TasaCambioController {
     /** Registra una tasa nueva (queda historial — nunca se sobreescribe la anterior). */
     @PostMapping
     public ResponseEntity<TasaCambio> actualizar(@RequestParam Long tenantId, @RequestBody ActualizarTasaRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA");
         if (request.tasa == null || request.tasa.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La tasa debe ser mayor a cero");
         }
@@ -84,6 +85,7 @@ public class TasaCambioController {
     @PostMapping("/actualizar-externa")
     public ResponseEntity<TasaCambio> actualizarExterna(@RequestParam Long tenantId, @RequestParam String fuente,
                                                           @RequestParam(defaultValue = "VES") String monedaDestino) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA");
         String origenGuardado;
         BigDecimal tasa;
         switch (fuente.toUpperCase()) {

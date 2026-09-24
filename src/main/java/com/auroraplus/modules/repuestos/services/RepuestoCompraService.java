@@ -88,7 +88,8 @@ public class RepuestoCompraService {
                 throw new RuntimeException("El costo unitario no puede ser negativo");
             }
 
-            RepuestoItem repuesto = repuestoItemRepository.findById(itemCompra.repuestoId)
+            // Con bloqueo: si una venta toca el mismo repuesto a la vez, espera en vez de pisar el stock.
+            RepuestoItem repuesto = repuestoItemRepository.buscarConBloqueoPesimista(itemCompra.repuestoId)
                 .orElseThrow(() -> new RuntimeException("Repuesto no encontrado: " + itemCompra.repuestoId));
 
             if (!repuesto.getTenantId().equals(tenantId)) {

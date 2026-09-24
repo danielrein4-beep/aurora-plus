@@ -65,6 +65,7 @@ public class TesoreriaController {
     @PostMapping("/cerrar-caja")
     public ResponseEntity<ArqueoCaja> cerrarCaja(@RequestParam Long tenantId, @RequestParam String idCajero,
                                                   @RequestParam BigDecimal montoDeclarado, @RequestParam String moneda) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         return ResponseEntity.ok(tesoreriaService.procesarArqueoCiego(tenantId, idCajero, montoDeclarado, moneda));
     }
 

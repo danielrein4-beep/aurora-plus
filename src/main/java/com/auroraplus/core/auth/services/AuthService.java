@@ -258,6 +258,7 @@ public class AuthService {
             throw new RuntimeException("Violación de seguridad: usuario no pertenece a este tenant");
         }
         usuario.setActivo(false);
+        usuario.setTokenVersion(usuario.getTokenVersion() + 1); // cierra sus sesiones abiertas
         usuarioRepository.save(usuario);
     }
 

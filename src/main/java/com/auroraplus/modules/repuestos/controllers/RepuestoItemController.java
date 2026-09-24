@@ -158,6 +158,7 @@ public class RepuestoItemController {
     @PostMapping("/{id}/ajustar-stock")
     public ResponseEntity<RepuestoItem> ajustarStock(@PathVariable Long id, @RequestParam Long tenantId,
                                                        @RequestBody AjusteStockRequest datos) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO", "ADMINISTRADOR_FINCA");
         RepuestoItem actualizado = repuestoConversionService.ajustarStock(id, tenantId, datos.stockReal, datos.motivo);
         return ResponseEntity.ok(actualizado);
     }
