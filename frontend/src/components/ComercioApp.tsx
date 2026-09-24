@@ -2403,7 +2403,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   useEffect(() => {
     if (user?.tenantId) {
       cargarRepuestosBackend();
-      listarProveedoresRepuesto().then(setProveedoresRepuesto).catch(() => {});
+      listarProveedoresRepuesto().then(setProveedoresRepuesto)
+        .catch(() => avisar("No se pudo cargar la lista de proveedores. Revisa la conexión.", "error"));
       cargarIngresosCaja();
       cargarGastosCaja();
       cargarCuentas();

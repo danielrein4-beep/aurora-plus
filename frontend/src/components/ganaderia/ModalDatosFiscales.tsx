@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import { useEffect, useState } from "react";
 import { IconFileText } from "../../Icons";
 import { obtenerDatosFiscalesNegocio, actualizarDatosFiscalesNegocio } from "../../api";
@@ -16,7 +17,7 @@ export default function ModalDatosFiscales({ notificar, onCerrar }: Props) {
   useEffect(() => {
     obtenerDatosFiscalesNegocio().then(d => setFormDatosFiscales({
       rif: d.rif || "", razonSocial: d.razonSocial || "", domicilioFiscal: d.domicilioFiscal || "",
-    })).catch(() => {});
+    })).catch(() => avisar("No se pudieron cargar tus datos fiscales. Si guardas así, podrías borrar lo que ya tenías. Cierra y vuelve a abrir.", "error"));
   }, []);
 
   return (

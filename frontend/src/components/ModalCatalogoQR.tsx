@@ -174,7 +174,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose, esDu
         if (data.bancolombiaTitular) setBancolombiaTitular(data.bancolombiaTitular);
         if (data.bancolombiaDocumento) setBancolombiaDocumento(data.bancolombiaDocumento);
       })
-      .catch(() => {});
+      .catch(() => avisar("No se pudieron cargar tus métodos de pago. Si guardas así, podrías borrar lo que ya tenías. Cierra y vuelve a abrir.", "error"));
 
     // Cargar perfil de la tienda
     fetch(`/api/comercio/catalogo/perfil-tienda`, {
@@ -194,7 +194,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose, esDu
         if (data.domicilioFiscal) setSlogan(data.domicilioFiscal);
         if (data.costoEnvioDelivery != null) setCostoEnvioDelivery(String(data.costoEnvioDelivery));
       })
-      .catch(() => {});
+      .catch(() => avisar("No se pudo cargar el perfil de tu tienda. Si guardas así, podrías borrar lo que ya tenías. Cierra y vuelve a abrir.", "error"));
   }, [tenantId]);
 
   const handleCopiar = () => {

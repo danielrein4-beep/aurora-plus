@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import { contarSinLeerMercado } from "../api";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -269,6 +270,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   }, [deepLinkAnimalId, animales]);
 
   const cargarDatos = async () => {
+    const noCargo: string[] = [];
     try {
       const [resAnimales, resPotreros, resVacunas, resAlertas, resPrenez] = await Promise.allSettled([
         listarAnimalesGanaderia(),
@@ -281,6 +283,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       if (resPrenez.status === "fulfilled") {
         setPrenezActual(resPrenez.value ?? []);
       }
+      if (resAnimales.status === "rejected") noCargo.push("el hato");
+      if (resPotreros.status === "rejected") noCargo.push("los potreros");
+      if (resVacunas.status === "rejected") noCargo.push("las vacunas");
+      if (resAlertas.status === "rejected") noCargo.push("las alertas");
 
       // Tasas: la vigente del backend es la que usa caja; si existe, es la que se muestra.
       const [tVes, tCop] = await Promise.allSettled([tasaVigente(tenantId, "USD", "VES"), tasaVigente(tenantId, "USD", "COP")]);
@@ -305,17 +311,17 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       try {
         const repOrdeno = await obtenerReporteOrdenoGanaderia(tenantId, hace30d, hoy);
         setOrdenos(repOrdeno?.registros ?? []);
-      } catch {}
+      } catch { noCargo.push("los ordeños"); }
 
       // Cargar estado del tanque de leche y ventas históricas
       try {
         const tanque = await obtenerStockTanqueLeche(tenantId);
         setTanqueLeche(tanque);
-      } catch {}
+      } catch { noCargo.push("el tanque de leche"); }
       try {
         const ventas = await obtenerVentasLecheTanque(tenantId);
         setVentasLeche(ventas ?? []);
-      } catch {}
+      } catch { noCargo.push("las ventas de leche"); }
 
       // Cargar gastos operativos y ventas de animales
       try {
@@ -329,9 +335,15 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         if (resVentasAnimales.status === "fulfilled" && resVentasAnimales.value) {
           setVentasAnimales(resVentasAnimales.value ?? []);
         }
-      } catch {}
+        if (resGastos.status === "rejected") noCargo.push("los gastos");
+        if (resVentasAnimales.status === "rejected") noCargo.push("las ventas de animales");
+      } catch { noCargo.push("los gastos"); }
     } catch (err) {
       console.warn("No se pudo cargar la información real de Ganadería desde el backend:", err);
+      noCargo.push("los datos de la finca");
+    }
+    if (noCargo.length > 0 && (typeof navigator === "undefined" || navigator.onLine)) {
+      avisar(`No se pudo cargar ${noCargo.join(", ")}. Lo que ves puede estar incompleto; revisa la conexión.`, "error");
     }
   };
 
@@ -485,7 +497,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Vacunación aplicada: queda lista la constancia y se recargan las alertas de retiro.
   const alAplicarVacuna = (aplicacion: VacunacionAplicada) => {
     setUltimaVacunacion(aplicacion);
-    obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
+    obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias)
+      .catch(() => { if (navigator.onLine) avisar("No se pudieron cargar las alertas sanitarias (retiro de leche y carne).", "error"); });
   };
 
   // Exportar matriz a XLSX

@@ -1366,7 +1366,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
         .then((itemsBackend) => {
           setItemsPorComanda((prev) => ({ ...prev, [comandaActiva.id]: itemsBackend }));
         })
-        .catch(() => {});
+        .catch(() => avisar("No se pudieron cargar los productos de esta comanda. Revisa la conexión.", "error"));
     }
   }, [comandaActiva?.id, tenantId, setItemsPorComanda]);
 
@@ -3194,7 +3194,10 @@ function Cocina({ tenantId, onCambio, zonasCocina, onZonasCocinaGuardadas, nombr
       await actualizarEstadoItem(item.id, next);
       cargar();
       onCambio();
-    } catch {}
+    } catch (err) {
+      // Antes el plato quedaba igual en pantalla sin decir nada y cocina creía que había cambiado.
+      avisar(err instanceof Error ? `No se pudo cambiar el estado del plato: ${err.message}` : "No se pudo cambiar el estado del plato.", "error");
+    }
   };
 
   const columnas: { estado: EstadoItemComanda; label: string; color: string }[] = [
@@ -3946,7 +3949,7 @@ function ModalEditarReceta({
           editarArticulo(art.id, {
             costoUnitario: unitUsd,
             monedaCosto: monedaCompraSel,
-          }).catch(() => {});
+          }).catch(() => avisar(`La compra se registró, pero no se actualizó el costo de "${art.nombre}".`, "error"));
           art.monedaCosto = monedaCompraSel;
           art.costoUnitario = unitUsd;
           art.costoUnitarioOriginal = costoCompraNum;
@@ -6405,7 +6408,8 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
       // lista, se guarda aparte — registrarCompraInsumo solo toca costo/stock.
       for (const f of filas) {
         if (f.articuloId && f.precioVentaNuevo && Number(f.precioVentaNuevo) > 0) {
-          await editarArticulo(Number(f.articuloId), { precioVenta: Number(f.precioVentaNuevo) }).catch(() => {});
+          await editarArticulo(Number(f.articuloId), { precioVenta: Number(f.precioVentaNuevo) })
+            .catch(() => avisar("La compra se registró, pero no se guardó uno de los precios de venta nuevos. Cámbialo desde Inventario.", "error"));
         }
       }
       setFilas([filaVacia()]);

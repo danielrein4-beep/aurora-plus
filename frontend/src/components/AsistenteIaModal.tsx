@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import { leerSesion } from "../api";
 import React, { useState, useEffect, useRef } from "react";
 
@@ -102,7 +103,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
         if (data.verifyToken) setVerifyToken(data.verifyToken);
         if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
       })
-      .catch(() => {});
+      .catch(() => avisar("No se pudo cargar la configuración del asistente de WhatsApp. Si guardas así, podrías borrar lo que ya tenías. Cierra y vuelve a abrir.", "error"));
   }, [tenantId]);
 
   useEffect(() => {
