@@ -993,7 +993,13 @@ function ResumenFinancieroComercio() {
   const tarjetas = [
     { titulo: "Ventas del mes", valor: fmt(ventas), nota: "Ventas brutas registradas" },
     { titulo: "Costo de ventas", valor: fmt(costo), nota: "Costo de lo vendido" },
-    { titulo: "Margen bruto", valor: fmt(margen), nota: ventas > 0 ? `${((margen / ventas) * 100).toFixed(1)}% sobre ventas` : "Sin ventas aún" },
+    {
+      titulo: "Margen bruto",
+      valor: fmt(margen),
+      nota: ventas > 0 ? `${((margen / ventas) * 100).toFixed(1)}% sobre ventas` : "Sin ventas aún",
+      // El margen se lee de un vistazo: verde si deja ganancia, rojo si se vende a perdida.
+      tono: ventas > 0 ? (margen >= 0 ? "positivo" : "negativo") : undefined,
+    },
     {
       titulo: variasVerticales ? "Resultado del negocio" : "Resultado estimado",
       valor: fmt(datos.consolidado.resultadoEstimado),
@@ -1014,7 +1020,19 @@ function ResumenFinancieroComercio() {
           <div key={t.titulo} className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t.titulo}</div>
             <div className="mt-1 font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{t.valor}</div>
-            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t.nota}</div>
+            {"tono" in t && t.tono ? (
+              <span
+                className={`mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  t.tono === "positivo"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30"
+                    : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30"
+                }`}
+              >
+                {t.tono === "positivo" ? "▲" : "▼"} {t.nota}
+              </span>
+            ) : (
+              <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t.nota}</div>
+            )}
           </div>
         ))}
       </div>
