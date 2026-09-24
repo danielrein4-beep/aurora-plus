@@ -82,6 +82,7 @@ import {
   obtenerDatosFiscalesNegocio, actualizarDatosFiscalesNegocio,
   type FacturacionFiscalConfig, type ModoFacturacionFiscal, type DatosFiscalesNegocio,
 } from "../api";
+import ArqueoCajaMultimoneda from "./ArqueoCajaMultimoneda";
 
 // ── Moneda base del negocio ────────────────────────────────────────────────
 // CONVENCIÓN INTERNA: en todo este archivo, la moneda "USD" significa "la moneda base del
@@ -4368,7 +4369,12 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             </div>
 
             {subCierre === "caja" ? (
-              <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
+              <ArqueoCajaMultimoneda
+                tenantId={user.tenantId}
+                tasaUsdVes={tasaActivaBs}
+                tasaUsdCop={tasaCop}
+                monedas={modoEuro() ? ["USD"] : ["USD", "VES", "COP"]}
+              />
             ) : subCierre === "devoluciones" && puedeDevolver ? (
               <DevolucionesComercio
                 ticketInicial={ticketADevolver}
