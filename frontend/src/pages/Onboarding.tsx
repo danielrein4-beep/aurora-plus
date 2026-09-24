@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
+import SpecularButton from "../components/SpecularButton";
 import {
   AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm,
   IconEducation, IconConstruction, IconWarning, IconClose, IconCheck, IconLock,
@@ -347,27 +348,19 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="aurora-access-page min-h-screen text-[var(--text-primary)] flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden transition-colors duration-300">
+    <div className="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] flex flex-col items-center justify-center px-4 py-12 antialiased">
       <AuroraGradientDef />
-
-      {/* ── FONDOS ATMOSFÉRICOS: AURORAS BOREALES EN MOVIMIENTO ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
-        <div className="aurora-ribbon-1 -top-32 -left-28 opacity-60" />
-        <div className="aurora-ribbon-2 -bottom-20 -right-28 opacity-70" />
-        <div className="cyber-grid absolute inset-0 opacity-20" />
-        <div className="absolute w-[600px] h-[600px] rounded-full blur-[150px] bg-gradient-to-tr from-[#00f2fe]/15 via-[#7928ca]/20 to-[#ff007f]/15 -top-24" />
-      </div>
 
       <div className="relative z-10 w-full max-w-3xl">
         {/* Cabecera superior con Logo */}
         <div className="flex flex-col items-center mb-6">
-          <div className="p-2.5 rounded-2xl bg-teal-50 border border-teal-200 shadow-sm mb-3">
+          <div className="p-2.5 rounded-2xl bg-white border border-[#E5E5EA] shadow-sm mb-3">
             <AuroraLogo size={42} animated />
           </div>
-          <h1 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
             Configuración del Ecosistema Aurora Plus
           </h1>
-          <p className="text-slate-400 text-xs mt-1 tracking-widest uppercase font-mono">
+          <p className="text-[#86868B] text-xs mt-1 tracking-wider uppercase">
             Paso {step} de 4 · Selección de Rubro & Arquitectura
           </p>
         </div>
@@ -382,58 +375,57 @@ export default function Onboarding() {
           ].map((s) => (
             <div
               key={s.num}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 s.num === step
-                  ? "bg-slate-900 text-white font-bold shadow-md"
+                  ? "btn-deep-black font-semibold"
                   : s.num < step
-                  ? "bg-teal-50 text-teal-700 border border-teal-200"
-                  : "bg-slate-100 text-slate-400 border border-slate-200"
+                  ? "bg-[#177E89]/10 text-[#177E89] border border-[#177E89]/30"
+                  : "bg-white text-[#86868B] border border-[#E5E5EA]"
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${s.num === step ? "bg-teal-400 animate-pulse" : s.num < step ? "bg-teal-500" : "bg-slate-300"}`} />
+              <span className={`w-2 h-2 rounded-full ${s.num === step ? "bg-[#5BC0BE]" : s.num < step ? "bg-[#177E89]" : "bg-[#D1D1D6]"}`} />
               {s.label}
             </div>
           ))}
         </div>
 
-        {/* Tarjeta Principal Liquid Glass */}
-        <div className="apple-glass rounded-[32px] p-6 sm:p-9 shadow-xl border border-slate-200 relative overflow-hidden">
-          <div className="line-aurora absolute top-0 left-0 right-0" />
+        {/* Tarjeta Principal */}
+        <div className="bg-white rounded-3xl p-6 sm:p-9 shadow-sm border border-[#E5E5EA] relative overflow-hidden">
 
           {/* ════════════ PASO 1: SELECCIONAR RUBRO / INDUSTRIA ════════════ */}
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <div className="inline-block px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-700 text-[11px] font-mono uppercase tracking-wider mb-2">
+                <div className="inline-block px-3 py-1 rounded-full bg-[#177E89]/10 border border-[#177E89]/30 text-[#177E89] text-[11px] font-semibold uppercase tracking-wider mb-2">
                   Selección de Sector Comercial
                 </div>
-                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 leading-tight">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F] leading-tight">
                   ¿A qué rubro se dedica tu negocio?
                 </h2>
-                <p className="text-slate-500 text-sm mt-1">
-                  Actualmente <strong className="text-teal-600">Mediclinic Pro</strong>, <strong className="text-teal-600">Aurora Horeca</strong>, <strong className="text-teal-600">Aurora Retail</strong> (Ferretería, Farmacia y Repuestos) y <strong className="text-teal-600">Aurora Ganadería</strong> están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
+                <p className="text-[#6E6E73] text-sm mt-1">
+                  Actualmente <strong className="text-[#177E89]">Mediclinic Pro</strong>, <strong className="text-[#177E89]">Aurora Horeca</strong>, <strong className="text-[#177E89]">Aurora Retail</strong> (Ferretería, Farmacia y Repuestos) y <strong className="text-[#177E89]">Aurora Ganadería</strong> están 100% habilitadas y listas para operar. Las demás verticales se encuentran en proceso de despliegue.
                 </p>
               </div>
 
               {/* Banner de aviso si hizo clic en un rubro con candado */}
               {lockedNotice && (
-                <div className="rounded-2xl p-4 border border-amber-300 bg-amber-50 text-amber-900 text-xs sm:text-sm flex items-start gap-3 animate-fade-in shadow-sm">
-                  <span className="text-amber-500"><IconWarning size={20} /></span>
+                <div className="rounded-2xl p-4 border border-[#E5E5EA] bg-[#F5F5F7] text-[#1D1D1F] text-xs sm:text-sm flex items-start gap-3 shadow-sm">
+                  <span className="text-[#177E89]"><IconWarning size={20} /></span>
                   <div className="flex-1">
-                    <p className="font-semibold text-amber-700 mb-1">Módulo en Desarrollo</p>
-                    <p className="text-amber-800/90 leading-relaxed">{lockedNotice}</p>
+                    <p className="font-semibold text-[#1D1D1F] mb-1">Módulo en Desarrollo</p>
+                    <p className="text-[#6E6E73] leading-relaxed">{lockedNotice}</p>
                     <div className="flex flex-wrap gap-2 mt-2.5">
                       <button
                         type="button"
                         onClick={() => { handleSelectIndustry(INDUSTRIES.find((i) => i.id === "clinica")!); }}
-                        className="px-3 py-1.5 rounded-lg bg-teal-600 text-white font-bold text-xs hover:bg-teal-500 transition-all flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                       >
                         <IconClinic size={14} /> Seleccionar Mediclinic Pro
                       </button>
                       <button
                         type="button"
                         onClick={() => { handleSelectIndustry(INDUSTRIES.find((i) => i.id === "restaurante")!); }}
-                        className="px-3 py-1.5 rounded-lg bg-teal-600 text-white font-bold text-xs hover:bg-teal-500 transition-all flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] border border-[#E5E5EA] text-[#1D1D1F] font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                       >
                         <IconRestaurant size={14} /> Seleccionar Aurora Horeca
                       </button>
@@ -441,7 +433,7 @@ export default function Onboarding() {
                   </div>
                   <button
                     onClick={() => setLockedNotice(null)}
-                    className="text-amber-500 hover:text-amber-700 text-xs"
+                    className="text-[#86868B] hover:text-[#1D1D1F] text-xs cursor-pointer"
                   >
                     <IconClose size={14} />
                   </button>
@@ -451,8 +443,8 @@ export default function Onboarding() {
               {/* Grid de rubros: primero los disponibles, luego los que vienen en camino */}
               <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
                 <div>
-                  <p className="text-[11px] font-mono font-semibold tracking-widest uppercase text-teal-700 mb-2 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                  <p className="text-[11px] font-semibold tracking-wider uppercase text-[#177E89] mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#177E89]" />
                     Disponibles ahora ({INDUSTRIES.filter((i) => i.isReady).length})
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -463,30 +455,30 @@ export default function Onboarding() {
                           key={ind.id}
                           type="button"
                           onClick={() => handleSelectIndustry(ind)}
-                          className={`relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-300 ${
+                          className={`relative flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
                             isSelected
-                              ? "bg-teal-50 border-teal-500 shadow-md scale-[1.01]"
-                              : "bg-teal-50/50 border-teal-200 hover:border-teal-400 hover:bg-teal-50"
+                              ? "bg-[#177E89]/10 border-[#177E89]"
+                              : "bg-white border-[#E5E5EA] hover:border-[#D1D1D6]"
                           }`}
                         >
-                          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-teal-100 border border-teal-200 text-teal-600">
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-white border border-[#E5E5EA] text-[#177E89]">
                             <ind.Icon size={17} />
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <span className="font-bold text-xs leading-tight block text-slate-900">
+                            <span className="font-bold text-xs leading-tight block text-[#1D1D1F]">
                               {ind.label}
                             </span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold inline-block mt-1 bg-teal-100 text-teal-700 border border-teal-200">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold inline-block mt-1 bg-[#177E89]/10 text-[#177E89] border border-[#177E89]/20">
                               Listo para operar
                             </span>
                           </div>
 
                           <div
-                            className={`flex-shrink-0 self-center w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                            className={`flex-shrink-0 self-center w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
                               isSelected
-                                ? "bg-teal-500 text-white shadow-md"
-                                : "border border-teal-300 text-transparent"
+                                ? "bg-[#177E89] text-white"
+                                : "border border-[#D1D1D6] text-transparent"
                             }`}
                           >
                             <IconCheck size={11} />
@@ -498,8 +490,8 @@ export default function Onboarding() {
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-mono font-semibold tracking-widest uppercase text-slate-400 mb-2 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                  <p className="text-[11px] font-semibold tracking-wider uppercase text-[#86868B] mb-2 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#D1D1D6]" />
                     En camino ({INDUSTRIES.filter((i) => !i.isReady).length})
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -508,22 +500,22 @@ export default function Onboarding() {
                         key={ind.id}
                         type="button"
                         onClick={() => handleSelectIndustry(ind)}
-                        className="relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-300 bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100"
+                        className="relative flex items-center gap-3 p-3 rounded-xl border text-left transition-colors bg-[#F5F5F7] border-[#E5E5EA] hover:border-[#D1D1D6]"
                       >
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-slate-100 border border-slate-200 text-slate-400">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-white border border-[#E5E5EA] text-[#86868B]">
                           <ind.Icon size={17} />
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <span className="font-bold text-xs leading-tight block text-slate-500">
+                          <span className="font-bold text-xs leading-tight block text-[#6E6E73]">
                             {ind.label}
                           </span>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-mono font-semibold inline-block mt-1 bg-slate-200/70 text-slate-500 border border-slate-200">
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold inline-block mt-1 bg-white text-[#86868B] border border-[#E5E5EA]">
                             {ind.badge}
                           </span>
                         </div>
 
-                        <div className="flex-shrink-0 self-center w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                        <div className="flex-shrink-0 self-center w-5 h-5 rounded-full bg-white border border-[#E5E5EA] flex items-center justify-center text-[#86868B]">
                           <IconLock size={10} />
                         </div>
                       </button>
@@ -533,11 +525,11 @@ export default function Onboarding() {
               </div>
 
               {/* Botón de continuar */}
-              <div className="pt-2 flex items-center justify-between border-t border-slate-200">
+              <div className="pt-2 flex items-center justify-between border-t border-[#E5E5EA]">
                 <button
                   type="button"
                   onClick={() => navigate("/auth")}
-                  className="text-slate-400 hover:text-slate-700 text-xs transition-colors"
+                  className="text-[#86868B] hover:text-[#1D1D1F] text-xs transition-colors cursor-pointer"
                 >
                   ← Volver a inicio de sesión
                 </button>
@@ -545,7 +537,7 @@ export default function Onboarding() {
                   type="button"
                   onClick={() => setStep(2)}
                   disabled={!INDUSTRIES.find((i) => i.id === selectedIndustry)?.isReady}
-                  className={`btn-cyber-neon text-white font-bold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer ${
+                  className={`btn-deep-black font-semibold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer ${
                     INDUSTRIES.find((i) => i.id === selectedIndustry)?.isReady ? "" : "opacity-40 cursor-not-allowed"
                   }`}
                 >
@@ -559,13 +551,13 @@ export default function Onboarding() {
           {step === 2 && (
             <div className="space-y-6">
               <div>
-                <div className="inline-block px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-[11px] font-mono uppercase tracking-wider mb-2">
+                <div className="inline-block px-3 py-1 rounded-full bg-[#177E89]/10 border border-[#177E89]/30 text-[#177E89] text-[11px] font-semibold uppercase tracking-wider mb-2">
                   Paso 2 · {selectedIndustry === "restaurante" ? "Arquitectura del Local" : esRetail ? "Arquitectura del Negocio" : esGanaderia ? "Arquitectura de la Finca" : "Arquitectura Médica"}
                 </div>
-                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white leading-tight">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F] leading-tight">
                   {selectedIndustry === "restaurante" ? "Personaliza tu Restaurante" : esRetail ? "Personaliza tu Negocio" : esGanaderia ? "Personaliza tu Finca" : "Personaliza tu Consultorio"}
                 </h2>
-                <p className="text-white/50 text-sm mt-1">
+                <p className="text-[#6E6E73] text-sm mt-1">
                   {selectedIndustry === "restaurante"
                     ? "Indica el nombre de tu local y activa los módulos que utilizará tu equipo."
                     : esRetail
@@ -578,7 +570,7 @@ export default function Onboarding() {
 
               {/* Nombre del negocio */}
               <div>
-                <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1.5">
+                <label className="block text-[#86868B] text-[11px] font-medium uppercase tracking-wider mb-1.5">
                   {selectedIndustry === "restaurante" ? "Nombre del Restaurante / Local" : esRetail ? "Nombre del Negocio" : esGanaderia ? "Nombre de la Finca" : "Nombre de tu Consultorio (o tu nombre, Dr./Dra.)"}
                 </label>
                 <input
@@ -586,13 +578,13 @@ export default function Onboarding() {
                   placeholder={selectedIndustry === "restaurante" ? "Ej. Restaurante La Terraza" : esRetail ? "Ej. Ferretería El Tornillo Feliz" : esGanaderia ? "Ej. Finca Los Alpes" : "Ej. Consultorio Dr. Carlos Mendoza"}
                   value={empresaNombre}
                   onChange={(e) => setEmpresaNombre(e.target.value)}
-                  className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none transition-all shadow-inner"
+                  className="w-full bg-white border border-[#E5E5EA] focus:border-[#177E89] rounded-xl px-4 py-3 text-sm text-[#1D1D1F] placeholder-[#86868B] focus:outline-none transition-colors"
                 />
               </div>
 
               {/* Lista de módulos */}
               <div className="space-y-2.5">
-                <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider">
+                <label className="block text-[#86868B] text-[11px] font-medium uppercase tracking-wider">
                   Módulos de {VERTICAL_LABEL[selectedIndustry]?.split(" (")[0] || "la vertical"} habilitados ({modules.length}/{modulosDisponibles.length})
                 </label>
                 <div className="grid grid-cols-1 gap-2.5">
@@ -602,16 +594,16 @@ export default function Onboarding() {
                     if (!disponible) {
                       return (
                         <div key={m.id} title="Próximamente disponible" aria-disabled
-                          className="flex items-center gap-3.5 p-3.5 rounded-2xl border text-left bg-white/[0.02] border-white/10 text-white/30 cursor-not-allowed">
-                          <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border border-white/10 text-white/30">
+                          className="flex items-center gap-3.5 p-3.5 rounded-2xl border text-left bg-[#F5F5F7] border-[#E5E5EA] text-[#86868B] cursor-not-allowed">
+                          <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 border border-[#E5E5EA] text-[#86868B]">
                             <IconLock size={11} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-semibold text-sm flex items-center gap-2">
                               {m.label}
-                              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/10 text-white/40">Próximamente</span>
+                              <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white text-[#86868B] border border-[#E5E5EA]">Próximamente</span>
                             </div>
-                            <div className="text-xs mt-0.5 text-white/25">{m.desc}</div>
+                            <div className="text-xs mt-0.5 text-[#86868B]">{m.desc}</div>
                           </div>
                         </div>
                       );
@@ -621,22 +613,22 @@ export default function Onboarding() {
                         key={m.id}
                         type="button"
                         onClick={() => toggleModule(m.id)}
-                        className={`flex items-center gap-3.5 p-3.5 rounded-2xl border text-left transition-all ${
+                        className={`flex items-center gap-3.5 p-3.5 rounded-2xl border text-left transition-colors ${
                           isChecked
-                            ? "bg-teal-500/15 border-teal-500/40 text-white shadow-[0_0_15px_rgba(0,242,254,0.15)]"
-                            : "bg-white/[0.03] border-white/10 text-white/50 hover:bg-white/[0.06] hover:text-white/70"
+                            ? "bg-[#177E89]/10 border-[#177E89]/40 text-[#1D1D1F]"
+                            : "bg-white border-[#E5E5EA] text-[#6E6E73] hover:bg-[#F5F5F7]"
                         }`}
                       >
                         <div
-                          className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
-                            isChecked ? "bg-teal-400 text-black" : "border border-white/20"
+                          className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-colors ${
+                            isChecked ? "bg-[#177E89] text-white" : "border border-[#D1D1D6]"
                           }`}
                         >
                           {isChecked && <IconCheck size={11} />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-sm">{m.label}</div>
-                          <div className={`text-xs mt-0.5 ${isChecked ? "text-white/60" : "text-white/30"}`}>
+                          <div className={`text-xs mt-0.5 ${isChecked ? "text-[#6E6E73]" : "text-[#86868B]"}`}>
                             {m.desc}
                           </div>
                         </div>
@@ -647,11 +639,11 @@ export default function Onboarding() {
               </div>
 
               {/* Botones de navegación */}
-              <div className="pt-2 flex items-center justify-between border-t border-white/10">
+              <div className="pt-2 flex items-center justify-between border-t border-[#E5E5EA]">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="text-white/40 hover:text-white text-xs transition-colors"
+                  className="text-[#86868B] hover:text-[#1D1D1F] text-xs transition-colors cursor-pointer"
                 >
                   ← Cambiar de rubro
                 </button>
@@ -659,7 +651,7 @@ export default function Onboarding() {
                   type="button"
                   onClick={() => setStep(3)}
                   disabled={modules.length === 0}
-                  className="btn-cyber-neon text-white font-bold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer"
+                  className="btn-deep-black font-semibold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Continuar a Método de Pago →
                 </button>
@@ -671,14 +663,14 @@ export default function Onboarding() {
           {step === 3 && (
             <div className="space-y-6">
               <div>
-                <div className="inline-block px-3 py-1 rounded-full bg-slate-500/10 border border-slate-300/60 text-slate-600 text-[11px] font-mono uppercase tracking-wider mb-2">
+                <div className="inline-block px-3 py-1 rounded-full bg-[#F5F5F7] border border-[#E5E5EA] text-[#6E6E73] text-[11px] font-semibold uppercase tracking-wider mb-2">
                   Paso 3 · Método de Pago
                 </div>
-                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 leading-tight">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F] leading-tight">
                   ¿Cómo prefieres pagar cuando termine tu prueba?
                 </h2>
-                <p className="text-slate-500 text-sm mt-1">
-                  Tu prueba de <strong className="text-slate-700">30 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
+                <p className="text-[#6E6E73] text-sm mt-1">
+                  Tu prueba de <strong className="text-[#1D1D1F]">30 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
                 </p>
               </div>
 
@@ -688,13 +680,13 @@ export default function Onboarding() {
                     key={m.id}
                     type="button"
                     onClick={() => setMetodoPago(m.id)}
-                    className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition-all ${
+                    className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition-colors ${
                       metodoPago === m.id
-                        ? "bg-slate-500/10 border-slate-400/60 text-slate-800 shadow-sm"
-                        : "bg-slate-500/[0.04] border-slate-200 text-slate-500 hover:bg-slate-500/[0.08]"
+                        ? "bg-[#177E89]/10 border-[#177E89]/40 text-[#1D1D1F]"
+                        : "bg-white border-[#E5E5EA] text-[#6E6E73] hover:bg-[#F5F5F7]"
                     }`}
                   >
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${metodoPago === m.id ? "bg-slate-500/15 text-slate-600" : "bg-slate-500/5 text-slate-400"}`}>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${metodoPago === m.id ? "bg-[#177E89]/15 text-[#177E89]" : "bg-[#F5F5F7] text-[#86868B]"}`}>
                       <IconCard size={16} />
                     </div>
                     <span className="font-semibold text-sm">{m.label}</span>
@@ -703,23 +695,23 @@ export default function Onboarding() {
                 ))}
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-500/[0.04] border border-slate-200 flex items-start gap-3 text-xs text-slate-500">
+              <div className="p-4 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] flex items-start gap-3 text-xs text-[#6E6E73]">
                 <IconBank size={16} />
                 <p>Ningún cobro se procesa ahora. Cuando termine tu prueba, te avisamos y reportas tu pago por este método directamente desde el Hub.</p>
               </div>
 
-              <div className="pt-2 flex items-center justify-between border-t border-slate-200">
+              <div className="pt-2 flex items-center justify-between border-t border-[#E5E5EA]">
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="text-slate-400 hover:text-slate-700 text-xs transition-colors"
+                  className="text-[#86868B] hover:text-[#1D1D1F] text-xs transition-colors cursor-pointer"
                 >
                   ← Volver a módulos
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(4)}
-                  className="btn-cyber-neon text-white font-bold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer"
+                  className="btn-deep-black font-semibold px-7 py-3 rounded-full text-sm flex items-center gap-2 cursor-pointer"
                 >
                   Revisar y Activar Prueba →
                 </button>
@@ -731,73 +723,82 @@ export default function Onboarding() {
           {step === 4 && (
             <div className="text-center space-y-6 py-2">
               <div className="flex justify-center">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#00f2fe] via-[#7928ca] to-[#ff007f] p-0.5 shadow-[0_0_30px_rgba(0,242,254,0.5)]">
-                  <div className="w-full h-full bg-[#0d131f] rounded-2xl flex items-center justify-center text-teal-300">
-                    {(() => { const Icon = INDUSTRIES.find((i) => i.id === selectedIndustry)?.Icon || IconClinic; return <Icon size={26} />; })()}
-                  </div>
+                <div className="w-16 h-16 rounded-2xl bg-[#177E89]/10 border border-[#177E89]/30 flex items-center justify-center text-[#177E89]">
+                  {(() => { const Icon = INDUSTRIES.find((i) => i.id === selectedIndustry)?.Icon || IconClinic; return <Icon size={26} />; })()}
                 </div>
               </div>
 
               <div>
-                <h2 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-white">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F]">
                   {selectedIndustry === "restaurante" ? "¡Todo Listo para tu Restaurante!" : esRetail ? "¡Todo Listo para tu Negocio!" : esGanaderia ? "¡Todo Listo para tu Finca!" : "¡Todo Listo para tu Consultorio!"}
                 </h2>
-                <p className="text-white/50 text-sm mt-1 max-w-md mx-auto">
-                  Tu entorno privado en <strong>Aurora Hub</strong> ha sido preparado con la vertical{" "}
-                  <strong className="text-teal-300">{VERTICAL_LABEL[selectedIndustry]?.split(" (")[0] || "Mediclinic Pro"}</strong>.
+                <p className="text-[#6E6E73] text-sm mt-1 max-w-md mx-auto">
+                  Tu entorno privado en <strong className="text-[#1D1D1F]">Aurora Hub</strong> ha sido preparado con la vertical{" "}
+                  <strong className="text-[#177E89]">{VERTICAL_LABEL[selectedIndustry]?.split(" (")[0] || "Mediclinic Pro"}</strong>.
                 </p>
               </div>
 
               {/* Resumen de configuración */}
-              <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-5 text-left space-y-3.5 max-w-md mx-auto shadow-inner">
+              <div className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-5 text-left space-y-3.5 max-w-md mx-auto">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-white/40 uppercase tracking-wider font-mono">Organización:</span>
-                  <span className="text-white font-bold">{empresaNombre || NOMBRE_POR_DEFECTO[selectedIndustry] || "Centro Médico Pro"}</span>
+                  <span className="text-[#86868B] uppercase tracking-wider">Organización:</span>
+                  <span className="text-[#1D1D1F] font-bold">{empresaNombre || NOMBRE_POR_DEFECTO[selectedIndustry] || "Centro Médico Pro"}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-white/40 uppercase tracking-wider font-mono">Vertical:</span>
-                  <span className="text-teal-300 font-semibold flex items-center gap-1.5">
+                  <span className="text-[#86868B] uppercase tracking-wider">Vertical:</span>
+                  <span className="text-[#177E89] font-semibold flex items-center gap-1.5">
                     {(() => { const Icon = INDUSTRIES.find((i) => i.id === selectedIndustry)?.Icon || IconClinic; return <Icon size={13} />; })()} {VERTICAL_LABEL[selectedIndustry] || "Mediclinic Pro (Clínica & Salud)"}
                   </span>
                 </div>
                 <div className="flex items-start justify-between text-xs">
-                  <span className="text-white/40 uppercase tracking-wider font-mono mt-0.5">Módulos:</span>
+                  <span className="text-[#86868B] uppercase tracking-wider mt-0.5">Módulos:</span>
                   <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
                     {modules.map((m) => (
                       <span
                         key={m}
-                        className="bg-teal-500/15 border border-teal-500/30 text-teal-300 text-[10px] px-2 py-0.5 rounded-full"
+                        className="bg-[#177E89]/10 border border-[#177E89]/30 text-[#177E89] text-[10px] px-2 py-0.5 rounded-full"
                       >
                         {m}
                       </span>
                     ))}
                   </div>
                 </div>
-                <div className="h-px bg-white/10" />
+                <div className="h-px bg-[#E5E5EA]" />
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-white/40 uppercase tracking-wider font-mono">Prueba Gratuita:</span>
-                  <span className="text-emerald-400 font-bold">30 días de acceso completo</span>
+                  <span className="text-[#86868B] uppercase tracking-wider">Prueba Gratuita:</span>
+                  <span className="text-[#177E89] font-bold">30 días de acceso completo</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-white/40 uppercase tracking-wider font-mono">Método de Pago:</span>
-                  <span className="text-white font-semibold">{METODOS_PAGO.find((m) => m.id === metodoPago)?.label}</span>
+                  <span className="text-[#86868B] uppercase tracking-wider">Método de Pago:</span>
+                  <span className="text-[#1D1D1F] font-semibold">{METODOS_PAGO.find((m) => m.id === metodoPago)?.label}</span>
                 </div>
               </div>
 
               {errorActivacion && (
-                <p className="text-[#ff3b80] text-xs max-w-md mx-auto">{errorActivacion}</p>
+                <p className="text-red-600 text-xs max-w-md mx-auto">{errorActivacion}</p>
               )}
 
               <div className="space-y-3 max-w-md mx-auto">
-                <button
-                  type="button"
+                <SpecularButton
+                  size="lg"
+                  radius={999}
+                  tint="#177E89"
+                  tintOpacity={1}
+                  textColor="#f5f5f5"
+                  lineColor="#5BC0BE"
+                  baseColor="#177E89"
+                  shineSize={10}
+                  shineFade={40}
+                  intensity={1}
+                  thickness={1}
+                  proximity={280}
+                  className="w-full"
                   onClick={handleActivate}
                   disabled={activando}
-                  className="w-full btn-cyber-neon text-white font-bold py-4 rounded-full text-base shadow-[0_0_30px_rgba(255,59,128,0.4)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {activando ? "Creando tu cuenta…" : `Entrar a ${VERTICAL_LABEL[selectedIndustry]?.split(" (")[0] || "Mediclinic Pro"} en Aurora Hub →`}
-                </button>
-                <p className="text-white/30 text-xs">
+                </SpecularButton>
+                <p className="text-[#86868B] text-xs">
                   Sin cobros obligatorios. Podrás gestionar pagos, planes y roles desde el Hub.
                 </p>
               </div>
@@ -808,6 +809,3 @@ export default function Onboarding() {
     </div>
   );
 }
-
-
-

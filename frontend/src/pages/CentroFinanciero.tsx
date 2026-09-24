@@ -25,7 +25,6 @@ import {
   IconScale,
   IconFileText,
   IconCloud,
-  IconBank,
   IconCalendar
 } from '../Icons';
 
@@ -152,7 +151,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Resumen General',
       shortLabel: 'Resumen',
       renderIcon: (active) => (
-        <IconChart size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
+        <IconChart size={17} className={active ? 'text-[#177E89]' : 'text-[#86868B]'} />
       )
     },
     {
@@ -160,7 +159,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Ventas y Compras',
       shortLabel: 'Ventas',
       renderIcon: (active) => (
-        <IconRefresh size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
+        <IconRefresh size={17} className={active ? 'text-[#177E89]' : 'text-[#86868B]'} />
       ),
       demo: true
     },
@@ -169,7 +168,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Estructura de Costos',
       shortLabel: 'Costos',
       renderIcon: (active) => (
-        <IconScale size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
+        <IconScale size={17} className={active ? 'text-[#177E89]' : 'text-[#86868B]'} />
       ),
       demo: true
     },
@@ -178,7 +177,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Documentos',
       shortLabel: 'Docs',
       renderIcon: (active) => (
-        <IconFileText size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
+        <IconFileText size={17} className={active ? 'text-[#177E89]' : 'text-[#86868B]'} />
       ),
       demo: true
     },
@@ -187,7 +186,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       label: 'Cobertura por Vertical',
       shortLabel: 'Cobertura',
       renderIcon: (active) => (
-        <IconCloud size={17} className={active ? 'text-teal-600 dark:text-teal-300' : 'text-slate-500 dark:text-white/60'} />
+        <IconCloud size={17} className={active ? 'text-[#177E89]' : 'text-[#86868B]'} />
       )
     }
   ];
@@ -243,44 +242,36 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
   };
 
   return (
-    <div className={`min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 relative overflow-hidden flex flex-col ${embedded ? 'pb-6' : 'pb-24'}`}>
+    <div className={`min-h-screen bg-white text-[#1D1D1F] relative overflow-hidden flex flex-col ${embedded ? 'pb-6' : 'pb-24'}`}>
       {!embedded && <AuroraGradientDef />}
 
-      {/* Fondos atmosféricos aurora */}
+      {/* HEADER SUPERIOR */}
       {!embedded && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="aurora-ribbon-1 -top-32 -left-20 opacity-25" />
-          <div className="aurora-ribbon-2 top-1/3 -right-20 opacity-30" />
-        </div>
-      )}
-
-      {/* HEADER SUPERIOR — APPLE GLASS */}
-      {!embedded && (
-        <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4 relative z-30 sticky top-0 transition-colors duration-500 backdrop-blur-2xl">
+        <header className="bg-white border-b border-[#E5E5EA] px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4 relative z-30 sticky top-0">
           <div className="flex items-center gap-3.5">
             <button
               onClick={() => navigate('/dashboard')}
-              className="apple-glass-btn text-xs font-semibold px-3 py-1.5 rounded-full text-slate-700 dark:text-white/80 hover:text-teal-500 dark:hover:text-teal-300 border border-slate-300/70 dark:border-white/15 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA] border border-[#E5E5EA] transition-colors flex items-center gap-1.5 cursor-pointer"
               title="Regresar al Hub Principal"
             >
               <span>←</span>
               <span>Volver al Hub</span>
             </button>
 
-            <div className="h-5 w-[1px] bg-slate-300/80 dark:bg-white/15 mx-1" />
+            <div className="h-5 w-[1px] bg-[#E5E5EA] mx-1" />
 
             <div className="flex items-center gap-2.5">
-              <div className="p-1 rounded-xl bg-teal-500/10 border border-teal-500/20">
+              <div className="p-1 rounded-xl bg-[#177E89]/10 border border-[#177E89]/20">
                 <AuroraLogo size={24} animated />
               </div>
               <div>
-                <div className="font-['Outfit'] font-extrabold text-base text-aurora leading-none flex items-center gap-2">
+                <div className="font-bold text-base text-[#1D1D1F] leading-none flex items-center gap-2">
                   <span>Aurora Finanzas</span>
-                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                  <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-[#177E89]/10 text-[#177E89] border border-[#177E89]/30 font-bold">
                     Control Integral
                   </span>
                 </div>
-                <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium">
+                <div className="text-[#86868B] text-[10px] tracking-wider uppercase mt-0.5 font-medium">
                   Visión operativa del negocio
                 </div>
               </div>
@@ -289,24 +280,24 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
 
           {/* Rango de Fechas y Botón Aplicar */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 apple-glass-pill rounded-full px-3 py-1 border border-slate-300/70 dark:border-white/15 shadow-inner">
-              <IconCalendar size={14} className="text-teal-500" />
+            <div className="flex items-center gap-2 rounded-full px-3 py-1 bg-[#F5F5F7] border border-[#E5E5EA]">
+              <IconCalendar size={14} className="text-[#177E89]" />
               <div className="flex items-center gap-1.5 text-xs">
-                <span className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold">Del</span>
+                <span className="text-[#86868B] text-[10px] uppercase font-bold">Del</span>
                 <input
                   type="date"
                   value={desde}
                   max={hasta}
                   onChange={(e) => setDesde(e.target.value)}
-                  className="bg-transparent text-slate-800 dark:text-white text-xs outline-none cursor-pointer font-medium"
+                  className="bg-transparent text-[#1D1D1F] text-xs outline-none cursor-pointer font-medium"
                 />
-                <span className="text-slate-400 dark:text-white/40 text-[10px] uppercase font-bold">al</span>
+                <span className="text-[#86868B] text-[10px] uppercase font-bold">al</span>
                 <input
                   type="date"
                   value={hasta}
                   min={desde}
                   onChange={(e) => setHasta(e.target.value)}
-                  className="bg-transparent text-slate-800 dark:text-white text-xs outline-none cursor-pointer font-medium"
+                  className="bg-transparent text-[#1D1D1F] text-xs outline-none cursor-pointer font-medium"
                 />
               </div>
             </div>
@@ -315,7 +306,7 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
               type="button"
               onClick={handleApplyPeriod}
               disabled={previewMode || loading}
-              className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer shadow-md hover:scale-105 transition-all disabled:opacity-50"
+              className="bg-[#177E89] hover:bg-[#136570] text-white text-xs font-semibold px-4 py-2 rounded-full cursor-pointer transition-colors disabled:opacity-50"
             >
               {loading ? 'Consultando…' : 'Consultar'}
             </button>
@@ -323,21 +314,21 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
         </header>
       )}
 
-      {/* Pill Informativa de Estado de Conexión (Aesthetics Premium) */}
+      {/* Pill Informativa de Estado de Conexión */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5">
-        <div className="apple-glass rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border border-slate-300/60 dark:border-white/10 shadow-sm text-xs">
+        <div className="bg-white rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border border-[#E5E5EA] shadow-sm text-xs">
           <div className="flex items-center gap-2.5">
-            <span className={`w-2 h-2 rounded-full ${isDemoTab ? 'bg-amber-400 animate-pulse' : 'bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)]'}`} />
-            <span className="font-semibold text-slate-800 dark:text-white">
+            <span className={`w-2 h-2 rounded-full ${isDemoTab ? 'bg-[#86868B]' : 'bg-[#177E89]'}`} />
+            <span className="font-semibold text-[#1D1D1F]">
               {isDemoTab ? 'Vista de Demostración & Estructura' : 'Fuentes Operativas Consolidadas'}
             </span>
-            <span className="text-slate-500 dark:text-white/50 text-[11px] hidden md:inline">
+            <span className="text-[#86868B] text-[11px] hidden md:inline">
               — {isDemoTab ? 'Módulo configurado para recibir datos automáticos de tus verticales' : `Moneda base: ${financeData?.moneda || 'USD'}`}
             </span>
           </div>
 
-          <div className="text-[11px] font-mono text-slate-500 dark:text-white/50">
-            Período: <strong className="text-teal-600 dark:text-teal-300">{appliedPeriod.desde}</strong> al <strong className="text-teal-600 dark:text-teal-300">{appliedPeriod.hasta}</strong>
+          <div className="text-[11px] text-[#86868B]">
+            Período: <strong className="text-[#177E89]">{appliedPeriod.desde}</strong> al <strong className="text-[#177E89]">{appliedPeriod.hasta}</strong>
           </div>
         </div>
       </div>
@@ -345,10 +336,10 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
       {/* CONTENIDO PRINCIPAL */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10 space-y-6">
         
-        {/* Barra de Pestañas Apple Liquid Glass */}
+        {/* Barra de Pestañas */}
         <div
           id="finance-tabs-nav"
-          className="flex items-center gap-1.5 p-1.5 apple-glass-pill rounded-full border border-slate-300/80 dark:border-white/15 bg-slate-100/90 dark:bg-white/[0.04] shadow-inner text-xs overflow-x-auto whitespace-nowrap"
+          className="flex items-center gap-1.5 p-1.5 rounded-full border border-[#E5E5EA] bg-[#F5F5F7] text-xs overflow-x-auto whitespace-nowrap"
         >
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
@@ -356,18 +347,16 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-colors cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? 'bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.12)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25'
-                    : 'text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8'
+                    ? 'bg-white text-[#1D1D1F] shadow-sm'
+                    : 'text-[#6E6E73] hover:text-[#1D1D1F] hover:bg-white'
                 }`}
               >
                 <span>{tab.renderIcon(isActive)}</span>
-                <span className="font-['Outfit']">{tab.label}</span>
+                <span>{tab.label}</span>
                 {tab.demo && (
-                  <span className={`rounded-full px-2 py-0.5 text-[9px] uppercase font-mono tracking-wide ${
-                    isActive ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300' : 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
-                  }`}>
+                  <span className="rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wide bg-[#F5F5F7] text-[#6E6E73] border border-[#E5E5EA]">
                     Vista
                   </span>
                 )}
@@ -379,20 +368,20 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
         {/* CONTENEDOR DE LA PESTAÑA ACTIVA */}
         <div ref={activeContentRef} className="transition-all duration-300">
           {!previewMode && (activeTab === 'resumen' || activeTab === 'cobertura') && loading && (
-            <div className="apple-glass rounded-3xl border border-slate-300/60 dark:border-white/10 p-12 text-center text-sm text-slate-500 dark:text-white/60 space-y-3">
-              <div className="w-8 h-8 mx-auto border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+            <div className="bg-white rounded-2xl border border-[#E5E5EA] p-12 text-center text-sm text-[#86868B] space-y-3 shadow-sm">
+              <div className="w-8 h-8 mx-auto border-2 border-[#177E89] border-t-transparent rounded-full animate-spin" />
               <p className="font-semibold">Consultando las fuentes financieras en tiempo real…</p>
             </div>
           )}
 
           {!previewMode && (activeTab === 'resumen' || activeTab === 'cobertura') && !loading && error && (
-            <div className="apple-glass rounded-3xl border border-rose-500/30 bg-rose-500/10 p-6 text-sm text-rose-700 dark:text-rose-200 space-y-3">
-              <p className="font-bold font-['Outfit'] text-base">No pudimos mostrar los datos del negocio.</p>
+            <div className="bg-[#DC2626]/5 rounded-2xl border border-[#DC2626]/20 p-6 text-sm text-[#DC2626] space-y-3">
+              <p className="font-bold text-base">No pudimos mostrar los datos del negocio.</p>
               <p className="text-xs opacity-80">{error}</p>
               <button
                 type="button"
                 onClick={() => void loadFinanceData()}
-                className="btn-electric-blue text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer shadow-md"
+                className="bg-[#177E89] hover:bg-[#136570] text-white text-xs font-semibold px-4 py-2 rounded-full cursor-pointer transition-colors"
               >
                 Reintentar
               </button>
@@ -449,12 +438,12 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
 
           {activeTab === 'cobertura' && (previewMode || (!loading && !error && financeData)) && (
             <div className="space-y-6">
-              <div className="apple-glass rounded-3xl p-5 sm:p-6 border border-slate-300/60 dark:border-white/10 shadow-lg">
-                <h3 className="text-base sm:text-lg font-bold font-['Outfit'] text-slate-900 dark:text-white">
+              <div className="bg-white rounded-2xl p-5 sm:p-6 border border-[#E5E5EA] shadow-sm">
+                <h3 className="text-base sm:text-lg font-bold text-[#1D1D1F]">
                   Detalle de Integración de Fuentes por Vertical
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-white/60 mt-1 leading-relaxed max-w-2xl">
-                  Para que las cifras operativas reflejen la realidad de tu empresa, Aurora Plus clasifica cada área en estado cualitativo: <strong className="text-emerald-500">Con datos</strong>, <strong className="text-amber-500">Parcial</strong> o <strong className="text-rose-500">Sin conexión</strong>.
+                <p className="text-xs text-[#86868B] mt-1 leading-relaxed max-w-2xl">
+                  Para que las cifras operativas reflejen la realidad de tu empresa, Aurora Plus clasifica cada área en estado cualitativo: <strong className="text-[#16A34A]">Con datos</strong>, <strong className="text-[#6E6E73]">Parcial</strong> o <strong className="text-[#DC2626]">Sin conexión</strong>.
                 </p>
               </div>
               <VerticalCoverageCard coverageList={previewMode ? MOCK_COVERAGE : realCoverage} />
@@ -463,19 +452,19 @@ export const CentroFinanciero: React.FC<CentroFinancieroProps> = ({ previewMode 
         </div>
       </main>
 
-      {/* DOCK MÓVIL INFERIOR — APPLE LIQUID GLASS */}
+      {/* DOCK MÓVIL INFERIOR */}
       {!embedded && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 apple-glass border-t border-slate-300/60 dark:border-white/10 px-2 py-2 flex justify-between items-center backdrop-blur-2xl">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E5EA] px-2 py-2 flex justify-between items-center">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-1 px-1 rounded-xl transition-all cursor-pointer ${
+                className={`flex-1 min-w-0 flex flex-col items-center gap-1 py-1 px-1 rounded-xl transition-colors cursor-pointer ${
                   isActive
-                    ? 'text-teal-600 dark:text-teal-300 font-bold'
-                    : 'text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white'
+                    ? 'text-[#177E89] font-bold'
+                    : 'text-[#86868B] hover:text-[#1D1D1F]'
                 }`}
               >
                 <span className="flex items-center justify-center">

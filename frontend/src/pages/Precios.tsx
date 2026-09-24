@@ -18,12 +18,12 @@ const PERIODOS = [
 // de una a otra es el precio de Full y cuál es su herramienta más fuerte, así que eso
 // se selecciona primero y el precio de la tarjeta Full se ajusta según la elección.
 const VERTICALES = [
-  { id: "comercio", nombre: "Comercio", precioFull: 40, beneficioFull: "Catálogo público + asistente de IA por WhatsApp (precios, stock, tasa BCV y delivery al instante)", Icon: IconHardware, color: "from-orange-400 to-amber-500", ring: "ring-orange-400/50", glow: "rgba(251,146,60,0.35)" },
-  { id: "mediclinic", nombre: "Mediclinic", precioFull: 50, beneficioFull: "Vademécum de 36+ fármacos, récipe médico oficial en PDF y firma electrónica", Icon: IconClinic, color: "from-sky-400 to-blue-500", ring: "ring-sky-400/50", glow: "rgba(56,189,248,0.35)" },
-  { id: "odontologia", nombre: "Odontología", precioFull: 50, beneficioFull: "Odontograma FDI, periodontograma de 6 puntos y planes de tratamiento por fases", Icon: IconTooth, color: "from-cyan-400 to-teal-500", ring: "ring-cyan-400/50", glow: "rgba(34,211,238,0.35)" },
-  { id: "restaurantes", nombre: "Restaurantes", precioFull: 40, beneficioFull: "Turnos de caja con arqueo real, reservas y zonas de cocina configurables", Icon: IconRestaurant, color: "from-rose-400 to-pink-500", ring: "ring-rose-400/50", glow: "rgba(251,113,133,0.35)" },
-  { id: "ganaderia", nombre: "Ganadería", precioFull: 40, beneficioFull: "Mapa satelital de potreros y básculas bluetooth para pesaje en manga", Icon: IconFarm, color: "from-green-400 to-emerald-500", ring: "ring-emerald-400/50", glow: "rgba(52,211,153,0.35)" },
-  { id: "veterinaria", nombre: "Veterinaria", precioFull: 40, beneficioFull: "Historias clínicas, agenda y cotizador para mascotas sobre el motor de Mediclinic", Icon: IconVet, color: "from-violet-400 to-purple-500", ring: "ring-violet-400/50", glow: "rgba(167,139,250,0.35)" },
+  { id: "comercio", nombre: "Comercio", precioFull: 40, beneficioFull: "Catálogo público + asistente de IA por WhatsApp (precios, stock, tasa BCV y delivery al instante)", Icon: IconHardware },
+  { id: "mediclinic", nombre: "Mediclinic", precioFull: 50, beneficioFull: "Vademécum de 36+ fármacos, récipe médico oficial en PDF y firma electrónica", Icon: IconClinic },
+  { id: "odontologia", nombre: "Odontología", precioFull: 50, beneficioFull: "Odontograma FDI, periodontograma de 6 puntos y planes de tratamiento por fases", Icon: IconTooth },
+  { id: "restaurantes", nombre: "Restaurantes", precioFull: 40, beneficioFull: "Turnos de caja con arqueo real, reservas y zonas de cocina configurables", Icon: IconRestaurant },
+  { id: "ganaderia", nombre: "Ganadería", precioFull: 40, beneficioFull: "Mapa satelital de potreros y básculas bluetooth para pesaje en manga", Icon: IconFarm },
+  { id: "veterinaria", nombre: "Veterinaria", precioFull: 40, beneficioFull: "Historias clínicas, agenda y cotizador para mascotas sobre el motor de Mediclinic", Icon: IconVet },
 ] as const;
 
 const BASICO_PRECIO = 25;
@@ -64,230 +64,216 @@ export default function Precios() {
     {
       id: "basico", nombre: "Aurora Básico", precioBase: BASICO_PRECIO,
       tagline: "Lo esencial para dejar de operar a mano", destacado: false,
-      features: BASICO_FEATURES, nota: "",
+      features: BASICO_FEATURES,
     },
     {
       id: "full", nombre: "Aurora Full", precioBase: vertical.precioFull,
       tagline: `Todo lo del Básico + lo más fuerte para ${vertical.nombre}`, destacado: true,
       features: [FULL_FEATURES_COMUNES[0], vertical.beneficioFull, ...FULL_FEATURES_COMUNES.slice(1)],
-      nota: "",
     },
   ];
 
   return (
-    <main className="aurora-public-page pt-32 pb-24 relative">
+    <main className="w-full bg-white text-[#1D1D1F] antialiased pt-28">
 
       {/* Header */}
-      <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
-        <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/20 rounded-full px-4 py-1.5 text-xs text-violet-600 dark:text-violet-300 mb-6 font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-          Sin contratos de permanencia
+      <section className="py-20 md:py-28 px-6 sm:px-8 border-b border-[#E5E5EA]">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-[#F5F5F7] border border-[#E5E5EA] rounded-full px-4 py-1.5 text-xs font-semibold text-[#177E89] mb-6">
+            Sin contratos de permanencia
+          </div>
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.06] text-[#1D1D1F] mb-5">
+            Dos planes claros,<br />
+            <span className="text-[#177E89]">sin letra pequeña</span>
+          </h1>
+          <p className="text-base sm:text-lg text-[#86868B] max-w-xl mx-auto leading-relaxed">
+            Desde $25 al mes con lo esencial de tu vertical. Sube a Full desde $40 y desbloquea nuestras herramientas más fuertes. Cancela cuando quieras.
+          </p>
         </div>
-        <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
-          Dos planes claros,<br />
-          <span className="text-aurora">sin letra pequeña</span>
-        </h1>
-        <p className="text-slate-500 dark:text-white/45 text-lg max-w-xl mx-auto leading-relaxed">
-          Desde $25 al mes con lo esencial de tu vertical. Sube a Full desde $40 y desbloquea nuestras herramientas más fuertes. Cancela cuando quieras.
-        </p>
       </section>
 
       {/* Dos planes con selector de vertical y período */}
-      <section className="px-4 sm:px-6 max-w-5xl mx-auto mb-20">
-        {/* Selector de vertical — el precio de Full depende de cuál elijas */}
-        <div className="text-center mb-5">
-          <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase">¿Qué negocio manejas?</p>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-12 max-w-3xl mx-auto">
-          {VERTICALES.map((v) => {
-            const activo = verticalId === v.id;
-            return (
+      <section className="py-20 md:py-28 px-6 sm:px-8 bg-[#F5F5F7] border-b border-[#E5E5EA]">
+        <div className="max-w-5xl mx-auto">
+          {/* Selector de vertical — el precio de Full depende de cuál elijas */}
+          <div className="text-center mb-5">
+            <p className="text-xs font-semibold tracking-widest text-[#177E89] uppercase">¿Qué negocio manejas?</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-12 max-w-3xl mx-auto">
+            {VERTICALES.map((v) => {
+              const activo = verticalId === v.id;
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => setVerticalId(v.id)}
+                  className={`relative flex items-center gap-2 py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
+                    activo
+                      ? "bg-white text-[#1D1D1F] border border-[#177E89] shadow-sm"
+                      : "bg-white text-[#86868B] border border-[#E5E5EA] hover:border-[#D1D1D6] hover:text-[#1D1D1F]"
+                  }`}
+                >
+                  <v.Icon size={14} />
+                  {v.nombre}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selector de período de facturación */}
+          <div className="flex items-center justify-center gap-1.5 mb-10 p-1.5 rounded-2xl bg-white border border-[#E5E5EA] max-w-md mx-auto">
+            {PERIODOS.map((p) => (
               <button
-                key={v.id}
-                onClick={() => setVerticalId(v.id)}
-                className={`relative flex items-center gap-2 py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                  activo
-                    ? "bg-white !text-slate-900 shadow-md"
-                    : "bg-white/5 border border-white/10 text-white/55 hover:text-white hover:border-white/25"
+                key={p.id}
+                onClick={() => setPeriodoId(p.id)}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                  periodoId === p.id
+                    ? "bg-[#177E89] text-white"
+                    : "text-[#86868B] hover:text-[#1D1D1F]"
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${v.color} flex-shrink-0`} />
-                {v.nombre}
+                {p.label}
+                {p.descuento > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    periodoId === p.id ? "bg-white/20" : "bg-[#177E89]/10 text-[#177E89]"
+                  }`}>
+                    -{Math.round(p.descuento * 100)}%
+                  </span>
+                )}
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
 
-        {/* Selector de período de facturación */}
-        <div className="flex items-center justify-center gap-1.5 mb-10 p-1.5 rounded-2xl bg-white/5 border border-white/10 max-w-md mx-auto">
-          {PERIODOS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPeriodoId(p.id)}
-              className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                periodoId === p.id
-                  ? "g-aurora text-white shadow-md"
-                  : "text-white/60 hover:text-white"
-              }`}
-            >
-              {p.label}
-              {p.descuento > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  periodoId === p.id ? "bg-white/20" : "bg-teal-500/15 text-teal-300"
-                }`}>
-                  -{Math.round(p.descuento * 100)}%
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
-          {PLANES.map((plan) => {
-            const precioMensualConDescuento = plan.precioBase * (1 - periodo.descuento);
-            const totalPeriodo = precioMensualConDescuento * periodo.meses;
-            return (
-              <div
-                key={plan.id}
-                className={`relative rounded-2xl p-8 sm:p-10 flex flex-col items-center text-center apple-glass shadow-2xl transition-all ${
-                  plan.destacado ? `border-2 sm:scale-[1.03] pt-11 ${vertical.ring.replace("ring-", "border-").replace("/50", "/60")}` : "border border-slate-300/60 dark:border-white/10"
-                }`}
-              >
-                {plan.destacado && (
-                  <>
-                    <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-15 pointer-events-none"
-                      style={{ background: `radial-gradient(ellipse at 50% -10%, ${vertical.glow} 0%, transparent 65%)` }} />
-                    <div className={`absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r ${vertical.color} text-white text-[11px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-md`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
+            {PLANES.map((plan) => {
+              const precioMensualConDescuento = plan.precioBase * (1 - periodo.descuento);
+              const totalPeriodo = precioMensualConDescuento * periodo.meses;
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative rounded-3xl p-8 sm:p-10 flex flex-col items-center text-center bg-white shadow-sm transition-all ${
+                    plan.destacado ? "border-2 border-[#177E89] sm:scale-[1.03] pt-11" : "border border-[#E5E5EA]"
+                  }`}
+                >
+                  {plan.destacado && (
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#177E89] text-white text-[11px] font-bold px-4 py-1.5 rounded-full whitespace-nowrap">
                       LO MÁS FUERTE PARA {vertical.nombre.toUpperCase()}
                     </div>
-                  </>
-                )}
+                  )}
 
-                <h2 className="relative font-['Outfit'] font-bold text-slate-900 dark:text-white text-2xl mb-1">{plan.nombre}</h2>
-                <p className="relative text-slate-500 dark:text-white/35 text-xs mb-5">{plan.tagline}</p>
+                  <h2 className="relative font-bold text-[#1D1D1F] text-2xl mb-1">{plan.nombre}</h2>
+                  <p className="relative text-[#86868B] text-xs mb-5">{plan.tagline}</p>
 
-                <div className="flex items-end gap-1 mb-1">
-                  <span className="font-['Outfit'] font-black text-6xl text-slate-900 dark:text-white leading-none">
-                    ${precioMensualConDescuento.toFixed(2).replace(/\.00$/, "")}
-                  </span>
-                  <span className="text-slate-500 dark:text-white/35 text-base mb-2">/mes</span>
+                  <div className="flex items-end gap-1 mb-1">
+                    <span className="text-5xl sm:text-6xl font-bold tracking-tight text-[#1D1D1F] leading-none">
+                      ${precioMensualConDescuento.toFixed(2).replace(/\.00$/, "")}
+                    </span>
+                    <span className="text-[#86868B] text-base mb-2">/mes</span>
+                  </div>
+
+                  {periodo.descuento > 0 ? (
+                    <p className="text-xs text-[#177E89] font-semibold mb-6">
+                      Facturado {periodo.meses === 6 ? "cada 6 meses" : "una vez al año"}: ${totalPeriodo.toFixed(2).replace(/\.00$/, "")} total
+                      <span className="text-[#86868B] font-normal"> (antes ${(plan.precioBase * periodo.meses).toFixed(0)})</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-[#86868B] mb-6">Facturado mes a mes</p>
+                  )}
+
+                  <ul className="relative space-y-3 mb-8 w-full max-w-xs text-left flex-1">
+                    {plan.features.map((f, idx) => {
+                      const esBeneficioClave = plan.destacado && idx === 1;
+                      return (
+                        <li key={f} className={`flex items-start gap-3 text-sm font-medium ${esBeneficioClave ? "text-[#1D1D1F]" : "text-[#6E6E73]"}`}>
+                          <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            esBeneficioClave ? "bg-[#177E89] text-white" : "bg-[#F5F5F7] text-[#6E6E73]"
+                          }`}><IconCheck size={9} /></span>
+                          {f}
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  <SpecularButton
+                    size="md"
+                    radius={999}
+                    tint={plan.destacado ? "#177E89" : "#F5F5F7"}
+                    tintOpacity={plan.destacado ? 1 : 0.92}
+                    blur={plan.destacado ? 0 : 14}
+                    textColor={plan.destacado ? "#f5f5f5" : "#1D1D1F"}
+                    lineColor={plan.destacado ? "#5BC0BE" : "#ffffff"}
+                    baseColor={plan.destacado ? "#177E89" : "#D1D1D6"}
+                    shineSize={10}
+                    shineFade={40}
+                    intensity={1}
+                    thickness={1}
+                    proximity={280}
+                    className="relative w-full max-w-xs shadow-sm"
+                    onClick={() => navigate("/onboarding")}
+                  >
+                    {plan.destacado ? `Quiero Full para ${vertical.nombre}` : "Comenzar con Básico"}
+                  </SpecularButton>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
-                {periodo.descuento > 0 ? (
-                  <p className="text-xs text-teal-600 dark:text-teal-400 font-semibold mb-6">
-                    Facturado {periodo.meses === 6 ? "cada 6 meses" : "una vez al año"}: ${totalPeriodo.toFixed(2).replace(/\.00$/, "")} total
-                    <span className="text-slate-400 dark:text-white/30 font-normal"> (antes ${(plan.precioBase * periodo.meses).toFixed(0)})</span>
-                  </p>
-                ) : (
-                  <p className="text-xs text-slate-400 dark:text-white/30 mb-6">Facturado mes a mes</p>
-                )}
-
-                <ul className="relative space-y-3 mb-8 w-full max-w-xs text-left flex-1">
-                  {plan.features.map((f, idx) => {
-                    const esBeneficioClave = plan.destacado && idx === 1;
-                    return (
-                      <li key={f} className={`flex items-start gap-3 text-sm font-medium ${esBeneficioClave ? "text-slate-900 dark:text-white" : "text-slate-700 dark:text-white/60"}`}>
-                        <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          esBeneficioClave
-                            ? `bg-gradient-to-br ${vertical.color} text-white`
-                            : plan.destacado
-                              ? "bg-slate-500/15 text-slate-600 dark:text-white/60"
-                              : "bg-slate-500/15 text-slate-600 dark:text-white/60"
-                        }`}><IconCheck size={9} /></span>
-                        {f}
-                      </li>
-                    );
-                  })}
+      {/* Web page service */}
+      <section className="py-20 md:py-28 px-6 sm:px-8 border-b border-[#E5E5EA]">
+        <div className="max-w-5xl mx-auto">
+          <div className="bg-white border border-[#E5E5EA] rounded-3xl overflow-hidden p-8 sm:p-12 shadow-sm">
+            <div className="flex flex-col lg:flex-row items-start gap-8">
+              <div className="flex-1">
+                <div className="inline-block bg-[#F5F5F7] border border-[#E5E5EA] rounded-full px-3 py-1 text-xs text-[#177E89] font-semibold tracking-widest uppercase mb-4">
+                  Servicio adicional
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-3">
+                  Página Web Profesional
+                </h2>
+                <p className="text-[#86868B] text-base leading-relaxed mb-6 max-w-lg">
+                  Diseño personalizado con tu identidad de marca, catálogo de productos o servicios, y ventana de pagos integrada. Tu presencia digital, lista para vender.
+                </p>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                  {[
+                    "Diseño 100% personalizado",
+                    "Catálogo de productos / servicios",
+                    "Pasarela de pagos integrada",
+                    "Dominio y hosting incluido por 1 año",
+                    "Optimizado para celulares",
+                    "Panel auto-administrable",
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-2.5 text-sm text-[#1D1D1F] font-medium">
+                      <span className="w-4 h-4 rounded-full bg-[#177E89]/10 text-[#177E89] flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
+                      {item}
+                    </li>
+                  ))}
                 </ul>
-
                 <SpecularButton
                   size="md"
-                  radius={12}
-                  tint={plan.destacado ? "#177E89" : "#F5F5F7"}
-                  tintOpacity={plan.destacado ? 1 : 0.92}
-                  blur={plan.destacado ? 0 : 14}
-                  textColor={plan.destacado ? "#f5f5f5" : "#1D1D1F"}
-                  lineColor={plan.destacado ? "#5BC0BE" : "#ffffff"}
-                  baseColor={plan.destacado ? "#177E89" : "#4b4b4b"}
+                  radius={999}
+                  tint="#177E89"
+                  tintOpacity={1}
+                  textColor="#f5f5f5"
+                  lineColor="#5BC0BE"
+                  baseColor="#177E89"
                   shineSize={10}
                   shineFade={40}
                   intensity={1}
                   thickness={1}
                   proximity={280}
-                  className="relative w-full max-w-xs shadow-sm"
-                  onClick={() => navigate("/onboarding")}
+                  onClick={() => navigate("/nosotros")}
                 >
-                  {plan.destacado ? `Quiero Full para ${vertical.nombre}` : "Comenzar con Básico"}
+                  Cotizar mi página web →
                 </SpecularButton>
-
-                {plan.nota && (
-                  <p className="mt-4 text-[11px] text-slate-400 dark:text-white/30 max-w-xs leading-relaxed">
-                    {plan.nota}
-                  </p>
-                )}
               </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Web page service */}
-      <section className="px-4 sm:px-6 max-w-5xl mx-auto mb-20">
-        <div className="relative apple-glass border border-violet-500/30 rounded-3xl overflow-hidden p-8 sm:p-12 shadow-xl">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-500 to-transparent" />
-          <div className="absolute inset-0 opacity-15"
-            style={{ background: "radial-gradient(ellipse at 80% 50%, rgba(168,85,247,0.4) 0%, transparent 60%)" }} />
-
-          <div className="relative flex flex-col lg:flex-row items-start gap-8">
-            <div className="flex-1">
-              <div className="inline-block bg-violet-500/15 border border-violet-500/30 rounded-full px-3 py-1 text-xs text-violet-600 dark:text-violet-300 font-semibold tracking-widest uppercase mb-4">
-                Servicio adicional
-              </div>
-              <h2 className="font-['Outfit'] font-bold text-3xl sm:text-4xl text-slate-900 dark:text-white mb-3">
-                Página Web Profesional
-              </h2>
-              <p className="text-slate-500 dark:text-white/50 text-base leading-relaxed mb-6 max-w-lg">
-                Diseño personalizado con tu identidad de marca, catálogo de productos o servicios, y ventana de pagos integrada. Tu presencia digital, lista para vender.
-              </p>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                {[
-                  "Diseño 100% personalizado",
-                  "Catálogo de productos / servicios",
-                  "Pasarela de pagos integrada",
-                  "Dominio y hosting incluido por 1 año",
-                  "Optimizado para celulares",
-                  "Panel auto-administrable",
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-white/60 font-medium">
-                    <span className="w-4 h-4 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <SpecularButton
-                size="md"
-                radius={12}
-                tint="#177E89"
-                tintOpacity={1}
-                textColor="#f5f5f5"
-                lineColor="#5BC0BE"
-                baseColor="#177E89"
-                shineSize={10}
-                shineFade={40}
-                intensity={1}
-                thickness={1}
-                proximity={280}
-                onClick={() => navigate("/nosotros")}
-              >
-                Cotizar mi página web →
-              </SpecularButton>
-            </div>
-            <div className="lg:w-64 flex-shrink-0 apple-glass rounded-2xl p-6 text-center border border-violet-500/20">
-              <div className="text-slate-500 dark:text-white/35 text-xs mb-1 font-medium">Inversión única</div>
-              <div className="font-['Outfit'] font-black text-3xl text-slate-900 dark:text-white mb-1">Cotizable</div>
-              <div className="text-xs text-violet-600 dark:text-violet-400 mb-4 font-semibold">según requerimientos</div>
-              <div className="text-slate-500 dark:text-white/30 text-xs leading-relaxed">
-                Entrega estimada en 7–14 días hábiles con soporte post-lanzamiento.
+              <div className="lg:w-64 flex-shrink-0 bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-6 text-center">
+                <div className="text-[#86868B] text-xs mb-1 font-medium">Inversión única</div>
+                <div className="text-3xl font-bold tracking-tight text-[#1D1D1F] mb-1">Cotizable</div>
+                <div className="text-xs text-[#177E89] mb-4 font-semibold">según requerimientos</div>
+                <div className="text-[#86868B] text-xs leading-relaxed">
+                  Entrega estimada en 7–14 días hábiles con soporte post-lanzamiento.
+                </div>
               </div>
             </div>
           </div>
@@ -295,36 +281,40 @@ export default function Precios() {
       </section>
 
       {/* FAQ */}
-      <section className="px-4 sm:px-6 max-w-3xl mx-auto">
-        <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white text-center mb-10">Preguntas Frecuentes</h2>
-        <div className="space-y-3">
-          {FAQ.map((faq, i) => (
-            <div key={i}
-              className="apple-glass rounded-2xl overflow-hidden transition-all shadow-sm">
-              <button
-                onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                className="w-full text-left p-5 flex items-center justify-between gap-4 cursor-pointer">
-                <span className="font-['Outfit'] font-semibold text-slate-900 dark:text-white text-base">{faq.q}</span>
-                <span className={`text-slate-400 dark:text-white/40 text-lg transition-transform ${openFaq === i ? "rotate-45" : ""}`}>+</span>
-              </button>
-              {openFaq === i && (
-                <div className="px-5 pb-5 text-slate-500 dark:text-white/50 text-sm leading-relaxed border-t border-slate-200/60 dark:border-white/5 pt-3">
-                  {faq.a}
-                </div>
-              )}
-            </div>
-          ))}
+      <section className="py-20 md:py-28 px-6 sm:px-8 bg-[#F5F5F7] border-b border-[#E5E5EA]">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] text-center mb-10">Preguntas Frecuentes</h2>
+          <div className="space-y-3">
+            {FAQ.map((faq, i) => (
+              <div key={i}
+                className="bg-white border border-[#E5E5EA] rounded-2xl overflow-hidden shadow-sm">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full text-left p-5 flex items-center justify-between gap-4 cursor-pointer">
+                  <span className="font-semibold text-[#1D1D1F] text-base">{faq.q}</span>
+                  <span className={`text-[#86868B] text-lg transition-transform ${openFaq === i ? "rotate-45" : ""}`}>+</span>
+                </button>
+                {openFaq === i && (
+                  <div className="px-5 pb-5 text-[#6E6E73] text-sm leading-relaxed border-t border-[#E5E5EA] pt-3">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Bottom CTA */}
-      <section className="px-4 sm:px-6 max-w-3xl mx-auto text-center mt-20">
-        <p className="text-white/35 text-sm mb-4">¿Tienes dudas sobre qué plan es el adecuado para ti?</p>
-        <button
-          onClick={() => navigate("/nosotros")}
-          className="text-teal-400 hover:text-teal-300 transition-colors text-sm font-medium">
-          Hablar con nuestro equipo →
-        </button>
+      <section className="py-20 md:py-28 px-6 sm:px-8">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-[#86868B] text-sm mb-4">¿Tienes dudas sobre qué plan es el adecuado para ti?</p>
+          <button
+            onClick={() => navigate("/nosotros")}
+            className="text-[#177E89] hover:text-[#1D1D1F] transition-colors text-sm font-semibold cursor-pointer">
+            Hablar con nuestro equipo →
+          </button>
+        </div>
       </section>
     </main>
   );

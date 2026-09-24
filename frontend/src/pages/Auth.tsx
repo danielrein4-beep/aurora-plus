@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
+import SpecularButton from "../components/SpecularButton";
 import {
   AuroraGradientDef, IconLock,
   IconRestaurant, IconPrescription, IconHardware, IconClinic,
@@ -140,7 +141,7 @@ export default function Auth() {
           try { localStorage.removeItem(REMEMBERED_EMAIL_KEY); } catch {}
         }
         await login(form.email, form.password);
-        
+
         // Conexión directa a la vertical del negocio del usuario
         let rutaDestino = "/dashboard";
         try {
@@ -179,24 +180,14 @@ export default function Auth() {
 
 
   return (
-    <div className="aurora-access-page min-h-screen text-[var(--text-primary)] flex items-center justify-center px-4 sm:px-6 py-12 relative overflow-hidden transition-colors duration-300">
+    <div className="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] flex items-center justify-center px-4 sm:px-6 py-12 antialiased">
       <AuroraGradientDef />
 
-      {/* ── FONDOS ATMOSFÉRICOS: AURORAS BOREALES 3D Y DESTELLOS DE NEÓN ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
-        <div className="aurora-ribbon-1 -top-32 -left-28 opacity-60" />
-        <div className="aurora-ribbon-2 -bottom-20 -right-28 opacity-70" />
-        <div className="cyber-grid absolute inset-0 opacity-20" />
-        
-        {/* Luces volumétricas estilo torus (Rosa / Cyan / Púrpura) */}
-        <div className="absolute w-[550px] h-[550px] rounded-full blur-[140px] bg-gradient-to-tr from-[#ff007f]/20 via-[#7928ca]/25 to-[#00f2fe]/20 -top-20" />
-      </div>
-
-      {/* ── BOTÓN FLOTANTE SUPERIOR: VOLVER A PÁGINA PRINCIPAL ── */}
+      {/* ── BOTÓN SUPERIOR: VOLVER A PÁGINA PRINCIPAL ── */}
       <button
         type="button"
         onClick={() => navigate("/")}
-        className="absolute top-6 left-6 z-30 apple-glass-pill px-4 py-2 rounded-full text-xs font-semibold text-white/80 hover:text-white hover:border-[#177E89]/60 hover:bg-white/10 transition-all duration-300 flex items-center gap-2 cursor-pointer group shadow-xl"
+        className="absolute top-6 left-6 z-30 bg-white border border-[#E5E5EA] hover:border-[#D1D1D6] px-4 py-2 rounded-full text-xs font-semibold text-[#1D1D1F] transition-colors flex items-center gap-2 cursor-pointer group shadow-sm"
         title="Volver a la página principal">
         <svg className="w-4 h-4 transition-transform duration-300 group-hover:-translate-x-1 text-[#177E89]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -204,20 +195,18 @@ export default function Auth() {
         <span>Volver a la página principal</span>
       </button>
 
-      {/* ── CONTENEDOR PRINCIPAL: TARJETA LIQUID GLASS ULTRA PREMIUM ── */}
-      <div className="relative z-10 w-full max-w-4xl apple-glass rounded-[32px] p-6 sm:p-10 shadow-[0_25px_70px_rgba(0,0,0,0.7)] border border-white/15 mt-10 sm:mt-0">
-        
+      {/* ── CONTENEDOR PRINCIPAL ── */}
+      <div className="relative z-10 w-full max-w-4xl bg-white border border-[#E5E5EA] rounded-3xl p-6 sm:p-10 shadow-sm mt-10 sm:mt-0">
+
         {/* Barra superior de la tarjeta */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-8 mb-8 border-b border-white/10">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-8 mb-8 border-b border-[#E5E5EA]">
           <button onClick={handleAuthLogoClick} className="flex items-center gap-3.5 group cursor-pointer" title="Ir a la página principal">
-            <div className="p-2 rounded-2xl bg-white/5 border border-white/10 shadow-inner group-hover:scale-105 transition-transform duration-300">
-              <AuroraLogo size={34} animated />
-            </div>
+            <AuroraLogo size={34} animated />
             <div className="text-left">
-              <div className="font-['Outfit'] font-black text-lg text-aurora leading-none">
+              <div className="font-bold text-lg leading-none tracking-tight text-[#1D1D1F]">
                 Aurora Plus
               </div>
-              <div className="text-white/35 text-[10px] uppercase tracking-widest mt-1">
+              <div className="text-[#86868B] text-[10px] uppercase tracking-widest mt-1">
                 Software Administrativo
               </div>
             </div>
@@ -228,7 +217,7 @@ export default function Auth() {
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="apple-glass-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-white/70 hover:text-white hover:border-[#177E89]/50 hover:bg-white/10 transition-all duration-300 flex items-center gap-1.5 cursor-pointer group shadow-sm"
+              className="bg-[#F5F5F7] border border-[#E5E5EA] hover:bg-[#E5E5EA] px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#1D1D1F] transition-colors flex items-center gap-1.5 cursor-pointer group"
               title="Volver al inicio">
               <svg className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-[#177E89]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -237,27 +226,25 @@ export default function Auth() {
             </button>
 
             {/* Toggle pill mode: Iniciar sesión / Crear cuenta */}
-            <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1">
+            <div className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-full p-1 flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => { setMode("login"); setErrors({}); }}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
                   mode === "login"
-                    ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
-                    : "text-white/50 hover:text-white"
+                    ? "bg-white text-[#1D1D1F] shadow-sm border border-[#E5E5EA]"
+                    : "text-[#86868B] hover:text-[#1D1D1F]"
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${mode === "login" ? "bg-teal-500 animate-pulse" : "bg-white/30"}`} />
                 Iniciar sesión
               </button>
               <button
                 type="button"
                 onClick={() => { setMode("register"); setErrors({}); }}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
                   mode === "register"
-                    ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
-                    : "text-white/50 hover:text-white"
+                    ? "bg-white text-[#1D1D1F] shadow-sm border border-[#E5E5EA]"
+                    : "text-[#86868B] hover:text-[#1D1D1F]"
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${mode === "register" ? "bg-[#177E89] animate-pulse" : "bg-white/30"}`} />
                 Registrarse
               </button>
             </div>
@@ -266,14 +253,13 @@ export default function Auth() {
 
         {/* Grid Principal: Formulario a la Izquierda + Panel Visual a la Derecha */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-          
-          {/* Columna Izquierda: Formulario "Join the Future" */}
+
+          {/* Columna Izquierda: Formulario */}
           <div className="lg:col-span-7">
             <div className="mb-6">
-              <h2 className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F]">
                 {mode === "register" ? "Crea tu cuenta" : "Bienvenido de vuelta"}
               </h2>
-              {/* Barra de acento aurora estilo futurista */}
               <div className="h-1 w-20 bg-[#177E89] rounded-full mt-2" />
             </div>
 
@@ -281,7 +267,7 @@ export default function Auth() {
               {mode === "register" && (
                 <>
                   <div>
-                    <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                    <label className="block text-[#86868B] text-[11px] font-medium uppercase tracking-wider mb-1">
                       Nombre Completo
                     </label>
                     <input
@@ -289,13 +275,13 @@ export default function Auth() {
                       placeholder="Ej. Alejandro Ramos"
                       value={form.nombre}
                       onChange={(e) => set("nombre", e.target.value)}
-                      className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                      className="w-full bg-white border border-[#E5E5EA] focus:border-[#177E89] rounded-xl px-4 py-3 text-sm text-[#1D1D1F] placeholder-[#86868B] focus:outline-none transition-colors"
                     />
-                    {errors.nombre && <p className="text-[#ff3b80] text-xs mt-1">{errors.nombre}</p>}
+                    {errors.nombre && <p className="text-red-600 text-xs mt-1">{errors.nombre}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                    <label className="block text-[#86868B] text-[11px] font-medium uppercase tracking-wider mb-1">
                       Nombre de tu Negocio / Local
                     </label>
                     <input
@@ -303,13 +289,13 @@ export default function Auth() {
                       placeholder="Ej. Hamburguesas El Catire, Ferretería San Cristóbal, etc."
                       value={form.empresa}
                       onChange={(e) => set("empresa", e.target.value)}
-                      className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                      className="w-full bg-white border border-[#E5E5EA] focus:border-[#177E89] rounded-xl px-4 py-3 text-sm text-[#1D1D1F] placeholder-[#86868B] focus:outline-none transition-colors"
                     />
-                    {errors.empresa && <p className="text-[#ff3b80] text-xs mt-1">{errors.empresa}</p>}
+                    {errors.empresa && <p className="text-red-600 text-xs mt-1">{errors.empresa}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-2">
+                    <label className="block text-[#86868B] text-[11px] font-medium uppercase tracking-wider mb-2">
                       ¿De qué se trata tu negocio?
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -320,19 +306,19 @@ export default function Auth() {
                             key={r.id}
                             type="button"
                             onClick={() => set("industry", r.id)}
-                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                            className={`p-2.5 rounded-xl border text-left transition-colors cursor-pointer flex flex-col justify-between ${
                               sel
-                                ? "bg-teal-500/20 border-teal-400 text-white shadow-[0_0_15px_rgba(45,212,191,0.25)] scale-[1.02]"
-                                : "bg-white/[0.03] hover:bg-white/[0.06] border-white/10 text-white/70 hover:text-white"
+                                ? "bg-[#177E89]/10 border-[#177E89] text-[#1D1D1F]"
+                                : "bg-white hover:bg-[#F5F5F7] border-[#E5E5EA] text-[#6E6E73] hover:text-[#1D1D1F]"
                             }`}
                           >
                             <div className="flex items-center justify-between">
-                              <r.Icon size={22} className={sel ? "text-teal-300" : "text-white/60"} />
-                              {sel && <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />}
+                              <r.Icon size={22} className={sel ? "text-[#177E89]" : "text-[#86868B]"} />
+                              {sel && <span className="w-2 h-2 rounded-full bg-[#177E89]" />}
                             </div>
                             <div className="mt-1.5">
                               <div className="text-xs font-bold leading-tight">{r.label}</div>
-                              <div className="text-[10px] text-white/40 leading-snug mt-0.5 line-clamp-1">{r.sub}</div>
+                              <div className="text-[10px] text-[#86868B] leading-snug mt-0.5 line-clamp-1">{r.sub}</div>
                             </div>
                           </button>
                         );
@@ -343,7 +329,7 @@ export default function Auth() {
               )}
 
               <div>
-                <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                <label className="block text-[#86868B] text-[11px] font-medium uppercase tracking-wider mb-1">
                   {mode === "register" ? "Correo Electrónico" : "Usuario o Correo Electrónico"}
                 </label>
                 <input
@@ -351,13 +337,13 @@ export default function Auth() {
                   placeholder={mode === "register" ? "usuario@empresa.com" : "danielrein4 o correo@empresa.com"}
                   value={form.email}
                   onChange={(e) => set("email", e.target.value)}
-                  className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                  className="w-full bg-white border border-[#E5E5EA] focus:border-[#177E89] rounded-xl px-4 py-3 text-sm text-[#1D1D1F] placeholder-[#86868B] focus:outline-none transition-colors"
                 />
-                {errors.email && <p className="text-[#ff3b80] text-xs mt-1">{errors.email}</p>}
+                {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email}</p>}
               </div>
 
               <div>
-                <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                <label className="block text-[#86868B] text-[11px] font-medium uppercase tracking-wider mb-1">
                   Contraseña
                 </label>
                 <input
@@ -365,17 +351,17 @@ export default function Auth() {
                   placeholder="••••••••••••"
                   value={form.password}
                   onChange={(e) => set("password", e.target.value)}
-                  className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                  className="w-full bg-white border border-[#E5E5EA] focus:border-[#177E89] rounded-xl px-4 py-3 text-sm text-[#1D1D1F] placeholder-[#86868B] focus:outline-none transition-colors"
                 />
-                {errors.password && <p className="text-[#ff3b80] text-xs mt-1">{errors.password}</p>}
-                
+                {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password}</p>}
+
                 {/* Indicador sutil de seguridad */}
                 {form.password.length > 0 && (
                   <div className="flex items-center gap-1.5 mt-2">
-                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 1 ? "bg-teal-400" : "bg-white/10"}`} />
-                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 6 ? "bg-teal-400" : "bg-white/10"}`} />
-                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 10 ? "bg-teal-400" : "bg-white/10"}`} />
-                    <span className="text-[10px] text-white/40 font-mono ml-1">
+                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 1 ? "bg-[#177E89]" : "bg-[#E5E5EA]"}`} />
+                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 6 ? "bg-[#177E89]" : "bg-[#E5E5EA]"}`} />
+                    <div className={`h-1 flex-1 rounded-full ${form.password.length >= 10 ? "bg-[#177E89]" : "bg-[#E5E5EA]"}`} />
+                    <span className="text-[10px] text-[#86868B] ml-1">
                       {form.password.length < 6 ? "Débil" : form.password.length < 10 ? "Buena" : "Segura"}
                     </span>
                   </div>
@@ -384,7 +370,7 @@ export default function Auth() {
 
               {mode === "register" && (
                 <div>
-                  <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-1">
+                  <label className="block text-[#86868B] text-[11px] font-medium uppercase tracking-wider mb-1">
                     Confirmar Contraseña
                   </label>
                   <input
@@ -392,9 +378,9 @@ export default function Auth() {
                     placeholder="••••••••••••"
                     value={form.confirmar}
                     onChange={(e) => set("confirmar", e.target.value)}
-                    className="w-full bg-white/[0.04] hover:bg-white/[0.06] border border-white/10 focus:border-teal-400/60 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none transition-all shadow-inner"
+                    className="w-full bg-white border border-[#E5E5EA] focus:border-[#177E89] rounded-xl px-4 py-3 text-sm text-[#1D1D1F] placeholder-[#86868B] focus:outline-none transition-colors"
                   />
-                  {errors.confirmar && <p className="text-[#ff3b80] text-xs mt-1">{errors.confirmar}</p>}
+                  {errors.confirmar && <p className="text-red-600 text-xs mt-1">{errors.confirmar}</p>}
                 </div>
               )}
 
@@ -405,19 +391,19 @@ export default function Auth() {
                     type="checkbox"
                     checked={mode === "login" ? form.remember : form.terms}
                     onChange={(e) => set(mode === "login" ? "remember" : "terms", e.target.checked)}
-                    className="w-4 h-4 rounded border-white/20 bg-white/5 accent-teal-400 focus:ring-0 focus:outline-none"
+                    className="w-4 h-4 rounded border-[#D1D1D6] accent-[#177E89] focus:ring-0 focus:outline-none"
                   />
-                  <span className="text-xs text-white/60 hover:text-white/80 transition-colors">
+                  <span className="text-xs text-[#6E6E73] hover:text-[#1D1D1F] transition-colors">
                     {mode === "login" ? (
                       "Mantener sesión activa"
                     ) : (
                       <>
                         Acepto los{" "}
-                        <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline" onClick={(e) => e.stopPropagation()}>
+                        <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-[#177E89] hover:text-[#1D1D1F] underline" onClick={(e) => e.stopPropagation()}>
                           términos
                         </a>{" "}
                         y la{" "}
-                        <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-teal-400 hover:text-teal-300 underline" onClick={(e) => e.stopPropagation()}>
+                        <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#177E89] hover:text-[#1D1D1F] underline" onClick={(e) => e.stopPropagation()}>
                           política de privacidad
                         </a>
                       </>
@@ -429,52 +415,63 @@ export default function Auth() {
                   <button
                     type="button"
                     onClick={() => { setModalOlvide(true); setEmailOlvide(form.email); setMensajeOlvide(null); }}
-                    className="text-xs text-teal-400 hover:text-teal-300 transition-colors cursor-pointer"
+                    className="text-xs text-[#177E89] hover:text-[#1D1D1F] transition-colors cursor-pointer"
                   >
                     ¿Olvidaste tu clave?
                   </button>
                 )}
               </div>
-              {errors.terms && <p className="text-[#ff3b80] text-xs -mt-2">{errors.terms}</p>}
+              {errors.terms && <p className="text-red-600 text-xs -mt-2">{errors.terms}</p>}
 
               {errors.submit && (
-                <p className="text-[#ff3b80] text-xs text-center -mb-1">{errors.submit}</p>
+                <p className="text-red-600 text-xs text-center -mb-1">{errors.submit}</p>
               )}
 
-              {/* Botón Principal Cyber Neon */}
-              <button
+              {/* Botón Principal */}
+              <SpecularButton
                 type="submit"
+                size="lg"
+                radius={999}
+                tint="#177E89"
+                tintOpacity={1}
+                textColor="#f5f5f5"
+                lineColor="#5BC0BE"
+                baseColor="#177E89"
+                shineSize={10}
+                shineFade={40}
+                intensity={1}
+                thickness={1}
+                proximity={280}
+                className="w-full mt-4"
                 disabled={enviando}
-                className="w-full btn-cyber-neon text-white font-bold py-3.5 rounded-full text-sm mt-4 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+              >
                 {enviando ? "Configurando tu negocio…" : mode === "register" ? `Crear cuenta y entrar a ${rubroActual.label} →` : "Ingresar a la plataforma →"}
-              </button>
+              </SpecularButton>
             </form>
           </div>
 
-          {/* Columna Derecha: Tarjeta Visual Futurista Apple Glass */}
+          {/* Columna Derecha: Tarjeta Visual */}
           <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-6">
-            <div className="apple-glass rounded-2xl p-6 sm:p-7 relative overflow-hidden border border-white/10 shadow-2xl">
-              <div className="line-aurora absolute top-0 left-0 right-0" />
-              
-              <p className="text-sm sm:text-base text-white/80 leading-relaxed italic mb-4 font-light">
+            <div className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-6 sm:p-7 relative overflow-hidden">
+              <p className="text-sm sm:text-base text-[#1D1D1F] leading-relaxed italic mb-4">
                 "El bolívar se mueve de la mañana a la tarde y tu caja lo refleja al instante — tú fijas la tasa, no una hoja de cálculo desactualizada."
               </p>
 
-              <div className="text-xs font-mono text-teal-400 font-semibold tracking-wider">
-                // Aurora Engine Core
+              <div className="text-xs font-semibold tracking-wider text-[#177E89]">
+                Aurora Engine Core
               </div>
 
-              <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-xs text-white/50">
+              <div className="mt-6 pt-5 border-t border-[#E5E5EA] space-y-2 text-xs text-[#6E6E73]">
                 <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#177E89]" />
                   <span>4 verticales nativas — Clínicas, Restaurantes, Comercio y Ganadería</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#177E89]" />
                   <span>Multi-moneda en vivo (USD · VES · COP)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#177E89]" />
                   <span>POS resiliente a cortes de conexión, caja 100% idempotente</span>
                 </div>
               </div>
@@ -482,7 +479,7 @@ export default function Auth() {
 
             {/* Badge inferior derecho de seguridad */}
             <div className="flex justify-end">
-              <div className="apple-glass-pill rounded-full px-4 py-2 flex items-center gap-2 text-xs text-white/70 shadow-lg">
+              <div className="bg-white border border-[#E5E5EA] rounded-full px-4 py-2 flex items-center gap-2 text-xs text-[#6E6E73] shadow-sm">
                 <IconLock size={14} />
                 <span className="font-medium text-[11px] tracking-wide">Conexión cifrada (HTTPS) · Contraseñas nunca en texto plano</span>
               </div>
@@ -493,24 +490,24 @@ export default function Auth() {
       </div>
 
       {modalOlvide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
-          <div className="relative w-full max-w-sm rounded-3xl p-6 bg-[#0a0e17] border border-white/10 text-white space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="relative w-full max-w-sm rounded-3xl p-6 bg-white border border-[#E5E5EA] text-[#1D1D1F] space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-lg">Recuperar contraseña</h3>
               <button
                 type="button"
                 onClick={() => setModalOlvide(false)}
-                className="text-white/40 hover:text-white cursor-pointer text-xl leading-none"
+                className="text-[#86868B] hover:text-[#1D1D1F] cursor-pointer text-xl leading-none"
               >
                 ×
               </button>
             </div>
-            <p className="text-xs text-white/50">
+            <p className="text-xs text-[#86868B]">
               Ingresa tu correo y te enviamos un enlace para elegir una nueva contraseña.
             </p>
             <form onSubmit={handleSolicitarOlvide} className="space-y-3">
               {mensajeOlvide && (
-                <p className="text-xs text-teal-300 bg-teal-500/10 border border-teal-500/20 rounded-xl p-3">{mensajeOlvide}</p>
+                <p className="text-xs text-[#177E89] bg-[#177E89]/10 border border-[#177E89]/20 rounded-xl p-3">{mensajeOlvide}</p>
               )}
               <input
                 type="email"
@@ -518,12 +515,12 @@ export default function Auth() {
                 value={emailOlvide}
                 onChange={(e) => setEmailOlvide(e.target.value)}
                 placeholder="tu@correo.com"
-                className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 text-white text-sm focus:outline-none focus:border-teal-400"
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E5E5EA] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:border-[#177E89]"
               />
               <button
                 type="submit"
                 disabled={enviandoOlvide}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 text-slate-900 text-sm font-bold cursor-pointer disabled:opacity-50"
+                className="w-full py-2.5 rounded-xl btn-deep-black text-sm font-semibold cursor-pointer disabled:opacity-50"
               >
                 {enviandoOlvide ? "Enviando…" : "Enviar enlace de recuperación"}
               </button>

@@ -123,236 +123,13 @@ function SvgCopy({ className = "w-3.5 h-3.5", style }: { className?: string; sty
   );
 }
 
-/* =========================================================================
-   ILUSTRACIONES VECTORIALES EXCLUSIVAS PARA CADA PRODUCTO (CERO REPETICION)
-   ========================================================================= */
-
-// Silueta genérica de caja/producto — usada cuando un producto no tiene foto
-// Y no coincide con ninguna ilustración de la muestra de lujo (ej. un negocio
-// real de ferretería o calzado, no la demo de perfumería). Antes el "default"
-// caía en el frasco de Baccarat Rouge 540, que no tiene ningún sentido fuera
-// de esa muestra.
+// Silueta genérica de producto — usada cuando un producto no tiene foto propia.
+// Ícono de trazo simple (consistente con los Icon* de ../Icons), sin ilustraciones
+// decorativas: el sistema de diseño de la tienda no usa dibujos vectoriales por producto.
 function VisualProductoGenerico({ className = "w-24 h-24" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M21 8L12 3L3 8M21 8L12 13M21 8V16L12 21M3 8L12 13M3 8V16L12 21M12 13V21" stroke="#A3A3A3" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-// 1. Frasco de Baccarat Rouge 540 (Cristal rubí y tapón ámbar/dorado)
-function VisualBaccaratRouge({ className = "w-28 h-40" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 120 170" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="36" y="8" width="48" height="24" rx="3" fill="#D4AF37" stroke="#997A15" strokeWidth="1.5" />
-      <rect x="42" y="2" width="36" height="8" rx="2" fill="#E6CA65" />
-      <rect x="52" y="32" width="16" height="12" fill="#C5A028" />
-      <rect x="18" y="44" width="84" height="116" rx="14" fill="#8B1824" stroke="#660E18" strokeWidth="2" />
-      <rect x="24" y="50" width="72" height="104" rx="10" fill="#A82030" />
-      <path d="M28 54L38 144" stroke="#E55B6E" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
-      <rect x="32" y="78" width="56" height="48" rx="4" fill="#F4E8C1" stroke="#D4AF37" strokeWidth="1" />
-      <rect x="36" y="82" width="48" height="40" fill="#FAF6E8" />
-      <text x="60" y="98" textAnchor="middle" fill="#8B1824" fontSize="6.5" fontFamily="serif" fontWeight="bold" letterSpacing="0.5">
-        BACCARAT
-      </text>
-      <text x="60" y="108" textAnchor="middle" fill="#111" fontSize="8" fontFamily="sans-serif" fontWeight="900" letterSpacing="1">
-        540
-      </text>
-      <text x="60" y="116" textAnchor="middle" fill="#666" fontSize="4.5" fontFamily="sans-serif" letterSpacing="0.5">
-        EXTRAIT DE PARFUM
-      </text>
-      <ellipse cx="60" cy="164" rx="42" ry="4" fill="#000" opacity="0.1" />
-    </svg>
-  );
-}
-
-// 2. Frasco Monolítico Tom Ford Oud Wood (Ahumado carbón oscuro y placa plateada)
-function VisualTomFordOud({ className = "w-28 h-40" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 120 170" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="38" y="6" width="44" height="28" rx="2" fill="#1F2421" stroke="#111" strokeWidth="1.5" />
-      <rect x="34" y="2" width="52" height="6" rx="1" fill="#2E3530" />
-      <rect x="53" y="34" width="14" height="10" fill="#999" />
-      <rect x="22" y="44" width="76" height="116" rx="4" fill="#1A1D1A" stroke="#0D0E0D" strokeWidth="2" />
-      <rect x="27" y="49" width="66" height="106" rx="2" fill="#242924" />
-      <path d="M30 52L30 150" stroke="#4B554E" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
-      <rect x="34" y="80" width="52" height="38" rx="2" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="1" />
-      <text x="60" y="93" textAnchor="middle" fill="#0F172A" fontSize="6.5" fontFamily="sans-serif" fontWeight="900" letterSpacing="0.8">
-        TOM FORD
-      </text>
-      <text x="60" y="103" textAnchor="middle" fill="#334155" fontSize="6" fontFamily="sans-serif" fontWeight="bold" letterSpacing="0.5">
-        OUD WOOD
-      </text>
-      <text x="60" y="111" textAnchor="middle" fill="#64748B" fontSize="4" fontFamily="sans-serif" letterSpacing="0.3">
-        EAU DE PARFUM
-      </text>
-      <ellipse cx="60" cy="164" rx="38" ry="4" fill="#000" opacity="0.12" />
-    </svg>
-  );
-}
-
-// 3. Frasco Botica Le Labo Santal 33 (Vidrio transparente y etiqueta artesanal)
-function VisualLeLaboSantal({ className = "w-28 h-40" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 120 170" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="44" y="8" width="32" height="26" rx="3" fill="#64748B" stroke="#475569" strokeWidth="1" />
-      <rect x="52" y="34" width="16" height="10" fill="#94A3B8" />
-      <path
-        d="M26 62C26 52 34 44 44 44H76C86 44 94 52 94 62V150C94 156 89 160 83 160H37C31 160 26 156 26 150V62Z"
-        fill="#F8FAFC"
-        stroke="#CBD5E1"
-        strokeWidth="2"
-      />
-      <rect x="30" y="60" width="60" height="96" rx="4" fill="#F1F5F9" opacity="0.7" />
-      <rect x="30" y="75" width="60" height="60" fill="#FFFDF8" stroke="#E2E8F0" strokeWidth="1" />
-      <text x="60" y="90" textAnchor="middle" fill="#0F172A" fontSize="7" fontFamily="monospace" fontWeight="bold" letterSpacing="0.5">
-        LE LABO
-      </text>
-      <text x="60" y="103" textAnchor="middle" fill="#0F172A" fontSize="8.5" fontFamily="monospace" fontWeight="900" letterSpacing="0.8">
-        SANTAL 33
-      </text>
-      <text x="60" y="113" textAnchor="middle" fill="#64748B" fontSize="4.5" fontFamily="monospace">
-        100ml 3.4 FL.OZ.
-      </text>
-      <text x="60" y="123" textAnchor="middle" fill="#94A3B8" fontSize="4" fontFamily="monospace">
-        LABORATORY CRAFT
-      </text>
-      <ellipse cx="60" cy="164" rx="36" ry="4" fill="#000" opacity="0.08" />
-    </svg>
-  );
-}
-
-// 4. Frasco Imperial Creed Aventus (Hombros plateados y cuerpo texturizado)
-function VisualCreedAventus({ className = "w-28 h-40" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 120 170" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="42" y="6" width="36" height="24" rx="4" fill="#1E293B" stroke="#0F172A" strokeWidth="1.5" />
-      <circle cx="60" cy="18" r="4" fill="#E2E8F0" />
-      <path
-        d="M20 62C20 48 30 40 46 40H74C90 40 100 48 100 62V152C100 158 95 162 89 162H31C25 162 20 158 20 152V62Z"
-        fill="#0F172A"
-        stroke="#020617"
-        strokeWidth="2"
-      />
-      <path
-        d="M21 60C21 48 30 41 46 41H74C90 41 99 48 99 60V84H21V60Z"
-        fill="#E2E8F0"
-        stroke="#94A3B8"
-        strokeWidth="1"
-      />
-      <rect x="30" y="98" width="60" height="38" rx="2" fill="#1E293B" stroke="#475569" strokeWidth="1" />
-      <text x="60" y="112" textAnchor="middle" fill="#F8FAFC" fontSize="7" fontFamily="serif" fontWeight="bold" letterSpacing="1">
-        CREED
-      </text>
-      <text x="60" y="123" textAnchor="middle" fill="#E2E8F0" fontSize="7.5" fontFamily="serif" fontWeight="900" letterSpacing="1">
-        AVENTUS
-      </text>
-      <ellipse cx="60" cy="165" rx="40" ry="4" fill="#000" opacity="0.14" />
-    </svg>
-  );
-}
-
-// 5. Frasco de Porcelana Kilian Paris Love (Blanco inmaculado con placa dorada)
-function VisualKilianLove({ className = "w-28 h-40" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 120 170" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="42" y="8" width="36" height="24" rx="2" fill="#D4AF37" stroke="#A17B1B" strokeWidth="1.5" />
-      <rect x="52" y="32" width="16" height="12" fill="#B8942A" />
-      <rect x="24" y="44" width="72" height="116" rx="8" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="2" />
-      <path d="M27 48V156" stroke="#F1F5F9" strokeWidth="3" />
-      <path d="M93 48V156" stroke="#F1F5F9" strokeWidth="3" />
-      <rect x="34" y="78" width="52" height="48" rx="3" fill="#FAF6E8" stroke="#D4AF37" strokeWidth="1.2" />
-      <text x="60" y="95" textAnchor="middle" fill="#1E293B" fontSize="6.5" fontFamily="serif" letterSpacing="0.8">
-        KILIAN PARIS
-      </text>
-      <text x="60" y="106" textAnchor="middle" fill="#991B1B" fontSize="7.5" fontFamily="serif" fontWeight="bold">
-        LOVE
-      </text>
-      <text x="60" y="115" textAnchor="middle" fill="#64748B" fontSize="4.5" fontFamily="sans-serif">
-        DON'T BE SHY
-      </text>
-      <ellipse cx="60" cy="164" rx="36" ry="4" fill="#000" opacity="0.08" />
-    </svg>
-  );
-}
-
-// 6. Sneaker Escultórico Chunky Balenciaga Triple S
-function VisualBalenciagaTripleS({ className = "w-44 h-28" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 200 110" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M20 74C20 74 38 68 60 62C82 56 108 34 136 34C156 34 172 44 182 58C188 66 190 74 186 78C176 86 160 84 140 84C108 84 80 88 56 88C36 88 20 84 20 74Z"
-        fill="#E2E8F0"
-        stroke="#94A3B8"
-        strokeWidth="2"
-      />
-      <path
-        d="M24 78C38 78 72 82 108 80C144 78 176 80 186 76C186 86 166 94 134 94C94 94 56 94 28 92C18 90 18 84 24 78Z"
-        fill="#CBD5E1"
-        stroke="#94A3B8"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M18 88C32 88 70 94 112 92C154 90 182 92 192 86C190 98 168 104 128 104C80 104 40 102 14 98C10 94 12 90 18 88Z"
-        fill="#0F172A"
-      />
-      <path
-        d="M92 48L114 66M110 44L128 62M128 42L142 58"
-        stroke="#0F172A"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <rect x="144" y="60" width="18" height="8" rx="2" fill="#0F172A" />
-      <text x="153" y="66" textAnchor="middle" fill="#FFF" fontSize="4.5" fontFamily="sans-serif" fontWeight="bold">
-        42
-      </text>
-      <ellipse cx="106" cy="106" rx="84" ry="4" fill="#000" opacity="0.12" />
-    </svg>
-  );
-}
-
-// 7. Zapato Derby Formal en Cuero Spazzolato Prada
-function VisualPradaDerby({ className = "w-44 h-28" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 200 110" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M26 68C26 68 44 64 68 58C92 52 116 38 136 38C152 38 166 46 178 58C186 66 188 74 182 78C168 84 148 82 120 82C84 82 56 84 32 84C22 84 22 74 26 68Z"
-        fill="#0A0A0A"
-        stroke="#000000"
-        strokeWidth="2"
-      />
-      <path d="M50 56C72 48 114 38 138 46" stroke="#404040" strokeWidth="2.5" strokeLinecap="round" />
-      <path
-        d="M18 78C30 78 70 82 114 82C158 82 182 80 188 76C188 84 172 90 144 90C108 90 60 90 24 88C16 86 14 82 18 78Z"
-        fill="#171717"
-      />
-      <rect x="18" y="86" width="34" height="12" rx="2" fill="#000000" />
-      <path d="M102 50L112 62M112 48L122 60M122 46L130 58" stroke="#525252" strokeWidth="1.8" strokeLinecap="round" />
-      <ellipse cx="106" cy="98" rx="82" ry="4" fill="#000" opacity="0.14" />
-    </svg>
-  );
-}
-
-// 8. Bota Acordonada Alexander McQueen Tread Slick
-function VisualMcQueenBoot({ className = "w-44 h-32" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 200 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M50 20H86C92 20 96 24 96 30V62C122 62 152 68 168 80C176 86 176 94 168 98C148 104 116 102 86 102C58 102 44 100 42 90L42 28C42 24 46 20 50 20Z"
-        fill="#111827"
-        stroke="#030712"
-        strokeWidth="2"
-      />
-      <path d="M96 32V64" stroke="#D1D5DB" strokeWidth="2.5" strokeDasharray="3 3" />
-      <path
-        d="M36 94C56 94 108 98 148 98C172 98 182 92 184 88C184 102 164 114 128 114C80 114 46 112 28 106C22 100 26 94 36 94Z"
-        fill="#FFFFFF"
-        stroke="#E5E7EB"
-        strokeWidth="2"
-      />
-      <rect x="28" y="104" width="154" height="8" rx="2" fill="#F3F4F6" stroke="#D1D5DB" strokeWidth="1" />
-      <path d="M38 112L42 120M62 112L66 120M86 112L90 120M110 112L114 120M134 112L138 120M158 112L162 120" stroke="#9CA3AF" strokeWidth="3" strokeLinecap="round" />
-      <ellipse cx="106" cy="124" rx="80" ry="4" fill="#000" opacity="0.12" />
+      <path d="M21 8L12 3L3 8M21 8L12 13M21 8V16L12 21M3 8L12 13M3 8V16L12 21M12 13V21" stroke="#D1D1D6" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -972,27 +749,9 @@ export default function CatalogoPublico() {
   }, [productosActivos, categoriaSeleccionada, busqueda]);
 
   // Renderizar la silueta adecuada para cada producto
-  const renderVisualProducto = (tipo?: string) => {
-    switch (tipo) {
-      case "baccarat":
-        return <VisualBaccaratRouge className="w-24 sm:w-28 h-36 sm:h-44 transition-transform duration-300 group-hover:scale-105" />;
-      case "tomford":
-        return <VisualTomFordOud className="w-24 sm:w-28 h-36 sm:h-44 transition-transform duration-300 group-hover:scale-105" />;
-      case "lelabo":
-        return <VisualLeLaboSantal className="w-24 sm:w-28 h-36 sm:h-44 transition-transform duration-300 group-hover:scale-105" />;
-      case "creed":
-        return <VisualCreedAventus className="w-24 sm:w-28 h-36 sm:h-44 transition-transform duration-300 group-hover:scale-105" />;
-      case "kilian":
-        return <VisualKilianLove className="w-24 sm:w-28 h-36 sm:h-44 transition-transform duration-300 group-hover:scale-105" />;
-      case "balenciaga":
-        return <VisualBalenciagaTripleS className="w-40 sm:w-48 h-auto transition-transform duration-300 group-hover:scale-105" />;
-      case "prada":
-        return <VisualPradaDerby className="w-40 sm:w-48 h-auto transition-transform duration-300 group-hover:scale-105" />;
-      case "mcqueen":
-        return <VisualMcQueenBoot className="w-40 sm:w-48 h-auto transition-transform duration-300 group-hover:scale-105" />;
-      default:
-        return <VisualProductoGenerico className="w-20 sm:w-24 h-20 sm:h-24 transition-transform duration-300 group-hover:scale-105" />;
-    }
+  // Silueta genérica cuando el producto no tiene foto propia (sin ilustraciones decorativas por producto).
+  const renderVisualProducto = (_tipo?: string) => {
+    return <VisualProductoGenerico className="w-20 sm:w-24 h-20 sm:h-24 transition-transform duration-300 group-hover:scale-105" />;
   };
 
   // Abrir modal de detalle al hacer clic en un producto
@@ -1217,25 +976,25 @@ export default function CatalogoPublico() {
 
   if (cargando) {
     return (
-      <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center text-neutral-600 font-['Plus_Jakarta_Sans',sans-serif]">
-        <div className="w-8 h-8 border-2 border-neutral-300 border-t-neutral-900 rounded-full animate-spin mb-4" />
-        <p className="text-[11px] font-bold tracking-[0.25em] uppercase text-neutral-800">Cargando Catálogo</p>
+      <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center text-[#6E6E73]">
+        <div className="w-8 h-8 border-2 border-[#D1D1D6] border-t-[#1D1D1F] rounded-full animate-spin mb-4" />
+        <p className="text-[11px] font-bold tracking-[0.25em] uppercase text-[#1D1D1F]">Cargando Catálogo</p>
       </div>
     );
   }
 
   if (error || !tienda) {
     return (
-      <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-6 text-center text-neutral-800 font-['Plus_Jakarta_Sans',sans-serif]">
-        <div className="w-16 h-16 rounded-3xl bg-white border border-neutral-200 flex items-center justify-center text-neutral-400 mb-4 shadow-sm">
+      <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center p-6 text-center text-[#1D1D1F]">
+        <div className="w-16 h-16 rounded-3xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#86868B] mb-4 shadow-sm">
           <SvgStore className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-semibold text-neutral-900 mb-2 font-['Cormorant_Garamond',serif]">Boutique no disponible</h2>
-        <p className="text-xs text-neutral-500 max-w-md mb-6">{error || "No se ha encontrado la tienda solicitada."}</p>
+        <h2 className="text-xl font-semibold text-[#1D1D1F] mb-2">Boutique no disponible</h2>
+        <p className="text-xs text-[#86868B] max-w-md mb-6">{error || "No se ha encontrado la tienda solicitada."}</p>
         <Link
           to="/"
           className="px-6 py-2.5 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase transition-all hover:opacity-90"
-          style={{ backgroundColor: "#171717", color: "#ffffff" }}
+          style={{ backgroundColor: "#1D1D1F", color: "#ffffff" }}
         >
           <span style={{ color: "#ffffff" }}>Volver al Inicio</span>
         </Link>
@@ -1250,7 +1009,7 @@ export default function CatalogoPublico() {
     : null;
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] font-['Plus_Jakarta_Sans',sans-serif] selection:bg-neutral-900 selection:text-white relative">
+    <div className="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] selection:bg-[#1D1D1F] selection:text-white relative">
       {/* Marca de Agua Fija del Logo del Comercio - Visible durante todo el scroll */}
       <div 
         className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden select-none"
@@ -1263,7 +1022,7 @@ export default function CatalogoPublico() {
             className="w-[340px] sm:w-[520px] md:w-[700px] max-h-[75vh] object-contain opacity-[0.055] filter contrast-125 select-none pointer-events-none transform -rotate-6 transition-all duration-700"
           />
         ) : (
-          <div className="font-serif text-[20vw] font-bold text-neutral-900 opacity-[0.035] select-none pointer-events-none tracking-widest uppercase transform -rotate-6">
+          <div className="text-[20vw] font-bold text-[#1D1D1F] opacity-[0.035] select-none pointer-events-none tracking-widest uppercase transform -rotate-6">
             {(tienda.nombreTienda || "AP").substring(0, 4)}
           </div>
         )}
@@ -1275,12 +1034,12 @@ export default function CatalogoPublico() {
         // la tienda superpuesto. El scrim oscuro (no el difuminado blanco de Compacto)
         // es lo que hace legible el texto sobre la foto; solo el borde inferior se
         // funde a blanco para no cortar seco contra el header que sigue.
-        <div className="relative z-10 w-full h-72 sm:h-[28rem] overflow-hidden bg-neutral-900">
+        <div className="relative z-10 w-full h-72 sm:h-[28rem] overflow-hidden bg-[#1D1D1F]">
           <img src={tienda.bannerBase64} alt={`Portada de ${tienda.nombreTienda}`} className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-black/20" />
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-[#fafafa]" />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-[#F5F5F7]" />
           <div className="relative h-full flex flex-col items-center justify-center text-center px-4">
-            <h1 className="font-['Cormorant_Garamond',serif] text-4xl sm:text-6xl font-semibold text-white tracking-[0.08em] uppercase drop-shadow-lg">
+            <h1 className="text-4xl sm:text-6xl font-semibold text-white tracking-[0.08em] uppercase drop-shadow-sm">
               {tienda.nombreTienda}
             </h1>
             {tienda.slogan && (
@@ -1306,7 +1065,7 @@ export default function CatalogoPublico() {
       )}
 
       {/* 1. Header Minimalista de Alta Gama con Marca y Controles */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200/60 transition-all">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-none border-b border-[#E5E5EA]/60 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           {/* Logo del Comercio / Identidad */}
           <div className="flex items-center gap-4 min-w-0">
@@ -1321,10 +1080,10 @@ export default function CatalogoPublico() {
                   }}
                 />
                 <div className="hidden sm:block">
-                  <h1 className="font-serif text-lg sm:text-xl font-bold tracking-tight text-neutral-950 uppercase leading-none">
+                  <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#1D1D1F] uppercase leading-none">
                     {tienda.nombreTienda}
                   </h1>
-                  <span className="text-[10px] tracking-[0.25em] text-neutral-400 uppercase block mt-0.5">
+                  <span className="text-[10px] tracking-[0.25em] text-[#86868B] uppercase block mt-0.5">
                     Catalogo Oficial
                   </span>
                 </div>
@@ -1332,16 +1091,16 @@ export default function CatalogoPublico() {
             ) : (
               <div className="flex items-center gap-3">
                 <div 
-                  className="w-11 h-11 rounded-2xl bg-gradient-to-br from-white to-neutral-100 border border-neutral-200/90 flex items-center justify-center font-serif text-base font-bold tracking-wider shadow-sm"
-                  style={{ color: '#171717' }}
+                  className="w-11 h-11 rounded-2xl bg-gradient-to-br from-white to-[#F5F5F7] border border-[#E5E5EA]/90 flex items-center justify-center text-base font-bold tracking-wider shadow-sm"
+                  style={{ color: '#1D1D1F' }}
                 >
                   {tienda.nombreTienda.substring(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <h1 className="text-lg sm:text-xl font-['Cormorant_Garamond',serif] font-semibold tracking-wide text-neutral-950 uppercase leading-none">
+                  <h1 className="text-lg sm:text-xl font-semibold tracking-wide text-[#1D1D1F] uppercase leading-none">
                     {tienda.nombreTienda}
                   </h1>
-                  <span className="text-[9px] font-bold text-neutral-400 tracking-[0.25em] uppercase block mt-0.5">
+                  <span className="text-[9px] font-bold text-[#86868B] tracking-[0.25em] uppercase block mt-0.5">
                     Catálogo Oficial
                   </span>
                 </div>
@@ -1352,33 +1111,33 @@ export default function CatalogoPublico() {
           {/* Selector de Moneda y Carrito */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             {/* Tasa BCV Pill */}
-            <div className="hidden md:flex items-center px-3 py-1 rounded-full bg-neutral-100/90 border border-neutral-200/80 text-[11px] font-mono text-neutral-600">
+            <div className="hidden md:flex items-center px-3 py-1 rounded-full bg-[#F5F5F7]/90 border border-[#E5E5EA]/80 text-[11px] text-[#6E6E73]">
               BCV: {tasa.toFixed(2)} Bs/$
             </div>
 
             {/* Toggle de Moneda */}
-            <div className="flex items-center p-1 rounded-full bg-neutral-100 border border-neutral-200 text-xs">
+            <div className="flex items-center p-1 rounded-full bg-[#F5F5F7] border border-[#E5E5EA] text-xs">
               <button
                 type="button"
                 onClick={() => setMoneda("USD")}
                 className="px-3.5 py-1 rounded-full transition-all text-xs font-bold shadow-sm"
                 style={{
-                  backgroundColor: moneda === "USD" ? "#171717" : "transparent",
-                  color: moneda === "USD" ? "#ffffff" : "#64748b"
+                  backgroundColor: moneda === "USD" ? "#1D1D1F" : "transparent",
+                  color: moneda === "USD" ? "#ffffff" : "#86868B"
                 }}
               >
-                <span style={{ color: moneda === "USD" ? "#ffffff" : "#64748b" }}>USD ($)</span>
+                <span style={{ color: moneda === "USD" ? "#ffffff" : "#86868B" }}>USD ($)</span>
               </button>
               <button
                 type="button"
                 onClick={() => setMoneda("VES")}
                 className="px-3.5 py-1 rounded-full transition-all text-xs font-bold shadow-sm"
                 style={{
-                  backgroundColor: moneda === "VES" ? "#171717" : "transparent",
-                  color: moneda === "VES" ? "#ffffff" : "#64748b"
+                  backgroundColor: moneda === "VES" ? "#1D1D1F" : "transparent",
+                  color: moneda === "VES" ? "#ffffff" : "#86868B"
                 }}
               >
-                <span style={{ color: moneda === "VES" ? "#ffffff" : "#64748b" }}>VES (Bs.)</span>
+                <span style={{ color: moneda === "VES" ? "#ffffff" : "#86868B" }}>VES (Bs.)</span>
               </button>
             </div>
 
@@ -1386,13 +1145,13 @@ export default function CatalogoPublico() {
             <button
               type="button"
               onClick={abrirDrawerCarrito}
-              className="relative w-11 h-11 rounded-2xl bg-white hover:bg-neutral-100 border border-neutral-200/90 text-neutral-800 flex items-center justify-center transition-all shadow-sm active:scale-95"
+              className="relative w-11 h-11 rounded-2xl bg-white hover:bg-[#F5F5F7] border border-[#E5E5EA]/90 text-[#1D1D1F] flex items-center justify-center transition-all shadow-sm active:scale-95"
               title="Ver Bolsa de Compras"
             >
               <SvgBag className="w-5 h-5" />
               {totalItems > 0 && (
                 <span 
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 font-bold text-[10px] rounded-full flex items-center justify-center shadow-md animate-scale-up"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#177E89] font-bold text-[10px] rounded-full flex items-center justify-center shadow-sm animate-scale-up"
                   style={{ color: '#ffffff' }}
                 >
                   {totalItems}
@@ -1405,7 +1164,7 @@ export default function CatalogoPublico() {
         {/* 2. Menú desplegable de Categorías (único selector de categoría de la
             página — reemplaza tanto las píldoras como el panel lateral que hubo
             antes, para no repetir el mismo filtro dos veces) + Buscador */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4 border-t border-neutral-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4 border-t border-[#F5F5F7]">
           {categorias.length > 2 ? (
             <div ref={categoriasMenuRef} className="relative flex-shrink-0">
               <button
@@ -1420,7 +1179,7 @@ export default function CatalogoPublico() {
               {/* Panel: siempre montado, animado con opacity + translate-y para que
                   abra/cierre con una transición suave en vez de aparecer de golpe. */}
               <div
-                className={`absolute left-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-lg border border-[#E5E5EA] py-2 z-30 origin-top transition-all duration-300 ease-out ${
+                className={`absolute left-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-sm border border-[#E5E5EA] py-2 z-30 origin-top transition-all duration-300 ease-out ${
                   categoriasAbiertas
                     ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
                     : "opacity-0 -translate-y-2 scale-95 pointer-events-none"
@@ -1449,7 +1208,7 @@ export default function CatalogoPublico() {
 
           {/* Buscador Integrado */}
           <div className="relative w-48 sm:w-64 flex-shrink-0">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#86868B]">
               <SvgSearch className="w-3.5 h-3.5" />
             </div>
             <input
@@ -1457,13 +1216,13 @@ export default function CatalogoPublico() {
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por aroma, marca o estilo..."
-              className="w-full pl-9 pr-7 py-1.5 rounded-full bg-neutral-100 border border-neutral-200/80 text-xs text-neutral-800 placeholder-neutral-400 focus:outline-none focus:bg-white focus:border-neutral-900 transition-all"
+              className="w-full pl-9 pr-7 py-1.5 rounded-full bg-[#F5F5F7] border border-[#E5E5EA]/80 text-xs text-[#1D1D1F] placeholder-[#86868B] focus:outline-none focus:bg-white focus:border-[#1D1D1F] transition-all"
             />
             {busqueda && (
               <button
                 type="button"
                 onClick={() => setBusqueda("")}
-                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-neutral-400 hover:text-neutral-900"
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[#86868B] hover:text-[#1D1D1F]"
               >
                 <SvgClose className="w-3.5 h-3.5" />
               </button>
@@ -1476,21 +1235,21 @@ export default function CatalogoPublico() {
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Banner de Tienda / Estado Vacío si no hay productos cargados */}
         {productosActivos.length === 0 && (
-          <div className="my-10 p-10 sm:p-16 rounded-[2.5rem] bg-white border border-neutral-100 shadow-[0_4px_30px_rgba(0,0,0,0.03)] text-center max-w-2xl mx-auto">
-            <div className="w-20 h-20 rounded-3xl bg-neutral-100 flex items-center justify-center text-neutral-800 mx-auto mb-6">
+          <div className="my-10 p-10 sm:p-16 rounded-[2.5rem] bg-white border border-[#E5E5EA] shadow-sm text-center max-w-2xl mx-auto">
+            <div className="w-20 h-20 rounded-3xl bg-[#F5F5F7] flex items-center justify-center text-[#1D1D1F] mx-auto mb-6">
               <SvgStore className="w-10 h-10" />
             </div>
 
-            <span className="inline-block px-3 py-1 rounded-full bg-neutral-100 text-neutral-700 text-[10px] font-bold tracking-[0.25em] uppercase mb-3">
+            <span className="inline-block px-3 py-1 rounded-full bg-[#F5F5F7] text-[#3A3A3C] text-[10px] font-bold tracking-[0.25em] uppercase mb-3">
               Actualización de Colección
             </span>
 
-            <h3 className="text-2xl sm:text-3xl font-['Cormorant_Garamond',serif] font-semibold text-neutral-950 uppercase tracking-wide">
+            <h3 className="text-2xl sm:text-3xl font-semibold text-[#1D1D1F] uppercase tracking-wide">
               Catálogo en Preparación
             </h3>
 
-            <p className="text-sm text-neutral-500 mt-2 max-w-md mx-auto leading-relaxed">
-              <strong className="text-neutral-900">{tienda.nombreTienda}</strong> está actualizando su catálogo digital. Puedes solicitar información directa o explorar la muestra exclusiva con fragancias y calzado de lujo.
+            <p className="text-sm text-[#86868B] mt-2 max-w-md mx-auto leading-relaxed">
+              <strong className="text-[#1D1D1F]">{tienda.nombreTienda}</strong> está actualizando su catálogo digital. Puedes solicitar información directa o explorar la muestra exclusiva con fragancias y calzado de lujo.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -1499,8 +1258,8 @@ export default function CatalogoPublico() {
                   href={phoneHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold text-xs tracking-[0.15em] uppercase transition-all shadow-md active:scale-95 hover:opacity-90"
-                  style={{ backgroundColor: "#171717", color: "#ffffff" }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold text-xs tracking-[0.15em] uppercase transition-all shadow-sm active:scale-95 hover:opacity-90"
+                  style={{ backgroundColor: "#1D1D1F", color: "#ffffff" }}
                 >
                   <SvgWhatsApp className="w-4 h-4" style={{ color: "#ffffff" }} />
                   <span style={{ color: "#ffffff" }}>Consultar por WhatsApp</span>
@@ -1510,9 +1269,9 @@ export default function CatalogoPublico() {
               <button
                 type="button"
                 onClick={() => setMostrarDemo(true)}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-900 font-bold text-xs tracking-[0.15em] uppercase transition-all active:scale-95"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-bold text-xs tracking-[0.15em] uppercase transition-all active:scale-95"
               >
-                <SvgSparkles className="w-4 h-4 text-neutral-700" />
+                <SvgSparkles className="w-4 h-4 text-[#3A3A3C]" />
                 <span>Ver Colección de Muestra</span>
               </button>
             </div>
@@ -1521,14 +1280,14 @@ export default function CatalogoPublico() {
 
         {/* Banner Informativo si el modo muestra está activo */}
         {mostrarDemo && (
-          <div className="mb-8 p-4 rounded-3xl bg-white border border-neutral-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="mb-8 p-4 rounded-3xl bg-white border border-[#E5E5EA]/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-neutral-950 text-white flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 rounded-2xl bg-[#1D1D1F] text-white flex items-center justify-center flex-shrink-0">
                 <SvgSparkles className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-950">Muestra Interactiva de Fragancias y Calzado</h4>
-                <p className="text-xs text-neutral-500">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#1D1D1F]">Muestra Interactiva de Fragancias y Calzado</h4>
+                <p className="text-xs text-[#86868B]">
                   Haz clic en cualquier artículo para ver su descripción sensorial, elegir volumen/talla y probar el carrito de compras con delivery y Pago Móvil.
                 </p>
               </div>
@@ -1536,7 +1295,7 @@ export default function CatalogoPublico() {
             <button
               type="button"
               onClick={() => setMostrarDemo(false)}
-              className="px-4 py-2 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold uppercase tracking-wider transition-colors self-start sm:self-center"
+              className="px-4 py-2 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] text-xs font-bold uppercase tracking-wider transition-colors self-start sm:self-center"
             >
               Cerrar Muestra
             </button>
@@ -1554,7 +1313,7 @@ export default function CatalogoPublico() {
               return (
                 <div
                   key={prod.id}
-                  className="group relative bg-white rounded-2xl p-7 sm:p-8 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 hover:-translate-y-1 transition-all duration-300 ease-out flex flex-col justify-between"
+                  className="group relative bg-white border border-[#E5E5EA] rounded-2xl p-7 sm:p-8 shadow-sm hover:border-[#D1D1D6] hover:-translate-y-0.5 transition-all duration-300 ease-out flex flex-col justify-between"
                 >
                   {/* Fila Superior: Marca en pequeño e insignia NUEVO */}
                   <div className="flex items-center justify-between gap-2 mb-2">
@@ -1565,7 +1324,7 @@ export default function CatalogoPublico() {
                     {prod.esNuevo && (
                       <span 
                         className="px-2.5 py-0.5 rounded-full border text-[9px] font-bold tracking-[0.2em] uppercase"
-                        style={{ backgroundColor: "#f8fafc", color: "#334155", borderColor: "#cbd5e1" }}
+                        style={{ backgroundColor: "#F5F5F7", color: "#1D1D1F", borderColor: "#D1D1D6" }}
                       >
                         Nuevo
                       </span>
@@ -1647,16 +1406,16 @@ export default function CatalogoPublico() {
 
       {/* 4. MODAL DE DETALLE DE PRODUCTO */}
       {productoDetalle && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-none flex items-center justify-center p-4 animate-fade-in">
           <div
-            className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden p-6 sm:p-8 space-y-6 animate-scale-up"
+            className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-sm overflow-hidden p-6 sm:p-8 space-y-6 animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Botón Cerrar */}
             <button
               type="button"
               onClick={cerrarDetalle}
-              className="absolute top-6 right-6 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors z-10"
+              className="absolute top-6 right-6 w-9 h-9 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#3A3A3C] flex items-center justify-center transition-colors z-10"
             >
               <SvgClose className="w-5 h-5" />
             </button>
@@ -1666,7 +1425,7 @@ export default function CatalogoPublico() {
                   propia foto, se muestra esa en vez de la genérica de la tarjeta; cambia
                   sola al elegir otro color porque cada color es su propio RepuestoItem con
                   su propia foto (ver construirTarjetaAgrupada en el backend). */}
-              <div className="bg-[#f9fafb] rounded-3xl h-64 sm:h-80 flex flex-col items-center justify-center p-6 relative">
+              <div className="bg-[#F5F5F7] rounded-3xl h-64 sm:h-80 flex flex-col items-center justify-center p-6 relative">
                 {(varianteActual?.imagenUrl || productoDetalle.imagenUrl) ? (
                   <img
                     src={varianteActual?.imagenUrl || productoDetalle.imagenUrl}
@@ -1676,7 +1435,7 @@ export default function CatalogoPublico() {
                 ) : (
                   renderVisualProducto(productoDetalle.tipoVisual)
                 )}
-                <span className="absolute bottom-4 text-[9px] font-mono text-neutral-400 tracking-[0.2em] uppercase">
+                <span className="absolute bottom-4 text-[9px] text-[#86868B] tracking-[0.2em] uppercase">
                   SKU: {productoDetalle.codigo}
                 </span>
               </div>
@@ -1684,21 +1443,21 @@ export default function CatalogoPublico() {
               {/* Información y Especificaciones */}
               <div className="space-y-4">
                 <div>
-                  <span className="text-[10px] font-bold text-neutral-400 tracking-[0.25em] uppercase">
+                  <span className="text-[10px] font-bold text-[#86868B] tracking-[0.25em] uppercase">
                     {productoDetalle.marca || productoDetalle.categoria}
                   </span>
-                  <h3 className="text-3xl sm:text-4xl font-['Cormorant_Garamond',serif] font-semibold text-neutral-950 leading-tight mt-0.5">
+                  <h3 className="text-3xl sm:text-4xl font-semibold text-[#1D1D1F] leading-tight mt-0.5">
                     {productoDetalle.nombre}
                   </h3>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="text-4xl sm:text-5xl font-black text-rose-600 tracking-tight leading-none" style={tienda.colorAcentoTienda ? { color: tienda.colorAcentoTienda } : undefined}>
+                    <span className="text-4xl sm:text-5xl font-bold text-[#177E89] tracking-tight leading-none" style={tienda.colorAcentoTienda ? { color: tienda.colorAcentoTienda } : undefined}>
                       ${(varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd).toFixed(2)}
                     </span>
-                    <span className="text-[10px] font-bold text-neutral-400 tracking-wider uppercase">USD</span>
+                    <span className="text-[10px] font-bold text-[#86868B] tracking-wider uppercase">USD</span>
                   </div>
-                  <div className="mt-1.5 flex flex-col gap-0.5 text-xs font-mono text-neutral-500">
+                  <div className="mt-1.5 flex flex-col gap-0.5 text-xs text-[#86868B]">
                     <span>
-                      {formatearMonto((varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd) * tasa)} Bs. <span className="text-neutral-400">(BCV)</span>
+                      {formatearMonto((varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd) * tasa)} Bs. <span className="text-[#86868B]">(BCV)</span>
                     </span>
                     {tienda?.tasaCop != null && tienda.tasaCop > 0 && (
                       <span>
@@ -1708,7 +1467,7 @@ export default function CatalogoPublico() {
                   </div>
                 </div>
 
-                <p className="text-xs text-neutral-600 leading-relaxed font-normal">
+                <p className="text-xs text-[#6E6E73] leading-relaxed font-normal">
                   {productoDetalle.descripcion}
                 </p>
 
@@ -1719,7 +1478,7 @@ export default function CatalogoPublico() {
                   <>
                     {coloresDisponibles.length > 0 && (
                       <div>
-                        <span className="block text-[10px] font-bold text-neutral-900 tracking-[0.2em] uppercase mb-2">
+                        <span className="block text-[10px] font-bold text-[#1D1D1F] tracking-[0.2em] uppercase mb-2">
                           1. Color
                         </span>
                         <div className="flex flex-wrap gap-2">
@@ -1736,8 +1495,8 @@ export default function CatalogoPublico() {
                               }}
                               className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                                 colorModal === c
-                                  ? "bg-neutral-900 text-white"
-                                  : "bg-neutral-100 text-neutral-600 hover:bg-neutral-800 hover:text-white"
+                                  ? "bg-[#1D1D1F] text-white"
+                                  : "bg-[#F5F5F7] text-[#6E6E73] hover:bg-[#1D1D1F] hover:text-white"
                               }`}
                             >
                               {c}
@@ -1747,7 +1506,7 @@ export default function CatalogoPublico() {
                       </div>
                     )}
                     <div>
-                      <span className="block text-[10px] font-bold text-neutral-900 tracking-[0.2em] uppercase mb-2">
+                      <span className="block text-[10px] font-bold text-[#1D1D1F] tracking-[0.2em] uppercase mb-2">
                         {coloresDisponibles.length > 0 ? "2. Talla" : "Seleccionar"}
                       </span>
                       <div className="flex flex-wrap gap-2">
@@ -1759,8 +1518,8 @@ export default function CatalogoPublico() {
                             onClick={() => setTallaModal(v.atributo)}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                               tallaModal === v.atributo
-                                ? "bg-neutral-900 text-white"
-                                : "bg-neutral-100 text-neutral-600 hover:bg-neutral-800 hover:text-white"
+                                ? "bg-[#1D1D1F] text-white"
+                                : "bg-[#F5F5F7] text-[#6E6E73] hover:bg-[#1D1D1F] hover:text-white"
                             }`}
                             title={v.stock <= 0 ? "Agotado en esta variante" : undefined}
                           >
@@ -1773,7 +1532,7 @@ export default function CatalogoPublico() {
                 ) : (
                   productoDetalle.tallas && productoDetalle.tallas.length > 0 && (
                     <div>
-                      <span className="block text-[10px] font-bold text-neutral-900 tracking-[0.2em] uppercase mb-2">
+                      <span className="block text-[10px] font-bold text-[#1D1D1F] tracking-[0.2em] uppercase mb-2">
                         Seleccionar Tamaño / Talla
                       </span>
                       <div className="flex flex-wrap gap-2">
@@ -1784,11 +1543,11 @@ export default function CatalogoPublico() {
                             onClick={() => setTallaModal(t)}
                             className="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
                             style={{
-                              backgroundColor: tallaModal === t ? "#171717" : "#f5f5f5",
-                              color: tallaModal === t ? "#ffffff" : "#525252"
+                              backgroundColor: tallaModal === t ? "#1D1D1F" : "#F5F5F7",
+                              color: tallaModal === t ? "#ffffff" : "#86868B"
                             }}
                           >
-                            <span style={{ color: tallaModal === t ? "#ffffff" : "#525252" }}>{t}</span>
+                            <span style={{ color: tallaModal === t ? "#ffffff" : "#86868B" }}>{t}</span>
                           </button>
                         ))}
                       </div>
@@ -1798,15 +1557,15 @@ export default function CatalogoPublico() {
 
                 {/* Selector de Cantidad */}
                 <div className="flex items-center gap-4 pt-1">
-                  <div className="flex items-center border border-neutral-200 rounded-xl p-1 bg-neutral-50">
+                  <div className="flex items-center border border-[#E5E5EA] rounded-xl p-1 bg-[#F5F5F7]">
                     <button
                       type="button"
                       onClick={() => setCantidadModal((c) => Math.max(1, c - 1))}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-600 hover:bg-white"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6E6E73] hover:bg-white"
                     >
                       <SvgMinus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="px-3 text-sm font-bold font-mono min-w-[28px] text-center">
+                    <span className="px-3 text-sm font-bold min-w-[28px] text-center">
                       {cantidadModal}
                     </span>
                     <button
@@ -1814,14 +1573,14 @@ export default function CatalogoPublico() {
                       onClick={() =>
                         setCantidadModal((c) => Math.min(c + 1, varianteActual ? varianteActual.stock : productoDetalle.stock))
                       }
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-600 hover:bg-white"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6E6E73] hover:bg-white"
                     >
                       <SvgPlus className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
-                  <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[11px] font-semibold text-[#177E89] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#177E89]" />
                     {(varianteActual ? varianteActual.stock : productoDetalle.stock) > 0 ? "Disponible en Boutique" : "Agotado"}
                   </span>
                 </div>
@@ -1836,9 +1595,9 @@ export default function CatalogoPublico() {
                       agregarAlCarritoConTalla(resolverProductoParaCarrito(productoDetalle), etiquetaVariante, cantidadModal);
                       setTimeout(() => cerrarDetalle(), 700);
                     }}
-                    className="w-full py-3.5 rounded-full font-bold text-xs tracking-[0.15em] uppercase transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-3.5 rounded-full font-bold text-xs tracking-[0.15em] uppercase transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
-                      backgroundColor: agregadoAnim ? "#059669" : "#1e293b",
+                      backgroundColor: agregadoAnim ? "#177E89" : "#1D1D1F",
                       color: "#ffffff"
                     }}
                   >
@@ -1857,31 +1616,31 @@ export default function CatalogoPublico() {
         <div className={
           mostrandoCheckout || pedidoConfirmado
             ? "fixed inset-0 z-50 bg-white overflow-y-auto animate-fade-in"
-            : "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end animate-fade-in"
+            : "fixed inset-0 z-50 bg-black/60 backdrop-blur-none flex justify-end animate-fade-in"
         }>
           <div
             className={
               mostrandoCheckout || pedidoConfirmado
                 ? "relative w-full max-w-2xl mx-auto min-h-full flex flex-col"
-                : "relative w-full max-w-lg bg-white h-full flex flex-col shadow-2xl overflow-hidden"
+                : "relative w-full max-w-lg bg-white h-full flex flex-col shadow-sm overflow-hidden"
             }
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del Carrito / Checkout */}
-            <div className="sticky top-0 z-10 px-6 py-5 border-b border-neutral-200 bg-white/95 backdrop-blur-sm flex items-center justify-between">
+            <div className="sticky top-0 z-10 px-6 py-5 border-b border-[#E5E5EA] bg-white/95 backdrop-blur-none flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 {mostrandoCheckout && !pedidoConfirmado ? (
                   <button
                     type="button"
                     onClick={() => setMostrandoCheckout(false)}
-                    className="flex items-center gap-1.5 text-neutral-500 hover:text-neutral-950 transition-colors text-xs font-bold uppercase tracking-wider"
+                    className="flex items-center gap-1.5 text-[#86868B] hover:text-[#1D1D1F] transition-colors text-xs font-bold uppercase tracking-wider"
                   >
                     <span aria-hidden>←</span> Volver a la Bolsa
                   </button>
                 ) : (
                   <>
-                    <SvgBag className="w-5 h-5 text-neutral-950" />
-                    <h3 className="text-base font-['Cormorant_Garamond',serif] font-semibold text-neutral-950 uppercase tracking-wide">
+                    <SvgBag className="w-5 h-5 text-[#1D1D1F]" />
+                    <h3 className="text-base font-semibold text-[#1D1D1F] uppercase tracking-wide">
                       {pedidoConfirmado ? "Tu Pedido" : `Bolsa de Compras (${totalItems})`}
                     </h3>
                   </>
@@ -1890,7 +1649,7 @@ export default function CatalogoPublico() {
               <button
                 type="button"
                 onClick={cerrarDrawerCarrito}
-                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center text-neutral-500 hover:text-neutral-950 transition-colors"
+                className="w-8 h-8 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] flex items-center justify-center text-[#86868B] hover:text-[#1D1D1F] transition-colors"
               >
                 <SvgClose className="w-4 h-4" />
               </button>
@@ -1899,16 +1658,16 @@ export default function CatalogoPublico() {
             {/* Contenido del Carrito */}
             {pedidoConfirmado ? (
               <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4">
+                <div className="w-16 h-16 rounded-full bg-[#E7F3F3] text-[#177E89] flex items-center justify-center mb-4">
                   <SvgCheckCircle className="w-10 h-10" />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#177E89]">
                   Orden Confirmada
                 </span>
-                <h4 className="text-2xl font-black text-neutral-950 font-mono mt-1">
+                <h4 className="text-2xl font-bold text-[#1D1D1F] mt-1">
                   #{pedidoConfirmado.numeroPedido}
                 </h4>
-                <p className="text-xs text-neutral-500 mt-2 max-w-xs leading-relaxed">
+                <p className="text-xs text-[#86868B] mt-2 max-w-xs leading-relaxed">
                   {(() => {
                     const requierePago = pedidoConfirmado.metodoPago !== "EFECTIVO_USD" && pedidoConfirmado.metodoPago !== "EFECTIVO_BS";
                     if (requierePago && !comprobanteSubido) return "Realiza el pago con los datos de abajo y notifícanos con la captura para confirmar tu orden más rápido.";
@@ -1921,40 +1680,40 @@ export default function CatalogoPublico() {
                   {/* 1. Instrucciones de pago reales — mismos datos que se mostraron al
                       elegir el método, para que no tenga que volver atrás a buscarlos. */}
                   {pedidoConfirmado.metodoPago === "PAGO_MOVIL" && tienda.pagoMovil?.activo && (
-                    <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-1.5 text-left">
+                    <div className="p-4 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] space-y-1.5 text-left">
                       <div className="flex items-center justify-between text-xs font-bold">
                         <span>Datos de Pago Móvil</span>
-                        <span className="font-mono text-rose-600">{pedidoConfirmado.totalBs.toFixed(2)} Bs.</span>
+                        <span className="text-[#177E89]">{pedidoConfirmado.totalBs.toFixed(2)} Bs.</span>
                       </div>
-                      <div className="text-[11px] text-neutral-600 font-mono space-y-0.5">
-                        <div><span className="text-neutral-400 font-sans">Banco:</span> {tienda.pagoMovil.banco}</div>
-                        <div><span className="text-neutral-400 font-sans">Teléfono:</span> {tienda.pagoMovil.telefono}</div>
-                        <div><span className="text-neutral-400 font-sans">RIF:</span> {tienda.pagoMovil.documento}</div>
-                        {tienda.pagoMovil.titular && <div><span className="text-neutral-400 font-sans">Titular:</span> {tienda.pagoMovil.titular}</div>}
+                      <div className="text-[11px] text-[#6E6E73] space-y-0.5">
+                        <div><span className="text-[#86868B] font-sans">Banco:</span> {tienda.pagoMovil.banco}</div>
+                        <div><span className="text-[#86868B] font-sans">Teléfono:</span> {tienda.pagoMovil.telefono}</div>
+                        <div><span className="text-[#86868B] font-sans">RIF:</span> {tienda.pagoMovil.documento}</div>
+                        {tienda.pagoMovil.titular && <div><span className="text-[#86868B] font-sans">Titular:</span> {tienda.pagoMovil.titular}</div>}
                       </div>
                     </div>
                   )}
                   {pedidoConfirmado.metodoPago === "BINANCE" && tienda.binance?.activo && (
-                    <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs space-y-1 text-left">
-                      <span className="font-bold text-amber-900 block">Binance Pay (USDT)</span>
-                      <p className="text-[11px] text-amber-800">Transfiere <strong className="text-black">${pedidoConfirmado.totalUsd.toFixed(2)} USDT</strong> al Pay ID:</p>
-                      <p className="font-mono font-bold text-amber-900">{tienda.binance.payId}</p>
+                    <div className="p-3.5 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs space-y-1 text-left">
+                      <span className="font-bold text-[#1D1D1F] block">Binance Pay (USDT)</span>
+                      <p className="text-[11px] text-[#1D1D1F]">Transfiere <strong className="text-black">${pedidoConfirmado.totalUsd.toFixed(2)} USDT</strong> al Pay ID:</p>
+                      <p className="font-bold text-[#1D1D1F]">{tienda.binance.payId}</p>
                     </div>
                   )}
                   {pedidoConfirmado.metodoPago === "ZELLE" && tienda.zelle?.activo && (
-                    <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-xs space-y-1 text-left">
-                      <span className="font-bold text-neutral-900 block">Zelle</span>
-                      <p className="text-[11px] text-neutral-600">Envía <strong className="text-black">${pedidoConfirmado.totalUsd.toFixed(2)} USD</strong> a:</p>
-                      <p className="font-mono font-bold text-neutral-900">{tienda.zelle.correo}</p>
-                      {tienda.zelle.titular && <p className="text-[11px] text-neutral-600">Titular: {tienda.zelle.titular}</p>}
+                    <div className="p-3.5 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs space-y-1 text-left">
+                      <span className="font-bold text-[#1D1D1F] block">Zelle</span>
+                      <p className="text-[11px] text-[#6E6E73]">Envía <strong className="text-black">${pedidoConfirmado.totalUsd.toFixed(2)} USD</strong> a:</p>
+                      <p className="font-bold text-[#1D1D1F]">{tienda.zelle.correo}</p>
+                      {tienda.zelle.titular && <p className="text-[11px] text-[#6E6E73]">Titular: {tienda.zelle.titular}</p>}
                     </div>
                   )}
                   {pedidoConfirmado.metodoPago === "BANCOLOMBIA" && tienda.bancolombia?.activo && (
-                    <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-xs space-y-1 text-left">
-                      <span className="font-bold text-neutral-900 block">Bancolombia</span>
-                      <div className="text-[11px] text-neutral-600 font-mono space-y-0.5 pt-1">
-                        <div><span className="text-neutral-400 font-sans">Cuenta {tienda.bancolombia.tipoCuenta}:</span> {tienda.bancolombia.cuenta}</div>
-                        <div><span className="text-neutral-400 font-sans">Titular:</span> {tienda.bancolombia.titular}</div>
+                    <div className="p-3.5 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs space-y-1 text-left">
+                      <span className="font-bold text-[#1D1D1F] block">Bancolombia</span>
+                      <div className="text-[11px] text-[#6E6E73] space-y-0.5 pt-1">
+                        <div><span className="text-[#86868B] font-sans">Cuenta {tienda.bancolombia.tipoCuenta}:</span> {tienda.bancolombia.cuenta}</div>
+                        <div><span className="text-[#86868B] font-sans">Titular:</span> {tienda.bancolombia.titular}</div>
                       </div>
                     </div>
                   )}
@@ -1963,7 +1722,7 @@ export default function CatalogoPublico() {
                       haya enviado; efectivo no la necesita, ahí no hay nada que capturar. */}
                   {pedidoConfirmado.metodoPago !== "EFECTIVO_USD" && pedidoConfirmado.metodoPago !== "EFECTIVO_BS" && (
                     comprobanteSubido ? (
-                      <div className="w-full py-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs uppercase tracking-[0.15em] flex items-center justify-center gap-2">
+                      <div className="w-full py-3 rounded-full bg-[#F5F5F7] border border-[#177E89] text-[#12626B] font-bold text-xs uppercase tracking-[0.15em] flex items-center justify-center gap-2">
                         <SvgCheckCircle className="w-4 h-4" />
                         <span>Comprobante Recibido</span>
                       </div>
@@ -1983,16 +1742,16 @@ export default function CatalogoPublico() {
                           type="button"
                           disabled={comprobanteSubiendo}
                           onClick={() => comprobanteInputRef.current?.click()}
-                          className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs uppercase tracking-[0.15em] transition-all disabled:opacity-50"
+                          className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-[#1D1D1F] hover:bg-[#1D1D1F] text-white font-bold text-xs uppercase tracking-[0.15em] transition-all disabled:opacity-50"
                         >
                           <SvgUpload className="w-4 h-4" />
                           <span>{comprobanteSubiendo ? "Subiendo..." : "Notificar Pago (Subir Captura)"}</span>
                         </button>
                         {errorComprobante && (
-                          <p className="text-[11px] text-rose-500 mt-1.5 text-center">{errorComprobante}</p>
+                          <p className="text-[11px] text-[#177E89] mt-1.5 text-center">{errorComprobante}</p>
                         )}
                         {pedidoConfirmado.accessToken && emailCliente.trim() && (
-                          <p className="text-[10px] text-neutral-400 mt-1.5 text-center">
+                          <p className="text-[10px] text-[#86868B] mt-1.5 text-center">
                             Cuando confirmemos tu pago, te llega el comprobante a {emailCliente.trim()}.
                           </p>
                         )}
@@ -2007,7 +1766,7 @@ export default function CatalogoPublico() {
                       href={pedidoConfirmado.whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg shadow-emerald-500/25 transition-all"
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-[#177E89] hover:bg-[#177E89] text-white font-bold text-xs uppercase tracking-[0.15em] shadow-sm transition-all"
                     >
                       <SvgWhatsApp className="w-5 h-5" />
                       <span>Escribir por WhatsApp con el Pedido</span>
@@ -2017,7 +1776,7 @@ export default function CatalogoPublico() {
                   <button
                     type="button"
                     onClick={() => generarComprobantePedidoPDF(pedidoConfirmado, tienda.nombreTienda, tienda.logoBase64)}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs uppercase tracking-[0.15em] transition-all"
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] font-bold text-xs uppercase tracking-[0.15em] transition-all"
                   >
                     <SvgDownload className="w-4 h-4" />
                     <span>Descargar Comprobante PDF</span>
@@ -2031,7 +1790,7 @@ export default function CatalogoPublico() {
                       setErrorComprobante(null);
                       cerrarDrawerCarrito();
                     }}
-                    className="w-full py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 text-xs font-bold uppercase tracking-[0.15em] text-neutral-700 transition-colors"
+                    className="w-full py-2.5 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-bold uppercase tracking-[0.15em] text-[#3A3A3C] transition-colors"
                   >
                     Hacer otro pedido
                   </button>
@@ -2042,8 +1801,8 @@ export default function CatalogoPublico() {
                 {/* PASO CHECKOUT: Formulario de Envío y Pago — la lista de artículos ya
                     se vio y confirmó en la Bolsa (paso anterior), acá no se repite. */}
                 {carrito.length > 0 && (
-                  <div className="p-5 rounded-2xl bg-white border border-neutral-200 space-y-4">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-400 block">
+                  <div className="p-5 rounded-2xl bg-white border border-[#E5E5EA] space-y-4">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#86868B] block">
                       Método de Despacho
                     </span>
 
@@ -2054,33 +1813,33 @@ export default function CatalogoPublico() {
                         onClick={() => setTipoEntrega("DELIVERY")}
                         className="py-2.5 rounded-2xl border text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
                         style={{
-                          backgroundColor: tipoEntrega === "DELIVERY" ? "#171717" : "#f5f5f5",
-                          color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#525252",
-                          borderColor: tipoEntrega === "DELIVERY" ? "#171717" : "#e5e5e5"
+                          backgroundColor: tipoEntrega === "DELIVERY" ? "#1D1D1F" : "#F5F5F7",
+                          color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#86868B",
+                          borderColor: tipoEntrega === "DELIVERY" ? "#1D1D1F" : "#E5E5EA"
                         }}
                       >
-                        <SvgTruck className="w-4 h-4" style={{ color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#525252" }} />
-                        <span style={{ color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#525252" }}>Delivery</span>
+                        <SvgTruck className="w-4 h-4" style={{ color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#86868B" }} />
+                        <span style={{ color: tipoEntrega === "DELIVERY" ? "#ffffff" : "#86868B" }}>Delivery</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setTipoEntrega("PICKUP")}
                         className="py-2.5 rounded-2xl border text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
                         style={{
-                          backgroundColor: tipoEntrega === "PICKUP" ? "#171717" : "#f5f5f5",
-                          color: tipoEntrega === "PICKUP" ? "#ffffff" : "#525252",
-                          borderColor: tipoEntrega === "PICKUP" ? "#171717" : "#e5e5e5"
+                          backgroundColor: tipoEntrega === "PICKUP" ? "#1D1D1F" : "#F5F5F7",
+                          color: tipoEntrega === "PICKUP" ? "#ffffff" : "#86868B",
+                          borderColor: tipoEntrega === "PICKUP" ? "#1D1D1F" : "#E5E5EA"
                         }}
                       >
-                        <SvgStore className="w-4 h-4" style={{ color: tipoEntrega === "PICKUP" ? "#ffffff" : "#525252" }} />
-                        <span style={{ color: tipoEntrega === "PICKUP" ? "#ffffff" : "#525252" }}>Retiro en Boutique</span>
+                        <SvgStore className="w-4 h-4" style={{ color: tipoEntrega === "PICKUP" ? "#ffffff" : "#86868B" }} />
+                        <span style={{ color: tipoEntrega === "PICKUP" ? "#ffffff" : "#86868B" }}>Retiro en Boutique</span>
                       </button>
                     </div>
 
                     {/* Campos de Contacto */}
                     <div className="space-y-2.5">
                       <div>
-                        <label className="block text-[10px] font-bold text-neutral-600 tracking-[0.15em] uppercase mb-1">
+                        <label className="block text-[10px] font-bold text-[#6E6E73] tracking-[0.15em] uppercase mb-1">
                           Nombre y Apellido *
                         </label>
                         <input
@@ -2089,12 +1848,12 @@ export default function CatalogoPublico() {
                           value={nombreCliente}
                           onChange={(e) => setNombreCliente(e.target.value)}
                           placeholder="Ej: Daniel Reina"
-                          className="w-full px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-900 font-medium focus:outline-none focus:border-neutral-950 focus:bg-white transition-all"
+                          className="w-full px-3.5 py-2 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs text-[#1D1D1F] font-medium focus:outline-none focus:border-[#1D1D1F] focus:bg-white transition-all"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-neutral-600 tracking-[0.15em] uppercase mb-1">
+                        <label className="block text-[10px] font-bold text-[#6E6E73] tracking-[0.15em] uppercase mb-1">
                           Teléfono o WhatsApp *
                         </label>
                         <input
@@ -2103,12 +1862,12 @@ export default function CatalogoPublico() {
                           value={telefonoCliente}
                           onChange={(e) => setTelefonoCliente(e.target.value)}
                           placeholder="Ej: 04141234567"
-                          className="w-full px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-900 font-medium focus:outline-none focus:border-neutral-950 focus:bg-white transition-all"
+                          className="w-full px-3.5 py-2 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs text-[#1D1D1F] font-medium focus:outline-none focus:border-[#1D1D1F] focus:bg-white transition-all"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-neutral-600 tracking-[0.15em] uppercase mb-1">
+                        <label className="block text-[10px] font-bold text-[#6E6E73] tracking-[0.15em] uppercase mb-1">
                           Correo Electrónico (Opcional)
                         </label>
                         <input
@@ -2116,13 +1875,13 @@ export default function CatalogoPublico() {
                           value={emailCliente}
                           onChange={(e) => setEmailCliente(e.target.value)}
                           placeholder="Para enviarte el comprobante cuando confirmemos tu pago"
-                          className="w-full px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-900 font-medium focus:outline-none focus:border-neutral-950 focus:bg-white transition-all"
+                          className="w-full px-3.5 py-2 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs text-[#1D1D1F] font-medium focus:outline-none focus:border-[#1D1D1F] focus:bg-white transition-all"
                         />
                       </div>
 
                       {tipoEntrega === "DELIVERY" && (
                         <div>
-                          <label className="block text-[10px] font-bold text-neutral-600 tracking-[0.15em] uppercase mb-1">
+                          <label className="block text-[10px] font-bold text-[#6E6E73] tracking-[0.15em] uppercase mb-1">
                             Dirección de Entrega *
                           </label>
                           <input
@@ -2131,20 +1890,20 @@ export default function CatalogoPublico() {
                             value={direccionEntrega}
                             onChange={(e) => setDireccionEntrega(e.target.value)}
                             placeholder="Calle, Edificio, Apartamento o Punto de Referencia"
-                            className="w-full px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-900 font-medium focus:outline-none focus:border-neutral-950 focus:bg-white transition-all"
+                            className="w-full px-3.5 py-2 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs text-[#1D1D1F] font-medium focus:outline-none focus:border-[#1D1D1F] focus:bg-white transition-all"
                           />
                         </div>
                       )}
 
                       {/* Método de Pago */}
                       <div>
-                        <label className="block text-[10px] font-bold text-neutral-600 tracking-[0.15em] uppercase mb-1">
+                        <label className="block text-[10px] font-bold text-[#6E6E73] tracking-[0.15em] uppercase mb-1">
                           Método de Pago
                         </label>
                         <select
                           value={metodoPago}
                           onChange={(e) => setMetodoPago(e.target.value)}
-                          className="w-full px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-900 font-medium focus:outline-none focus:border-neutral-950 focus:bg-white"
+                          className="w-full px-3.5 py-2 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs text-[#1D1D1F] font-medium focus:outline-none focus:border-[#1D1D1F] focus:bg-white"
                         >
                           {tienda.pagoMovil?.activo && <option value="PAGO_MOVIL">Pago Móvil (Bolívares al BCV)</option>}
                           {tienda.binance?.activo && <option value="BINANCE">Binance Pay (USDT sin comisiones)</option>}
@@ -2158,30 +1917,30 @@ export default function CatalogoPublico() {
 
                       {/* Caja de Datos de Pago Móvil con Botón de Copiar y Referencia */}
                       {metodoPago === "PAGO_MOVIL" && tienda.pagoMovil?.activo && (
-                        <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-2">
+                        <div className="p-4 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] space-y-2">
                           <div className="flex items-center justify-between text-xs font-bold">
                             <span>Datos Oficiales Pago Móvil</span>
-                            <span className="font-mono text-rose-600 font-bold">
+                            <span className="text-[#177E89] font-bold">
                               {totalBs.toFixed(2)} Bs.
                             </span>
                           </div>
 
-                          <div className="text-[11px] text-neutral-600 font-mono space-y-0.5">
+                          <div className="text-[11px] text-[#6E6E73] space-y-0.5">
                             <div>
-                              <span className="text-neutral-400 font-sans">Banco:</span>{" "}
+                              <span className="text-[#86868B] font-sans">Banco:</span>{" "}
                               {tienda.pagoMovil.banco}
                             </div>
                             <div>
-                              <span className="text-neutral-400 font-sans">Teléfono:</span>{" "}
+                              <span className="text-[#86868B] font-sans">Teléfono:</span>{" "}
                               {tienda.pagoMovil.telefono}
                             </div>
                             <div>
-                              <span className="text-neutral-400 font-sans">RIF:</span>{" "}
+                              <span className="text-[#86868B] font-sans">RIF:</span>{" "}
                               {tienda.pagoMovil.documento}
                             </div>
                             {tienda.pagoMovil.titular && (
                               <div>
-                                <span className="text-neutral-400 font-sans">Titular:</span>{" "}
+                                <span className="text-[#86868B] font-sans">Titular:</span>{" "}
                                 {tienda.pagoMovil.titular}
                               </div>
                             )}
@@ -2190,7 +1949,7 @@ export default function CatalogoPublico() {
                           <button
                             type="button"
                             onClick={handleCopiarPagoMovil}
-                            className="w-full py-1.5 rounded-xl bg-white border border-neutral-300 hover:bg-neutral-100 text-[11px] font-bold text-neutral-800 flex items-center justify-center gap-1.5 transition-colors"
+                            className="w-full py-1.5 rounded-xl bg-white border border-[#D1D1D6] hover:bg-[#F5F5F7] text-[11px] font-bold text-[#1D1D1F] flex items-center justify-center gap-1.5 transition-colors"
                           >
                             <SvgCopy className="w-3.5 h-3.5" />
                             <span>
@@ -2201,7 +1960,7 @@ export default function CatalogoPublico() {
                           </button>
 
                           <div className="pt-2">
-                            <label className="block text-[10px] font-bold text-neutral-500 uppercase mb-1">
+                            <label className="block text-[10px] font-bold text-[#86868B] uppercase mb-1">
                               Número de Referencia Bancaria (Opcional)
                             </label>
                             <input
@@ -2209,48 +1968,48 @@ export default function CatalogoPublico() {
                               value={numeroReferencia}
                               onChange={(e) => setNumeroReferencia(e.target.value)}
                               placeholder="Últimos 4 o 6 dígitos de la transferencia"
-                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-neutral-200 text-xs font-mono focus:outline-none"
+                              className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#E5E5EA] text-xs focus:outline-none"
                             />
                           </div>
                         </div>
                       )}
 
                       {metodoPago === "BINANCE" && tienda.binance?.activo && (
-                        <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs space-y-1">
-                          <span className="font-bold text-amber-900 block">
+                        <div className="p-3.5 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs space-y-1">
+                          <span className="font-bold text-[#1D1D1F] block">
                             Binance Pay (USDT)
                           </span>
-                          <p className="text-[11px] text-amber-800">
+                          <p className="text-[11px] text-[#1D1D1F]">
                             Transfiere exactamente <strong className="text-black">${totalUsd.toFixed(2)} USDT</strong> al Pay ID:
                           </p>
-                          <p className="font-mono font-bold text-amber-900">{tienda.binance.payId}</p>
+                          <p className="font-bold text-[#1D1D1F]">{tienda.binance.payId}</p>
                         </div>
                       )}
 
                       {metodoPago === "ZELLE" && tienda.zelle?.activo && (
-                        <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-xs space-y-1">
-                          <span className="font-bold text-neutral-900 block">Zelle</span>
-                          <p className="text-[11px] text-neutral-600">
+                        <div className="p-3.5 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs space-y-1">
+                          <span className="font-bold text-[#1D1D1F] block">Zelle</span>
+                          <p className="text-[11px] text-[#6E6E73]">
                             Envía <strong className="text-black">${totalUsd.toFixed(2)} USD</strong> a:
                           </p>
-                          <p className="font-mono font-bold text-neutral-900">{tienda.zelle.correo}</p>
-                          {tienda.zelle.titular && <p className="text-[11px] text-neutral-600">Titular: {tienda.zelle.titular}</p>}
+                          <p className="font-bold text-[#1D1D1F]">{tienda.zelle.correo}</p>
+                          {tienda.zelle.titular && <p className="text-[11px] text-[#6E6E73]">Titular: {tienda.zelle.titular}</p>}
                         </div>
                       )}
 
                       {metodoPago === "BANCOLOMBIA" && tienda.bancolombia?.activo && (
-                        <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-xs space-y-1">
-                          <span className="font-bold text-neutral-900 block">Bancolombia</span>
-                          <div className="text-[11px] text-neutral-600 font-mono space-y-0.5 pt-1">
-                            <div><span className="text-neutral-400 font-sans">Cuenta {tienda.bancolombia.tipoCuenta}:</span> {tienda.bancolombia.cuenta}</div>
-                            <div><span className="text-neutral-400 font-sans">Titular:</span> {tienda.bancolombia.titular}</div>
-                            {tienda.bancolombia.documento && <div><span className="text-neutral-400 font-sans">Documento:</span> {tienda.bancolombia.documento}</div>}
+                        <div className="p-3.5 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs space-y-1">
+                          <span className="font-bold text-[#1D1D1F] block">Bancolombia</span>
+                          <div className="text-[11px] text-[#6E6E73] space-y-0.5 pt-1">
+                            <div><span className="text-[#86868B] font-sans">Cuenta {tienda.bancolombia.tipoCuenta}:</span> {tienda.bancolombia.cuenta}</div>
+                            <div><span className="text-[#86868B] font-sans">Titular:</span> {tienda.bancolombia.titular}</div>
+                            {tienda.bancolombia.documento && <div><span className="text-[#86868B] font-sans">Documento:</span> {tienda.bancolombia.documento}</div>}
                           </div>
                         </div>
                       )}
 
                       <div>
-                        <label className="block text-[10px] font-bold text-neutral-600 tracking-[0.15em] uppercase mb-1">
+                        <label className="block text-[10px] font-bold text-[#6E6E73] tracking-[0.15em] uppercase mb-1">
                           Instrucciones Especiales (Opcional)
                         </label>
                         <input
@@ -2258,7 +2017,7 @@ export default function CatalogoPublico() {
                           value={notas}
                           onChange={(e) => setNotas(e.target.value)}
                           placeholder="Ej: Empaque para obsequio / Recibir después de las 2pm"
-                          className="w-full px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-900 font-medium focus:outline-none focus:border-neutral-950 focus:bg-white"
+                          className="w-full px-3.5 py-2 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs text-[#1D1D1F] font-medium focus:outline-none focus:border-[#1D1D1F] focus:bg-white"
                         />
                       </div>
                     </div>
@@ -2270,10 +2029,10 @@ export default function CatalogoPublico() {
                 {/* PASO BOLSA: solo los artículos — el formulario de entrega y pago
                     vive en su propia página de Checkout (paso siguiente). */}
                 {carrito.length === 0 ? (
-                  <div className="py-16 text-center text-neutral-400">
+                  <div className="py-16 text-center text-[#86868B]">
                     <SvgBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p className="text-sm font-semibold text-neutral-700 font-['Cormorant_Garamond',serif]">Tu bolsa está vacía</p>
-                    <p className="text-xs text-neutral-400 mt-1">
+                    <p className="text-sm font-semibold text-[#3A3A3C]">Tu bolsa está vacía</p>
+                    <p className="text-xs text-[#86868B] mt-1">
                       Selecciona artículos de la colección para comenzar tu pedido.
                     </p>
                   </div>
@@ -2284,17 +2043,17 @@ export default function CatalogoPublico() {
                       return (
                         <div
                           key={`${item.producto.id}-${item.tallaSeleccionada}`}
-                          className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-100 flex items-center justify-between gap-3"
+                          className="p-3.5 rounded-2xl bg-[#F5F5F7] border border-[#F5F5F7] flex items-center justify-between gap-3"
                         >
                           <div className="min-w-0 flex-1">
-                            <h5 className="text-sm font-['Cormorant_Garamond',serif] font-semibold text-neutral-950 truncate">
+                            <h5 className="text-sm font-semibold text-[#1D1D1F] truncate">
                               {item.producto.nombre}
                             </h5>
-                            <div className="text-[11px] text-neutral-500 mt-0.5 flex items-center gap-2">
-                              <span className="font-medium bg-white px-2 py-0.5 rounded border border-neutral-200 text-[10px]">
+                            <div className="text-[11px] text-[#86868B] mt-0.5 flex items-center gap-2">
+                              <span className="font-medium bg-white px-2 py-0.5 rounded border border-[#E5E5EA] text-[10px]">
                                 {item.tallaSeleccionada}
                               </span>
-                              <span className="font-mono text-rose-600 font-bold">
+                              <span className="text-[#177E89] font-bold">
                                 ${item.producto.precioUsd.toFixed(2)} c/u
                               </span>
                             </div>
@@ -2302,17 +2061,17 @@ export default function CatalogoPublico() {
 
                           {/* Controles */}
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <div className="flex items-center bg-white border border-neutral-200 rounded-xl p-0.5 shadow-sm">
+                            <div className="flex items-center bg-white border border-[#E5E5EA] rounded-xl p-0.5 shadow-sm">
                               <button
                                 type="button"
                                 onClick={() =>
                                   modificarCantidad(item.producto.id, item.tallaSeleccionada, -1)
                                 }
-                                className="w-6 h-6 flex items-center justify-center text-neutral-500 hover:text-neutral-900"
+                                className="w-6 h-6 flex items-center justify-center text-[#86868B] hover:text-[#1D1D1F]"
                               >
                                 <SvgMinus className="w-3 h-3" />
                               </button>
-                              <span className="px-2 text-xs font-mono font-bold min-w-[20px] text-center">
+                              <span className="px-2 text-xs font-bold min-w-[20px] text-center">
                                 {item.cantidad}
                               </span>
                               <button
@@ -2320,7 +2079,7 @@ export default function CatalogoPublico() {
                                 onClick={() =>
                                   modificarCantidad(item.producto.id, item.tallaSeleccionada, 1)
                                 }
-                                className="w-6 h-6 flex items-center justify-center text-neutral-500 hover:text-neutral-900"
+                                className="w-6 h-6 flex items-center justify-center text-[#86868B] hover:text-[#1D1D1F]"
                               >
                                 <SvgPlus className="w-3 h-3" />
                               </button>
@@ -2331,7 +2090,7 @@ export default function CatalogoPublico() {
                               onClick={() =>
                                 eliminarDelCarrito(item.producto.id, item.tallaSeleccionada)
                               }
-                              className="w-7 h-7 flex items-center justify-center text-neutral-400 hover:text-rose-600 transition-colors"
+                              className="w-7 h-7 flex items-center justify-center text-[#86868B] hover:text-[#177E89] transition-colors"
                             >
                               <SvgTrash className="w-4 h-4" />
                             </button>
@@ -2346,16 +2105,16 @@ export default function CatalogoPublico() {
 
             {/* Footer de la Bolsa (paso 1): solo subtotal + pasar al Checkout */}
             {carrito.length > 0 && !pedidoConfirmado && !mostrandoCheckout && (
-              <div className="sticky bottom-0 p-6 border-t border-neutral-200 bg-white/95 backdrop-blur-sm shadow-[0_-8px_24px_rgba(0,0,0,0.05)] space-y-3">
+              <div className="sticky bottom-0 p-6 border-t border-[#E5E5EA] bg-white/95 backdrop-blur-none shadow-[0_-8px_24px_rgba(0,0,0,0.05)] space-y-3">
                 <div className="flex justify-between items-baseline text-sm">
-                  <span className="text-neutral-500 font-mono">Subtotal ({totalItems} artículo{totalItems === 1 ? "" : "s"})</span>
-                  <span className="font-bold text-neutral-900 font-mono">${subtotalUsd.toFixed(2)} USD</span>
+                  <span className="text-[#86868B]">Subtotal ({totalItems} artículo{totalItems === 1 ? "" : "s"})</span>
+                  <span className="font-bold text-[#1D1D1F]">${subtotalUsd.toFixed(2)} USD</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMostrandoCheckout(true)}
-                  className="w-full py-3 rounded-full font-bold text-xs uppercase tracking-[0.15em] transition-all shadow-md active:scale-95"
-                  style={{ backgroundColor: "#171717", color: "#ffffff" }}
+                  className="w-full py-3 rounded-full font-bold text-xs uppercase tracking-[0.15em] transition-all shadow-sm active:scale-95"
+                  style={{ backgroundColor: "#1D1D1F", color: "#ffffff" }}
                 >
                   Proceder al Checkout →
                 </button>
@@ -2364,25 +2123,25 @@ export default function CatalogoPublico() {
 
             {/* Footer del Checkout (paso 2): totales completos + confirmar */}
             {carrito.length > 0 && !pedidoConfirmado && mostrandoCheckout && (
-              <div className="sticky bottom-0 p-6 border-t border-neutral-200 bg-white/95 backdrop-blur-sm shadow-[0_-8px_24px_rgba(0,0,0,0.05)] space-y-3">
+              <div className="sticky bottom-0 p-6 border-t border-[#E5E5EA] bg-white/95 backdrop-blur-none shadow-[0_-8px_24px_rgba(0,0,0,0.05)] space-y-3">
                 <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-neutral-500 font-mono">
+                  <div className="flex justify-between text-xs text-[#86868B]">
                     <span>Subtotal Divisas:</span>
-                    <span className="font-bold text-neutral-900">${subtotalUsd.toFixed(2)} USD</span>
+                    <span className="font-bold text-[#1D1D1F]">${subtotalUsd.toFixed(2)} USD</span>
                   </div>
                   {costoEnvio > 0 && (
-                    <div className="flex justify-between text-xs text-neutral-500 font-mono">
+                    <div className="flex justify-between text-xs text-[#86868B]">
                       <span>Envío (Delivery):</span>
-                      <span className="font-bold text-neutral-900">${costoEnvio.toFixed(2)} USD</span>
+                      <span className="font-bold text-[#1D1D1F]">${costoEnvio.toFixed(2)} USD</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-xs text-neutral-500 font-mono">
+                  <div className="flex justify-between text-xs text-[#86868B]">
                     <span>Total Divisas:</span>
-                    <span className="font-bold text-neutral-900">${totalUsd.toFixed(2)} USD</span>
+                    <span className="font-bold text-[#1D1D1F]">${totalUsd.toFixed(2)} USD</span>
                   </div>
-                  <div className="flex justify-between text-xs text-neutral-500 font-mono">
+                  <div className="flex justify-between text-xs text-[#86868B]">
                     <span>Total Bolívares (BCV {tasa.toFixed(2)}):</span>
-                    <span className="font-bold text-rose-600 text-sm">{totalBs.toFixed(2)} Bs.</span>
+                    <span className="font-bold text-[#177E89] text-sm">{totalBs.toFixed(2)} Bs.</span>
                   </div>
                 </div>
 
@@ -2391,8 +2150,8 @@ export default function CatalogoPublico() {
                     type="button"
                     onClick={() => procesarPedido(false)}
                     disabled={enviandoPedido}
-                    className="w-full py-3 rounded-full font-bold text-xs uppercase tracking-[0.15em] transition-all shadow-md active:scale-95 disabled:opacity-50"
-                    style={{ backgroundColor: "#1e293b", color: "#ffffff" }}
+                    className="w-full py-3 rounded-full font-bold text-xs uppercase tracking-[0.15em] transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                    style={{ backgroundColor: "#1D1D1F", color: "#ffffff" }}
                   >
                     {enviandoPedido ? "Procesando..." : "Confirmar Orden"}
                   </button>
@@ -2401,7 +2160,7 @@ export default function CatalogoPublico() {
                     type="button"
                     onClick={() => procesarPedido(true)}
                     disabled={enviandoPedido}
-                    className="w-full py-3 rounded-full font-bold text-xs uppercase tracking-[0.15em] flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    className="w-full py-3 rounded-full font-bold text-xs uppercase tracking-[0.15em] flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50"
                     style={{ backgroundColor: "#059669", color: "#ffffff" }}
                   >
                     <SvgWhatsApp className="w-4 h-4" style={{ color: "#ffffff" }} />
@@ -2421,7 +2180,7 @@ export default function CatalogoPublico() {
           target="_blank"
           rel="noopener noreferrer"
           title="Atencion directa por WhatsApp"
-          className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300"
+          className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-sm hover:scale-110 active:scale-95 transition-all duration-300"
           style={{ backgroundColor: "#059669", color: "#ffffff" }}
         >
           <SvgWhatsApp className="w-7 h-7" style={{ color: "#ffffff" }} />

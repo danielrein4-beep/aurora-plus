@@ -11,7 +11,6 @@ const SOLUCIONES = [
     tag: "Adaptabilidad",
     desc: "Aurora Plus no te obliga a cambiar cómo trabajas. Configuramos los módulos, flujos y formularios según los procesos exactos de tu empresa. Sin código, sin consultores externos.",
     puntos: ["Formularios y campos a medida", "Flujos de aprobación configurables", "Nomenclatura adaptada a tu industria", "Roles y vistas por departamento"],
-    color: "from-teal-400 to-cyan-400",
   },
   {
     Icon: IconChart,
@@ -19,7 +18,6 @@ const SOLUCIONES = [
     tag: "Analítica",
     desc: "Convierte los datos de tu operación en decisiones. Dashboards en tiempo real con los KPIs que importan, reportes automáticos y alertas configurables.",
     puntos: ["Paneles con más de 40 tipos de gráficos", "Reportes exportables a Excel y PDF", "Alertas automáticas por umbral", "Comparativas de períodos y sucursales"],
-    color: "from-sky-400 to-blue-500",
   },
   {
     Icon: IconLink,
@@ -27,7 +25,6 @@ const SOLUCIONES = [
     tag: "Integración",
     desc: "Todos los módulos comparten la misma base de datos. Una venta actualiza el inventario, genera la factura y alimenta la contabilidad — sin doble ingreso.",
     puntos: ["Ventas → Inventario en tiempo real", "Compras → Cuentas por pagar automático", "RRHH → Nómina sin pasos manuales", "CRM conectado a todo el ciclo"],
-    color: "from-violet-400 to-purple-500",
   },
   {
     Icon: IconCloud,
@@ -35,7 +32,6 @@ const SOLUCIONES = [
     tag: "Disponibilidad",
     desc: "Si se corta la conexión en plena operación, puedes seguir tomando pedidos y cobrando mesas ya abiertas — se guardan en el dispositivo y se sincronizan solos al reconectarse.",
     puntos: ["Acceso desde cualquier navegador", "Sobrevive cortes breves de conexión sin perder ventas", "Sincronización automática en segundo plano", "Backups diarios en la nube"],
-    color: "from-teal-400 to-blue-500",
   },
   {
     Icon: IconLock,
@@ -43,7 +39,6 @@ const SOLUCIONES = [
     tag: "Seguridad",
     desc: "Define exactamente qué puede ver y hacer cada persona. Registro de auditoría completo de cada acción, con historial de cambios por usuario.",
     puntos: ["Roles y permisos granulares", "Auditoría completa por usuario", "Historial de cambios en registros", "Sesiones con tiempo de expiración"],
-    color: "from-blue-400 to-violet-500",
   },
   {
     Icon: IconMobile,
@@ -51,90 +46,93 @@ const SOLUCIONES = [
     tag: "Movilidad",
     desc: "Todo el poder de Aurora Plus desde tu celular. Consulta métricas, aprueba solicitudes y revisa alertas desde cualquier lugar, sin instalar nada.",
     puntos: ["Diseño responsivo para cualquier pantalla", "Consulta de dashboards y reportes", "Aprobación de órdenes y solicitudes", "Notificaciones de alertas importantes"],
-    color: "from-purple-400 to-pink-500",
   },
 ];
 
 export default function Soluciones() {
   const navigate = useNavigate();
   return (
-    <main className="aurora-public-page pt-32 pb-24 relative">
+    <main className="w-full bg-white text-[#1D1D1F] antialiased pt-28">
 
       {/* Header */}
-      <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-20">
-        <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-600 dark:text-teal-300 mb-6 font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          Capacidades de la plataforma
+      <section className="py-20 md:py-28 px-6 sm:px-8 border-b border-[#E5E5EA]">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-[#F5F5F7] border border-[#E5E5EA] rounded-full px-4 py-1.5 text-xs font-semibold text-[#177E89] mb-6">
+            Capacidades de la plataforma
+          </div>
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.06] text-[#1D1D1F] mb-5">
+            Una plataforma,<br />
+            <span className="text-[#177E89]">todas las herramientas</span>
+          </h1>
+          <p className="text-base sm:text-lg text-[#86868B] max-w-2xl mx-auto leading-relaxed">
+            Aurora Plus reúne en un solo sistema todo lo que tu empresa necesita para operar con eficiencia — desde el primer día y sin complicaciones técnicas.
+          </p>
         </div>
-        <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
-          Una plataforma,<br />
-          <span className="text-aurora">todas las herramientas</span>
-        </h1>
-        <p className="text-slate-500 dark:text-white/45 text-lg max-w-2xl mx-auto leading-relaxed">
-          Aurora Plus reúne en un solo sistema todo lo que tu empresa necesita para operar con eficiencia — desde el primer día y sin complicaciones técnicas.
-        </p>
       </section>
 
       {/* Solutions grid */}
-      <section className="px-4 sm:px-6 max-w-7xl mx-auto space-y-5">
-        {SOLUCIONES.map((sol, i) => (
-          <div key={sol.title}
-            className={`relative apple-glass rounded-3xl overflow-hidden flex flex-col shadow-lg hover:shadow-2xl transition-all duration-300 ${
-              i % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"
-            }`}>
-            <div className="absolute inset-x-0 top-0 h-px line-aurora" />
+      <section className="py-20 md:py-28 px-6 sm:px-8 bg-[#F5F5F7] border-b border-[#E5E5EA]">
+        <div className="max-w-6xl mx-auto space-y-5">
+          {SOLUCIONES.map((sol, i) => (
+            <div key={sol.title}
+              className={`bg-white border border-[#E5E5EA] rounded-3xl overflow-hidden shadow-sm flex flex-col ${
+                i % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"
+              }`}>
 
-            {/* Icon panel */}
-            <div className={`lg:w-64 flex-shrink-0 flex items-center justify-center p-12 bg-slate-50/70 dark:bg-white/[0.02]`}>
-              <div className={`w-20 h-20 rounded-2xl bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 flex items-center justify-center shadow-inner`}>
-                <sol.Icon size={36} />
+              {/* Icon panel */}
+              <div className="lg:w-64 flex-shrink-0 flex items-center justify-center p-12 bg-[#F5F5F7]">
+                <div className="w-20 h-20 rounded-2xl bg-white border border-[#E5E5EA] flex items-center justify-center text-[#177E89] shadow-sm">
+                  <sol.Icon size={36} />
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 p-8 sm:p-10">
+                <div className="inline-block bg-[#F5F5F7] border border-[#E5E5EA] rounded-full px-3 py-1 text-xs text-[#177E89] font-semibold tracking-widest uppercase mb-3">
+                  {sol.tag}
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D1D1F] mb-3">{sol.title}</h2>
+                <p className="text-[#86868B] text-base leading-relaxed mb-6 max-w-xl">{sol.desc}</p>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {sol.puntos.map((p) => (
+                    <li key={p} className="flex items-center gap-2.5 text-sm text-[#1D1D1F] font-medium">
+                      <span className="w-4 h-4 rounded-full bg-[#177E89]/10 text-[#177E89] flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
+                      {p}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
-
-            {/* Content */}
-            <div className="flex-1 p-8 sm:p-10">
-              <div className="inline-block bg-teal-500/10 dark:bg-white/5 border border-teal-500/20 dark:border-white/8 rounded-full px-3 py-1 text-xs text-teal-600 dark:text-white/40 font-semibold tracking-widest uppercase mb-3">
-                {sol.tag}
-              </div>
-              <h2 className="font-['Outfit'] font-bold text-2xl sm:text-3xl text-slate-900 dark:text-white mb-3">{sol.title}</h2>
-              <p className="text-slate-500 dark:text-white/50 text-base leading-relaxed mb-6 max-w-xl">{sol.desc}</p>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {sol.puntos.map((p) => (
-                  <li key={p} className="flex items-center gap-2.5 text-sm text-slate-700 dark:text-white/55 font-medium">
-                    <span className="w-4 h-4 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400 flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </section>
 
       {/* CTA */}
-      <section className="px-4 sm:px-6 max-w-3xl mx-auto text-center mt-24">
-        <h2 className="font-['Outfit'] font-bold text-3xl sm:text-4xl text-slate-900 dark:text-white mb-4">
-          ¿Quieres ver todo esto<br />
-          <span className="text-aurora">funcionando en tu negocio?</span>
-        </h2>
-        <p className="text-slate-500 dark:text-white/40 mb-8">Agenda una demo personalizada — te mostramos exactamente lo que necesitas, sin perder tu tiempo.</p>
-        <SpecularButton
-          size="lg"
-          radius={12}
-          tint="#177E89"
-          tintOpacity={1}
-          textColor="#f5f5f5"
-          lineColor="#5BC0BE"
-          baseColor="#177E89"
-          shineSize={10}
-          shineFade={40}
-          intensity={1}
-          thickness={1}
-          proximity={280}
-          onClick={() => navigate("/onboarding")}
-        >
-          Solicitar demo gratuita
-        </SpecularButton>
+      <section className="py-20 md:py-28 px-6 sm:px-8">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-4">
+            ¿Quieres ver todo esto<br />
+            <span className="text-[#177E89]">funcionando en tu negocio?</span>
+          </h2>
+          <p className="text-[#86868B] mb-8">Agenda una demo personalizada — te mostramos exactamente lo que necesitas, sin perder tu tiempo.</p>
+          <SpecularButton
+            size="lg"
+            radius={999}
+            tint="#177E89"
+            tintOpacity={1}
+            textColor="#f5f5f5"
+            lineColor="#5BC0BE"
+            baseColor="#177E89"
+            shineSize={10}
+            shineFade={40}
+            intensity={1}
+            thickness={1}
+            proximity={280}
+            onClick={() => navigate("/onboarding")}
+          >
+            Solicitar demo gratuita
+          </SpecularButton>
+        </div>
       </section>
     </main>
   );

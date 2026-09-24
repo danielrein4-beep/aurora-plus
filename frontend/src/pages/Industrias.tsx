@@ -48,107 +48,108 @@ export default function Industrias() {
   const ind = INDUSTRIES.find((i) => i.name === active)!;
 
   return (
-    <main className="aurora-public-page pt-32 pb-24 relative">
+    <main className="w-full bg-white text-[#1D1D1F] antialiased pt-28">
 
       {/* Header */}
-      <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
-        <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-600 dark:text-teal-300 mb-6 font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          6 industrias con módulos propios
+      <section className="py-20 md:py-28 px-6 sm:px-8 border-b border-[#E5E5EA]">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-[#F5F5F7] border border-[#E5E5EA] rounded-full px-4 py-1.5 text-xs font-semibold text-[#177E89] mb-6">
+            6 industrias con módulos propios
+          </div>
+          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[1.06] text-[#1D1D1F] mb-5">
+            Hecho para tu industria,<br />
+            <span className="text-[#177E89]">no para todas en general</span>
+          </h1>
+          <p className="text-base sm:text-lg text-[#86868B] max-w-2xl mx-auto leading-relaxed">
+            Cada vertical tiene sus propios módulos preconfigurados y flujos adaptados. Elige tu industria y ve exactamente qué incluye.
+          </p>
         </div>
-        <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
-          Hecho para tu industria,<br />
-          <span className="text-aurora">no para todas en general</span>
-        </h1>
-        <p className="text-slate-500 dark:text-white/45 text-lg max-w-2xl mx-auto leading-relaxed">
-          Cada vertical tiene sus propios módulos preconfigurados y flujos adaptados. Elige tu industria y ve exactamente qué incluye.
-        </p>
       </section>
 
       {/* Selector + detail */}
-      <section className="px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="flex flex-col lg:flex-row gap-6">
+      <section className="py-20 md:py-28 px-6 sm:px-8 bg-[#F5F5F7]">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col lg:flex-row gap-6">
 
-          {/* Industry selector */}
-          <div className="lg:w-64 flex-shrink-0 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
-            {INDUSTRIES.map((ind) => (
-              <button key={ind.name}
-                onClick={() => setActive(ind.name)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap lg:whitespace-normal flex-shrink-0 cursor-pointer ${
-                  active === ind.name
-                    ? "g-aurora text-white shadow-lg"
-                    : "bg-white/70 dark:bg-white/5 text-slate-700 dark:text-white/50 hover:bg-white dark:hover:bg-white/8 hover:text-black dark:hover:text-white border border-slate-200/80 dark:border-white/5"
-                }`}>
-                {ind.name}
-              </button>
-            ))}
-          </div>
+            {/* Industry selector */}
+            <div className="lg:w-64 flex-shrink-0 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
+              {INDUSTRIES.map((it) => (
+                <button key={it.name}
+                  onClick={() => setActive(it.name)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap lg:whitespace-normal flex-shrink-0 cursor-pointer ${
+                    active === it.name
+                      ? "bg-[#177E89] text-white"
+                      : "bg-white text-[#1D1D1F] border border-[#E5E5EA] hover:border-[#D1D1D6]"
+                  }`}>
+                  {it.name}
+                </button>
+              ))}
+            </div>
 
-          {/* Detail panel */}
-          <div className="flex-1 min-w-0">
-            <div className="relative apple-glass rounded-3xl overflow-hidden shadow-xl">
-              <div className="line-aurora absolute top-0 left-0 right-0" />
+            {/* Detail panel */}
+            <div className="flex-1 min-w-0">
+              <div className="bg-white border border-[#E5E5EA] rounded-3xl overflow-hidden shadow-sm">
+                <div className="p-8 sm:p-10">
+                  {/* Header */}
+                  <div className="mb-6">
+                    <div className="text-[#177E89] text-xs font-semibold tracking-widest uppercase mb-2">{ind.tagline}</div>
+                    <h2 className="text-3xl font-bold tracking-tight text-[#1D1D1F]">{ind.name}</h2>
+                  </div>
 
-              <div className="p-8 sm:p-10">
-                {/* Header */}
-                <div className="mb-6">
-                  <div className="text-teal-600 dark:text-white/35 text-xs font-semibold tracking-widest uppercase mb-2">{ind.tagline}</div>
-                  <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white">{ind.name}</h2>
-                </div>
+                  <p className="text-[#6E6E73] text-base leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
 
-                <p className="text-slate-600 dark:text-white/55 text-base leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
-
-                {/* Modules */}
-                <div className="mb-8">
-                  <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase mb-4">Módulos incluidos</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {ind.modulos.map((m) => (
-                      <div key={m} className="flex items-center gap-3 bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/5 rounded-xl px-4 py-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0" aria-hidden="true" />
-                        <span className="text-slate-700 dark:text-white/65 text-sm font-medium">{m}</span>
-                      </div>
-                    ))}
+                  {/* Modules */}
+                  <div className="mb-8">
+                    <p className="text-xs font-semibold tracking-widest text-[#177E89] uppercase mb-4">Módulos incluidos</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {ind.modulos.map((m) => (
+                        <div key={m} className="flex items-center gap-3 bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl px-4 py-3">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#177E89] flex-shrink-0" aria-hidden="true" />
+                          <span className="text-[#1D1D1F] text-sm font-medium">{m}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* CTA */}
-            <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <SpecularButton
-                size="md"
-                radius={12}
-                tint="#177E89"
-                tintOpacity={1}
-                textColor="#f5f5f5"
-                lineColor="#5BC0BE"
-                baseColor="#177E89"
-                shineSize={10}
-                shineFade={40}
-                intensity={1}
-                thickness={1}
-                proximity={280}
-                onClick={() => navigate("/onboarding")}
-              >
-                Quiero una demo para {ind.name}
-              </SpecularButton>
-              <SpecularButton
-                size="md"
-                radius={12}
-                tint="#F5F5F7"
-                tintOpacity={0.92}
-                blur={14}
-                textColor="#1D1D1F"
-                lineColor="#ffffff"
-                baseColor="#4b4b4b"
-                shineSize={10}
-                shineFade={40}
-                proximity={280}
-                className="shadow-sm"
-                onClick={() => navigate("/precios")}
-              >
-                Ver precios →
-              </SpecularButton>
+              {/* CTA */}
+              <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                <SpecularButton
+                  size="md"
+                  radius={999}
+                  tint="#177E89"
+                  tintOpacity={1}
+                  textColor="#f5f5f5"
+                  lineColor="#5BC0BE"
+                  baseColor="#177E89"
+                  shineSize={10}
+                  shineFade={40}
+                  intensity={1}
+                  thickness={1}
+                  proximity={280}
+                  onClick={() => navigate("/onboarding")}
+                >
+                  Quiero una demo para {ind.name}
+                </SpecularButton>
+                <SpecularButton
+                  size="md"
+                  radius={999}
+                  tint="#F5F5F7"
+                  tintOpacity={0.92}
+                  blur={14}
+                  textColor="#1D1D1F"
+                  lineColor="#ffffff"
+                  baseColor="#D1D1D6"
+                  shineSize={10}
+                  shineFade={40}
+                  proximity={280}
+                  className="shadow-sm"
+                  onClick={() => navigate("/precios")}
+                >
+                  Ver precios →
+                </SpecularButton>
+              </div>
             </div>
           </div>
         </div>

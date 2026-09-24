@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
-import { IconLock } from "../Icons";
+import { IconLock, IconCheck } from "../Icons";
 import { resetearClave } from "../api";
 
 export default function ResetearClave() {
@@ -39,52 +39,52 @@ export default function ResetearClave() {
   };
 
   return (
-    <div className="aurora-access-page min-h-screen flex items-center justify-center p-4">
-      <div className="aurora-access-card w-full max-w-sm rounded-3xl p-7 text-white space-y-5">
+    <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-4 antialiased">
+      <div className="w-full max-w-sm bg-white border border-[#E5E5EA] rounded-3xl p-7 text-[#1D1D1F] space-y-5 shadow-sm">
         <div className="flex justify-center mb-1">
           <AuroraLogo size={36} />
         </div>
-        <h1 className="text-xl font-bold text-center">Elige tu nueva contraseña</h1>
+        <h1 className="text-xl font-bold tracking-tight text-center">Elige tu nueva contraseña</h1>
 
         {!token ? (
-          <p className="text-sm text-rose-300 text-center">
+          <p className="text-sm text-red-600 text-center">
             Este enlace no es válido — falta el token de recuperación. Solicita uno nuevo desde la pantalla de inicio de sesión.
           </p>
         ) : exito ? (
-          <p className="text-sm text-teal-300 text-center">
-            ✓ Contraseña actualizada. Redirigiendo al inicio de sesión…
+          <p className="text-sm text-[#177E89] text-center flex items-center justify-center gap-1.5">
+            <IconCheck size={14} /> Contraseña actualizada. Redirigiendo al inicio de sesión…
           </p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
             {error && (
-              <p className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">{error}</p>
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">{error}</p>
             )}
             <div className="space-y-1.5">
-              <label className="text-[11px] text-white/50 uppercase font-mono">Nueva contraseña</label>
+              <label className="text-[11px] text-[#86868B] uppercase tracking-wider font-medium">Nueva contraseña</label>
               <input
                 type="password"
                 required
                 value={clave}
                 onChange={(e) => setClave(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 text-white text-sm focus:outline-none focus:border-teal-400"
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E5E5EA] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:border-[#177E89] transition-colors"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] text-white/50 uppercase font-mono">Confirmar contraseña</label>
+              <label className="text-[11px] text-[#86868B] uppercase tracking-wider font-medium">Confirmar contraseña</label>
               <input
                 type="password"
                 required
                 value={confirmar}
                 onChange={(e) => setConfirmar(e.target.value)}
                 placeholder="Repite la contraseña"
-                className="w-full px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 text-white text-sm focus:outline-none focus:border-teal-400"
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E5E5EA] bg-white text-[#1D1D1F] text-sm focus:outline-none focus:border-[#177E89] transition-colors"
               />
             </div>
             <button
               type="submit"
               disabled={enviando}
-              className="aurora-access-primary w-full py-3 rounded-xl text-sm font-bold cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              className="btn-deep-black w-full py-3 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <IconLock size={14} />
               {enviando ? "Guardando…" : "Guardar nueva contraseña"}

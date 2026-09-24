@@ -46,11 +46,11 @@ export const TasaCambioWidget: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#0b2341] border border-white/10 rounded-2xl p-4 sm:p-5">
+    <div className="bg-white border border-[#E5E5EA] rounded-2xl p-4 sm:p-5 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h4 className="text-sm font-semibold text-white">Tasa de Cambio USD / VES</h4>
-          <p className="text-xs text-white/60 mt-0.5">
+          <h4 className="text-sm font-semibold text-[#1D1D1F]">Tasa de Cambio USD / VES</h4>
+          <p className="text-xs text-[#86868B] mt-0.5">
             Cifra pública que se actualiza seguido — ninguna de las dos la define el negocio. Tráela en vivo desde el BCV o Binance P2P.
           </p>
         </div>
@@ -62,7 +62,7 @@ export const TasaCambioWidget: React.FC = () => {
               type="button"
               onClick={() => void handleActualizar(f.id)}
               disabled={actualizando !== null}
-              className="flex items-center gap-1.5 rounded-lg border border-[#177E89]/40 bg-[#177E89]/15 px-3 py-2 text-xs font-semibold text-[#177E89] transition-colors hover:bg-[#177E89]/25 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-full border border-[#E5E5EA] bg-[#F5F5F7] px-3 py-2 text-xs font-semibold text-[#177E89] transition-colors hover:bg-[#E5E5EA] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
             >
               <IconRefresh size={14} className={actualizando === f.id ? 'animate-spin' : ''} />
               {actualizando === f.id ? 'Consultando…' : `Actualizar desde ${f.label}`}
@@ -71,29 +71,29 @@ export const TasaCambioWidget: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-white/10">
+      <div className="mt-4 pt-4 border-t border-[#E5E5EA]">
         {cargando ? (
-          <p className="text-xs text-white/50">Consultando tasa vigente…</p>
+          <p className="text-xs text-[#86868B]">Consultando tasa vigente…</p>
         ) : error ? (
-          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">
+          <div className="rounded-xl border border-[#DC2626]/30 bg-[#DC2626]/5 p-3 text-xs text-[#DC2626]">
             {error}
           </div>
         ) : tasa ? (
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-2xl font-bold font-['IBM_Plex_Mono',monospace] text-white">
+            <span className="text-2xl font-bold text-[#1D1D1F]">
               {tasa.tasa.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} Bs.
             </span>
-            <span className="text-xs text-white/50 font-['IBM_Plex_Mono',monospace]">
+            <span className="text-xs text-[#86868B]">
               1 USD · fuente {tasa.origenApi} · {new Date(tasa.fechaActualizacion).toLocaleString('es-VE')}
             </span>
             {tasa.obsoleta && (
-              <span className="text-[10px] uppercase tracking-wide font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded">
+              <span className="text-[10px] uppercase tracking-wide font-semibold text-[#DC2626] bg-[#DC2626]/10 border border-[#DC2626]/30 px-1.5 py-0.5 rounded-full">
                 Sin refrescar hace más de 24h
               </span>
             )}
           </div>
         ) : (
-          <p className="text-xs text-white/50">Aún no hay una tasa USD/VES registrada para este negocio.</p>
+          <p className="text-xs text-[#86868B]">Aún no hay una tasa USD/VES registrada para este negocio.</p>
         )}
       </div>
     </div>

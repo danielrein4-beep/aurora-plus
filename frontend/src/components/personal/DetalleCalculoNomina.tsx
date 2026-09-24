@@ -19,37 +19,37 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
     return (
       <div
         key={idx}
-        className="p-3 rounded-lg bg-[#0f172a]/70 border border-[#1e293b] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+        className="p-3 rounded-lg bg-[#F5F5F7]/70 border border-[#E5E5EA] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
       >
         <div className="flex-1 space-y-1">
           <div className="flex items-center gap-2">
             <span
               className={`w-2 h-2 rounded-full ${
-                c.tipo === 'PERCEPCION' ? 'bg-[#177E89]' : 'bg-[#f87171]'
+                c.tipo === 'PERCEPCION' ? 'bg-[#177E89]' : 'bg-[#D92D20]'
               }`}
             />
-            <span className="font-medium text-[#f8fafc]">{c.concepto}</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1e293b] text-[#94a3b8] font-mono">
+            <span className="font-medium text-[#1D1D1F]">{c.concepto}</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#F5F5F7] text-[#86868B]">
               {c.vigencia}
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-[#94a3b8] pl-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-[#86868B] pl-4">
             <div>
-              <span className="text-[#64748b]">Base: </span>
-              <span className="font-mono text-[#cbd5e1]">{textoBase}</span>
+              <span className="text-[#86868B]">Base: </span>
+              <span className="text-[#1D1D1F]">{textoBase}</span>
             </div>
             <div>
-              <span className="text-[#64748b]">Regla: </span>
-              <span className="font-mono text-[#cbd5e1]">{c.reglaAplicada}</span>
+              <span className="text-[#86868B]">Regla: </span>
+              <span className="text-[#1D1D1F]">{c.reglaAplicada}</span>
             </div>
           </div>
         </div>
 
-        <div className="text-right sm:pl-4 sm:border-l sm:border-[#1e293b] self-end sm:self-center">
-          <span className="text-[10px] text-[#64748b] block sm:hidden">Resultado:</span>
+        <div className="text-right sm:pl-4 sm:border-l sm:border-[#E5E5EA] self-end sm:self-center">
+          <span className="text-[10px] text-[#86868B] block sm:hidden">Resultado:</span>
           <span
-            className={`font-mono text-sm font-semibold ${
-              c.tipo === 'PERCEPCION' ? 'text-[#177E89]' : 'text-[#f87171]'
+            className={`text-sm font-semibold ${
+              c.tipo === 'PERCEPCION' ? 'text-[#177E89]' : 'text-[#D92D20]'
             }`}
           >
             {ocultarSueldo
@@ -64,25 +64,25 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
   return (
     <div className="space-y-4">
       {/* Resumen del colaborador */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#131c2e] rounded-lg border border-[#1e2d48]">
+      <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#FFFFFF] rounded-lg border border-[#E5E5EA]">
         <div>
-          <h4 className="font-semibold text-[#f8fafc] text-xs">{recibo.empleadoNombre}</h4>
-          <p className="text-[11px] text-[#94a3b8]">
-            {recibo.empleadoCargo} &bull; <span className="text-[#cbd5e1]">{recibo.departamento}</span>
+          <h4 className="font-semibold text-[#1D1D1F] text-xs">{recibo.empleadoNombre}</h4>
+          <p className="text-[11px] text-[#86868B]">
+            {recibo.empleadoCargo} &bull; <span className="text-[#1D1D1F]">{recibo.departamento}</span>
           </p>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <div className="text-right">
-            <span className="text-[#64748b] block text-[10px]">Días computados</span>
-            <span className="font-mono font-medium text-[#f8fafc]">{recibo.diasTrabajados} días</span>
+            <span className="text-[#86868B] block text-[10px]">Días computados</span>
+            <span className="font-medium text-[#1D1D1F]">{recibo.diasTrabajados} días</span>
           </div>
           <div className="text-right">
-            <span className="text-[#64748b] block text-[10px]">Horas extras</span>
-            <span className="font-mono font-medium text-[#f8fafc]">{recibo.horasExtrasTotal} hrs</span>
+            <span className="text-[#86868B] block text-[10px]">Horas extras</span>
+            <span className="font-medium text-[#1D1D1F]">{recibo.horasExtrasTotal} hrs</span>
           </div>
-          <div className="text-right pl-3 border-l border-[#1e2d48]">
-            <span className="text-[#64748b] block text-[10px]">Neto a liquidar</span>
-            <span className="font-mono font-bold text-[#177E89] text-xs">
+          <div className="text-right pl-3 border-l border-[#E5E5EA]">
+            <span className="text-[#86868B] block text-[10px]">Neto a liquidar</span>
+            <span className="font-bold text-[#177E89] text-xs">
               {ocultarSueldo ? '••••••' : formatearMoneda(recibo.montoNetoPagar, recibo.moneda)}
             </span>
           </div>
@@ -91,12 +91,12 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
 
       {/* Asignaciones / Percepciones */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">
+        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[#86868B]">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded bg-[#177E89]" />
             Percepciones y Asignaciones
           </span>
-          <span className="font-mono text-[#177E89]">
+          <span className="text-[#177E89]">
             {ocultarSueldo ? '••••••' : `+${formatearMoneda(recibo.totalPercepciones, recibo.moneda)}`}
           </span>
         </div>
@@ -108,12 +108,12 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
       {/* Deducciones */}
       {deducciones.length > 0 && (
         <div className="space-y-2 pt-2">
-          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">
+          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-[#86868B]">
             <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded bg-[#f87171]" />
+              <span className="w-2 h-2 rounded bg-[#D92D20]" />
               Deducciones y Retenciones
             </span>
-            <span className="font-mono text-[#f87171]">
+            <span className="text-[#D92D20]">
               {ocultarSueldo ? '••••••' : `-${formatearMoneda(recibo.totalDeducciones, recibo.moneda)}`}
             </span>
           </div>
@@ -124,11 +124,11 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
       )}
 
       {/* Totalizador de Auditoría */}
-      <div className="p-3 rounded-lg bg-[#0b111e] border border-[#1e293b] flex items-center justify-between text-xs">
-        <span className="text-[#64748b]">
-          Fórmula de liquidación: <span className="font-mono text-[#94a3b8]">Neto = Total Percepciones - Total Deducciones</span>
+      <div className="p-3 rounded-lg bg-[#F5F5F7] border border-[#E5E5EA] flex items-center justify-between text-xs">
+        <span className="text-[#86868B]">
+          Fórmula de liquidación: <span className="text-[#86868B]">Neto = Total Percepciones - Total Deducciones</span>
         </span>
-        <span className="font-mono font-bold text-[#177E89]">
+        <span className="font-bold text-[#177E89]">
           {ocultarSueldo ? '••••••' : formatearMoneda(recibo.montoNetoPagar, recibo.moneda)}
         </span>
       </div>

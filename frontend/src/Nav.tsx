@@ -13,16 +13,16 @@ const LINKS = [
   { label: "Nosotros",    path: "/nosotros" },
 ];
 
-const VERTICAL_POR_INDUSTRIA: Record<string, { ruta: string; label: string; icono: string }> = {
-  restaurante: { ruta: "/restaurante", label: "Aurora Horeca", icono: "🍽️" },
-  ferreteria: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
-  repuestos: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
-  farmacia: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
-  retail: { ruta: "/comercio", label: "Aurora Comercio", icono: "🛒" },
-  finca: { ruta: "/ganaderia", label: "Aurora Ganadería", icono: "🐄" },
-  ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería", icono: "🐄" },
+const VERTICAL_POR_INDUSTRIA: Record<string, { ruta: string; label: string }> = {
+  restaurante: { ruta: "/restaurante", label: "Aurora Horeca" },
+  ferreteria: { ruta: "/comercio", label: "Aurora Comercio" },
+  repuestos: { ruta: "/comercio", label: "Aurora Comercio" },
+  farmacia: { ruta: "/comercio", label: "Aurora Comercio" },
+  retail: { ruta: "/comercio", label: "Aurora Comercio" },
+  finca: { ruta: "/ganaderia", label: "Aurora Ganadería" },
+  ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería" },
 };
-const VERTICAL_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", icono: "🩺" };
+const VERTICAL_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro" };
 
 export default function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -61,10 +61,10 @@ export default function Nav() {
         <button onClick={handleNavLogoClick} className="flex items-center gap-3 group cursor-pointer" title="Aurora Plus">
           <AuroraLogo size={34} animated />
           <div className="text-left">
-            <div className="font-['Inter'] font-bold text-base leading-none tracking-tight text-[#1D1D1F]">
+            <div className="font-bold text-base leading-none tracking-tight text-[#1D1D1F]">
               Aurora Plus
             </div>
-            <div className="font-sans text-[#86868B] text-[10px] leading-none tracking-wider uppercase mt-1">
+            <div className="text-[#86868B] text-[10px] leading-none tracking-wider uppercase mt-1">
               Software Administrativo
             </div>
           </div>
@@ -78,9 +78,9 @@ export default function Nav() {
               <button
                 key={l.path}
                 onClick={() => navigate(l.path)}
-                className={`group font-sans text-sm font-semibold transition-colors duration-200 cursor-pointer flex items-center gap-1 ${
+                className={`group text-sm font-semibold transition-colors duration-200 cursor-pointer flex items-center gap-1 ${
                   isActive
-                    ? "text-[#1D1D1F] font-black"
+                    ? "text-[#1D1D1F]"
                     : "text-[#86868B] hover:text-[#1D1D1F]"
                 }`}>
                 <span className={`text-[#177E89] font-bold transition-all duration-200 ${
@@ -181,13 +181,13 @@ export default function Nav() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-[#E5E5EA] bg-white px-6 py-5 space-y-1 shadow-lg">
+        <div className="md:hidden border-t border-[#E5E5EA] bg-white px-6 py-5 space-y-1 shadow-sm">
           {LINKS.map((l) => (
             <button
               key={l.path}
               onClick={() => { navigate(l.path); setMobileOpen(false); }}
               className={`block w-full text-left px-4 py-3 text-sm rounded-xl font-semibold transition-colors ${
-                pathname === l.path ? "text-[#1D1D1F] font-black bg-[#F5F5F7]" : "text-[#1D1D1F] hover:bg-[#F5F5F7]"
+                pathname === l.path ? "text-[#1D1D1F] bg-[#F5F5F7]" : "text-[#1D1D1F] hover:bg-[#F5F5F7]"
               }`}>
               {l.label}
             </button>

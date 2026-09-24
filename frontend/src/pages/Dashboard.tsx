@@ -92,10 +92,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN CLÍNICA & SALUD",
     desc: "Historias clínicas digitales, agenda de especialistas, recetas y facturación.",
     stats: [
-      { label: "Pacientes Registrados", val: "0", change: "Sin pacientes aún", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Citas de Hoy", val: "0", change: "Sin citas agendadas", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Ingresos del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Pacientes en Espera", val: "0", change: "Sin pacientes en espera", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Pacientes Registrados", val: "0", change: "Sin pacientes aún", color: "text-[#177E89]" },
+      { label: "Citas de Hoy", val: "0", change: "Sin citas agendadas", color: "text-[#177E89]" },
+      { label: "Ingresos del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-[#1D1D1F]" },
+      { label: "Pacientes en Espera", val: "0", change: "Sin pacientes en espera", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Nueva Consulta", desc: "Abrir historia clínica y registrar diagnóstico" },
@@ -110,10 +110,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN FARMACIA & DROGUERÍA",
     desc: "Dispensación de medicamentos, control de lotes y vencimientos, POS mostrador y alertas de stock.",
     stats: [
-      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Stock Farmacia", val: "0", change: "Sin medicamentos cargados", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Lotes por Vencer", val: "0", change: "Sin alertas activas", color: "text-amber-500 dark:text-amber-400" },
-      { label: "Caja del Día", val: "$0.00", change: "Multi-moneda (USD/VES/COP)", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-[#177E89]" },
+      { label: "Stock Farmacia", val: "0", change: "Sin medicamentos cargados", color: "text-[#177E89]" },
+      { label: "Lotes por Vencer", val: "0", change: "Sin alertas activas", color: "text-[#1D1D1F]" },
+      { label: "Caja del Día", val: "$0.00", change: "Multi-moneda (USD/VES/COP)", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Cobrar Factura", desc: "Venta de medicamentos por mostrador" },
@@ -128,10 +128,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN VETERINARIA",
     desc: "Expedientes por mascota, plan de vacunas, cirugías e inventario veterinario.",
     stats: [
-      { label: "Mascotas Atendidas", val: "0", change: "Sin mascotas registradas", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Vacunaciones", val: "0", change: "Sin vacunas hoy", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Venta Farmacia Vet", val: "$0.00", change: "Alimentos y fármacos", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Hospitalizaciones", val: "0", change: "Sin animales hospitalizados", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Mascotas Atendidas", val: "0", change: "Sin mascotas registradas", color: "text-[#177E89]" },
+      { label: "Vacunaciones", val: "0", change: "Sin vacunas hoy", color: "text-[#177E89]" },
+      { label: "Venta Farmacia Vet", val: "$0.00", change: "Alimentos y fármacos", color: "text-[#1D1D1F]" },
+      { label: "Hospitalizaciones", val: "0", change: "Sin animales hospitalizados", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Ficha Mascota", desc: "Historial por paciente y tutor" },
@@ -146,10 +146,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN ODONTOLÓGICA",
     desc: "Historia clínica, agenda, odontograma FDI interactivo y facturación para consultorios dentales.",
     stats: [
-      { label: "Pacientes Atendidos", val: "0", change: "Sin pacientes registrados", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Citas de Hoy", val: "0", change: "Sin citas agendadas", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Ingresos del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Tratamientos en Curso", val: "0", change: "Sin planes activos", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Pacientes Atendidos", val: "0", change: "Sin pacientes registrados", color: "text-[#177E89]" },
+      { label: "Citas de Hoy", val: "0", change: "Sin citas agendadas", color: "text-[#177E89]" },
+      { label: "Ingresos del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-[#1D1D1F]" },
+      { label: "Tratamientos en Curso", val: "0", change: "Sin planes activos", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Nueva Consulta", desc: "Abrir historia clínica y registrar diagnóstico" },
@@ -164,10 +164,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN COMERCIO",
     desc: "POS mostrador con código de barras, kardex multi-unidad, compras a proveedores y cuentas por cobrar.",
     stats: [
-      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-[#177E89]" },
+      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-[#177E89]" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-[#1D1D1F]" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
@@ -182,10 +182,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN RESTAURANTES & HORECA",
     desc: "Mapa de mesas, comandas digitales, cocina en tiempo real (KDS) y escandallo de recetas.",
     stats: [
-      { label: "Mesas Ocupadas", val: "0 / 0", change: "Sin mesas configuradas", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Comandas Abiertas", val: "0", change: "Sin comandas activas", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Ventas del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Platos en Cocina", val: "0", change: "Cocina al día", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Mesas Ocupadas", val: "0 / 0", change: "Sin mesas configuradas", color: "text-[#177E89]" },
+      { label: "Comandas Abiertas", val: "0", change: "Sin comandas activas", color: "text-[#177E89]" },
+      { label: "Ventas del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-[#1D1D1F]" },
+      { label: "Platos en Cocina", val: "0", change: "Cocina al día", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Abrir Mesa / Comanda", desc: "Tomar pedido y enviar a cocina" },
@@ -202,10 +202,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN COMERCIO",
     desc: "POS mostrador con código de barras, kardex multi-unidad, compras a proveedores y cuentas por cobrar.",
     stats: [
-      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-[#177E89]" },
+      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-[#177E89]" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-[#1D1D1F]" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
@@ -220,10 +220,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN COMERCIO",
     desc: "POS mostrador con código de barras, kardex multi-unidad, compras a proveedores y cuentas por cobrar.",
     stats: [
-      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-[#177E89]" },
+      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-[#177E89]" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-[#1D1D1F]" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
@@ -238,10 +238,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN COMERCIO",
     desc: "POS mostrador con código de barras, kardex multi-unidad, compras a proveedores y cuentas por cobrar.",
     stats: [
-      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-teal-500 dark:text-teal-400" },
-      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-amber-500 dark:text-amber-400" },
+      { label: "Ventas de Hoy", val: "$0.00", change: "Sin ventas hoy", color: "text-[#177E89]" },
+      { label: "Artículos en Stock", val: "0", change: "Sin artículos cargados", color: "text-[#177E89]" },
+      { label: "Cuentas x Cobrar", val: "$0.00", change: "Sin deudas pendientes", color: "text-[#1D1D1F]" },
+      { label: "Órdenes de Compra", val: "0", change: "Sin órdenes registradas", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Abrir Caja / POS", desc: "Venta por mostrador y códigos de barra" },
@@ -256,10 +256,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN FINCAS & GANADERÍA",
     desc: "Rotación agronómica de potreros, control de hato, producción lechera, GDP y trazabilidad.",
     stats: [
-      { label: "Cabezas en Hato", val: "0", change: "Sin animales registrados", color: "text-emerald-500 dark:text-emerald-400" },
-      { label: "Litros Ordeñados", val: "0 L", change: "Sin registros hoy", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Potreros Activos", val: "0", change: "Sin potreros registrados", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Alertas Retiro", val: "0", change: "100% apto consumo", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Cabezas en Hato", val: "0", change: "Sin animales registrados", color: "text-[#177E89]" },
+      { label: "Litros Ordeñados", val: "0 L", change: "Sin registros hoy", color: "text-[#177E89]" },
+      { label: "Potreros Activos", val: "0", change: "Sin potreros registrados", color: "text-[#1D1D1F]" },
+      { label: "Alertas Retiro", val: "0", change: "100% apto consumo", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Nuevo Animal", desc: "Alta por arete, raza y potrero" },
@@ -274,10 +274,10 @@ const VERTICAL_METADATA: Record<string, {
     badge: "EDICIÓN FINCAS & GANADERÍA",
     desc: "Rotación agronómica de potreros, control de hato, producción lechera, GDP y trazabilidad.",
     stats: [
-      { label: "Cabezas en Hato", val: "0", change: "Sin animales registrados", color: "text-emerald-500 dark:text-emerald-400" },
-      { label: "Litros Ordeñados", val: "0 L", change: "Sin registros hoy", color: "text-sky-500 dark:text-sky-400" },
-      { label: "Potreros Activos", val: "0", change: "Sin potreros registrados", color: "text-purple-500 dark:text-purple-400" },
-      { label: "Alertas Retiro", val: "0", change: "100% apto consumo", color: "text-teal-500 dark:text-teal-400" },
+      { label: "Cabezas en Hato", val: "0", change: "Sin animales registrados", color: "text-[#177E89]" },
+      { label: "Litros Ordeñados", val: "0 L", change: "Sin registros hoy", color: "text-[#177E89]" },
+      { label: "Potreros Activos", val: "0", change: "Sin potreros registrados", color: "text-[#1D1D1F]" },
+      { label: "Alertas Retiro", val: "0", change: "100% apto consumo", color: "text-[#1D1D1F]" },
     ],
     actions: [
       { label: "Nuevo Animal", desc: "Alta por arete, raza y potrero" },
@@ -467,25 +467,25 @@ export default function Dashboard() {
             change: animList.length > 0
               ? `${animList.filter(a => a.sexo === "HEMBRA").length} hembras · ${animList.filter(a => a.sexo === "MACHO").length} machos`
               : "Sin animales registrados",
-            color: "text-emerald-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Litros Ordeñados",
             val: `${litrosHoy.toFixed(1)} L`,
             change: litrosHoy > 0 ? "Ordeño registrado hoy" : "Sin ordeños hoy",
-            color: "text-sky-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Potreros Activos",
             val: potList.length > 0 ? `${potActivos} / ${potList.length}` : "0",
             change: potList.length > 0 ? `${potDescanso} en descanso` : "Sin potreros registrados",
-            color: "text-purple-400",
+            color: "text-[#1D1D1F]",
           },
           {
             label: "Alertas Retiro",
             val: String(retirosCount),
             change: retirosCount > 0 ? `${retirosCount} retiros activos` : "100% apto consumo",
-            color: "text-teal-400",
+            color: "text-[#1D1D1F]",
           },
         ]);
       });
@@ -521,25 +521,25 @@ export default function Dashboard() {
             label: "Ventas de Hoy",
             val: `$${ventasVal.toFixed(2)}`,
             change: cantMovs > 0 ? `${cantMovs} movimientos de caja` : "Sin ventas hoy",
-            color: "text-teal-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Artículos en Stock",
             val: String(repList.length),
             change: repList.length > 0 ? `${bajoMinimo} bajo mínimo` : "Sin artículos cargados",
-            color: "text-sky-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Cuentas x Cobrar",
             val: `$${cxcTotal.toFixed(2)}`,
             change: cxcList.length > 0 ? `${cxcList.length} créditos pendientes` : "Sin deudas pendientes",
-            color: "text-purple-400",
+            color: "text-[#1D1D1F]",
           },
           {
             label: "Órdenes de Compra",
             val: String(compList.length),
             change: compList.length > 0 ? `${compList.length} compras registradas` : "Sin compras registradas",
-            color: "text-amber-400",
+            color: "text-[#1D1D1F]",
           },
         ]);
       });
@@ -566,25 +566,25 @@ export default function Dashboard() {
             label: "Mesas Ocupadas",
             val: mapa.length > 0 ? `${mesasOcupadas} / ${mapa.length}` : "0 / 0",
             change: mapa.length > 0 ? "Mapa en vivo" : "Sin mesas configuradas",
-            color: "text-teal-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Comandas Abiertas",
             val: String(comandasAbiertas),
             change: comandasAbiertas > 0 ? "Salón + delivery" : "Sin comandas activas",
-            color: "text-sky-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Ventas del Día",
             val: `$${ventasVal.toFixed(2)}`,
             change: ventasVal > 0 ? "Cobros del día" : "Sin ventas hoy",
-            color: "text-purple-400",
+            color: "text-[#1D1D1F]",
           },
           {
             label: "Platos en Cocina",
             val: String(platosEnCocina),
             change: platosEnCocina > 0 ? "Pendientes + en preparación" : "Cocina al día",
-            color: "text-amber-400",
+            color: "text-[#1D1D1F]",
           },
         ]);
       });
@@ -613,25 +613,25 @@ export default function Dashboard() {
             label: "Ventas de Hoy",
             val: `$${ventasVal.toFixed(2)}`,
             change: cantMovs > 0 ? `${cantMovs} tickets emitidos` : "Sin ventas hoy",
-            color: "text-teal-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Stock Farmacia",
             val: String(repList.length),
             change: repList.length > 0 ? `${bajoMinimo} alertas de reorden` : "Sin medicamentos cargados",
-            color: "text-sky-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Lotes por Vencer",
             val: String(lotes.length),
             change: lotes.length > 0 ? "Próximos 30 días" : "Sin alertas activas",
-            color: "text-amber-400",
+            color: "text-[#1D1D1F]",
           },
           {
             label: "Caja del Día",
             val: `$${cajaVal.toFixed(2)}`,
             change: "Multi-moneda (USD/VES/COP)",
-            color: "text-purple-400",
+            color: "text-[#1D1D1F]",
           },
         ]);
       });
@@ -660,25 +660,25 @@ export default function Dashboard() {
             label: "Mascotas Atendidas",
             val: String(pacientes.length),
             change: pacientes.length > 0 ? "Expedientes registrados" : "Sin mascotas registradas",
-            color: "text-teal-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Citas de Hoy",
             val: String(citas.length),
             change: citas.length > 0 ? `${citas.filter(c => c.estado === "CONFIRMADA").length} confirmadas` : "Sin citas hoy",
-            color: "text-sky-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Ingresos del Día",
             val: `$${ingVal.toFixed(2)}`,
             change: "Consultas y PetShop",
-            color: "text-purple-400",
+            color: "text-[#1D1D1F]",
           },
           {
             label: "En Espera / Hospital",
             val: String(enEspera),
             change: enEspera > 0 ? "En atención activa" : "Sin pacientes en espera",
-            color: "text-amber-400",
+            color: "text-[#1D1D1F]",
           },
         ]);
       });
@@ -707,25 +707,25 @@ export default function Dashboard() {
             label: "Pacientes Registrados",
             val: String(pacientes.length),
             change: pacientes.length > 0 ? "Total en consultorio" : "Sin pacientes aún",
-            color: "text-teal-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Citas de Hoy",
             val: String(citas.length),
             change: citas.length > 0 ? `${citas.filter(c => c.estado === "CONFIRMADA").length} confirmadas` : "Sin citas agendadas",
-            color: "text-sky-400",
+            color: "text-[#177E89]",
           },
           {
             label: "Ingresos del Día",
             val: `$${ingVal.toFixed(2)}`,
             change: "Multi-moneda (USD/VES/COP)",
-            color: "text-purple-400",
+            color: "text-[#1D1D1F]",
           },
           {
             label: "Sala de Espera",
             val: String(enEspera),
             change: enEspera > 0 ? "Pacientes en espera" : "Sin pacientes en espera",
-            color: "text-amber-400",
+            color: "text-[#1D1D1F]",
           },
         ]);
       });
@@ -750,32 +750,26 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500 relative overflow-hidden flex flex-col">
+    <div className="min-h-screen bg-white text-[#1D1D1F] flex flex-col">
       <AuroraGradientDef />
 
-      {/* Fondos atmosféricos suaves */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="aurora-ribbon-1 -top-32 -left-20 opacity-30" />
-        <div className="aurora-ribbon-2 top-1/3 -right-20 opacity-35" />
-      </div>
-
-      {/* ── HEADER SUPERIOR DEL PORTAL DE CLIENTE: ULTRA PREMIUM APPLE GLASS ── */}
-      <header className="nav-glass border-b border-slate-300/60 dark:border-white/10 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4 relative z-30 sticky top-0 transition-colors duration-500 backdrop-blur-2xl">
+      {/* ── HEADER SUPERIOR DEL PORTAL DE CLIENTE ── */}
+      <header className="bg-white/95 border-b border-[#E5E5EA] px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-4 relative z-30 sticky top-0">
         {/* Izquierda: Logo + Nombre del Hub + Empresa */}
         <div className="flex items-center gap-3.5">
           <button
             onClick={() => navigate("/")}
             className="flex items-center gap-3 cursor-pointer group text-left"
           >
-            <div className="p-1.5 rounded-xl bg-white/5 border border-white/10 group-hover:scale-105 transition-transform">
+            <div className="p-1.5 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] group-hover:scale-105 transition-transform">
               <AuroraLogo size={32} animated />
             </div>
             <div>
-              <div className="font-['Outfit'] font-black text-lg text-aurora leading-none">
+              <div className="font-bold text-lg text-[#1D1D1F] leading-none">
                 Aurora Hub
               </div>
-              <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
+              <div className="text-[#86868B] text-[10px] tracking-wider uppercase mt-0.5 font-medium flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#177E89]" />
                 <span>{user?.empresa || "Clínica & Consultorios Médicos"}</span>
               </div>
             </div>
@@ -783,13 +777,13 @@ export default function Dashboard() {
         </div>
 
         {/* Centro: Pestañas de Navegación en 1 sola línea fluida (Segmented Pill) */}
-        <nav className="flex items-center gap-1.5 apple-glass-pill rounded-full p-1.5 border border-slate-300/80 dark:border-white/15 bg-slate-100/90 dark:bg-white/[0.04] shadow-inner text-xs overflow-x-auto whitespace-nowrap">
+        <nav className="flex items-center gap-1.5 bg-[#F5F5F7] border border-[#E5E5EA] rounded-full p-1.5 text-xs overflow-x-auto whitespace-nowrap">
           <button
             onClick={() => setActiveTab("vertical")}
-            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-2 ${
               activeTab === "vertical"
-                ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
-                : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
+                ? "bg-white text-[#1D1D1F] shadow-sm"
+                : "text-[#86868B] hover:text-[#1D1D1F]"
             }`}>
             <VerticalIcon size={15} />
             <span>Mis Sistemas</span>
@@ -797,10 +791,10 @@ export default function Dashboard() {
 
           <button
             onClick={() => setActiveTab("billing")}
-            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-2 ${
               activeTab === "billing"
-                ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
-                : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
+                ? "bg-white text-[#1D1D1F] shadow-sm"
+                : "text-[#86868B] hover:text-[#1D1D1F]"
             }`}>
             <IconCard size={15} />
             <span>Facturación & Pagos</span>
@@ -809,10 +803,10 @@ export default function Dashboard() {
           {esDuenoAdmin && (
             <button
               onClick={() => setActiveTab("team")}
-              className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-2 ${
                 activeTab === "team"
-                  ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
-                  : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
+                  ? "bg-white text-[#1D1D1F] shadow-sm"
+                  : "text-[#86868B] hover:text-[#1D1D1F]"
               }`}>
               <IconUsers size={15} />
               <span>Equipo & Roles</span>
@@ -822,7 +816,7 @@ export default function Dashboard() {
           <button
             onClick={() => navigate("/onboarding")}
             title="Cambiar o explorar otras verticales de Aurora"
-            className="px-3.5 py-2 rounded-full font-medium transition-all duration-300 text-slate-500 dark:text-white/40 hover:text-teal-500 dark:hover:text-teal-300 hover:bg-white/40 dark:hover:bg-white/8 flex items-center gap-1.5 text-xs">
+            className="px-3.5 py-2 rounded-full font-medium transition-colors text-[#86868B] hover:text-[#177E89] flex items-center gap-1.5 text-xs">
             <IconCustomize size={14} />
             <span>Cambiar Rubro</span>
           </button>
@@ -834,10 +828,9 @@ export default function Dashboard() {
           {esVerticalReal && (
             <button
               onClick={() => navigate(rutaVertical)}
-              className="btn-cyber-neon text-white text-xs font-extrabold px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.5)] hover:scale-105 transition-all cursor-pointer"
+              className="bg-[#177E89] text-white text-xs font-semibold px-4 py-2 rounded-full flex items-center gap-2 hover:bg-[#136570] transition-colors cursor-pointer"
               title={`Abrir ${vertical.name}`}
             >
-              <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
               <span>Entrar a {vertical.name} →</span>
             </button>
           )}
@@ -845,16 +838,16 @@ export default function Dashboard() {
           {/* Badge de Licencia compacto en 1 línea */}
           <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${
             isTrial
-              ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
-              : "bg-teal-500/10 border-teal-500/30 text-teal-700 dark:text-teal-300"
+              ? "bg-[#F5F5F7] border-[#E5E5EA] text-[#1D1D1F]"
+              : "bg-[#177E89]/10 border-[#177E89]/30 text-[#177E89]"
           }`}>
-            <span className={`w-2 h-2 rounded-full ${isTrial ? "bg-amber-400 animate-ping" : "bg-teal-400"}`} />
+            <span className={`w-2 h-2 rounded-full ${isTrial ? "bg-[#86868B]" : "bg-[#177E89]"}`} />
             <span>{isTrial ? `Trial (${daysLeft}d)` : "Plan Activo"}</span>
           </div>
 
           <button
             onClick={logout}
-            className="apple-glass-btn text-xs font-semibold px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
+            className="bg-[#F5F5F7] hover:bg-[#E5E5EA] border border-[#E5E5EA] text-xs font-semibold px-3.5 py-2 rounded-full text-[#1D1D1F] hover:text-red-600 transition-colors cursor-pointer"
             title="Cerrar sesión de Aurora"
           >
             Salir
@@ -864,27 +857,27 @@ export default function Dashboard() {
 
       {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10 space-y-8">
-        
-        {/* BARRA DE RECORDATORIO DE TRIAL / PAGO (DISEÑO PREMIUM EN 1 LÍNEA) */}
+
+        {/* BARRA DE RECORDATORIO DE TRIAL / PAGO */}
         {isTrial && (
-          <div className="apple-glass rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-teal-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.06)] bg-gradient-to-r from-teal-500/10 via-transparent to-purple-500/10 backdrop-blur-xl">
+          <div className="bg-white border border-[#E5E5EA] rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-300 flex items-center justify-center shadow-inner flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-[#177E89]/10 text-[#177E89] flex items-center justify-center flex-shrink-0">
                 <IconHourglass size={20} />
               </div>
               <div>
-                <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
+                <h4 className="font-bold text-[#1D1D1F] text-sm">
                   Estás disfrutando de tu prueba gratuita de {vertical.name}
                 </h4>
-                <p className="text-slate-500 dark:text-white/50 text-xs mt-0.5">
-                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Tus datos e historias clínicas se guardan permanentemente.
+                <p className="text-[#86868B] text-xs mt-0.5">
+                  Te quedan <strong className="text-[#177E89] font-bold">{daysLeft} días</strong> de acceso completo. Tus datos e historias clínicas se guardan permanentemente.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="btn-electric-blue text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md cursor-pointer hover:scale-105 transition-all">
+                className="bg-[#177E89] text-white text-xs font-semibold px-5 py-2.5 rounded-full cursor-pointer hover:bg-[#136570] transition-colors">
                 Activar Plan Pro ($35/mes) →
               </button>
             </div>
@@ -894,24 +887,21 @@ export default function Dashboard() {
         {/* ── PESTAÑA 1: LAUNCHER & ENTORNO DE LA VERTICAL (MEDICLINIC PRO) ── */}
         {activeTab === "vertical" && (
           <div className="space-y-8">
-            
-            {/* HERO LAUNCHER CARD — DISEÑO REDONDEADO Y ELEGANTE ESTILO APPLE LIQUID GLASS */}
-            <div className="relative apple-glass rounded-[32px] p-6 sm:p-9 overflow-hidden shadow-2xl border border-teal-500/30 bg-gradient-to-br from-slate-900/95 via-[#0c1424]/95 to-slate-900/95 backdrop-blur-2xl">
-              <div className="line-aurora absolute top-0 left-0 right-0" />
-              
+
+            {/* HERO LAUNCHER CARD */}
+            <div className="relative bg-white rounded-3xl p-6 sm:p-9 overflow-hidden shadow-sm border border-[#E5E5EA]">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
                 {/* Lado Izquierdo: Presentación y Botones Principales */}
                 <div className="lg:col-span-7 space-y-5 text-left">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-xs font-extrabold text-teal-300 tracking-wider uppercase shadow-xs">
-                    <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#177E89]/10 border border-[#177E89]/30 text-xs font-semibold text-[#177E89] tracking-wider uppercase">
                     <span>{vertical.badge}</span>
                   </div>
 
-                  <h2 className="font-['Outfit'] font-black text-3xl sm:text-4xl text-white leading-tight tracking-tight">
-                    <span className="text-aurora">{vertical.name}</span> — Centro de Operaciones
+                  <h2 className="text-2xl sm:text-3xl font-bold text-[#1D1D1F] leading-tight tracking-tight">
+                    {vertical.name} — Centro de Operaciones
                   </h2>
 
-                  <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
+                  <p className="text-[#6E6E73] text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
                     {vertical.desc}{" "}
                     {userIndustry === "restaurante"
                       ? "Gestiona mesas, comandas y cocina en tiempo real desde un solo lugar."
@@ -921,7 +911,7 @@ export default function Dashboard() {
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
                       onClick={() => navigate(rutaVertical)}
-                      className="btn-cyber-neon text-white text-xs sm:text-sm font-extrabold px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
+                      className="btn-deep-black text-xs sm:text-sm font-semibold px-7 py-3.5 rounded-full flex items-center gap-2.5 cursor-pointer">
                       <IconRocket size={17} />
                       <span>Entrar a {vertical.name} (Cloud Web)</span>
                       <span className="text-base">→</span>
@@ -931,27 +921,27 @@ export default function Dashboard() {
                       href="https://github.com"
                       target="_blank"
                       rel="noreferrer"
-                      className="apple-glass-btn text-xs sm:text-sm font-semibold px-5 py-3.5 rounded-2xl flex items-center gap-2 text-white/90 hover:text-white border border-white/15 cursor-pointer hover:border-teal-400/40 transition-all">
+                      className="bg-[#F5F5F7] hover:bg-[#E5E5EA] border border-[#E5E5EA] text-xs sm:text-sm font-semibold px-5 py-3.5 rounded-full flex items-center gap-2 text-[#1D1D1F] cursor-pointer transition-colors">
                       <IconDownload size={15} />
                       <span>Descargar para Windows (.exe)</span>
                     </a>
 
                     <button
                       onClick={() => alert("Tu API Token de Licencia: AURORA-MED-PRO-9842-SECURE")}
-                      className="apple-glass-btn text-xs font-mono px-4 py-3.5 rounded-2xl text-white/60 hover:text-white border border-white/10 cursor-pointer flex items-center gap-2 transition-all">
+                      className="bg-[#F5F5F7] hover:bg-[#E5E5EA] border border-[#E5E5EA] text-xs font-mono px-4 py-3.5 rounded-full text-[#86868B] hover:text-[#1D1D1F] cursor-pointer flex items-center gap-2 transition-colors">
                       <IconKey size={14} />
                       <span>Clave de Licencia</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Lado Derecho: Métricas Reales en Grid 2x2 Estilo Glassmorphism */}
+                {/* Lado Derecho: Métricas Reales en Grid 2x2 */}
                 <div className="lg:col-span-5 grid grid-cols-2 gap-3.5">
                   {(metricasEnVivo || vertical.stats).map((s) => (
-                    <div key={s.label} className="apple-glass rounded-2xl p-4 sm:p-5 text-left border border-white/10 shadow-md hover:border-teal-400/40 transition-all duration-300">
-                      <div className="text-white/50 text-[11px] font-medium leading-tight">{s.label}</div>
-                      <div className={`font-['Outfit'] font-black text-2xl sm:text-3xl mt-1.5 ${s.color}`}>{s.val}</div>
-                      <div className="text-[10px] text-white/40 mt-1">{s.change}</div>
+                    <div key={s.label} className="bg-[#F5F5F7] rounded-2xl p-4 sm:p-5 text-left border border-[#E5E5EA]">
+                      <div className="text-[#86868B] text-[11px] font-medium leading-tight">{s.label}</div>
+                      <div className={`font-bold text-2xl sm:text-3xl mt-1.5 ${s.color}`}>{s.val}</div>
+                      <div className="text-[10px] text-[#86868B] mt-1">{s.change}</div>
                     </div>
                   ))}
                 </div>
@@ -962,13 +952,13 @@ export default function Dashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-[#1D1D1F] flex items-center gap-2">
                     <span>Módulos de tu Empresa</span>
-                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-semibold">
+                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#177E89]/10 text-[#177E89] border border-[#177E89]/30 font-semibold">
                       Multi-Tenant Cloud
                     </span>
                   </h3>
-                  <p className="text-slate-500 dark:text-white/50 text-xs mt-0.5">
+                  <p className="text-[#86868B] text-xs mt-0.5">
                     Acceso directo a los módulos operativos y administrativos habilitados para tu negocio.
                   </p>
                 </div>
@@ -976,93 +966,93 @@ export default function Dashboard() {
 
               <div className={`grid grid-cols-1 md:grid-cols-3 ${user?.rol === "DUENO_ADMIN" ? "lg:grid-cols-4" : ""} gap-5`}>
                 {/* 1. Módulo Operativo Principal (Vertical Activa) */}
-                <div 
+                <div
                   onClick={() => navigate(rutaVertical)}
-                  className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-teal-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
+                  className="bg-white rounded-2xl p-6 border border-[#E5E5EA] hover:border-[#D1D1D6] transition-colors group cursor-pointer shadow-sm flex flex-col justify-between relative overflow-hidden"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-400/10 text-teal-600 dark:text-teal-300 flex items-center justify-center border border-teal-500/20 group-hover:scale-110 transition-transform">
+                      <div className="w-12 h-12 rounded-2xl bg-[#177E89]/10 text-[#177E89] flex items-center justify-center border border-[#177E89]/20 group-hover:scale-110 transition-transform">
                         <VerticalIcon size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 uppercase">
+                      <span className="text-[10px] font-semibold font-mono tracking-wider px-2.5 py-1 rounded-full bg-[#177E89]/10 text-[#177E89] border border-[#177E89]/30 uppercase">
                         Vertical Activa
                       </span>
                     </div>
 
                     <div>
-                      <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white group-hover:text-teal-500 dark:group-hover:text-teal-300 transition-colors">
+                      <h4 className="text-lg font-bold text-[#1D1D1F] group-hover:text-[#177E89] transition-colors">
                         {vertical.name}
                       </h4>
-                      <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
+                      <p className="text-[#86868B] text-xs mt-1 leading-relaxed line-clamp-2">
                         {vertical.desc}
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-teal-600 dark:text-teal-300">
+                  <div className="pt-5 mt-4 border-t border-[#E5E5EA] flex items-center justify-between text-xs font-semibold text-[#177E89]">
                     <span>Entrar al Sistema</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
                 </div>
 
                 {/* 2. Centro Financiero & Control Contable */}
-                <div 
+                <div
                   onClick={() => navigate("/finanzas")}
-                  className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-emerald-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
+                  className="bg-white rounded-2xl p-6 border border-[#E5E5EA] hover:border-[#D1D1D6] transition-colors group cursor-pointer shadow-sm flex flex-col justify-between relative overflow-hidden"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-300 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
+                      <div className="w-12 h-12 rounded-2xl bg-[#177E89]/10 text-[#177E89] flex items-center justify-center border border-[#177E89]/20 group-hover:scale-110 transition-transform">
                         <IconBank size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase">
+                      <span className="text-[10px] font-semibold font-mono tracking-wider px-2.5 py-1 rounded-full bg-[#177E89]/10 text-[#177E89] border border-[#177E89]/30 uppercase">
                         Finanzas & Control
                       </span>
                     </div>
 
                     <div>
-                      <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white group-hover:text-emerald-500 dark:group-hover:text-emerald-300 transition-colors">
+                      <h4 className="text-lg font-bold text-[#1D1D1F] group-hover:text-[#177E89] transition-colors">
                         Aurora Finanzas
                       </h4>
-                      <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
+                      <p className="text-[#86868B] text-xs mt-1 leading-relaxed line-clamp-2">
                         Consolidación de ventas, margen bruto, costeo operativo, cobertura y comprobantes no fiscales.
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-300">
+                  <div className="pt-5 mt-4 border-t border-[#E5E5EA] flex items-center justify-between text-xs font-semibold text-[#177E89]">
                     <span>Abrir Centro Financiero</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
                 </div>
 
                 {/* 3. Gestión de Personal & Nómina */}
-                <div 
+                <div
                   onClick={() => navigate("/personal")}
-                  className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-purple-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
+                  className="bg-white rounded-2xl p-6 border border-[#E5E5EA] hover:border-[#D1D1D6] transition-colors group cursor-pointer shadow-sm flex flex-col justify-between relative overflow-hidden"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-400/10 text-purple-600 dark:text-purple-300 flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
+                      <div className="w-12 h-12 rounded-2xl bg-[#177E89]/10 text-[#177E89] flex items-center justify-center border border-[#177E89]/20 group-hover:scale-110 transition-transform">
                         <IconUsers size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 uppercase">
+                      <span className="text-[10px] font-semibold font-mono tracking-wider px-2.5 py-1 rounded-full bg-[#177E89]/10 text-[#177E89] border border-[#177E89]/30 uppercase">
                         Talento & Nómina
                       </span>
                     </div>
 
                     <div>
-                      <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white group-hover:text-purple-500 dark:group-hover:text-purple-300 transition-colors">
+                      <h4 className="text-lg font-bold text-[#1D1D1F] group-hover:text-[#177E89] transition-colors">
                         Gestión de Personal
                       </h4>
-                      <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
+                      <p className="text-[#86868B] text-xs mt-1 leading-relaxed line-clamp-2">
                         Control de turnos, asistencias biométricas, comisiones por venta y liquidación periódica.
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-purple-600 dark:text-purple-300">
+                  <div className="pt-5 mt-4 border-t border-[#E5E5EA] flex items-center justify-between text-xs font-semibold text-[#177E89]">
                     <span>Abrir Gestión de Personal</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
@@ -1072,29 +1062,29 @@ export default function Dashboard() {
                 {user?.rol === "DUENO_ADMIN" && (
                   <div
                     onClick={() => navigate("/auditoria")}
-                    className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-amber-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
+                    className="bg-white rounded-2xl p-6 border border-[#E5E5EA] hover:border-[#D1D1D6] transition-colors group cursor-pointer shadow-sm flex flex-col justify-between relative overflow-hidden"
                   >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-300 flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
+                        <div className="w-12 h-12 rounded-2xl bg-[#177E89]/10 text-[#177E89] flex items-center justify-center border border-[#177E89]/20 group-hover:scale-110 transition-transform">
                           <IconShield size={24} />
                         </div>
-                        <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 uppercase">
+                        <span className="text-[10px] font-semibold font-mono tracking-wider px-2.5 py-1 rounded-full bg-[#177E89]/10 text-[#177E89] border border-[#177E89]/30 uppercase">
                           Solo Dueño/Admin
                         </span>
                       </div>
 
                       <div>
-                        <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white group-hover:text-amber-500 dark:group-hover:text-amber-300 transition-colors">
+                        <h4 className="text-lg font-bold text-[#1D1D1F] group-hover:text-[#177E89] transition-colors">
                           Auditoría
                         </h4>
-                        <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
+                        <p className="text-[#86868B] text-xs mt-1 leading-relaxed line-clamp-2">
                           Quién creó, editó o eliminó cada registro sensible en tu negocio, con fecha y usuario.
                         </p>
                       </div>
                     </div>
 
-                    <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-300">
+                    <div className="pt-5 mt-4 border-t border-[#E5E5EA] flex items-center justify-between text-xs font-semibold text-[#177E89]">
                       <span>Abrir Auditoría</span>
                       <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </div>
@@ -1104,14 +1094,14 @@ export default function Dashboard() {
             </div>
 
             {/* SIMULADOR EN VIVO / WORKSPACE INTEGRADO */}
-            <div className="apple-glass rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-300/60 dark:border-white/10">
+            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E5E5EA] shadow-sm space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#E5E5EA]">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-300 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-[#177E89]/10 text-[#177E89] flex items-center justify-center">
                     <VerticalIcon size={20} />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">
+                    <h3 className="text-lg font-bold text-[#1D1D1F]">
                       {userIndustry === "restaurante" ? "Espacio Gastronómico & POS en Vivo" :
                        userIndustry === "farmacia" ? "Espacio de Farmacia & Droguería en Vivo" :
                        esRubroComercio ? "Espacio de Comercio en Vivo" :
@@ -1119,7 +1109,7 @@ export default function Dashboard() {
                        userIndustry === "veterinaria" ? "Espacio Veterinario & Mascotas en Vivo" :
                        "Espacio de Trabajo Clínico en Vivo"}
                     </h3>
-                    <p className="text-slate-500 dark:text-white/40 text-xs">
+                    <p className="text-[#86868B] text-xs">
                       {userIndustry === "restaurante" ? "Venta rápida, mapa de mesas, KDS de cocina y control de caja multi-moneda." :
                        userIndustry === "farmacia" ? "Dispensación de medicamentos, control de lotes y ventas por mostrador." :
                        esRubroComercio ? "Kardex multi-unidad, código de barras, compras y cuentas por cobrar." :
@@ -1131,18 +1121,18 @@ export default function Dashboard() {
                 </div>
 
                 {/* Pestañas del simulador */}
-                <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1 text-xs">
+                <div className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-full p-1.5 flex items-center gap-1 text-xs">
                   <button
                     onClick={() => setWorkspaceTab("kpis")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
-                      workspaceTab === "kpis" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
+                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-colors ${
+                      workspaceTab === "kpis" ? "bg-white text-[#1D1D1F] shadow-sm" : "text-[#86868B] hover:text-[#1D1D1F]"
                     }`}>
                     Panel General
                   </button>
                   <button
                     onClick={() => setWorkspaceTab("patients")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
-                      workspaceTab === "patients" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
+                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-colors ${
+                      workspaceTab === "patients" ? "bg-white text-[#1D1D1F] shadow-sm" : "text-[#86868B] hover:text-[#1D1D1F]"
                     }`}>
                     {userIndustry === "finca" || userIndustry === "ganaderia" ? "Hato & Animales" :
                      userIndustry === "restaurante" ? "Mesas & Comandas" :
@@ -1152,8 +1142,8 @@ export default function Dashboard() {
                   </button>
                   <button
                     onClick={() => setWorkspaceTab("agenda")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
-                      workspaceTab === "agenda" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
+                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-colors ${
+                      workspaceTab === "agenda" ? "bg-white text-[#1D1D1F] shadow-sm" : "text-[#86868B] hover:text-[#1D1D1F]"
                     }`}>
                     {userIndustry === "finca" || userIndustry === "ganaderia" ? "Agenda Sanitaria" :
                      userIndustry === "restaurante" ? "Reservas & Turnos" :
@@ -1167,7 +1157,7 @@ export default function Dashboard() {
               {workspaceTab === "patients" ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white">
+                    <h4 className="font-bold text-sm text-[#1D1D1F]">
                       {userIndustry === "finca" || userIndustry === "ganaderia" ? "Inventario Reciente de Animales en el Hato" :
                        userIndustry === "restaurante" ? "Mesas y Comandas en el Salón" :
                        esRubroComercio || userIndustry === "farmacia" ? "Artículos en Catálogo & Kárdex" :
@@ -1176,7 +1166,7 @@ export default function Dashboard() {
                     </h4>
                     <button
                       onClick={() => navigate(rutaVertical)}
-                      className="btn-electric-blue text-xs font-semibold px-4 py-2 rounded-full cursor-pointer">
+                      className="bg-[#177E89] text-white text-xs font-semibold px-4 py-2 rounded-full cursor-pointer hover:bg-[#136570] transition-colors">
                       {userIndustry === "finca" || userIndustry === "ganaderia" ? "+ Registrar Animal" :
                        userIndustry === "restaurante" ? "+ Abrir Mesa" :
                        esRubroComercio || userIndustry === "farmacia" ? "+ Nuevo Artículo" :
@@ -1184,11 +1174,11 @@ export default function Dashboard() {
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-white/10">
+                  <div className="overflow-x-auto rounded-2xl border border-[#E5E5EA]">
                     <table className="w-full text-left text-xs">
                       {userIndustry === "finca" || userIndustry === "ganaderia" ? (
                         <>
-                          <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                          <thead className="bg-[#F5F5F7] text-[#86868B] border-b border-[#E5E5EA]">
                             <tr>
                               <th className="p-3.5">Arete / ID</th>
                               <th className="p-3.5">Nombre</th>
@@ -1199,28 +1189,28 @@ export default function Dashboard() {
                               <th className="p-3.5 text-right">Acción</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                          <tbody className="divide-y divide-[#E5E5EA]">
                             {animalesGanaderia === null ? (
-                              <tr><td colSpan={7} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando datos del hato…</td></tr>
+                              <tr><td colSpan={7} className="p-4 text-center text-[#86868B]">Cargando datos del hato…</td></tr>
                             ) : animalesGanaderia.length === 0 ? (
-                              <tr><td colSpan={7} className="p-4 text-center text-slate-400 dark:text-white/30">Sin animales registrados aún. Entra a Ganadería para registrar tu primer lote.</td></tr>
+                              <tr><td colSpan={7} className="p-4 text-center text-[#86868B]">Sin animales registrados aún. Entra a Ganadería para registrar tu primer lote.</td></tr>
                             ) : (
                               animalesGanaderia.slice(0, 8).map((a) => (
-                                <tr key={a.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold font-mono text-emerald-600 dark:text-emerald-400">{a.arete}</td>
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{a.nombre || "—"}</td>
-                                  <td className="p-3.5 text-slate-600 dark:text-white/70">{a.raza || a.especie || "Bovino"}</td>
-                                  <td className="p-3.5 text-slate-700 dark:text-white/80">{a.tipoAnimal || "VACA"} · {a.sexo}</td>
-                                  <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{a.pesoActual ? `${a.pesoActual} kg` : "—"}</td>
+                                <tr key={a.id} className="hover:bg-[#F5F5F7] transition-colors">
+                                  <td className="p-3.5 font-bold font-mono text-[#177E89]">{a.arete}</td>
+                                  <td className="p-3.5 font-bold text-[#1D1D1F]">{a.nombre || "—"}</td>
+                                  <td className="p-3.5 text-[#6E6E73]">{a.raza || a.especie || "Bovino"}</td>
+                                  <td className="p-3.5 text-[#1D1D1F]">{a.tipoAnimal || "VACA"} · {a.sexo}</td>
+                                  <td className="p-3.5 text-[#86868B] font-mono">{a.pesoActual ? `${a.pesoActual} kg` : "—"}</td>
                                   <td className="p-3.5">
-                                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-semibold text-[10px]">
+                                    <span className="px-2.5 py-1 rounded-full bg-[#177E89]/10 border border-[#177E89]/20 text-[#177E89] font-semibold text-[10px]">
                                       {a.estado || "ACTIVO"}
                                     </span>
                                   </td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer">
+                                      className="text-[#177E89] font-semibold hover:underline cursor-pointer">
                                       Ver Ficha →
                                     </button>
                                   </td>
@@ -1231,7 +1221,7 @@ export default function Dashboard() {
                         </>
                       ) : (esRubroComercio || userIndustry === "farmacia") ? (
                         <>
-                          <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                          <thead className="bg-[#F5F5F7] text-[#86868B] border-b border-[#E5E5EA]">
                             <tr>
                               <th className="p-3.5">SKU / Código</th>
                               <th className="p-3.5">Descripción</th>
@@ -1241,23 +1231,23 @@ export default function Dashboard() {
                               <th className="p-3.5 text-right">Acción</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                          <tbody className="divide-y divide-[#E5E5EA]">
                             {repuestosReales === null ? (
-                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando catálogo…</td></tr>
+                              <tr><td colSpan={6} className="p-4 text-center text-[#86868B]">Cargando catálogo…</td></tr>
                             ) : repuestosReales.length === 0 ? (
-                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Sin artículos registrados aún en inventario.</td></tr>
+                              <tr><td colSpan={6} className="p-4 text-center text-[#86868B]">Sin artículos registrados aún en inventario.</td></tr>
                             ) : (
                               repuestosReales.slice(0, 8).map((r) => (
-                                <tr key={r.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold font-mono text-teal-600 dark:text-teal-400">{r.codigoSku}</td>
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{r.descripcion}</td>
-                                  <td className="p-3.5 text-slate-700 dark:text-white/80 font-mono">{r.stockActual}</td>
-                                  <td className="p-3.5 text-slate-500 dark:text-white/50">{r.unidadBase || "UNIDAD"}</td>
-                                  <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">${Number(r.precioVenta || 0).toFixed(2)}</td>
+                                <tr key={r.id} className="hover:bg-[#F5F5F7] transition-colors">
+                                  <td className="p-3.5 font-bold font-mono text-[#177E89]">{r.codigoSku}</td>
+                                  <td className="p-3.5 font-bold text-[#1D1D1F]">{r.descripcion}</td>
+                                  <td className="p-3.5 text-[#1D1D1F] font-mono">{r.stockActual}</td>
+                                  <td className="p-3.5 text-[#86868B]">{r.unidadBase || "UNIDAD"}</td>
+                                  <td className="p-3.5 font-bold text-[#177E89]">${Number(r.precioVenta || 0).toFixed(2)}</td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      className="text-[#177E89] font-semibold hover:underline cursor-pointer">
                                       Ver Kárdex →
                                     </button>
                                   </td>
@@ -1268,7 +1258,7 @@ export default function Dashboard() {
                         </>
                       ) : userIndustry === "restaurante" ? (
                         <>
-                          <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                          <thead className="bg-[#F5F5F7] text-[#86868B] border-b border-[#E5E5EA]">
                             <tr>
                               <th className="p-3.5">Mesa</th>
                               <th className="p-3.5">Zona / Capacidad</th>
@@ -1278,31 +1268,31 @@ export default function Dashboard() {
                               <th className="p-3.5 text-right">Acción</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                          <tbody className="divide-y divide-[#E5E5EA]">
                             {mapaReales === null ? (
-                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando salón…</td></tr>
+                              <tr><td colSpan={6} className="p-4 text-center text-[#86868B]">Cargando salón…</td></tr>
                             ) : mapaReales.length === 0 ? (
-                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Sin mesas configuradas en el salón aún.</td></tr>
+                              <tr><td colSpan={6} className="p-4 text-center text-[#86868B]">Sin mesas configuradas en el salón aún.</td></tr>
                             ) : (
                               mapaReales.slice(0, 8).map((m) => (
-                                <tr key={m.mesa.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">Mesa #{m.mesa.numero}</td>
-                                  <td className="p-3.5 text-slate-500 dark:text-white/60">{m.mesa.zona || "Principal"} · {m.mesa.capacidad || 4}p</td>
+                                <tr key={m.mesa.id} className="hover:bg-[#F5F5F7] transition-colors">
+                                  <td className="p-3.5 font-bold text-[#1D1D1F]">Mesa #{m.mesa.numero}</td>
+                                  <td className="p-3.5 text-[#86868B]">{m.mesa.zona || "Principal"} · {m.mesa.capacidad || 4}p</td>
                                   <td className="p-3.5">
                                     <span className={`px-2.5 py-1 rounded-full font-semibold text-[10px] ${
                                       m.estado === "OCUPADA"
-                                        ? "bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-300"
-                                        : "bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300"
+                                        ? "bg-[#F5F5F7] border border-[#E5E5EA] text-[#1D1D1F]"
+                                        : "bg-[#177E89]/10 border border-[#177E89]/20 text-[#177E89]"
                                     }`}>
                                       {m.estado}
                                     </span>
                                   </td>
-                                  <td className="p-3.5 text-slate-700 dark:text-white/80">{m.comandaAbierta ? `Comanda #${m.comandaAbierta.id} (${m.comandaAbierta.mesero})` : "Sin comanda"}</td>
-                                  <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{m.comandaAbierta ? `$${Number(m.comandaAbierta.totalConsumo || 0).toFixed(2)}` : "—"}</td>
+                                  <td className="p-3.5 text-[#1D1D1F]">{m.comandaAbierta ? `Comanda #${m.comandaAbierta.id} (${m.comandaAbierta.mesero})` : "Sin comanda"}</td>
+                                  <td className="p-3.5 font-bold text-[#177E89]">{m.comandaAbierta ? `$${Number(m.comandaAbierta.totalConsumo || 0).toFixed(2)}` : "—"}</td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      className="text-[#177E89] font-semibold hover:underline cursor-pointer">
                                       Abrir Mesa →
                                     </button>
                                   </td>
@@ -1313,7 +1303,7 @@ export default function Dashboard() {
                         </>
                       ) : (
                         <>
-                          <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                          <thead className="bg-[#F5F5F7] text-[#86868B] border-b border-[#E5E5EA]">
                             <tr>
                               <th className="p-3.5">Paciente</th>
                               <th className="p-3.5">Edad / Info</th>
@@ -1323,27 +1313,27 @@ export default function Dashboard() {
                               <th className="p-3.5 text-right">Acción</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                          <tbody className="divide-y divide-[#E5E5EA]">
                             {citasReales === null ? (
-                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">Cargando…</td></tr>
+                              <tr><td colSpan={6} className="p-4 text-center text-[#86868B]">Cargando…</td></tr>
                             ) : citasReales.length === 0 ? (
-                              <tr><td colSpan={6} className="p-4 text-center text-slate-400 dark:text-white/30">No hay citas registradas hoy.</td></tr>
+                              <tr><td colSpan={6} className="p-4 text-center text-[#86868B]">No hay citas registradas hoy.</td></tr>
                             ) : (
                               citasReales.map((c) => (
-                                <tr key={c.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{c.paciente?.nombreCompleto || "—"}</td>
-                                  <td className="p-3.5 text-slate-500 dark:text-white/60">{c.paciente?.edad ? `${c.paciente.edad} años` : "—"}</td>
-                                  <td className="p-3.5 text-slate-700 dark:text-white/80">{c.motivo || c.especialidad || "—"}</td>
-                                  <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{c.horaInicio}</td>
+                                <tr key={c.id} className="hover:bg-[#F5F5F7] transition-colors">
+                                  <td className="p-3.5 font-bold text-[#1D1D1F]">{c.paciente?.nombreCompleto || "—"}</td>
+                                  <td className="p-3.5 text-[#86868B]">{c.paciente?.edad ? `${c.paciente.edad} años` : "—"}</td>
+                                  <td className="p-3.5 text-[#1D1D1F]">{c.motivo || c.especialidad || "—"}</td>
+                                  <td className="p-3.5 text-[#86868B] font-mono">{c.horaInicio}</td>
                                   <td className="p-3.5">
-                                    <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
+                                    <span className="px-2.5 py-1 rounded-full bg-[#177E89]/10 border border-[#177E89]/20 text-[#177E89] font-semibold text-[10px]">
                                       {c.estado}
                                     </span>
                                   </td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => alert(`Abriendo historia clínica de ${c.paciente?.nombreCompleto}`)}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      className="text-[#177E89] font-semibold hover:underline cursor-pointer">
                                       Abrir Historia →
                                     </button>
                                   </td>
@@ -1372,39 +1362,39 @@ export default function Dashboard() {
                           tag: "Reproducción",
                         })),
                       ].slice(0, 3).map((item, i) => (
-                        <div key={i} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
+                        <div key={i} className="bg-white rounded-2xl p-4 border border-[#E5E5EA] text-left space-y-2 shadow-sm">
                           <div className="flex items-center justify-between">
-                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold">{item.tag}</span>
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">Pendiente</span>
+                            <span className="text-[#177E89] text-xs font-mono font-bold">{item.tag}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#177E89]/10 text-[#177E89]">Pendiente</span>
                           </div>
-                          <div className="font-bold text-sm text-slate-900 dark:text-white">{item.titulo}</div>
-                          <p className="text-slate-500 dark:text-white/40 text-xs">{item.sub}</p>
+                          <div className="font-bold text-sm text-[#1D1D1F]">{item.titulo}</div>
+                          <p className="text-[#86868B] text-xs">{item.sub}</p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-6">
+                      <p className="text-[#86868B] text-sm col-span-3 text-center py-6">
                         No hay tareas sanitarias ni partos próximos programados para hoy en el hato.
                       </p>
                     )
                   ) : (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia") ? (
                     citasReales === null ? (
-                      <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">Cargando…</p>
+                      <p className="text-[#86868B] text-sm col-span-3 text-center py-4">Cargando…</p>
                     ) : citasReales.length === 0 ? (
-                      <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">No hay citas agendadas para hoy.</p>
+                      <p className="text-[#86868B] text-sm col-span-3 text-center py-4">No hay citas agendadas para hoy.</p>
                     ) : (
                       citasReales.map((c) => (
-                        <div key={c.id} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
+                        <div key={c.id} className="bg-white rounded-2xl p-4 border border-[#E5E5EA] text-left space-y-2 shadow-sm">
                           <div className="flex items-center justify-between">
-                            <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">{c.horaInicio} — {c.horaFin}</span>
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">{c.estado}</span>
+                            <span className="text-[#177E89] text-xs font-mono font-bold">{c.horaInicio} — {c.horaFin}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#177E89]/10 text-[#177E89]">{c.estado}</span>
                           </div>
-                          <div className="font-bold text-sm text-slate-900 dark:text-white">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
-                          <p className="text-slate-500 dark:text-white/40 text-xs">{c.motivo}</p>
+                          <div className="font-bold text-sm text-[#1D1D1F]">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
+                          <p className="text-[#86868B] text-xs">{c.motivo}</p>
                         </div>
                       ))
                     )
                   ) : (
-                    <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-6">
+                    <p className="text-[#86868B] text-sm col-span-3 text-center py-6">
                       Sin eventos o recepciones programadas para hoy.
                     </p>
                   )}
@@ -1418,10 +1408,10 @@ export default function Dashboard() {
                     <div
                       key={act.label}
                       onClick={() => navigate(rutaVertical)}
-                      className="apple-glass rounded-2xl p-5 hover-card text-left cursor-pointer border border-white/10 shadow-sm space-y-2">
-                      <div className="text-teal-600 dark:text-teal-300"><ActIcon size={22} /></div>
-                      <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">{act.label}</h4>
-                      <p className="text-slate-500 dark:text-white/40 text-xs leading-relaxed">{act.desc}</p>
+                      className="bg-white rounded-2xl p-5 text-left cursor-pointer border border-[#E5E5EA] hover:border-[#D1D1D6] shadow-sm transition-colors space-y-2">
+                      <div className="text-[#177E89]"><ActIcon size={22} /></div>
+                      <h4 className="font-bold text-[#1D1D1F] text-sm">{act.label}</h4>
+                      <p className="text-[#86868B] text-xs leading-relaxed">{act.desc}</p>
                     </div>
                     );
                   })}
@@ -1435,19 +1425,19 @@ export default function Dashboard() {
         {/* ── PESTAÑA 2: BILLING, FACTURACIÓN Y PAGOS ── */}
         {activeTab === "billing" && (
           <div className="space-y-8">
-            <div className="apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left">
-              <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-300/60 dark:border-white/10">
+            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E5E5EA] shadow-sm space-y-6 text-left">
+              <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-[#E5E5EA]">
                 <div>
-                  <h3 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
+                  <h3 className="text-2xl font-bold text-[#1D1D1F]">
                     Centro de Suscripción & Pagos
                   </h3>
-                  <p className="text-slate-500 dark:text-white/45 text-sm mt-1">
+                  <p className="text-[#86868B] text-sm mt-1">
                     Gestiona tu plan activo, métodos de pago autorizados y reporte de comprobantes.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowPaymentModal(true)}
-                  className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md flex items-center gap-2">
+                  className="bg-[#177E89] text-white text-xs font-semibold px-6 py-3 rounded-full cursor-pointer hover:bg-[#136570] transition-colors flex items-center gap-2">
                   <IconCard size={14} />
                   <span>Reportar Nuevo Pago</span>
                 </button>
@@ -1455,32 +1445,32 @@ export default function Dashboard() {
 
               {/* Tarjetas de Estado del Plan */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="apple-glass rounded-2xl p-5 border border-teal-500/30 space-y-2">
-                  <div className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Plan Actual</div>
-                  <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
+                <div className="bg-[#F5F5F7] rounded-2xl p-5 border border-[#E5E5EA] space-y-2">
+                  <div className="text-xs font-semibold text-[#177E89] uppercase tracking-wider">Plan Actual</div>
+                  <div className="text-2xl font-bold text-[#1D1D1F]">
                     {user?.plan || "Estándar"} ($35/mes)
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-white/40">
+                  <p className="text-xs text-[#86868B]">
                     Módulos ilimitados para tu clínica + versión móvil.
                   </p>
                 </div>
 
-                <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">Próxima Fecha de Corte</div>
-                  <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
+                <div className="bg-[#F5F5F7] rounded-2xl p-5 border border-[#E5E5EA] space-y-2">
+                  <div className="text-xs font-semibold text-[#86868B] uppercase tracking-wider">Próxima Fecha de Corte</div>
+                  <div className="text-2xl font-bold text-[#1D1D1F]">
                     25 Septiembre 2026
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-white/40">
+                  <p className="text-xs text-[#86868B]">
                     Recordatorio automático por WhatsApp 5 días antes.
                   </p>
                 </div>
 
-                <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Métodos Disponibles</div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-white/90">
+                <div className="bg-[#F5F5F7] rounded-2xl p-5 border border-[#E5E5EA] space-y-2">
+                  <div className="text-xs font-semibold text-[#86868B] uppercase tracking-wider">Métodos Disponibles</div>
+                  <div className="text-sm font-semibold text-[#1D1D1F]">
                     Pago Móvil · Binance · Zelle · Tarjeta
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-white/40">
+                  <p className="text-xs text-[#86868B]">
                     Tasa oficial BCV para pagos en bolívares.
                   </p>
                 </div>
@@ -1488,13 +1478,13 @@ export default function Dashboard() {
 
               {/* Historial de Pagos y Facturas */}
               <div className="space-y-4 pt-4">
-                <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
+                <h4 className="font-bold text-base text-[#1D1D1F]">
                   Historial de Pagos & Recibos
                 </h4>
 
-                <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-white/10">
+                <div className="overflow-x-auto rounded-2xl border border-[#E5E5EA]">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-200/60 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
+                    <thead className="bg-[#F5F5F7] text-[#86868B] border-b border-[#E5E5EA]">
                       <tr>
                         <th className="p-3.5">ID Recibo</th>
                         <th className="p-3.5">Fecha</th>
@@ -1504,23 +1494,23 @@ export default function Dashboard() {
                         <th className="p-3.5 text-right">Comprobante</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                    <tbody className="divide-y divide-[#E5E5EA]">
                       {(user?.payments && user.payments.length > 0) ? (
                         user.payments.map((p) => (
                           <tr key={p.id}>
-                            <td className="p-3.5 font-mono font-bold text-slate-900 dark:text-white">{p.id}</td>
-                            <td className="p-3.5 text-slate-600 dark:text-white/60">{p.fecha}</td>
-                            <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{p.monto}</td>
-                            <td className="p-3.5 text-slate-600 dark:text-white/70">{p.metodo} · Ref: {p.referencia}</td>
+                            <td className="p-3.5 font-mono font-bold text-[#1D1D1F]">{p.id}</td>
+                            <td className="p-3.5 text-[#86868B]">{p.fecha}</td>
+                            <td className="p-3.5 font-bold text-[#177E89]">{p.monto}</td>
+                            <td className="p-3.5 text-[#1D1D1F]">{p.metodo} · Ref: {p.referencia}</td>
                             <td className="p-3.5">
-                              <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
+                              <span className="px-2 py-0.5 rounded-full bg-[#177E89]/10 text-[#177E89] font-semibold text-[10px]">
                                 {p.estado.toUpperCase()}
                               </span>
                             </td>
                             <td className="p-3.5 text-right">
                               <button
                                 onClick={() => alert(`Descargando factura en PDF del pago ${p.id}`)}
-                                className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-1">
+                                className="text-[#177E89] font-semibold hover:underline cursor-pointer inline-flex items-center gap-1">
                                 <IconFileText size={12} /> Descargar PDF
                               </button>
                             </td>
@@ -1528,7 +1518,7 @@ export default function Dashboard() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="p-6 text-center text-slate-400 dark:text-white/40">
+                          <td colSpan={6} className="p-6 text-center text-[#86868B]">
                             Sin pagos ni recibos registrados aún en esta cuenta. Usa &ldquo;Reportar Nuevo Pago&rdquo; para registrar tu comprobante.
                           </td>
                         </tr>
@@ -1543,76 +1533,76 @@ export default function Dashboard() {
 
         {/* ── PESTAÑA 3: EQUIPO Y ROLES ── */}
         {activeTab === "team" && esDuenoAdmin && (
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 space-y-6 text-left shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-300/60 dark:border-white/10">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E5E5EA] shadow-sm space-y-6 text-left">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-[#E5E5EA]">
               <div>
-                <h3 className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
+                <h3 className="text-2xl font-bold text-[#1D1D1F]">
                   Equipo de Trabajo & Accesos
                 </h3>
-                <p className="text-slate-500 dark:text-white/45 text-sm mt-1">
+                <p className="text-[#86868B] text-sm mt-1">
                   Crea un usuario y contraseña por cada colaborador, con su propio rol. Solo tú, como Dueño/Administrador, ves esta pantalla y la Auditoría.
                 </p>
               </div>
               <button
                 onClick={() => setModalNuevoColaborador(true)}
-                className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md">
+                className="bg-[#177E89] text-white text-xs font-semibold px-6 py-3 rounded-full cursor-pointer hover:bg-[#136570] transition-colors">
                 + Nuevo Colaborador
               </button>
             </div>
 
             {errorEquipo && (
-              <p className="text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{errorEquipo}</p>
+              <p className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{errorEquipo}</p>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                <div className="text-teal-600 dark:text-teal-300"><IconUser size={26} /></div>
-                <div className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
+              <div className="bg-[#F5F5F7] rounded-2xl p-5 border border-[#E5E5EA] space-y-2">
+                <div className="text-[#177E89]"><IconUser size={26} /></div>
+                <div className="font-bold text-base text-[#1D1D1F]">
                   {user?.nombre || "Usuario Administrador"}
                 </div>
-                <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">
+                <div className="text-xs font-semibold text-[#177E89]">
                   {ROL_LABEL[user?.rol || ""] || user?.rol || "Propietario / Admin"}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-white/40 font-mono">
+                <div className="text-xs text-[#86868B] font-mono">
                   {user?.email || "admin@auroraplus.com"}
                 </div>
-                <span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">
+                <span className="inline-block text-[9px] font-semibold uppercase tracking-wider bg-[#177E89]/10 text-[#177E89] px-2 py-0.5 rounded-full">
                   Tú (Dueño/Administrador)
                 </span>
               </div>
 
               {cargandoEquipo ? (
-                <div className="apple-glass rounded-2xl p-6 border border-white/10 flex items-center justify-center col-span-1 md:col-span-2 text-xs text-slate-500 dark:text-white/50">
+                <div className="bg-[#F5F5F7] rounded-2xl p-6 border border-[#E5E5EA] flex items-center justify-center col-span-1 md:col-span-2 text-xs text-[#86868B]">
                   Cargando equipo…
                 </div>
               ) : colaboradores.length === 0 ? (
-                <div className="apple-glass rounded-2xl p-6 border border-dashed border-slate-300 dark:border-white/20 flex flex-col justify-center items-center text-center col-span-1 md:col-span-2 space-y-2">
-                  <p className="text-slate-500 dark:text-white/50 text-xs max-w-sm">
+                <div className="bg-[#F5F5F7] rounded-2xl p-6 border border-dashed border-[#D1D1D6] flex flex-col justify-center items-center text-center col-span-1 md:col-span-2 space-y-2">
+                  <p className="text-[#86868B] text-xs max-w-sm">
                     Sin colaboradores adicionales registrados aún. Crea uno con usuario, contraseña y rol (encargado de almacén, cajero, veterinario, etc. según tu vertical).
                   </p>
                 </div>
               ) : (
                 <div className="col-span-1 md:col-span-2 space-y-2">
                   {colaboradores.map((u) => (
-                    <div key={u.id} className="apple-glass rounded-2xl p-4 border border-white/10 flex items-center justify-between gap-3">
+                    <div key={u.id} className="bg-[#F5F5F7] rounded-2xl p-4 border border-[#E5E5EA] flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-['Outfit'] font-bold text-sm text-slate-900 dark:text-white truncate">
+                          <span className="font-bold text-sm text-[#1D1D1F] truncate">
                             {u.nombreCompleto || u.username}
                           </span>
                           {!u.activo && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-500/15 text-slate-500 dark:text-white/50 px-2 py-0.5 rounded-full shrink-0">
+                            <span className="text-[9px] font-semibold uppercase tracking-wider bg-[#E5E5EA] text-[#86868B] px-2 py-0.5 rounded-full shrink-0">
                               Desactivado
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-white/40 font-mono">@{u.username}</div>
-                        <div className="text-[11px] font-semibold text-teal-600 dark:text-teal-400">{ROL_LABEL[u.rol] || u.rol}</div>
+                        <div className="text-xs text-[#86868B] font-mono">@{u.username}</div>
+                        <div className="text-[11px] font-semibold text-[#177E89]">{ROL_LABEL[u.rol] || u.rol}</div>
                       </div>
                       {u.activo && (
                         <button
                           onClick={() => desactivarColaborador(u.id)}
-                          className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 cursor-pointer shrink-0"
+                          className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer transition-colors shrink-0"
                         >
                           Desactivar
                         </button>
@@ -1627,11 +1617,11 @@ export default function Dashboard() {
 
         {/* ── MODAL NUEVO COLABORADOR ── */}
         {modalNuevoColaborador && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalNuevoColaborador(false)}>
-            <div className="apple-glass rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl cursor-default text-left" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-300/60 dark:border-white/10">
-                <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Nuevo Colaborador</h3>
-                <button onClick={() => setModalNuevoColaborador(false)} className="text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white cursor-pointer">
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalNuevoColaborador(false)}>
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-sm border border-[#E5E5EA] cursor-default text-left" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between pb-3 border-b border-[#E5E5EA]">
+                <h3 className="text-lg font-bold text-[#1D1D1F]">Nuevo Colaborador</h3>
+                <button onClick={() => setModalNuevoColaborador(false)} className="text-[#86868B] hover:text-[#1D1D1F] cursor-pointer">
                   <IconClose size={18} />
                 </button>
               </div>
@@ -1660,34 +1650,34 @@ export default function Dashboard() {
                 className="space-y-3 text-sm"
               >
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Nombre completo</label>
-                  <input name="nombreCompleto" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white" />
+                  <label className="text-xs font-semibold text-[#86868B] block mb-1">Nombre completo</label>
+                  <input name="nombreCompleto" className="w-full px-3 py-2 rounded-xl bg-white border border-[#E5E5EA] text-[#1D1D1F]" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Usuario (para iniciar sesión)</label>
-                  <input required name="username" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-mono" />
+                  <label className="text-xs font-semibold text-[#86868B] block mb-1">Usuario (para iniciar sesión)</label>
+                  <input required name="username" className="w-full px-3 py-2 rounded-xl bg-white border border-[#E5E5EA] text-[#1D1D1F] font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Contraseña</label>
-                  <input required name="password" type="password" minLength={6} className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-mono" />
+                  <label className="text-xs font-semibold text-[#86868B] block mb-1">Contraseña</label>
+                  <input required name="password" type="password" minLength={6} className="w-full px-3 py-2 rounded-xl bg-white border border-[#E5E5EA] text-[#1D1D1F] font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Rol</label>
-                  <select required name="rol" defaultValue="" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white">
+                  <label className="text-xs font-semibold text-[#86868B] block mb-1">Rol</label>
+                  <select required name="rol" defaultValue="" className="w-full px-3 py-2 rounded-xl bg-white border border-[#E5E5EA] text-[#1D1D1F]">
                     <option value="" disabled>Selecciona un rol…</option>
                     {Object.entries(ROL_LABEL).filter(([id]) => id !== "DUENO_ADMIN").map(([id, label]) => (
                       <option key={id} value={id}>{label}</option>
                     ))}
                   </select>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-white/40">
+                <p className="text-[11px] text-[#86868B]">
                   Este colaborador no tendrá acceso a Equipo & Roles ni a Auditoría — eso queda reservado al Dueño/Administrador.
                 </p>
                 <div className="pt-2 flex justify-end gap-2">
-                  <button type="button" onClick={() => setModalNuevoColaborador(false)} className="px-4 py-2 rounded-xl bg-slate-200/70 dark:bg-white/10 text-xs font-bold text-slate-800 dark:text-white cursor-pointer">
+                  <button type="button" onClick={() => setModalNuevoColaborador(false)} className="px-4 py-2 rounded-full bg-[#F5F5F7] hover:bg-[#E5E5EA] border border-[#E5E5EA] text-xs font-semibold text-[#1D1D1F] cursor-pointer transition-colors">
                     Cancelar
                   </button>
-                  <button type="submit" disabled={guardandoColaborador} className="px-5 py-2 rounded-xl btn-electric-blue text-xs font-bold cursor-pointer disabled:opacity-60">
+                  <button type="submit" disabled={guardandoColaborador} className="px-5 py-2 rounded-full bg-[#177E89] text-white text-xs font-semibold cursor-pointer hover:bg-[#136570] transition-colors disabled:opacity-60">
                     {guardandoColaborador ? "Creando…" : "Crear Colaborador"}
                   </button>
                 </div>
@@ -1700,72 +1690,72 @@ export default function Dashboard() {
 
       {/* ── MODAL COMPLETO DE PAGO & REPORTE DE TRANSFERENCIA ── */}
       {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-white/20 shadow-2xl relative text-left space-y-5 animate-in fade-in zoom-in-95 duration-200">
-            
-            <div className="flex items-center justify-between pb-4 border-b border-slate-300/60 dark:border-white/10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-lg w-full border border-[#E5E5EA] shadow-sm relative text-left space-y-5">
+
+            <div className="flex items-center justify-between pb-4 border-b border-[#E5E5EA]">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-300 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-[#177E89]/10 text-[#177E89] flex items-center justify-center">
                   <IconCard size={20} />
                 </div>
                 <div>
-                  <h3 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white">
+                  <h3 className="text-lg font-bold text-[#1D1D1F]">
                     Pagar Suscripción Aurora Plus
                   </h3>
-                  <p className="text-slate-500 dark:text-white/40 text-xs">
+                  <p className="text-[#86868B] text-xs">
                     Activación automática para {vertical.name}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="w-8 h-8 rounded-full bg-black/10 dark:bg-white/10 text-slate-700 dark:text-white flex items-center justify-center cursor-pointer">
+                className="w-8 h-8 rounded-full bg-[#F5F5F7] text-[#1D1D1F] flex items-center justify-center cursor-pointer hover:bg-[#E5E5EA] transition-colors">
                 <IconClose size={14} />
               </button>
             </div>
 
             {paymentSuccessMsg ? (
               <div className="p-6 text-center space-y-3">
-                <div className="flex justify-center text-teal-500 dark:text-teal-400"><IconCheckCircle size={40} /></div>
-                <h4 className="font-['Outfit'] font-bold text-lg text-teal-600 dark:text-teal-400">{paymentSuccessMsg}</h4>
+                <div className="flex justify-center text-[#177E89]"><IconCheckCircle size={40} /></div>
+                <h4 className="font-bold text-lg text-[#177E89]">{paymentSuccessMsg}</h4>
               </div>
             ) : (
               <form onSubmit={handleReportPaymentSubmit} className="space-y-4">
 
                 {/* Datos bancarios oficiales para transferir */}
-                <div className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-300/80 dark:border-white/10 text-xs space-y-2.5">
-                  <div className="font-bold text-emerald-600 dark:text-emerald-400 font-sans text-xs flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] text-xs space-y-2.5">
+                  <div className="font-bold text-[#177E89] font-sans text-xs flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <IconBank size={14} /> Cuentas Oficiales para Transferir:
                     </div>
-                    <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-mono font-bold bg-[#177E89]/10 text-[#177E89] px-2 py-0.5 rounded-full">
                       Tasa BCV Oficial: {tasaBcv.toFixed(2)} Bs/$
                     </span>
                   </div>
 
                   {/* Pago Movil Banesco */}
-                  <div className="p-3 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 space-y-1.5 font-mono text-[11px]">
+                  <div className="p-3 rounded-xl bg-white border border-[#E5E5EA] space-y-1.5 font-mono text-[11px]">
                     <div className="flex items-center justify-between">
-                      <span className="font-sans font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span className="font-sans font-bold text-[#1D1D1F] flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#177E89]"></span>
                         Pago Movil {cuentasCobro.banco || "Banesco (0134)"}
                       </span>
                       <button
                         type="button"
                         onClick={() => copiarTexto(`${cuentasCobro.telefono} ${cuentasCobro.cedula}`, "todo")}
-                        className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer font-sans"
+                        className="text-[10px] text-[#177E89] font-bold hover:underline cursor-pointer font-sans"
                       >
                         {copiadoCampo === "todo" ? "Copiado!" : "Copiar Datos"}
                       </button>
                     </div>
 
-                    <div className="text-slate-700 dark:text-slate-300 space-y-0.5">
+                    <div className="text-[#1D1D1F] space-y-0.5">
                       <div className="flex justify-between items-center">
                         <span>Telefono: <strong>{cuentasCobro.telefono}</strong></span>
                         <button
                           type="button"
                           onClick={() => copiarTexto(cuentasCobro.telefono, "tel")}
-                          className="text-[9px] text-slate-400 hover:text-emerald-500 cursor-pointer"
+                          className="text-[9px] text-[#86868B] hover:text-[#177E89] cursor-pointer"
                         >
                           {copiadoCampo === "tel" ? "OK" : "Copiar"}
                         </button>
@@ -1775,22 +1765,22 @@ export default function Dashboard() {
                         <button
                           type="button"
                           onClick={() => copiarTexto(cuentasCobro.cedula, "ci")}
-                          className="text-[9px] text-slate-400 hover:text-emerald-500 cursor-pointer"
+                          className="text-[9px] text-[#86868B] hover:text-[#177E89] cursor-pointer"
                         >
                           {copiadoCampo === "ci" ? "OK" : "Copiar"}
                         </button>
                       </div>
                       {cuentasCobro.titular && (
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                        <div className="text-[10px] text-[#86868B]">
                           Titular: {cuentasCobro.titular}
                         </div>
                       )}
                     </div>
 
                     {/* Total equivalente en Bs */}
-                    <div className="pt-1.5 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px] font-sans">
-                      <span className="text-slate-500 dark:text-slate-400">Monto exacto a transferir:</span>
-                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs">
+                    <div className="pt-1.5 border-t border-[#E5E5EA] flex items-center justify-between text-[11px] font-sans">
+                      <span className="text-[#86868B]">Monto exacto a transferir:</span>
+                      <span className="font-mono font-bold text-[#177E89] text-xs">
                         Bs. {((parseFloat(paymentForm.monto.replace(/[^0-9.]/g, "")) || 35.0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -1798,12 +1788,12 @@ export default function Dashboard() {
 
                   {/* Binance USDT si existe */}
                   {cuentasCobro.binanceUsdt && (
-                    <div className="p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px]">
+                    <div className="p-2 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-between text-[11px]">
                       <span className="font-mono truncate mr-2">Binance USDT: {cuentasCobro.binanceUsdt}</span>
                       <button
                         type="button"
                         onClick={() => copiarTexto(cuentasCobro.binanceUsdt, "binance")}
-                        className="text-[10px] text-sky-500 font-bold hover:underline cursor-pointer flex-shrink-0"
+                        className="text-[10px] text-[#177E89] font-bold hover:underline cursor-pointer flex-shrink-0"
                       >
                         {copiadoCampo === "binance" ? "Copiado!" : "Copiar"}
                       </button>
@@ -1812,12 +1802,12 @@ export default function Dashboard() {
 
                   {/* Zelle si existe */}
                   {cuentasCobro.zelle && (
-                    <div className="p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px]">
+                    <div className="p-2 rounded-xl bg-white border border-[#E5E5EA] flex items-center justify-between text-[11px]">
                       <span className="font-mono truncate mr-2">Zelle: {cuentasCobro.zelle}</span>
                       <button
                         type="button"
                         onClick={() => copiarTexto(cuentasCobro.zelle, "zelle")}
-                        className="text-[10px] text-purple-500 font-bold hover:underline cursor-pointer flex-shrink-0"
+                        className="text-[10px] text-[#177E89] font-bold hover:underline cursor-pointer flex-shrink-0"
                       >
                         {copiadoCampo === "zelle" ? "Copiado!" : "Copiar"}
                       </button>
@@ -1825,20 +1815,20 @@ export default function Dashboard() {
                   )}
 
                   {cuentasCobro.instrucciones && (
-                    <p className="text-[10px] text-slate-500 dark:text-white/50 italic font-sans pt-0.5">
+                    <p className="text-[10px] text-[#86868B] italic font-sans pt-0.5">
                       {cuentasCobro.instrucciones}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                  <label className="block text-xs font-semibold text-[#1D1D1F] mb-1">
                     Metodo de Pago Utilizado
                   </label>
                   <select
                     value={paymentForm.metodo}
                     onChange={(e) => setPaymentForm({ ...paymentForm, metodo: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs font-medium text-slate-900 dark:text-white">
+                    className="w-full px-4 py-2.5 rounded-xl border border-[#E5E5EA] bg-white text-xs font-medium text-[#1D1D1F]">
                     <option value="Pago Móvil (Bolívares - Tasa BCV)">Pago Móvil (Bolívares - Tasa BCV)</option>
                     <option value="Transferencia Bancaria Nacional (Banesco/Mercantil)">Transferencia Bancaria Nacional</option>
                     <option value="Binance Pay / USDT">Binance Pay / USDT</option>
@@ -1849,19 +1839,19 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                    <label className="block text-xs font-semibold text-[#1D1D1F] mb-1">
                       Monto a Reportar
                     </label>
                     <input
                       type="text"
                       value={paymentForm.monto}
                       onChange={(e) => setPaymentForm({ ...paymentForm, monto: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white font-mono"
+                      className="w-full px-4 py-2.5 rounded-xl border border-[#E5E5EA] bg-white text-xs text-[#1D1D1F] font-mono"
                       placeholder="$35.00 USD"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                    <label className="block text-xs font-semibold text-[#1D1D1F] mb-1">
                       Número de Referencia
                     </label>
                     <input
@@ -1869,7 +1859,7 @@ export default function Dashboard() {
                       required
                       value={paymentForm.referencia}
                       onChange={(e) => setPaymentForm({ ...paymentForm, referencia: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white font-mono"
+                      className="w-full px-4 py-2.5 rounded-xl border border-[#E5E5EA] bg-white text-xs text-[#1D1D1F] font-mono"
                       placeholder="Ej. 984021"
                     />
                   </div>
@@ -1879,12 +1869,12 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowPaymentModal(false)}
-                    className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl text-slate-700 dark:text-white cursor-pointer">
+                    className="bg-[#F5F5F7] hover:bg-[#E5E5EA] border border-[#E5E5EA] text-xs font-semibold px-4 py-2.5 rounded-full text-[#1D1D1F] cursor-pointer transition-colors">
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-md">
+                    className="bg-[#177E89] text-white text-xs font-semibold px-6 py-2.5 rounded-full cursor-pointer hover:bg-[#136570] transition-colors">
                     Confirmar y Activar Plan →
                   </button>
                 </div>
@@ -1901,4 +1891,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

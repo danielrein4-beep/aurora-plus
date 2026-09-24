@@ -56,25 +56,25 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
       aria-modal="true"
       aria-labelledby="perfil-titulo"
     >
-      <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden my-auto">
+      <div className="bg-[#FFFFFF] border border-[#E5E5EA] w-full max-w-3xl rounded-2xl shadow-sm flex flex-col max-h-[90vh] overflow-hidden my-auto">
         {/* Cabecera del Perfil */}
-        <div className="p-4 sm:p-6 bg-[#0f172a] border-b border-[#1e2d48] flex items-start justify-between gap-4">
+        <div className="p-4 sm:p-6 bg-[#F5F5F7] border-b border-[#E5E5EA] flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#1e293b] border border-[#177E89]/30 flex items-center justify-center font-mono font-bold text-lg text-[#177E89]">
+            <div className="w-12 h-12 rounded-xl bg-[#F5F5F7] border border-[#177E89]/30 flex items-center justify-center font-bold text-lg text-[#177E89]">
               {empleado.nombre[0]}
               {empleado.apellidos[0]}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 id="perfil-titulo" className="text-base sm:text-lg font-bold text-[#f8fafc]">
+                <h3 id="perfil-titulo" className="text-base sm:text-lg font-bold text-[#1D1D1F]">
                   {empleado.nombre} {empleado.apellidos}
                 </h3>
-                <span className="text-xs px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono">
+                <span className="text-xs px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89]">
                   {empleado.codigoEmpleado}
                 </span>
               </div>
-              <p className="text-xs text-[#94a3b8]">
-                {empleado.cargo} &bull; <span className="text-[#cbd5e1]">{empleado.departamento}</span>
+              <p className="text-xs text-[#86868B]">
+                {empleado.cargo} &bull; <span className="text-[#1D1D1F]">{empleado.departamento}</span>
               </p>
             </div>
           </div>
@@ -82,7 +82,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
           <button
             ref={btnCerrarRef}
             onClick={onCerrar}
-            className="p-1.5 rounded-lg text-[#94a3b8] hover:text-[#f8fafc] hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+            className="p-1.5 rounded-lg text-[#86868B] hover:text-[#1D1D1F] hover:bg-[#F5F5F7] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
             aria-label="Cerrar ficha de colaborador"
           >
             ✕
@@ -90,13 +90,13 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
         </div>
 
         {/* Pestañas de Navegación Interna */}
-        <div className="flex border-b border-[#1e2d48] bg-[#0b111e] px-4 overflow-x-auto text-xs font-medium text-[#94a3b8]">
+        <div className="flex border-b border-[#E5E5EA] bg-[#F5F5F7] px-4 overflow-x-auto text-xs font-medium text-[#86868B]">
           <button
             onClick={() => setPestanaActiva('info')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'info'
                 ? 'border-[#177E89] text-[#177E89] font-semibold'
-                : 'border-transparent hover:text-[#f8fafc]'
+                : 'border-transparent hover:text-[#1D1D1F]'
             }`}
           >
             Información & Contrato
@@ -106,17 +106,17 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'asistencia'
                 ? 'border-[#177E89] text-[#177E89] font-semibold'
-                : 'border-transparent hover:text-[#f8fafc]'
+                : 'border-transparent hover:text-[#1D1D1F]'
             }`}
           >
-            ⏱️ Asistencia ({asistenciasEmpleado.length})
+            Asistencia ({asistenciasEmpleado.length})
           </button>
           <button
             onClick={() => setPestanaActiva('metas')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'metas'
                 ? 'border-[#177E89] text-[#177E89] font-semibold'
-                : 'border-transparent hover:text-[#f8fafc]'
+                : 'border-transparent hover:text-[#1D1D1F]'
             }`}
           >
             Metas ({metasEmpleado.length})
@@ -126,7 +126,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
               pestanaActiva === 'recibos'
                 ? 'border-[#177E89] text-[#177E89] font-semibold'
-                : 'border-transparent hover:text-[#f8fafc]'
+                : 'border-transparent hover:text-[#1D1D1F]'
             }`}
           >
             Recibos de Nómina ({recibosEmpleado.length})
@@ -139,62 +139,62 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
             <div className="space-y-6">
               {/* Información Personal */}
               <div className="space-y-3">
-                <h4 className="font-semibold text-[#f8fafc] text-xs uppercase tracking-wider text-[#94a3b8]">
+                <h4 className="font-semibold text-[#1D1D1F] text-xs uppercase tracking-wider text-[#86868B]">
                   Datos de Contacto e Identificación
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-[#0f172a] rounded-xl border border-[#1e293b]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA]">
                   <div>
-                    <span className="text-xs text-[#64748b] block">Documento de Identidad</span>
-                    <span className="font-mono text-[#cbd5e1] font-medium">{empleado.identificacion}</span>
+                    <span className="text-xs text-[#86868B] block">Documento de Identidad</span>
+                    <span className="text-[#1D1D1F] font-medium">{empleado.identificacion}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Correo Electrónico</span>
-                    <span className="text-[#cbd5e1]">{empleado.email}</span>
+                    <span className="text-xs text-[#86868B] block">Correo Electrónico</span>
+                    <span className="text-[#1D1D1F]">{empleado.email}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Teléfono de Contacto</span>
-                    <span className="font-mono text-[#cbd5e1]">{empleado.telefono}</span>
+                    <span className="text-xs text-[#86868B] block">Teléfono de Contacto</span>
+                    <span className="text-[#1D1D1F]">{empleado.telefono}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Fecha de Ingreso</span>
-                    <span className="font-mono text-[#cbd5e1]">{empleado.fechaIngreso}</span>
+                    <span className="text-xs text-[#86868B] block">Fecha de Ingreso</span>
+                    <span className="text-[#1D1D1F]">{empleado.fechaIngreso}</span>
                   </div>
                 </div>
               </div>
 
               {/* Condiciones Laborales y Salario */}
               <div className="space-y-3">
-                <h4 className="font-semibold text-[#f8fafc] text-xs uppercase tracking-wider text-[#94a3b8]">
+                <h4 className="font-semibold text-[#1D1D1F] text-xs uppercase tracking-wider text-[#86868B]">
                   Condiciones laborales y remuneración
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-[#0f172a] rounded-xl border border-[#1e293b]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-[#F5F5F7] rounded-xl border border-[#E5E5EA]">
                   <div>
-                    <span className="text-xs text-[#64748b] block">Tipo de Contrato</span>
-                    <span className="text-[#cbd5e1] font-medium">{empleado.tipoContrato.replace(/_/g, ' ')}</span>
+                    <span className="text-xs text-[#86868B] block">Tipo de Contrato</span>
+                    <span className="text-[#1D1D1F] font-medium">{empleado.tipoContrato.replace(/_/g, ' ')}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Modalidad de Pago</span>
-                    <span className="text-[#cbd5e1]">{empleado.modalidadPago}</span>
+                    <span className="text-xs text-[#86868B] block">Modalidad de Pago</span>
+                    <span className="text-[#1D1D1F]">{empleado.modalidadPago}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Turno Habitual</span>
-                    <span className="text-[#38bdf8] font-medium">{empleado.turnoAsignado}</span>
+                    <span className="text-xs text-[#86868B] block">Turno Habitual</span>
+                    <span className="text-[#177E89] font-medium">{empleado.turnoAsignado}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Sueldo pactado</span>
-                    <span className="font-mono text-[#177E89] font-bold text-sm sm:text-base">
+                    <span className="text-xs text-[#86868B] block">Sueldo pactado</span>
+                    <span className="text-[#177E89] font-bold text-sm sm:text-base">
                       {ocultarSueldo
                         ? '••••••'
                         : `${formatearMoneda(empleado.salarioBaseReferencial, empleado.moneda)} / mes`}
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Entidad bancaria</span>
-                    <span className="text-[#cbd5e1]">{ocultarSueldo ? '••••••' : (empleado.bancoReferencial || 'No configurado')}</span>
+                    <span className="text-xs text-[#86868B] block">Entidad bancaria</span>
+                    <span className="text-[#1D1D1F]">{ocultarSueldo ? '••••••' : (empleado.bancoReferencial || 'No configurado')}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-[#64748b] block">Cuenta / Referencia</span>
-                    <span className="font-mono text-[#cbd5e1]">{ocultarSueldo ? '••••••' : (empleado.cuentaReferencial || '••••')}</span>
+                    <span className="text-xs text-[#86868B] block">Cuenta / Referencia</span>
+                    <span className="text-[#1D1D1F]">{ocultarSueldo ? '••••••' : (empleado.cuentaReferencial || '••••')}</span>
                   </div>
                 </div>
               </div>
@@ -203,11 +203,11 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
 
           {pestanaActiva === 'asistencia' && (
             <div className="space-y-3">
-              <h4 className="font-semibold text-xs uppercase tracking-wider text-[#94a3b8]">
+              <h4 className="font-semibold text-xs uppercase tracking-wider text-[#86868B]">
                 Historial reciente de marcaciones
               </h4>
               {asistenciasEmpleado.length === 0 ? (
-                <div className="p-6 text-center text-[#94a3b8] bg-[#0f172a] rounded-xl border border-[#1e293b]">
+                <div className="p-6 text-center text-[#86868B] bg-[#F5F5F7] rounded-xl border border-[#E5E5EA]">
                   No hay registros de marcaje recientes para este colaborador.
                 </div>
               ) : (
@@ -215,28 +215,28 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                   {asistenciasEmpleado.map((a) => (
                     <div
                       key={a.id}
-                      className="p-3 bg-[#0f172a] border border-[#1e293b] rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                      className="p-3 bg-[#F5F5F7] border border-[#E5E5EA] rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                     >
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-[#cbd5e1] font-semibold">{a.fecha}</span>
-                          <span className="px-2 py-0.2 rounded text-[10px] font-medium bg-[#1e293b] text-[#177E89]">
+                          <span className="text-[#1D1D1F] font-semibold">{a.fecha}</span>
+                          <span className="px-2 py-0.2 rounded text-[10px] font-medium bg-[#F5F5F7] text-[#177E89]">
                             {a.estado}
                           </span>
                         </div>
-                        <p className="text-[#64748b]">
+                        <p className="text-[#86868B]">
                           Programado: {a.horaEntradaProgramada} - {a.horaSalidaProgramada} | Real: {a.horaEntradaReal || '--'} - {a.horaSalidaReal || '--'}
                         </p>
                         {a.justificacion && (
-                          <p className="text-[#fbbf24] text-[11px] italic">Nota: {a.justificacion}</p>
+                          <p className="text-[#6E6E73] text-[11px] italic">Nota: {a.justificacion}</p>
                         )}
                       </div>
                       <div className="text-right">
-                        <span className="font-mono text-[#177E89] font-medium">
+                        <span className="text-[#177E89] font-medium">
                           {a.horasTrabajadas}h laboradas
                         </span>
                         {a.horasExtras > 0 && (
-                          <span className="block text-[11px] text-[#38bdf8] font-mono">
+                          <span className="block text-[11px] text-[#177E89]">
                             +{a.horasExtras}h extras
                           </span>
                         )}
@@ -250,11 +250,11 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
 
           {pestanaActiva === 'metas' && (
             <div className="space-y-3">
-              <h4 className="font-semibold text-xs uppercase tracking-wider text-[#94a3b8]">
+              <h4 className="font-semibold text-xs uppercase tracking-wider text-[#86868B]">
                 Metas y Rendimiento No Punitivo
               </h4>
               {metasEmpleado.length === 0 ? (
-                <div className="p-6 text-center text-[#94a3b8] bg-[#0f172a] rounded-xl border border-[#1e293b]">
+                <div className="p-6 text-center text-[#86868B] bg-[#F5F5F7] rounded-xl border border-[#E5E5EA]">
                   No hay metas asignadas a este colaborador en el ciclo actual.
                 </div>
               ) : (
@@ -262,30 +262,30 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                   {metasEmpleado.map((m) => (
                     <div
                       key={m.id}
-                      className="p-4 bg-[#0f172a] border border-[#1e293b] rounded-xl space-y-2 text-xs"
+                      className="p-4 bg-[#F5F5F7] border border-[#E5E5EA] rounded-xl space-y-2 text-xs"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[#f8fafc] text-sm">{m.titulo}</span>
+                            <span className="font-semibold text-[#1D1D1F] text-sm">{m.titulo}</span>
                             <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium ${
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                                 m.tipo === 'AUTOMATICA'
-                                  ? 'bg-[#38bdf8]/15 text-[#38bdf8] border border-[#38bdf8]/30'
-                                  : 'bg-[#1e293b] text-[#cbd5e1] border border-[#334155]'
+                                  ? 'bg-[#177E89]/15 text-[#177E89] border border-[#177E89]/30'
+                                  : 'bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5EA]'
                               }`}
                             >
                               [{m.tipo}]
                             </span>
                           </div>
-                          <p className="text-[#94a3b8] text-xs mt-0.5">{m.descripcion}</p>
+                          <p className="text-[#86868B] text-xs mt-0.5">{m.descripcion}</p>
                         </div>
-                        <span className="font-mono text-[#177E89] font-bold">
+                        <span className="text-[#177E89] font-bold">
                           {m.progresoActual == null ? 'Sin seguimiento' : `${m.progresoActual} / ${m.metaValor} ${m.unidadMedida}`}
                         </span>
                       </div>
 
-                      <div className="w-full bg-[#0b111e] h-2 rounded-full overflow-hidden">
+                      <div className="w-full bg-[#F5F5F7] h-2 rounded-full overflow-hidden">
                         <div
                           className="bg-[#177E89] h-full rounded-full transition-all duration-300"
                           style={{
@@ -294,7 +294,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                         />
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px] text-[#64748b]">
+                      <div className="flex items-center justify-between text-[11px] text-[#86868B]">
                         <span>Métrica: {m.origenMetrica}</span>
                         <span className="text-[#177E89]">Regla no punitiva garantizada</span>
                       </div>
@@ -307,11 +307,11 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
 
           {pestanaActiva === 'recibos' && (
             <div className="space-y-4">
-              <h4 className="font-semibold text-xs uppercase tracking-wider text-[#94a3b8]">
+              <h4 className="font-semibold text-xs uppercase tracking-wider text-[#86868B]">
                 Recibos de Quincena y Desglose de Fórmulas
               </h4>
               {recibosEmpleado.length === 0 ? (
-                <div className="p-6 text-center text-[#94a3b8] bg-[#0f172a] rounded-xl border border-[#1e293b]">
+                <div className="p-6 text-center text-[#86868B] bg-[#F5F5F7] rounded-xl border border-[#E5E5EA]">
                   No se registran recibos calculados para este colaborador en el histórico.
                 </div>
               ) : (
@@ -330,10 +330,10 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
         </div>
 
         {/* Pie del Modal */}
-        <div className="p-4 bg-[#0f172a] border-t border-[#1e2d48] flex justify-end">
+        <div className="p-4 bg-[#F5F5F7] border-t border-[#E5E5EA] flex justify-end">
           <button
             onClick={onCerrar}
-            className="px-4 py-2 bg-[#1e293b] hover:bg-[#334155] text-xs font-medium text-[#f8fafc] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+            className="px-4 py-2 bg-[#F5F5F7] hover:bg-[#E5E5EA] text-xs font-medium text-[#1D1D1F] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
           >
             Cerrar Ficha
           </button>

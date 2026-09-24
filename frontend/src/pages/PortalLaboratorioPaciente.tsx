@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { consultarPortalLaboratorioPublico, subirExamenPortalLaboratorioPublico } from "../api";
-import { IconWarning, IconFrascoLab, IconFileText, IconCheckCircle, IconPaperclip, IconUpload } from "../Icons";
+import { IconWarning, IconFrascoLab, IconFileText, IconCheckCircle, IconPaperclip, IconUpload, IconClose } from "../Icons";
 
 interface ArchivoLocal {
   file: File;
@@ -82,9 +82,9 @@ export default function PortalLaboratorioPaciente() {
   // 1. Cargando
   if (cargando) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
-        <div className="w-12 h-12 border-4 border-teal-400 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-slate-400 font-medium">Verificando enlace...</p>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 text-[#1D1D1F]">
+        <div className="w-10 h-10 border-4 border-[#177E89] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-[#86868B] font-medium">Verificando enlace...</p>
       </div>
     );
   }
@@ -92,13 +92,13 @@ export default function PortalLaboratorioPaciente() {
   // 2. Enlace inválido
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
-        <div className="max-w-md w-full bg-slate-900/90 border border-red-500/30 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
-          <div className="w-16 h-16 bg-red-500/10 text-red-400 rounded-2xl flex items-center justify-center mx-auto">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 text-[#1D1D1F]">
+        <div className="max-w-md w-full bg-white border border-[#E5E5EA] rounded-3xl p-8 text-center space-y-4 shadow-sm">
+          <div className="w-16 h-16 bg-[#F5F5F7] text-[#ef4444] rounded-2xl flex items-center justify-center mx-auto">
             <IconWarning size={28} />
           </div>
-          <h1 className="text-xl font-bold text-white">Enlace no válido</h1>
-          <p className="text-sm text-slate-400">{error}</p>
+          <h1 className="text-xl font-bold text-[#1D1D1F]">Enlace no válido</h1>
+          <p className="text-sm text-[#86868B]">{error}</p>
         </div>
       </div>
     );
@@ -107,17 +107,17 @@ export default function PortalLaboratorioPaciente() {
   // 3. Envío exitoso
   if (exito) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 text-white">
-        <div className="max-w-md w-full bg-slate-900/90 border border-emerald-500/40 rounded-3xl p-8 sm:p-10 text-center space-y-5 shadow-2xl">
-          <div className="w-20 h-20 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-3xl flex items-center justify-center mx-auto">
+      <div className="min-h-screen bg-[#F5F5F7] flex flex-col items-center justify-center p-4 text-[#1D1D1F]">
+        <div className="max-w-md w-full bg-white border border-[#E5E5EA] rounded-3xl p-8 sm:p-10 text-center space-y-5 shadow-sm">
+          <div className="w-20 h-20 bg-[#177E89]/10 border border-[#177E89]/30 text-[#177E89] rounded-3xl flex items-center justify-center mx-auto">
             <IconCheckCircle size={36} />
           </div>
-          <h1 className="text-2xl font-black text-white font-['Outfit']">¡Resultados Enviados!</h1>
-          <p className="text-slate-300 text-sm leading-relaxed">
+          <h1 className="text-2xl font-bold tracking-tight text-[#1D1D1F]">¡Resultados Enviados!</h1>
+          <p className="text-[#6E6E73] text-sm leading-relaxed">
             Sus {archivos.length} {archivos.length === 1 ? "archivo fue enviado" : "archivos fueron enviados"} correctamente a{" "}
-            <strong className="text-emerald-300">{nombreConsultorio}</strong>. Su médico los revisará en breve.
+            <strong className="text-[#177E89]">{nombreConsultorio}</strong>. Su médico los revisará en breve.
           </p>
-          <p className="text-xs text-slate-500">Ya puede cerrar esta página.</p>
+          <p className="text-xs text-[#86868B]">Ya puede cerrar esta página.</p>
         </div>
       </div>
     );
@@ -125,102 +125,102 @@ export default function PortalLaboratorioPaciente() {
 
   // 4. Formulario de carga
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-['Manrope'] selection:bg-teal-500 selection:text-white pb-16">
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
+    <div className="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] antialiased pb-16">
+      <header className="border-b border-[#E5E5EA] bg-white sticky top-0 z-30 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 flex items-center justify-center text-slate-950 shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] flex items-center justify-center text-[#177E89]">
             <IconFrascoLab size={18} />
           </div>
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-teal-400">Envío de Resultados de Laboratorio</span>
-            <h1 className="text-sm font-bold text-white">{nombreConsultorio}</h1>
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#177E89]">Envío de Resultados de Laboratorio</span>
+            <h1 className="text-sm font-bold text-[#1D1D1F]">{nombreConsultorio}</h1>
           </div>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
-        <div className="bg-teal-500/10 border border-teal-500/20 rounded-2xl p-4 text-xs text-teal-200 leading-relaxed">
+        <div className="bg-[#177E89]/10 border border-[#177E89]/20 rounded-2xl p-4 text-xs text-[#1D1D1F] leading-relaxed">
           Suba aquí la foto o el PDF de los resultados que le entregó el laboratorio. Su médico los recibirá directamente
           en su expediente.
         </div>
 
-        <form onSubmit={handleEnviar} className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-xl space-y-5">
+        <form onSubmit={handleEnviar} className="bg-white border border-[#E5E5EA] rounded-3xl p-5 sm:p-7 shadow-sm space-y-5">
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1">
-              Número de Cédula <span className="text-teal-400">*</span>
+            <label className="text-xs font-semibold text-[#1D1D1F] block mb-1">
+              Número de Cédula <span className="text-[#177E89]">*</span>
             </label>
             <input
               type="text"
               value={cedula}
               onChange={(e) => setCedula(e.target.value)}
               placeholder="Ej. V-12345678"
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-teal-400 placeholder:text-slate-600"
+              className="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 py-2.5 text-sm text-[#1D1D1F] focus:outline-none focus:border-[#177E89] placeholder:text-[#86868B]"
             />
-            <p className="text-[11px] text-slate-500 mt-1">Así identificamos que estos resultados son suyos.</p>
+            <p className="text-[11px] text-[#86868B] mt-1">Así identificamos que estos resultados son suyos.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Nombre completo</label>
+              <label className="text-xs font-semibold text-[#1D1D1F] block mb-1">Nombre completo</label>
               <input
                 type="text"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Opcional"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-teal-400 placeholder:text-slate-600"
+                className="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 py-2.5 text-sm text-[#1D1D1F] focus:outline-none focus:border-[#177E89] placeholder:text-[#86868B]"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Teléfono / WhatsApp</label>
+              <label className="text-xs font-semibold text-[#1D1D1F] block mb-1">Teléfono / WhatsApp</label>
               <input
                 type="text"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 placeholder="Ej. 0414-1234567"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-teal-400 placeholder:text-slate-600"
+                className="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 py-2.5 text-sm text-[#1D1D1F] focus:outline-none focus:border-[#177E89] placeholder:text-[#86868B]"
               />
             </div>
           </div>
 
-          <div className="space-y-3 pt-2 border-t border-slate-800">
+          <div className="space-y-3 pt-2 border-t border-[#E5E5EA]">
             <div className="flex justify-between items-center">
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <h4 className="text-sm font-bold text-[#1D1D1F] flex items-center gap-2">
                 <IconPaperclip size={13} /> Resultados (fotos o PDF)
               </h4>
-              <label className="cursor-pointer px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md transition-all">
+              <label className="cursor-pointer px-4 py-2 bg-[#177E89] hover:bg-[#136570] text-white font-semibold text-xs rounded-full flex items-center gap-1.5 transition-colors">
                 <span>+</span> Añadir Archivos
                 <input type="file" multiple accept="image/*,application/pdf" onChange={handleArchivosSeleccionados} className="hidden" />
               </label>
             </div>
 
             {archivos.length === 0 ? (
-              <label className="border-2 border-dashed border-slate-800 hover:border-teal-500/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-950/40">
-                <div className="mb-2 flex justify-center text-slate-400"><IconFileText size={28} /></div>
-                <p className="text-sm font-semibold text-slate-300">Toque para seleccionar sus fotos o PDF</p>
-                <p className="text-xs text-slate-500 mt-1">Puede subir todos los que necesite, sin límite</p>
+              <label className="border-2 border-dashed border-[#E5E5EA] hover:border-[#177E89]/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#F5F5F7]">
+                <div className="mb-2 flex justify-center text-[#86868B]"><IconFileText size={28} /></div>
+                <p className="text-sm font-semibold text-[#1D1D1F]">Toque para seleccionar sus fotos o PDF</p>
+                <p className="text-xs text-[#86868B] mt-1">Puede subir todos los que necesite, sin límite</p>
                 <input type="file" multiple accept="image/*,application/pdf" onChange={handleArchivosSeleccionados} className="hidden" />
               </label>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
                 {archivos.map((adj, i) => (
-                  <div key={i} className="relative group bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden p-2 flex flex-col items-center text-center shadow-md">
+                  <div key={i} className="relative group bg-white border border-[#E5E5EA] rounded-2xl overflow-hidden p-2 flex flex-col items-center text-center shadow-sm">
                     {adj.previewUrl ? (
-                      <div className="w-full h-24 rounded-xl overflow-hidden bg-slate-900 mb-2">
+                      <div className="w-full h-24 rounded-xl overflow-hidden bg-[#F5F5F7] mb-2">
                         <img src={adj.previewUrl} alt={adj.nombreArchivo} className="w-full h-full object-cover" />
                       </div>
                     ) : (
-                      <div className="w-full h-24 rounded-xl bg-slate-900 border border-slate-800 flex flex-col items-center justify-center text-red-400 mb-2">
+                      <div className="w-full h-24 rounded-xl bg-[#F5F5F7] border border-[#E5E5EA] flex flex-col items-center justify-center text-[#177E89] mb-2">
                         <IconFileText size={22} />
-                        <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">PDF</span>
+                        <span className="text-[10px] uppercase font-bold text-[#86868B] mt-1">PDF</span>
                       </div>
                     )}
-                    <span className="text-[10px] text-slate-300 truncate w-full font-medium px-1">{adj.nombreArchivo}</span>
+                    <span className="text-[10px] text-[#1D1D1F] truncate w-full font-medium px-1">{adj.nombreArchivo}</span>
                     <button
                       type="button"
                       onClick={() => eliminarArchivo(i)}
-                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-600/80 hover:bg-red-600 text-white text-xs flex items-center justify-center shadow-lg transition-all"
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white border border-[#E5E5EA] hover:bg-[#F5F5F7] text-[#1D1D1F] flex items-center justify-center transition-colors cursor-pointer"
                     >
-                      ✖
+                      <IconClose size={12} />
                     </button>
                   </div>
                 ))}
@@ -229,13 +229,13 @@ export default function PortalLaboratorioPaciente() {
           </div>
 
           {errorEnvio && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-xl p-3">{errorEnvio}</div>
+            <div className="bg-[#F5F5F7] border border-[#ef4444]/30 text-[#ef4444] text-xs rounded-xl p-3">{errorEnvio}</div>
           )}
 
           <button
             type="submit"
             disabled={enviando}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-500 text-slate-950 font-black text-base shadow-xl hover:shadow-teal-500/25 hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full py-4 rounded-full bg-[#177E89] text-white font-semibold text-base transition-colors hover:bg-[#136570] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
           >
             {enviando ? "Enviando..." : <><IconUpload size={16} /> Enviar a mi médico</>}
           </button>
