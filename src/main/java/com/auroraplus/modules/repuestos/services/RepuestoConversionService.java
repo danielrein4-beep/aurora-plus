@@ -58,6 +58,9 @@ public class RepuestoConversionService {
     @Autowired
     private com.auroraplus.modules.comercio.repositories.LibroVentaRepository libroVentaRepository;
 
+    @Autowired
+    private com.auroraplus.modules.comercio.services.LibroFiscalService libroFiscalService;
+
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RepuestoConversionService.class);
 
     // Repuestos no tiene una entidad "VentaRepuesto" persistida (a diferencia de
@@ -612,11 +615,8 @@ public class RepuestoConversionService {
         renglon.setNumeroTicket(numeroTicket);
         String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
         renglon.setMonedaBase(monedaBase);
-        try {
-            renglon.setTasaBcv("VES".equals(monedaBase) ? BigDecimal.ONE : motorFinancieroService.factorConversion(tenantId, monedaBase, "VES"));
-        } catch (RuntimeException sinTasa) {
-            renglon.setTasaBcv(null); // el libro lo muestra como "sin tasa" en vez de inventarla
-        }
+        // Tasa BCV vigente hoy (no la de cobro, que puede ser otra referencia); null si no hay ninguna registrada.
+        renglon.setTasaBcv(libroFiscalService.tasaBcvVigente(tenantId, renglon.getFecha()));
         String nombre = nombreClienteManual;
         String rif = fiscal != null ? fiscal.clienteRif() : null;
         if (clienteId != null) {
