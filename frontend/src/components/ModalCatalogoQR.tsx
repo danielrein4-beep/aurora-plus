@@ -88,10 +88,15 @@ interface Props {
   onClose: () => void;
   esDuenoAdmin?: boolean;
   onIrAEquipoRoles?: () => void;
+  /** true = se dibuja como contenido de una pantalla (sin overlay ni botón de cerrar). */
+  embebido?: boolean;
+  /** Sección a mostrar; en modo embebido la controla la pantalla que lo contiene. */
+  seccion?: "qr" | "perfil" | "pago_movil";
 }
 
-export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose, esDuenoAdmin, onIrAEquipoRoles }: Props) {
-  const [tab, setTab] = useState<"qr" | "perfil" | "pago_movil">("qr");
+export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose, esDuenoAdmin, onIrAEquipoRoles, embebido, seccion }: Props) {
+  const [tab, setTab] = useState<"qr" | "perfil" | "pago_movil">(seccion ?? "qr");
+  useEffect(() => { if (seccion) setTab(seccion); }, [seccion]);
   const [copiado, setCopiado] = useState(false);
 
   // Perfil Tienda
@@ -320,8 +325,13 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose, esDu
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl animate-scale-up">
+    <div className={embebido ? "" : "fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"}>
+      <div className={embebido
+        ? "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-sm"
+        : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl animate-scale-up"}>
+        {/* Embebido en la pantalla de Configuración: la cabecera, las pestañas y el acceso a
+            Equipo los pone esa pantalla (menú lateral), no el modal. */}
+        {!embebido && (<>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -396,6 +406,8 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose, esDu
             <span className="text-slate-400">→</span>
           </button>
         )}
+
+        </>)}
 
         {/* TAB 1: QR & Enlace */}
         {tab === "qr" && (

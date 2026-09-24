@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +31,12 @@ public interface MovimientoCajaRepository extends JpaRepository<MovimientoCaja, 
     List<MovimientoCaja> findByTenantIdOrderByFechaRegistroDesc(Long tenantId);
 
     List<MovimientoCaja> findByTenantIdAndTipoOrderByFechaRegistroDesc(Long tenantId, MovimientoCaja.TipoMovimiento tipo);
+
+    /** CXC/CXP pendientes (con saldo real) cuya fecha de vencimiento ya llegó o llega dentro de `hasta` — para el recordatorio automático diario. */
+    @Query("SELECT m FROM MovimientoCaja m WHERE m.tipo = :tipo AND m.estado <> 'PAGADO' "
+        + "AND m.saldoPendiente IS NOT NULL AND m.saldoPendiente > 0 "
+        + "AND m.fechaVencimiento IS NOT NULL AND m.fechaVencimiento <= :hasta")
+    List<MovimientoCaja> findPendientesConVencimientoHasta(@Param("tipo") MovimientoCaja.TipoMovimiento tipo, @Param("hasta") LocalDate hasta);
 
     /** Trazabilidad de la Capa 1 (docs/finance-contract.md §2.2) — total de movimientos del período, sin distinguir origen. */
     long countByTenantIdAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(

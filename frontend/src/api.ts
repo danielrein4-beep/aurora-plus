@@ -57,6 +57,31 @@ function manejarSesionVencida() {
   }
 }
 
+// Modo euro: la app trabaja internamente con "USD" como moneda base y aquí, en el único borde
+// con el servidor, la traduce a "EUR" al enviar y de vuelta a "USD" al recibir. Solo actúa cuando
+// el negocio eligió euro (fijarMonedaBaseApi("EUR")); en cualquier otro caso no toca nada.
+// Se guarda por negocio en el navegador para que la primera carga (antes de consultar la
+// configuración al servidor) ya sepa en qué moneda traducir.
+const claveMonedaBase = () => `aurora_moneda_base:${leerSesion()?.tenantId ?? 0}`;
+export function monedaBaseGuardada(): string {
+  try { return localStorage.getItem(claveMonedaBase()) === "EUR" ? "EUR" : "USD"; } catch { return "USD"; }
+}
+export function fijarMonedaBaseApi(m: string) {
+  try { localStorage.setItem(claveMonedaBase(), m === "EUR" ? "EUR" : "USD"); } catch { /* sin almacenamiento: se resuelve con la consulta al servidor */ }
+}
+function traducirMoneda(v: unknown, de: string, a: string): unknown {
+  if (Array.isArray(v)) return v.map((x) => traducirMoneda(x, de, a));
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      const clave = k === de ? a : k;
+      out[clave] = /^moneda/i.test(k) && k !== "monedaBase" && val === de ? a : traducirMoneda(val, de, a);
+    }
+    return out;
+  }
+  return v;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const sesion = leerSesion();
   const headers: Record<string, string> = {
@@ -69,7 +94,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(path, { ...options, headers });
+    const cuerpo = monedaBaseGuardada() === "EUR" && typeof options.body === "string" && !path.includes("moneda-base")
+      ? JSON.stringify(traducirMoneda(JSON.parse(options.body), "USD", "EUR")) : options.body;
+    res = await fetch(path, { ...options, headers, body: cuerpo });
   } catch {
     // fetch() rechaza (no responde con un status) cuando el navegador no
     // pudo ni siquiera contactar al servidor: sin internet, DNS caído, el
@@ -102,7 +129,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(mensaje, res.status);
   }
   if (res.status === 204) return undefined as T;
-  return res.json();
+  const datos = await res.json();
+  return (monedaBaseGuardada() === "EUR" && !path.includes("moneda-base") ? traducirMoneda(datos, "EUR", "USD") : datos) as T;
 }
 
 // Formulario público de "Contáctanos" (Nosotros.tsx) — antes solo hacía
@@ -238,6 +266,32 @@ export function obtenerDatosFiscalesNegocio(): Promise<DatosFiscalesNegocio> {
 
 export function actualizarDatosFiscalesNegocio(datos: DatosFiscalesNegocio): Promise<DatosFiscalesNegocio> {
   return request("/api/config/mi-negocio/datos-fiscales", { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// Facturación Fiscal real (Formato Libre autorizado por imprenta SENIAT) — apagada
+// por defecto ("NINGUNA"). Ver FacturacionFiscalService en el backend: nunca se
+// inventa un número de control sin que el negocio tenga de verdad ese rango asignado.
+export type ModoFacturacionFiscal = "NINGUNA" | "FORMATO_LIBRE" | "MAQUINA_FISCAL";
+
+export interface FacturacionFiscalConfig {
+  modo: ModoFacturacionFiscal;
+  serie?: string | null;
+  numeroActual?: number | null;
+  numeroHasta?: number | null;
+  numerosRestantes?: number | null;
+}
+
+export function obtenerFacturacionFiscal(): Promise<FacturacionFiscalConfig> {
+  return request("/api/config/mi-negocio/facturacion-fiscal");
+}
+
+export function actualizarFacturacionFiscal(datos: { modo: ModoFacturacionFiscal; serie?: string; numeroDesde?: number; numeroHasta?: number }): Promise<FacturacionFiscalConfig> {
+  return request("/api/config/mi-negocio/facturacion-fiscal", { method: "PUT", body: JSON.stringify(datos) });
+}
+
+/** Reserva y devuelve el siguiente número de control fiscal, o {} si el negocio no tiene Formato Libre activo. */
+export function siguienteNumeroControlFiscal(): Promise<{ numeroControl?: string }> {
+  return request("/api/config/mi-negocio/facturacion-fiscal/siguiente-numero", { method: "POST" });
 }
 
 /** Zonas/estaciones de cocina de Horeca (ej. COCINA, PARRILLA, BAR) — cada negocio arma las suyas; sin configurar trae las 4 clásicas por defecto. */
@@ -2406,6 +2460,10 @@ export interface Cliente {
   telefono: string | null;
   correo: string | null;
   fechaRegistro: string;
+  // Solo Comercio (crédito de mostrador) — null en clientes de otras verticales.
+  direccion?: string | null;
+  limiteCredito?: number | null;
+  saldoPendiente?: number | null;
 }
 
 export interface MetricasCliente {
@@ -2425,12 +2483,49 @@ export function obtenerCliente(tenantId: number, id: number): Promise<Cliente> {
   return request(`/api/crm/clientes/${id}?tenantId=${tenantId}`);
 }
 
-export function crearCliente(tenantId: number, datos: { nombre?: string; identificacionRif?: string; telefono?: string; correo?: string }): Promise<Cliente> {
+type DatosClienteRequest = {
+  nombre?: string; identificacionRif?: string; telefono?: string; correo?: string;
+  direccion?: string; limiteCredito?: number; saldoPendiente?: number;
+};
+
+export function crearCliente(tenantId: number, datos: DatosClienteRequest): Promise<Cliente> {
   return request(`/api/crm/clientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarCliente(tenantId: number, id: number, datos: { nombre?: string; identificacionRif?: string; telefono?: string; correo?: string }): Promise<Cliente> {
+export function editarCliente(tenantId: number, id: number, datos: DatosClienteRequest): Promise<Cliente> {
   return request(`/api/crm/clientes/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// ─── Ventas del POS de Comercio (detalle completo, antes solo en localStorage) ───
+export interface VentaMostradorServidor {
+  id: number;
+  numero: string;
+  fechaRegistro: string;
+  detalleJson: string;
+}
+
+export interface VentaMostradorRequest {
+  numero: string;
+  clienteNombre?: string;
+  clienteDocumento?: string;
+  total: number;
+  utilidad?: number;
+  metodoPago?: string;
+  esCredito: boolean;
+  fechaIso?: string;
+  detalleJson: string;
+}
+
+export function guardarVentaMostrador(tenantId: number, venta: VentaMostradorRequest): Promise<VentaMostradorServidor> {
+  return request(`/api/comercio/ventas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(venta) });
+}
+
+export function guardarVentasMostradorLote(tenantId: number, ventas: VentaMostradorRequest[]): Promise<{ guardadas: number; omitidas: number }> {
+  return request(`/api/comercio/ventas/lote?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(ventas) });
+}
+
+export function listarVentasMostrador(tenantId: number): Promise<VentaMostradorServidor[]> {
+  return request(`/api/comercio/ventas?tenantId=${tenantId}`);
 }
 
 export function eliminarCliente(tenantId: number, id: number): Promise<void> {
@@ -2753,6 +2848,7 @@ async function requestSuperAdmin<T>(path: string, options: RequestInit = {}): Pr
     try {
       const parsed = JSON.parse(errorText);
       if (parsed.error) msg = parsed.error;
+      else if (parsed.message) msg = parsed.message;
     } catch {}
 
     if (res.status === 401) {
@@ -2848,7 +2944,6 @@ export function listarInboxLaboratorio(tenantId: number): Promise<OrdenLaborator
 }
 
 export function contadorInboxLaboratorio(tenantId: number): Promise<{ pendientes: number }> {
-      else if (parsed.message) msg = parsed.message;
   return request(`/api/salud/laboratorio/ordenes/inbox/contador?tenantId=${tenantId}`);
 }
 
@@ -3405,6 +3500,58 @@ export interface MovimientoRepuesto {
   stockNuevo: number;
   motivo?: string;
   fechaRegistro: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MULTI-ALMACÉN — capa aditiva sobre el stock total (ver AlmacenService en
+// backend): registra cómo se reparte el stock entre ubicaciones y permite
+// trasladar; no cambia cómo se vende ni el kárdex.
+// ═══════════════════════════════════════════════════════════════════════
+export interface Almacen {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  direccion?: string | null;
+  esPrincipal: boolean;
+  activo: boolean;
+  fechaCreacion: string;
+}
+
+export interface StockAlmacen {
+  id: number;
+  tenantId: number;
+  almacenId: number;
+  repuestoId: number;
+  cantidad: number;
+  ubicacion?: string | null; // posición física dentro de este almacén (ej. "Pasillo 3, Estante B")
+}
+
+export function listarUbicacionesAlmacen(tenantId: number): Promise<StockAlmacen[]> {
+  return request(`/api/repuestos/almacenes/ubicaciones?tenantId=${tenantId}`);
+}
+
+export function fijarUbicacionAlmacen(tenantId: number, datos: { repuestoId: number; almacenId: number; ubicacion: string }): Promise<StockAlmacen> {
+  return request(`/api/repuestos/almacenes/ubicacion?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function listarAlmacenes(tenantId: number): Promise<Almacen[]> {
+  return request(`/api/repuestos/almacenes?tenantId=${tenantId}`);
+}
+
+export function crearAlmacen(tenantId: number, datos: { nombre: string; direccion?: string }): Promise<Almacen> {
+  return request(`/api/repuestos/almacenes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function actualizarAlmacen(tenantId: number, id: number, datos: { nombre?: string; direccion?: string; activo?: boolean }): Promise<Almacen> {
+  return request(`/api/repuestos/almacenes/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function obtenerDistribucionAlmacen(tenantId: number, repuestoId: number): Promise<{ distribucion: StockAlmacen[]; sinAsignar: number }> {
+  return request(`/api/repuestos/almacenes/distribucion/${repuestoId}?tenantId=${tenantId}`);
+}
+
+export function trasladarStockAlmacen(tenantId: number, datos: { repuestoId: number; origenId: number; destinoId: number; cantidad: number }): Promise<void> {
+  return request(`/api/repuestos/almacenes/trasladar?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export interface ProveedorRepuesto {
@@ -4679,6 +4826,69 @@ export async function obtenerAnalyticsSuperAdmin(periodo?: string, fechaRef?: st
   return requestSuperAdmin<SaasAnalyticsResponse>(`/api/super-admin/tenants/analytics${q}`);
 }
 
+// --- Actividad operativa por vertical (super-admin): qué registran los tenants, no lo que pagan.
+
+export interface ResumenActividadVertical {
+  vertical: string;
+  totalTenants: number;
+  tenantsConActividad: number;
+  registrosPeriodo: number;
+}
+
+export interface TotalMetricaActividad {
+  clave: string;
+  etiqueta: string;
+  conFecha: boolean;
+  total: number;
+  periodo: number | null;
+  monto: number | null;
+}
+
+export interface ValorMetricaTenant {
+  total: number;
+  periodo: number | null;
+  monto: number | null;
+}
+
+export interface TenantActividad {
+  tenantId: number;
+  nombreEmpresa: string;
+  moduloPrincipal: string;
+  activa: boolean;
+  plan: string;
+  usuarios: number;
+  ultimaActividad: string | null;
+  metricas: Record<string, ValorMetricaTenant>;
+}
+
+export interface DetalleActividadVertical {
+  vertical: string;
+  dias: number;
+  metricaPrincipal: string;
+  totales: TotalMetricaActividad[];
+  serie: { fecha: string; cantidad: number }[];
+  tenants: TenantActividad[];
+}
+
+export function obtenerResumenActividadSuperAdmin(dias: number): Promise<ResumenActividadVertical[]> {
+  return requestSuperAdmin(`/api/super-admin/actividad/resumen?dias=${dias}`);
+}
+
+export interface ActividadTenant {
+  tenantId: number;
+  dias: number;
+  ultimaActividad: string | null;
+  metricas: (TotalMetricaActividad & { vertical: string })[];
+}
+
+export function obtenerActividadTenantSuperAdmin(tenantId: number, dias: number): Promise<ActividadTenant> {
+  return requestSuperAdmin(`/api/super-admin/actividad/tenant/${tenantId}?dias=${dias}`);
+}
+
+export function obtenerDetalleActividadSuperAdmin(vertical: string, dias: number): Promise<DetalleActividadVertical> {
+  return requestSuperAdmin(`/api/super-admin/actividad/${encodeURIComponent(vertical)}?dias=${dias}`);
+}
+
 
 // =========================================================================
 // SISTEMA DE SOPORTE & ASISTENCIA AL TENANT (TICKETS Y CHAT EN VIVO)
@@ -4826,69 +5036,6 @@ export async function listarAuditoriaGlobalSuperAdmin(params?: {
   modulo?: string;
   accion?: string;
   pagina?: number;
-// --- Actividad operativa por vertical (super-admin): qué registran los tenants, no lo que pagan.
-
-export interface ResumenActividadVertical {
-  vertical: string;
-  totalTenants: number;
-  tenantsConActividad: number;
-  registrosPeriodo: number;
-}
-
-export interface TotalMetricaActividad {
-  clave: string;
-  etiqueta: string;
-  conFecha: boolean;
-  total: number;
-  periodo: number | null;
-  monto: number | null;
-}
-
-export interface ValorMetricaTenant {
-  total: number;
-  periodo: number | null;
-  monto: number | null;
-}
-
-export interface TenantActividad {
-  tenantId: number;
-  nombreEmpresa: string;
-  moduloPrincipal: string;
-  activa: boolean;
-  plan: string;
-  usuarios: number;
-  ultimaActividad: string | null;
-  metricas: Record<string, ValorMetricaTenant>;
-}
-
-export interface DetalleActividadVertical {
-  vertical: string;
-  dias: number;
-  metricaPrincipal: string;
-  totales: TotalMetricaActividad[];
-  serie: { fecha: string; cantidad: number }[];
-  tenants: TenantActividad[];
-}
-
-export function obtenerResumenActividadSuperAdmin(dias: number): Promise<ResumenActividadVertical[]> {
-  return requestSuperAdmin(`/api/super-admin/actividad/resumen?dias=${dias}`);
-}
-
-export interface ActividadTenant {
-  tenantId: number;
-  dias: number;
-  ultimaActividad: string | null;
-  metricas: (TotalMetricaActividad & { vertical: string })[];
-}
-
-export function obtenerActividadTenantSuperAdmin(tenantId: number, dias: number): Promise<ActividadTenant> {
-  return requestSuperAdmin(`/api/super-admin/actividad/tenant/${tenantId}?dias=${dias}`);
-}
-
-export function obtenerDetalleActividadSuperAdmin(vertical: string, dias: number): Promise<DetalleActividadVertical> {
-  return requestSuperAdmin(`/api/super-admin/actividad/${encodeURIComponent(vertical)}?dias=${dias}`);
-}
-
   tamano?: number;
 }): Promise<{ content: RegistroAuditoriaItem[]; totalElements: number; totalPages: number; number: number }> {
   const qs = new URLSearchParams();

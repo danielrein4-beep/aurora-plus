@@ -44,7 +44,7 @@ import {
   historialTurnos,
   registrarEgresoTurno,
   cerrarTurno,
-  tasaVigente, actualizarTasa, actualizarTasaExternaTenant, ApiError,
+  tasaVigente, actualizarTasa, actualizarTasaExternaTenant, ApiError, monedaBaseGuardada, fijarMonedaBaseApi,
   obtenerOrigenTasaActiva, actualizarOrigenTasaActiva,
   type RepuestoItem,
   type PresentacionRepuesto,
@@ -59,12 +59,83 @@ import {
   type ItemImportacionRepuesto,
   type ResultadoImportacionRepuestos,
   obtenerMiNegocio,
+  obtenerMonedaBaseNegocio, actualizarMonedaBaseNegocio,
   subirComprobanteMovimientoCaja,
   listarCuentasBancarias, crearCuentaBancaria, actualizarCuentaBancaria,
   ingresarSaldoCuentaBancaria, retirarSaldoCuentaBancaria, transferirEntreCuentasBancarias,
   eliminarCuentaBancaria,
   type CuentaBancaria, type TipoCuentaBancaria,
+  listarAlmacenes, crearAlmacen, obtenerDistribucionAlmacen, trasladarStockAlmacen,
+  listarUbicacionesAlmacen, fijarUbicacionAlmacen,
+  type Almacen, type StockAlmacen,
+  listarClientes, editarCliente,
+  guardarVentaMostrador, guardarVentasMostradorLote, listarVentasMostrador,
+  type Cliente as ClienteServidor, type VentaMostradorRequest,
+  obtenerFacturacionFiscal, actualizarFacturacionFiscal, siguienteNumeroControlFiscal,
+  obtenerDatosFiscalesNegocio, actualizarDatosFiscalesNegocio,
+  type FacturacionFiscalConfig, type ModoFacturacionFiscal, type DatosFiscalesNegocio,
 } from "../api";
+
+// ── Moneda base del negocio ────────────────────────────────────────────────
+// CONVENCIÓN INTERNA: en todo este archivo, la moneda "USD" significa "la moneda base del
+// negocio", sea dólar o euro. En modo euro ("EUR") el negocio trabaja SOLO en euros: sin
+// bolívares, sin pesos, sin tasas. La traducción se hace en dos bordes nada más:
+//   · hacia el servidor  → aExterna("USD") devuelve la moneda real ("EUR" en modo euro)
+//   · desde el servidor  → aInterna("EUR") vuelve a "USD"
+// y en pantalla se usan SIM() y CODIGO() en vez de "$" y "USD" fijos.
+// MONEDA_BASE se fija al renderizar ComercioApp (ver ahí), antes de dibujar cualquier hijo.
+let MONEDA_BASE = "USD";
+const modoEuro = () => MONEDA_BASE === "EUR";
+const SIM = () => (MONEDA_BASE === "EUR" ? "€" : "$");
+const CODIGO = () => (MONEDA_BASE === "EUR" ? "EUR" : "USD");
+// "EUR" solo puede venir de un negocio en modo euro, así que no depende del orden de carga.
+const aInterna = (moneda: string): string => (moneda === "EUR" ? "USD" : moneda);
+const aExterna = (moneda: string): string => (moneda === "USD" ? MONEDA_BASE : moneda);
+/** Símbolo + monto para cualquier moneda (interna). Reemplaza al patrón `prefijoMoneda(m)`. */
+const prefijoMoneda = (moneda: string): string => (aInterna(moneda) === "USD" ? SIM() : moneda + " ");
+
+// Huella de lo que se guarda en el servidor de un cliente — si no cambia, no se vuelve a enviar.
+function firmaCliente(c: ClienteComercio): string {
+  return JSON.stringify([c.nombre, c.documento, c.telefono, c.direccion || "", c.saldoPendiente, c.limiteCredito]);
+}
+
+function datosClienteParaServidor(c: ClienteComercio) {
+  return {
+    nombre: c.nombre,
+    identificacionRif: c.documento && c.documento !== "-" ? c.documento : undefined,
+    telefono: c.telefono && c.telefono !== "-" ? c.telefono : undefined,
+    direccion: c.direccion || undefined,
+    limiteCredito: c.limiteCredito,
+    saldoPendiente: c.saldoPendiente,
+  };
+}
+
+function clienteDesdeServidor(c: ClienteServidor): ClienteComercio {
+  return {
+    id: `cl-${c.id}`,
+    backendId: c.id,
+    nombre: c.nombre,
+    documento: c.identificacionRif || "-",
+    telefono: c.telefono || "-",
+    direccion: c.direccion || undefined,
+    saldoPendiente: Number(c.saldoPendiente ?? 0),
+    limiteCredito: Number(c.limiteCredito ?? 200),
+    fechaRegistro: c.fechaRegistro ? c.fechaRegistro.split("T")[0] : undefined,
+  };
+}
+
+function ventaARequest(v: VentaComercio): VentaMostradorRequest {
+  return {
+    numero: v.numero,
+    clienteNombre: v.cliente?.nombre,
+    clienteDocumento: v.cliente?.documento,
+    total: v.total,
+    utilidad: v.utilidad,
+    metodoPago: v.metodoPago,
+    esCredito: v.esCredito,
+    detalleJson: JSON.stringify(v),
+  };
+}
 
 // Días restantes hasta la fecha de vencimiento (negativo = ya venció). Mismo
 // cálculo que RestauranteApp.diasParaVencer — se compara a medianoche local
@@ -168,6 +239,7 @@ export interface CuentaComercio {
 
 export interface ClienteComercio {
   id: string;
+  backendId?: number; // id real en el servidor (tabla clientes); sin esto, el cliente aún no se ha guardado allá
   nombre: string;
   documento: string; // V-12345678 o J-12345678-0
   telefono: string;
@@ -446,8 +518,13 @@ function generarNotaEntregaPDF(
   nombreLocal: string,
   tasaActivaBs: number,
   tasaCop: number,
-  descargar = true
+  descargar = true,
+  // Si viene un numeroControl real (reservado vía siguienteNumeroControlFiscal,
+  // ver FacturacionFiscalComercio), el documento se imprime como FACTURA fiscal
+  // de verdad en vez de Nota de Entrega — nunca se inventa este número acá.
+  datosFiscales?: { rif?: string; razonSocial?: string; numeroControl?: string }
 ): jsPDF {
+  const esFactura = !!datosFiscales?.numeroControl;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210;
   const margin = 14;
@@ -458,9 +535,15 @@ function generarNotaEntregaPDF(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(20, 20, 20);
-  doc.text(nombreLocal, margin, y);
+  doc.text(datosFiscales?.razonSocial || nombreLocal, margin, y);
+  if (esFactura && datosFiscales?.rif) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(`RIF: ${datosFiscales.rif}`, margin, y + 5);
+  }
 
-  // Recuadro NOTA DE ENTREGA (esquina superior derecha)
+  // Recuadro NOTA DE ENTREGA / FACTURA (esquina superior derecha)
   const ndX = W - 72;
   doc.setDrawColor(30, 150, 130);
   doc.setLineWidth(0.6);
@@ -468,10 +551,10 @@ function generarNotaEntregaPDF(
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(30, 150, 130);
-  doc.text("NOTA DE ENTREGA", ndX + 29, y - 2, { align: "center" });
+  doc.text(esFactura ? "FACTURA" : "NOTA DE ENTREGA", ndX + 29, y - 2, { align: "center" });
   doc.setFontSize(8);
   doc.setTextColor(60, 60, 60);
-  doc.text(`Control N°: ND-${venta.numero}`, ndX + 29, y + 4, { align: "center" });
+  doc.text(esFactura ? `N° Control: ${datosFiscales!.numeroControl}` : `Control N°: ND-${venta.numero}`, ndX + 29, y + 4, { align: "center" });
   doc.text(`Fecha: ${new Date().toLocaleDateString("es-VE")}`, ndX + 29, y + 9, { align: "center" });
   doc.text(`Hora: ${new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })}`, ndX + 29, y + 14, { align: "center" });
   doc.text(`Condición: ${venta.esCredito ? "A CRÉDITO (CXC)" : "CONTADO"}`, ndX + 29, y + 19, { align: "center" });
@@ -510,9 +593,9 @@ function generarNotaEntregaPDF(
   doc.text("Cant.", margin + 2, y);
   doc.text("Código", margin + 14, y);
   doc.text("Descripción", margin + 35, y);
-  doc.text("P. Unit. (USD)", margin + 110, y, { align: "right" });
-  doc.text("Subtotal USD", margin + 145, y, { align: "right" });
-  doc.text("Subtotal Bs.", colRight - 2, y, { align: "right" });
+  doc.text(`P. Unit. (${CODIGO()})`, margin + 110, y, { align: "right" });
+  doc.text(`Subtotal ${CODIGO()}`, modoEuro() ? colRight - 2 : margin + 145, y, { align: "right" });
+  if (!modoEuro()) doc.text("Subtotal Bs.", colRight - 2, y, { align: "right" });
   y += 3;
   doc.setDrawColor(180, 220, 215);
   doc.line(margin, y, colRight, y);
@@ -529,9 +612,9 @@ function generarNotaEntregaPDF(
     doc.text(String(item.cantidad), margin + 2, y);
     doc.text(item.productoId || "-", margin + 14, y);
     doc.text(nombre, margin + 35, y);
-    doc.text(`$${item.precio.toFixed(2)}`, margin + 110, y, { align: "right" });
-    doc.text(`$${subtotalUSD.toFixed(2)}`, margin + 145, y, { align: "right" });
-    doc.text(`Bs.${subtotalBs.toFixed(2)}`, colRight - 2, y, { align: "right" });
+    doc.text(`${SIM()}${item.precio.toFixed(2)}`, margin + 110, y, { align: "right" });
+    doc.text(`${SIM()}${subtotalUSD.toFixed(2)}`, modoEuro() ? colRight - 2 : margin + 145, y, { align: "right" });
+    if (!modoEuro()) doc.text(`Bs.${subtotalBs.toFixed(2)}`, colRight - 2, y, { align: "right" });
     y += 6;
     if (y > 240) {
       doc.addPage();
@@ -552,15 +635,17 @@ function generarNotaEntregaPDF(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(80, 80, 80);
-  doc.text("Subtotal USD:", totX, y);
-  doc.text(`$${venta.total.toFixed(2)}`, colRight - 2, y, { align: "right" });
+  doc.text(`Subtotal ${CODIGO()}:`, totX, y);
+  doc.text(`${SIM()}${venta.total.toFixed(2)}`, colRight - 2, y, { align: "right" });
   y += 5;
+  if (!modoEuro()) {
   doc.text(`Tasa BCV aplicada:`, totX, y);
   doc.text(`Bs.${tasaActivaBs.toFixed(2)}/USD`, colRight - 2, y, { align: "right" });
   y += 5;
   doc.text("Total en Bolívares:", totX, y);
   doc.text(`Bs.${totalBs.toFixed(2)}`, colRight - 2, y, { align: "right" });
   y += 5;
+  }
   if (tasaCop > 0) {
     doc.text("Equivalente COP:", totX, y);
     doc.text(`COP ${Math.round(totalCop).toLocaleString("en-US")}`, colRight - 2, y, { align: "right" });
@@ -574,7 +659,7 @@ function generarNotaEntregaPDF(
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(9);
   doc.text("TOTAL A PAGAR:", totX, y + 1);
-  doc.text(`$${venta.total.toFixed(2)} USD`, colRight - 2, y + 1, { align: "right" });
+  doc.text(`${SIM()}${venta.total.toFixed(2)} USD`, colRight - 2, y + 1, { align: "right" });
   y += 12;
 
   // ─── Detalle de Formas de Pago ─────────────────────────────────────
@@ -589,26 +674,26 @@ function generarNotaEntregaPDF(
   if (venta.pagosMixtos && venta.pagosMixtos.length > 0) {
     venta.pagosMixtos.forEach((p) => {
       const ref = p.referencia ? ` (Ref: ${p.referencia})` : "";
-      const montoFmt = p.moneda === "USD" ? `$${p.montoOriginal.toFixed(2)} USD` :
+      const montoFmt = p.moneda === "USD" ? `${SIM()}${p.montoOriginal.toFixed(2)} ${CODIGO()}` :
         p.moneda === "VES" ? `Bs.${p.montoOriginal.toFixed(2)}` :
         `COP ${Math.round(p.montoOriginal).toLocaleString("en-US")}`;
-      doc.text(`• ${p.metodo}${ref}: ${montoFmt} → $${p.montoUSD.toFixed(2)} USD`, margin + 3, y);
+      doc.text(`• ${p.metodo}${ref}: ${montoFmt} → ${SIM()}${p.montoUSD.toFixed(2)} ${CODIGO()}`, margin + 3, y);
       y += 5;
     });
   } else {
     const metLabel: Record<string,string> = {
-      EFECTIVO_USD: "Efectivo USD", EFECTIVO_BS: "Efectivo Bs.", PAGO_MOVIL: "Pago Móvil",
+      EFECTIVO_USD: `Efectivo ${CODIGO()}`, EFECTIVO_BS: "Efectivo Bs.", PAGO_MOVIL: "Pago Móvil",
       PUNTO_VENTA: "Punto Débito", ZELLE: "Zelle / USDT", COP_EFECTIVO: "Pesos COP",
       CREDITO_CUENTA: "Crédito (CXC)"
     };
-    doc.text(`• ${metLabel[venta.metodoPago] || venta.metodoPago}: $${venta.total.toFixed(2)} USD`, margin + 3, y);
+    doc.text(`• ${metLabel[venta.metodoPago] || venta.metodoPago}: ${SIM()}${venta.total.toFixed(2)} ${CODIGO()}`, margin + 3, y);
     y += 5;
   }
 
   if (venta.esCredito) {
     doc.setTextColor(180, 100, 0);
     doc.setFont("helvetica", "bold");
-    doc.text(`⚠ PENDIENTE CXC: $${venta.total.toFixed(2)} USD — Cliente: ${venta.cliente.nombre}`, margin, y);
+    doc.text(`⚠ PENDIENTE CXC: ${SIM()}${venta.total.toFixed(2)} USD — Cliente: ${venta.cliente.nombre}`, margin, y);
     doc.setTextColor(60, 60, 60);
     doc.setFont("helvetica", "normal");
     y += 6;
@@ -622,18 +707,47 @@ function generarNotaEntregaPDF(
   // ─── Leyenda SENIAT ────────────────────────────────────────────────
   // (El bloque de firmas "Entregado/Recibido Conforme" se quitó a pedido del
   // dueño — muchos comercios entregan la nota sin exigir firma física.)
+  // Si ES factura fiscal real (Formato Libre con N° Control asignado), NO se
+  // imprime el descargo "no constituye Factura Fiscal" — sería falso y
+  // contradictorio con el número de control que sí tiene.
   doc.setFontSize(6.5);
   doc.setTextColor(90, 90, 90);
   doc.setFont("helvetica", "italic");
-  const leyenda = "Documento no sujeto a retención ni constituye Factura Fiscal conforme a las normativas del SENIAT (Providencias 00071 y 0102). Comprobante para soporte de entrega, inventario y recepción de mercancía. Reclamos dentro de las 48 horas siguientes a la recepción.";
+  const leyenda = esFactura
+    ? "Factura elaborada bajo el régimen de Formato Libre autorizado por el SENIAT. Reclamos dentro de las 48 horas siguientes a la recepción."
+    : "Documento no sujeto a retención ni constituye Factura Fiscal conforme a las normativas del SENIAT (Providencias 00071 y 0102). Comprobante para soporte de entrega, inventario y recepción de mercancía. Reclamos dentro de las 48 horas siguientes a la recepción.";
   const lines = doc.splitTextToSize(leyenda, colRight - margin);
   doc.text(lines, margin, y);
 
   if (descargar) {
-    doc.save(`NotaEntrega_ND-${venta.numero}_${venta.cliente.nombre.replace(/\s+/g, "_")}.pdf`);
+    doc.save(`${esFactura ? "Factura_" + datosFiscales!.numeroControl : "NotaEntrega_ND-" + venta.numero}_${venta.cliente.nombre.replace(/\s+/g, "_")}.pdf`);
   }
   return doc;
 }
+
+/** Envoltorio async: reserva el siguiente N° de control fiscal SOLO si el negocio
+ * tiene Formato Libre activo (ver FacturacionFiscalComercio) — si no, genera la
+ * Nota de Entrega normal, exactamente como antes de que existiera esta función. */
+async function descargarNotaEntregaOFactura(venta: VentaComercio, nombreLocal: string, tasaActivaBs: number, tasaCop: number) {
+  try {
+    const [{ numeroControl }, datosFiscales] = await Promise.all([
+      siguienteNumeroControlFiscal(),
+      numeroControl_cache_datosFiscales ?? obtenerDatosFiscalesNegocio(),
+    ]);
+    numeroControl_cache_datosFiscales = datosFiscales;
+    if (numeroControl) {
+      generarNotaEntregaPDF(venta, nombreLocal, tasaActivaBs, tasaCop, true, { rif: datosFiscales.rif, razonSocial: datosFiscales.razonSocial, numeroControl });
+      return;
+    }
+  } catch {
+    // Si falla la reserva del número fiscal (ej. rango agotado), no se pierde la
+    // venta ni el comprobante — se degrada a Nota de Entrega normal.
+  }
+  generarNotaEntregaPDF(venta, nombreLocal, tasaActivaBs, tasaCop, true);
+}
+// Cache simple en memoria del módulo — los datos fiscales del negocio no cambian
+// mientras dura la sesión, evita pedirlos de nuevo en cada venta impresa.
+let numeroControl_cache_datosFiscales: DatosFiscalesNegocio | null = null;
 
 // ══════════════════════════════════════════════════════════════════════════
 // ENVÍO POR CORREO — mailto: 1-clic con adjunto de datos
@@ -653,15 +767,15 @@ function enviarNotaEntregaPorCorreo(
   const pagoStr = venta.pagosMixtos && venta.pagosMixtos.length > 0
     ? venta.pagosMixtos.map(p => {
         const ref = p.referencia ? ` (Ref: ${p.referencia})` : "";
-        const m = p.moneda === "USD" ? `$${p.montoOriginal.toFixed(2)} USD` :
+        const m = p.moneda === "USD" ? `${SIM()}${p.montoOriginal.toFixed(2)} ${CODIGO()}` :
           p.moneda === "VES" ? `Bs.${p.montoOriginal.toFixed(2)}` :
           `COP ${Math.round(p.montoOriginal).toLocaleString("en-US")}`;
-        return `  - ${p.metodo}${ref}: ${m} → $${p.montoUSD.toFixed(2)} USD`;
+        return `  - ${p.metodo}${ref}: ${m} → ${SIM()}${p.montoUSD.toFixed(2)} ${CODIGO()}`;
       }).join("\n")
-    : `  - ${venta.metodoPago}: $${venta.total.toFixed(2)} USD`;
+    : `  - ${venta.metodoPago}: ${SIM()}${venta.total.toFixed(2)} USD`;
 
   const lineasStr = venta.lineas.map(l =>
-    `  ${l.cantidad}x ${l.nombre} @ $${l.precio.toFixed(2)} = $${(l.precio * l.cantidad).toFixed(2)} USD`
+    `  ${l.cantidad}x ${l.nombre} @ ${SIM()}${l.precio.toFixed(2)} = ${SIM()}${(l.precio * l.cantidad).toFixed(2)} USD`
   ).join("\n");
 
   const cuerpo = encodeURIComponent(
@@ -679,8 +793,8 @@ PRODUCTOS:
 ${lineasStr}
 
 ──────────────────────────────────────
-TOTAL:          $${venta.total.toFixed(2)} USD
-En Bolívares:   Bs.${(venta.total * tasaActivaBs).toFixed(2)} (Tasa: ${tasaActivaBs.toFixed(2)})
+TOTAL:          ${SIM()}${venta.total.toFixed(2)} ${CODIGO()}
+${modoEuro() ? "" : `En Bolívares:   Bs.${(venta.total * tasaActivaBs).toFixed(2)} (Tasa: ${tasaActivaBs.toFixed(2)})`}
 ${tasaCop > 0 ? `En Pesos COP:   COP ${Math.round(venta.total * tasaCop).toLocaleString("en-US")}\n` : ""}
 FORMAS DE PAGO:
 ${pagoStr}
@@ -789,7 +903,7 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
         ${venta.lineas.map((l) => `
           <div class="item-row">
             <span style="flex: 1;">${l.cantidad}x ${l.nombre}</span>
-            <span class="right bold">$${(l.precio * l.cantidad).toFixed(2)}</span>
+            <span class="right bold">${SIM()}${(l.precio * l.cantidad).toFixed(2)}</span>
           </div>
           ${l.lote ? `<div class="item-sub">↳ Lote: ${l.lote} (Vence: ${l.fechaVencimiento || "N/A"})</div>` : ""}
           ${l.unidadMedida ? `<div class="item-sub">↳ Unidad: ${l.unidadMedida}</div>` : ""}
@@ -797,7 +911,7 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
         <div class="divider"></div>
         <div class="total-row">
           <span>TOTAL USD:</span>
-          <span>$${venta.total.toFixed(2)}</span>
+          <span>${SIM()}${venta.total.toFixed(2)}</span>
         </div>
         ${venta.totalBs ? `
           <div class="item-row bold">
@@ -808,7 +922,7 @@ function imprimirTicketComercio(venta: VentaComercio, nombreLocal: string, tasaA
         ${venta.totalCop ? `
           <div class="item-row">
             <span>TOTAL COP:</span>
-            <span>COP $${venta.totalCop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            <span>COP ${SIM()}${venta.totalCop.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
           </div>
         ` : ""}
         <div class="divider"></div>
@@ -1070,7 +1184,7 @@ function DashboardGeneralComercio({
   const fmtMonedas = (obj: Record<string, number>) => {
     const entradas = Object.entries(obj);
     if (entradas.length === 0) return "$0.00";
-    return entradas.map(([m, v]) => `${m === "USD" ? "$" : m + " "}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(" · ");
+    return entradas.map(([m, v]) => `${prefijoMoneda(m)}${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`).join(" · ");
   };
 
   // Utilidad real de HOY — no es lo mismo que ventas (ver conversación con el
@@ -1166,18 +1280,18 @@ function DashboardGeneralComercio({
 
                 {/* Total Consolidado */}
                 <div className="mt-2 font-['Outfit'] font-black text-3xl text-teal-700 dark:text-teal-400 tracking-tight">
-                  ${totalConsolidadoUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                  {SIM()}{totalConsolidadoUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
                   <span className="text-xs font-bold text-slate-400 font-sans uppercase">Vendido Hoy</span>
                 </div>
                 {cantidadVentasHoy > 0 && (
                   <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                    Ticket promedio: <span className="text-slate-700 dark:text-slate-200 font-mono">${(totalConsolidadoUSD / cantidadVentasHoy).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    Ticket promedio: <span className="text-slate-700 dark:text-slate-200 font-mono">{SIM()}{(totalConsolidadoUSD / cantidadVentasHoy).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
 
                 {/* Equivalencias oficiales — COP solo si el negocio configuró esa tasa;
                     mostrarla siempre a un negocio que nunca cobra en pesos es ruido puro. */}
-                <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap">
+                <div className={`flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap ${modoEuro() ? "hidden" : ""}`}>
                   <span>Equivalente:</span>
                   <span className="font-bold text-slate-700 dark:text-slate-200">
                     Bs. {totalConsolidadoBs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1186,7 +1300,7 @@ function DashboardGeneralComercio({
                     <>
                       <span>·</span>
                       <span className="font-bold text-slate-700 dark:text-slate-200">
-                        COP ${Math.round(totalConsolidadoCop).toLocaleString()}
+                        COP {SIM()}{Math.round(totalConsolidadoCop).toLocaleString()}
                       </span>
                     </>
                   )}
@@ -1203,20 +1317,20 @@ function DashboardGeneralComercio({
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                 Cobrado por moneda:
               </div>
-              <div className={`grid gap-2 ${tasaCop > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
-                {/* Dólares */}
+              <div className={`grid gap-2 ${modoEuro() ? "grid-cols-1" : tasaCop > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
+                {/* Dólares (o Euros en modo euro) */}
                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
                   <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">
-                    <span>Dólares</span>
-                    <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">$ USD</span>
+                    <span>{modoEuro() ? "Euros" : "Dólares"}</span>
+                    <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">{SIM()} {CODIGO()}</span>
                   </div>
                   <div className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400 truncate">
-                    ${cobradoUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {SIM()}{cobradoUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
-                {/* Bolívares */}
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+                {/* Bolívares (no existen en modo euro) */}
+                <div className={`p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 ${modoEuro() ? "hidden" : ""}`}>
                   <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold mb-0.5">
                     <span>Bolívares</span>
                     <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">Bs.</span>
@@ -1234,7 +1348,7 @@ function DashboardGeneralComercio({
                       <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">COP $</span>
                     </div>
                     <div className="font-mono font-black text-sm text-amber-600 dark:text-amber-400 truncate">
-                      COP ${Math.round(cobradoCop).toLocaleString()}
+                      COP {SIM()}{Math.round(cobradoCop).toLocaleString()}
                     </div>
                   </div>
                 )}
@@ -1253,7 +1367,7 @@ function DashboardGeneralComercio({
                   ) : utilidadHoy && utilidadHoy.ventasBrutas > 0 ? (
                     <>
                       <div className="font-['Outfit'] font-black text-xl text-emerald-700 dark:text-emerald-400 truncate">
-                        {utilidadHoy.moneda === "USD" ? "$" : utilidadHoy.moneda + " "}{utilidadHoy.utilidad.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {prefijoMoneda(utilidadHoy.moneda)}{utilidadHoy.utilidad.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                       {utilidadHoy.margenPct !== null && (
                         <div className="text-[10px] text-slate-400 truncate">{utilidadHoy.margenPct.toFixed(1)}% de margen{utilidadHoy.coberturaPct < 100 ? ` · ${utilidadHoy.coberturaPct.toFixed(0)}% con costo conocido` : ""}</div>
@@ -1341,7 +1455,7 @@ function DashboardGeneralComercio({
               return (
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <div className="font-['Outfit'] font-black text-2xl text-teal-600 dark:text-teal-400 truncate">
-                    {primero ? `${primero[0] === "USD" ? "$" : primero[0] + " "}${primero[1].toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}
+                    {primero ? `${prefijoMoneda(primero[0])}${primero[1].toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}
                   </div>
                   {resto.length > 0 && (
                     <div className="flex items-baseline gap-3 pl-3 border-l-2 border-slate-200 dark:border-slate-700">
@@ -1439,8 +1553,8 @@ function DashboardGeneralComercio({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <div className="text-right">
-                        <div className="font-['Outfit'] font-black text-sm text-teal-600 dark:text-teal-400">${v.total.toFixed(2)}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">Bs. {v.totalBs.toFixed(2)}</div>
+                        <div className="font-['Outfit'] font-black text-sm text-teal-600 dark:text-teal-400">{SIM()}{v.total.toFixed(2)}</div>
+                        <div className={`text-[10px] text-slate-400 font-mono ${modoEuro() ? "hidden" : ""}`}>Bs. {v.totalBs.toFixed(2)}</div>
                       </div>
                       <IconChevronRight size={13} className={`text-slate-400 transition-transform ${abierta ? "rotate-90" : ""}`} />
                     </div>
@@ -1453,7 +1567,7 @@ function DashboardGeneralComercio({
                         {v.lineas.map((linea, idx) => (
                           <div key={idx} className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300">
                             <span className="truncate">{linea.cantidad}x {linea.nombre}</span>
-                            <span className="font-mono flex-shrink-0 ml-2">${(linea.precio * linea.cantidad).toFixed(2)}</span>
+                            <span className="font-mono flex-shrink-0 ml-2">{SIM()}{(linea.precio * linea.cantidad).toFixed(2)}</span>
                           </div>
                         ))}
                       </div>
@@ -1464,7 +1578,7 @@ function DashboardGeneralComercio({
                           {v.pagosMixtos.map((p, idx) => (
                             <div key={idx} className="flex items-center justify-between text-xs text-slate-700 dark:text-slate-300">
                               <span>{p.metodo}{p.referencia ? ` (Ref: ${p.referencia})` : ""}</span>
-                              <span className="font-mono">${p.montoUSD.toFixed(2)}</span>
+                              <span className="font-mono">{SIM()}{p.montoUSD.toFixed(2)}</span>
                             </div>
                           ))}
                         </div>
@@ -1475,7 +1589,7 @@ function DashboardGeneralComercio({
                           {v.cliente?.documento && v.cliente.documento !== "-" ? `C.I./RIF: ${v.cliente.documento}` : "Sin documento registrado"}
                         </span>
                         {v.utilidad != null && (
-                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Utilidad: ${v.utilidad.toFixed(2)}</span>
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Utilidad: {SIM()}{v.utilidad.toFixed(2)}</span>
                         )}
                       </div>
 
@@ -1530,7 +1644,7 @@ function DashboardGeneralComercio({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <div className="font-['Outfit'] font-black text-sm text-teal-600 dark:text-teal-400">
-                        {m.moneda === "USD" ? "$" : m.moneda + " "}{Number(m.monto).toFixed(2)}
+                        {prefijoMoneda(m.moneda)}{Number(m.monto).toFixed(2)}
                       </div>
                       <IconChevronRight size={13} className={`text-slate-400 transition-transform ${abierta ? "rotate-90" : ""}`} />
                     </div>
@@ -1638,7 +1752,7 @@ function DashboardGeneralComercio({
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className="text-xs font-mono font-bold text-slate-900 dark:text-white">
-                      {c.moneda === "USD" ? "$" : c.moneda + " "}{c.saldoPendiente.toFixed(2)}
+                      {prefijoMoneda(c.moneda)}{c.saldoPendiente.toFixed(2)}
                     </div>
                     <div className={`text-[10px] font-bold ${vencida ? "text-rose-600 dark:text-rose-400" : dias != null ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
                       {dias == null ? "Sin fecha" : vencida ? `Vencida (${Math.abs(dias)}d)` : dias === 0 ? "Vence hoy" : `Vence en ${dias}d`}
@@ -1802,21 +1916,35 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   const [origenTasaActiva, setOrigenTasaActiva] = useState<OrigenTasaActiva | null>(null);
   const [tasaVes, setTasaVes] = useState<TasaCambio | null>(null);
   const [tasaCopReal, setTasaCopReal] = useState<TasaCambio | null>(null);
+
+  // Moneda base del negocio: "USD" (por defecto) o "EUR" (modo euro: solo euros, sin tasas).
+  const [monedaBase, setMonedaBase] = useState<string>(() => monedaBaseGuardada());
+  const esEuro = monedaBase === "EUR";
+  MONEDA_BASE = monedaBase; // antes de dibujar cualquier hijo: ver la convención arriba
   useEffect(() => {
     if (!user?.tenantId) return;
+    obtenerMonedaBaseNegocio().then((r) => { const b = r.monedaBase || "USD"; if (b !== monedaBaseGuardada()) { fijarMonedaBaseApi(b); window.location.reload(); return; } setMonedaBase(b); }).catch(() => setMonedaBase("USD"));
+  }, [user?.tenantId]);
+
+  useEffect(() => {
+    if (!user?.tenantId || esEuro) return;
     obtenerOrigenTasaActiva().then((r) => setOrigenTasaActiva(r.origenTasaActiva)).catch(() => setOrigenTasaActiva("USDT"));
     tasaVigente(user.tenantId, "USD", "COP").then(setTasaCopReal).catch(() => setTasaCopReal(null));
-  }, [user?.tenantId]);
+  }, [user?.tenantId, esEuro]);
   useEffect(() => {
-    if (!user?.tenantId || !origenTasaActiva) return;
+    if (!user?.tenantId || !origenTasaActiva || esEuro) return;
     tasaVigente(user.tenantId, "USD", "VES", origenTasaActiva).then(setTasaVes).catch(() => setTasaVes(null));
-  }, [user?.tenantId, origenTasaActiva]);
+  }, [user?.tenantId, origenTasaActiva, esEuro]);
 
-  const tasaActivaBs = tasaVes ? Number(tasaVes.tasa) : 0;
-  const tasaCop = tasaCopReal ? Number(tasaCopReal.tasa) : 0;
+  // En modo euro no existen tasas: en cero, todo lo que dependa de ellas (Bs, COP) queda apagado.
+  const tasaActivaBs = !esEuro && tasaVes ? Number(tasaVes.tasa) : 0;
+  const tasaCop = !esEuro && tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "cierre" | "auditoria">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "cierre" | "auditoria" | "configuracion">("general");
+  // Configuración es una pantalla con secciones (antes era un modal llamado "Catálogo Online & QR"
+  // donde además vivían pagos y perfil de tienda, imposible de adivinar por su nombre).
+  const [seccionConfig, setSeccionConfig] = useState<SeccionConfiguracion>("tienda");
   // Submódulos dentro de "Administración" — antes CXC/CXP e Ingresos&Gastos eran dos
   // entradas separadas en el sidebar; se agrupan porque ambas son la misma función de
   // negocio (control administrativo del dinero), no dos cosas distintas.
@@ -1844,7 +1972,6 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // móvil ahora vive fuera de flujo (fixed) y entra/sale con un botón
   // hamburguesa; en desktop (lg:) sigue fijo en el layout como siempre.
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
-  const [modalQrVisible, setModalQrVisible] = useState(false);
   const [modalIaVisible, setModalIaVisible] = useState(false);
 
   // Estado del Catálogo y Clientes
@@ -2034,6 +2161,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   const [categoriaEnEdicion, setCategoriaEnEdicion] = useState("");
   const [editarTab, setEditarTab] = useState<"datos" | "catalogo">("datos");
   const [ajustarStockModalItem, setAjustarStockModalItem] = useState<ProductoComercio | null>(null);
+  const [almacenModalItem, setAlmacenModalItem] = useState<ProductoComercio | null>(null);
   const [guardandoAjuste, setGuardandoAjuste] = useState(false);
   const [comprasRepuesto, setComprasRepuesto] = useState<CompraRepuesto[] | null>(null);
   const [cargandoCompras, setCargandoCompras] = useState(false);
@@ -2047,11 +2175,119 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     setTimeout(() => setToast(null), 4000);
   };
 
+  // ── Clientes y ventas: el servidor es la fuente de verdad ──────────────────
+  // Antes vivían solo en el localStorage del navegador: abrir el sistema desde otro
+  // equipo, o limpiar datos, borraba el historial y los saldos de crédito. Al entrar:
+  // (1) se sube UNA vez lo que este navegador tenía y el servidor no (idempotente por
+  // número de venta / documento), (2) el servidor pasa a mandar. Si el servidor no
+  // responde, se sigue con lo local y se avisa — nunca se finge que quedó guardado.
+  const [sincronizacionListo, setSincronizacionListo] = useState(false);
+  const clientesSincronizados = useRef<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    const tenantId = user.tenantId;
+    let cancelado = false;
+    const leerLocal = <T,>(clave: string): T[] => {
+      try { const g = localStorage.getItem(clave); return g ? (JSON.parse(g) as T[]) : []; } catch { return []; }
+    };
+    (async () => {
+      try {
+        const [clientesSrv, ventasSrv] = await Promise.all([listarClientes(tenantId), listarVentasMostrador(tenantId)]);
+        let clientesFinal = clientesSrv;
+        let ventasFinal = ventasSrv;
+
+        // El caché local no está separado por negocio: solo se migra si es de este mismo tenant
+        // (o si nunca se marcó dueño, que es el caso de los datos anteriores a este cambio).
+        const dueno = localStorage.getItem("aurora_comercio_owner");
+        if (!dueno || dueno === String(tenantId)) {
+          const numerosDemo = new Set(VENTAS_INICIALES.map((v) => v.numero));
+          const pendientes = leerLocal<VentaComercio>("aurora_comercio_ventas")
+            .filter((v) => v.numero && !numerosDemo.has(v.numero) && !ventasSrv.some((s) => s.numero === v.numero));
+          if (pendientes.length > 0) {
+            await guardarVentasMostradorLote(tenantId, pendientes.map(ventaARequest));
+            ventasFinal = await listarVentasMostrador(tenantId);
+          }
+
+          const documentosDemo = new Set(CLIENTES_INICIALES.map((c) => c.documento.toUpperCase()));
+          let creoClientes = false;
+          for (const c of leerLocal<ClienteComercio>("aurora_comercio_clientes")) {
+            const doc = (c.documento || "").toUpperCase();
+            if (c.id === "c-1" || documentosDemo.has(doc)) continue;
+            if (clientesSrv.some((s) => (s.identificacionRif || "").toUpperCase() === doc && doc !== "")) continue;
+            await crearCliente(tenantId, datosClienteParaServidor(c));
+            creoClientes = true;
+          }
+          if (creoClientes) clientesFinal = await listarClientes(tenantId);
+          localStorage.setItem("aurora_comercio_owner", String(tenantId));
+        }
+        if (cancelado) return;
+
+        const consumidorFinal = CLIENTES_INICIALES.find((c) => c.id === "c-1") || CLIENTES_INICIALES[0];
+        const listaClientes = [consumidorFinal, ...clientesFinal.map(clienteDesdeServidor)];
+        clientesSincronizados.current = new Map(listaClientes.filter((c) => c.id !== "c-1").map((c) => [c.id, firmaCliente(c)]));
+        const listaVentas: VentaComercio[] = [];
+        for (const v of ventasFinal) {
+          try { listaVentas.push(JSON.parse(v.detalleJson) as VentaComercio); } catch { /* detalle ilegible: se omite esa venta */ }
+        }
+        setClientes(listaClientes);
+        setVentas(listaVentas);
+        try {
+          localStorage.setItem("aurora_comercio_clientes", JSON.stringify(listaClientes));
+          localStorage.setItem("aurora_comercio_ventas", JSON.stringify(listaVentas));
+        } catch { /* caché lleno: no afecta al servidor */ }
+        setSincronizacionListo(true);
+      } catch (err) {
+        console.warn("No se pudo sincronizar clientes/ventas con el servidor:", err);
+        if (!cancelado) mostrarToast("No se pudo conectar con el servidor para cargar clientes y ventas. Se muestra lo guardado en este equipo.", "error");
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [user?.tenantId]);
+
+  // Cualquier cambio en un cliente (nuevo, saldo tras una venta a crédito, abono, cobro)
+  // se envía al servidor aquí, en un solo lugar, en vez de en cada sitio que lo modifica.
+  useEffect(() => {
+    if (!user?.tenantId || !sincronizacionListo) return;
+    const tenantId = user.tenantId;
+    for (const c of clientes) {
+      if (c.id === "c-1") continue;
+      const firma = firmaCliente(c);
+      if (clientesSincronizados.current.get(c.id) === firma) continue;
+      clientesSincronizados.current.set(c.id, firma);
+      const operacion = c.backendId
+        ? editarCliente(tenantId, c.backendId, datosClienteParaServidor(c))
+        : crearCliente(tenantId, datosClienteParaServidor(c));
+      operacion
+        .then((guardado) => {
+          if (!c.backendId) setClientes((prev) => prev.map((x) => (x.id === c.id ? { ...x, backendId: guardado.id } : x)));
+        })
+        .catch((err) => {
+          clientesSincronizados.current.delete(c.id); // se reintenta con el próximo cambio
+          mostrarToast(`No se pudo guardar al cliente "${c.nombre}" en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`, "error");
+        });
+    }
+  }, [clientes, sincronizacionListo]);
+
   const cargarRepuestosBackend = async () => {
     if (!user?.tenantId) return;
     setCargandoBackend(true);
     try {
       const items = await listarRepuestos();
+      // Ubicación física real (pasillo/estante) por almacén — antes era un texto fijo
+      // "Almacén Central" que no reflejaba nada. Si falla, el inventario carga igual.
+      const [almacenesData, ubicacionesData] = await Promise.all([
+        listarAlmacenes(user.tenantId).catch(() => [] as Almacen[]),
+        listarUbicacionesAlmacen(user.tenantId).catch(() => [] as StockAlmacen[]),
+      ]);
+      const nombreAlmacen = new Map(almacenesData.map((a) => [a.id, a.nombre]));
+      const ubicacionPorRepuesto = new Map<number, string>();
+      for (const u of ubicacionesData) {
+        if (!u.ubicacion) continue;
+        const texto = `${nombreAlmacen.get(u.almacenId) || "Almacén"}: ${u.ubicacion}`;
+        const previo = ubicacionPorRepuesto.get(u.repuestoId);
+        ubicacionPorRepuesto.set(u.repuestoId, previo ? `${previo} · ${texto}` : texto);
+      }
       if (items && items.length > 0) {
         const itemsTenant = items.filter((r) => r.tenantId === user.tenantId);
         if (itemsTenant.length > 0) {
@@ -2071,7 +2307,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             codigoParte: r.codigoOriginalOem || undefined,
             precioMayorista: r.precioMayorista || undefined,
             cantidadMinimaMayorista: r.cantidadMinimaMayorista || undefined,
-            ubicacion: "Almacén Central",
+            ubicacion: ubicacionPorRepuesto.get(r.id),
             visible: r.visible !== false,
             ordenVisualizacion: r.ordenVisualizacion ?? 0,
             descripcionLarga: r.descripcionLarga || undefined,
@@ -2254,6 +2490,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
         p.nombre.toLowerCase().includes(b) ||
         p.codigo.toLowerCase().includes(b) ||
         (p.principioActivo && p.principioActivo.toLowerCase().includes(b)) ||
+        (p.ubicacion && p.ubicacion.toLowerCase().includes(b)) ||
         (p.codigoParte && p.codigoParte.toLowerCase().includes(b)) ||
         (p.lote && p.lote.toLowerCase().includes(b));
 
@@ -2439,15 +2676,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
           fechaRegistro: new Date().toISOString().split("T")[0],
         };
         clienteParaVenta = nuevoCliente;
-
-        // Sincronizar en CRM de backend si hay tenant activo
-        if (user?.tenantId) {
-          crearCliente(user.tenantId, {
-            nombre: nuevoCliente.nombre,
-            identificacionRif: nuevoCliente.documento,
-            telefono: nuevoCliente.telefono !== "-" ? nuevoCliente.telefono : undefined,
-          }).catch((err) => console.warn("Auto-registro en backend diferido:", err));
-        }
+        // El alta en el servidor la hace la sincronización de clientes (ver el efecto que
+        // observa `clientes`) una vez que la venta se confirma — no antes.
       }
     } else if (esCredito && clienteParaVenta.id === "c-1") {
       // Si por alguna razón forzó crédito sin datos, crear ficha de crédito
@@ -2489,15 +2719,6 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       emailCliente: emailClienteModal.trim() || undefined,
     };
 
-    // Registrar en el histórico persistente de ventas
-    setVentas((prev) => {
-      const updated = [nuevaVenta, ...prev];
-      try {
-        localStorage.setItem("aurora_comercio_ventas", JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-
     // Registrar en backend Spring Boot para Ferretería & Retail si hay tenant activo.
     // REGLA DE ORO: el inventario real vive en el backend (con bloqueo pesimista contra
     // sobreventa concurrente, ver RepuestoConversionService). Si el backend RECHAZA la
@@ -2537,7 +2758,25 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     }
 
     // Llegar aquí significa que el backend confirmó la venta (o no hay tenant activo,
-    // ej. modo demo) — recién ahora es seguro descontar el stock mostrado localmente.
+    // ej. modo demo). Recién ahora la venta entra al historial — antes se agregaba
+    // ANTES de la confirmación, así que una venta rechazada (ej. stock insuficiente)
+    // quedaba en el historial como si se hubiera hecho.
+    setVentas((prev) => {
+      const updated = [nuevaVenta, ...prev];
+      try {
+        localStorage.setItem("aurora_comercio_ventas", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    if (user?.tenantId) {
+      guardarVentaMostrador(user.tenantId, ventaARequest(nuevaVenta)).catch((err) => {
+        // El cobro y el inventario ya quedaron bien; solo falta el detalle. Queda en este equipo
+        // y se sube solo la próxima vez que se abra el sistema (ver la migración al cargar).
+        mostrarToast(`La venta se cobró, pero su detalle no se pudo guardar en el servidor (${err instanceof Error ? err.message : "error"}). Se reintentará al recargar.`, "error");
+      });
+    }
+
+    // Descontar el stock mostrado localmente.
     setProductos((prev) =>
       prev.map((prod) => {
         const items = carrito.filter((c) => c.productoId === prod.id);
@@ -2590,7 +2829,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     // arriba (RepuestoConversionService.registrarCobroVenta) — cargarCuentas() más abajo
     // refresca la lista desde ahí, no hace falta fabricarla localmente.
     if (esCredito) {
-      mostrarToast(`Venta a crédito cargada a Cuentas por Cobrar (CXC) de ${clienteParaVenta.nombre} por $${totalUSD.toFixed(2)}`, "success");
+      mostrarToast(`Venta a crédito cargada a Cuentas por Cobrar (CXC) de ${clienteParaVenta.nombre} por ${SIM()}${totalUSD.toFixed(2)}`, "success");
       if (user?.tenantId) cargarCuentas();
     }
 
@@ -2619,11 +2858,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       Fecha: ${new Date().toLocaleDateString()} · Validez: 5 días continuos
       Cliente: ${clienteSel.nombre} (${clienteSel.documento})
       ═══════════════════════════════════════════════════════════════════
-      ${carrito.map((l) => `${l.cantidad}x ${l.nombre} | Unit: $${l.precio.toFixed(2)} | Subtotal: $${(l.precio * l.cantidad).toFixed(2)}`).join("\n      ")}
+      ${carrito.map((l) => `${l.cantidad}x ${l.nombre} | Unit: ${SIM()}${l.precio.toFixed(2)} | Subtotal: ${SIM()}${(l.precio * l.cantidad).toFixed(2)}`).join("\n      ")}
       ═══════════════════════════════════════════════════════════════════
-      TOTAL REF. USD:  $${totalUSD.toFixed(2)}
+      TOTAL${modoEuro() ? "" : " REF. USD"}:  ${SIM()}${totalUSD.toFixed(2)}${modoEuro() ? "" : `
       TOTAL BOLÍVARES: Bs. ${totalBs.toFixed(2)} (Tasa: ${tasaActivaBs.toFixed(2)})
-      TOTAL COP:       COP $${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+      TOTAL COP:       COP ${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
       ═══════════════════════════════════════════════════════════════════
       * Precios sujetos a cambio tras vencimiento de la cotización.
     `;
@@ -2792,9 +3031,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   <div className="pt-3 mt-3 border-t border-slate-100">
           <button
             type="button"
-            title="Tienda, pagos y catálogo digital público con código QR"
-            onClick={() => { setModalQrVisible(true); setSidebarAbierto(false); }}
-            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+            title="Mi tienda, catálogo y QR, métodos de pago, facturación fiscal y equipo"
+            onClick={() => { setTab("configuracion"); setSidebarAbierto(false); }}
+            className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer transition-colors ${tab === "configuracion" ? "bg-teal-50/80 text-teal-900" : "text-slate-800 hover:bg-slate-50 hover:text-slate-900"}`}
           >
             <IconSettings size={16} />
             <span className="flex-1 text-left">Configuración</span>
@@ -2865,7 +3104,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
           </div>
 
           <div className="flex items-center gap-2.5 flex-shrink-0">
-            {user?.tenantId && (
+            {user?.tenantId && !esEuro && (
               <TasaBadgeComercio
                 tenantId={user.tenantId}
                 origenTasaActiva={origenTasaActiva}
@@ -2996,7 +3235,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         )}
                         {p.precioMayorista && p.cantidadMinimaMayorista && (
                           <div className="text-[9px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 truncate">
-                            ️ Mayoreo: ${p.precioMayorista.toFixed(2)} (≥{p.cantidadMinimaMayorista} {p.unidadMedida || "u"})
+                            ️ Mayoreo: {SIM()}{p.precioMayorista.toFixed(2)} (≥{p.cantidadMinimaMayorista} {p.unidadMedida || "u"})
                           </div>
                         )}
                         {p.lote && (
@@ -3014,9 +3253,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       <div className="mt-3 pt-2 border-t border-slate-300/60 dark:border-slate-700/40 flex items-baseline justify-between">
                         <div>
                           <div className="font-mono font-black text-sm text-teal-400">
-                            ${p.precio.toFixed(2)}
+                            {SIM()}{p.precio.toFixed(2)}
                           </div>
-                          <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                          <div className={`text-[10px] font-mono text-slate-500 dark:text-slate-400 ${modoEuro() ? "hidden" : ""}`}>
                             ≈ Bs. {(p.precio * tasaActivaBs).toFixed(2)}
                           </div>
                         </div>
@@ -3151,7 +3390,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   {clienteSel.saldoPendiente > 0 && (
                     <div className="text-right">
                       <span className="text-[9px] text-amber-500 dark:text-amber-400 font-bold">
-                        Deuda: <span className="font-mono text-xs font-black text-amber-600 dark:text-amber-300">${clienteSel.saldoPendiente.toFixed(2)}</span>
+                        Deuda: <span className="font-mono text-xs font-black text-amber-600 dark:text-amber-300">{SIM()}{clienteSel.saldoPendiente.toFixed(2)}</span>
                       </span>
                     </div>
                   )}
@@ -3182,7 +3421,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                               )}
                             </div>
                             <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                              ${l.precio.toFixed(2)} c/u {l.esMayorista && <span className="text-emerald-400 font-semibold">(Escala Mayor)</span>}
+                              {SIM()}{l.precio.toFixed(2)} c/u {l.esMayorista && <span className="text-emerald-400 font-semibold">(Escala Mayor)</span>}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -3197,7 +3436,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 pt-0.5">
                           {l.lote && <span className="font-mono text-emerald-400">Lote: {l.lote}</span>}
                           {l.unidadMedida && <span>Unidad: {l.unidadMedida}</span>}
-                          <span className="font-mono font-bold text-slate-900 dark:text-white ml-auto">${(l.precio * l.cantidad).toFixed(2)}</span>
+                          <span className="font-mono font-bold text-slate-900 dark:text-white ml-auto">{SIM()}{(l.precio * l.cantidad).toFixed(2)}</span>
                         </div>
                       </div>
                     );
@@ -3209,16 +3448,16 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
               <div className="flex-shrink-0 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="space-y-1 bg-slate-100/60 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-300/60 dark:border-slate-700/40">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">TOTAL USD:</span>
-                    <span className="font-mono font-black text-xl text-teal-400">${totalUSD.toFixed(2)}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">TOTAL {CODIGO()}:</span>
+                    <span className="font-mono font-black text-xl text-teal-400">{SIM()}{totalUSD.toFixed(2)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs font-mono">
+                  <div className={`flex items-center justify-between text-xs font-mono ${modoEuro() ? "hidden" : ""}`}>
                     <span className="text-slate-500 dark:text-slate-400">Total Bolívares (Bs):</span>
                     <span className="text-slate-800 dark:text-slate-200 font-bold">Bs. {totalBs.toFixed(2)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs font-mono">
+                  <div className={`flex items-center justify-between text-xs font-mono ${modoEuro() ? "hidden" : ""}`}>
                     <span className="text-slate-500 dark:text-slate-400">Total Pesos (COP):</span>
-                    <span className="text-slate-600 dark:text-slate-300 font-bold">COP ${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+                    <span className="text-slate-600 dark:text-slate-300 font-bold">COP {SIM()}{totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
                   </div>
                 </div>
 
@@ -3262,7 +3501,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   disabled={carrito.length === 0}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-400 text-slate-950 font-black text-sm cursor-pointer hover:opacity-95 disabled:opacity-40 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all flex items-center justify-center gap-2"
                 >
-                  <span> Cobrar en Mostrador (${totalUSD.toFixed(2)})</span>
+                  <span> Cobrar en Mostrador ({SIM()}{totalUSD.toFixed(2)})</span>
                   <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-950/25 text-[10px] font-mono text-slate-950 font-black">
                     F4
                   </kbd>
@@ -3427,8 +3666,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     {esComercio && <th className="p-3">Escala Mayorista</th>}
                     <th className="p-3 text-right">Stock</th>
                     {esComercio && <th className="p-3 text-right">Último Costo</th>}
-                    <th className="p-3 text-right">Precio USD</th>
-                    <th className="p-3 text-right">Precio Bs</th>
+                    <th className="p-3 text-right">Precio {CODIGO()}</th>
+                    <th className={`p-3 text-right ${modoEuro() ? "hidden" : ""}`}>Precio Bs</th>
                     {esComercio && <th className="p-3 text-right">Margen</th>}
                     {esComercio && <th className="p-3 text-center">Gestión</th>}
                   </tr>
@@ -3451,11 +3690,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       <td className="p-3 font-sans text-slate-500 dark:text-slate-400">{p.categoria}</td>
                       {esFarmacia && <td className="p-3 text-emerald-400">{p.principioActivo || "—"}</td>}
                       {esFarmacia && <td className="p-3 text-slate-600 dark:text-slate-300">{p.lote || "—"} ({p.fechaVencimiento || "—"})</td>}
-                      {esComercio && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Almacén"}</td>}
+                      {esComercio && <td className="p-3 text-slate-600 dark:text-slate-300">{p.unidadMedida || "Pza"} · {p.ubicacion || "Sin ubicación"}</td>}
                       {esComercio && (
                         <td className="p-3 text-emerald-400 text-xs">
                           {p.precioMayorista && p.cantidadMinimaMayorista
-                            ? `$${p.precioMayorista.toFixed(2)} (≥${p.cantidadMinimaMayorista} ${p.unidadMedida || 'u'})`
+                            ? `${SIM()}${p.precioMayorista.toFixed(2)} (≥${p.cantidadMinimaMayorista} ${p.unidadMedida || 'u'})`
                             : "—"}
                         </td>
                       )}
@@ -3464,11 +3703,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       </td>
                       {esComercio && (
                         <td className="p-3 text-right text-slate-500 dark:text-slate-400 font-mono">
-                          ${p.costo.toFixed(2)}
+                          {SIM()}{p.costo.toFixed(2)}
                         </td>
                       )}
-                      <td className="p-3 text-right font-bold text-slate-900 dark:text-white">${p.precio.toFixed(2)}</td>
-                      <td className="p-3 text-right text-slate-600 dark:text-slate-300">Bs. {(p.precio * tasaActivaBs).toFixed(2)}</td>
+                      <td className="p-3 text-right font-bold text-slate-900 dark:text-white">{SIM()}{p.precio.toFixed(2)}</td>
+                      <td className={`p-3 text-right text-slate-600 dark:text-slate-300 ${modoEuro() ? "hidden" : ""}`}>Bs. {(p.precio * tasaActivaBs).toFixed(2)}</td>
                       {esComercio && (
                         <td className="p-3 text-right">
                           {p.costo > 0 ? (() => {
@@ -3480,7 +3719,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                                 ? "text-amber-400"
                                 : "text-emerald-400";
                             return (
-                              <span className={`font-bold ${color}`} title={`+$${margenUnit.toFixed(2)} por unidad sobre el último costo`}>
+                              <span className={`font-bold ${color}`} title={`+${SIM()}${margenUnit.toFixed(2)} por unidad sobre el último costo`}>
                                 {margenPct >= 0 ? "+" : ""}{margenPct.toFixed(1)}%
                               </span>
                             );
@@ -3504,6 +3743,14 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                             title="Gestionar presentaciones fraccionadas (Cajas, Metros, etc.)"
                           >
                             ️ Presentaciones
+                          </button>
+                          <button
+                            onClick={() => setAlmacenModalItem(p)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-indigo-400 font-bold border border-slate-300 dark:border-slate-700 cursor-pointer shadow-sm"
+                            title="Ver en qué almacén está el stock y trasladar entre ubicaciones"
+                            disabled={!p.backendId}
+                          >
+                            Almacenes
                           </button>
                           <button
                             onClick={() => setAjustarStockModalItem(p)}
@@ -3584,7 +3831,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                             <td className="p-2.5 text-[11px] text-slate-500 dark:text-slate-400">{new Date(c.fechaCompra).toLocaleDateString()}</td>
                             <td className="p-2.5 font-sans font-bold text-slate-900 dark:text-white">{c.proveedor?.nombre || "—"}</td>
                             <td className="p-2.5">{c.numeroFactura || "—"}</td>
-                            <td className="p-2.5 text-right font-bold text-teal-500 dark:text-teal-400">${c.total.toFixed(2)}</td>
+                            <td className="p-2.5 text-right font-bold text-teal-500 dark:text-teal-400">{SIM()}{c.total.toFixed(2)}</td>
                             <td className="p-2.5 text-right text-slate-500 dark:text-slate-400">{c.items?.length ?? "—"}</td>
                           </tr>
                         ))}
@@ -3647,6 +3894,10 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     })
                     .map((p) => {
                       const comprasDeEste = (comprasRepuesto || []).filter((c) => c.proveedor?.id === p.id);
+                      const totalCompradoEste = comprasDeEste.reduce((acc, c) => acc + (c.total || 0), 0);
+                      const ultimaCompraEste = comprasDeEste.length > 0
+                        ? [...comprasDeEste].sort((a, b) => new Date(b.fechaCompra).getTime() - new Date(a.fechaCompra).getTime())[0]
+                        : null;
                       return (
                         <button
                           key={p.id}
@@ -3663,6 +3914,18 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                           </div>
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{p.rif || "Sin RIF registrado"}</div>
                           <div className="text-[11px] text-slate-500 dark:text-slate-400">{p.contacto || "—"} {p.telefono ? `· ${p.telefono}` : ""}</div>
+                          {comprasDeEste.length > 0 && (
+                            <div className="grid grid-cols-2 gap-2 text-[10px] pt-1">
+                              <div>
+                                <span className="text-slate-400 dark:text-slate-500 block">Comprado</span>
+                                <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{SIM()}{totalCompradoEste.toFixed(2)}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 dark:text-slate-500 block">Última compra</span>
+                                <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{ultimaCompraEste ? new Date(ultimaCompraEste.fechaCompra).toLocaleDateString("es-VE") : "—"}</span>
+                              </div>
+                            </div>
+                          )}
                           <div className="pt-1.5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-[10px]">
                             <span className="text-slate-400 dark:text-slate-500">{comprasDeEste.length} compra{comprasDeEste.length === 1 ? "" : "s"} registrada{comprasDeEste.length === 1 ? "" : "s"}</span>
                             <span className="text-cyan-600 dark:text-cyan-400 font-bold">Ver ficha →</span>
@@ -3693,6 +3956,17 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
           const totalCarteraCobrar = clientes.reduce((s, c) => s + (c.saldoPendiente || 0), 0);
           const clientesConDeuda = clientes.filter((c) => c.saldoPendiente > 0).length;
 
+          // Activo = compró en los últimos 30 días — mismo criterio que la ficha
+          // individual de cada cliente, calculado una sola vez acá para las tarjetas
+          // globales de arriba.
+          const clientesActivosCount = clientes.filter((c) => {
+            const compras = ventas.filter((v) => v.cliente.id === c.id || (v.cliente.documento && c.documento && v.cliente.documento.toUpperCase() === c.documento.toUpperCase()));
+            if (compras.length === 0) return false;
+            const f = new Date(compras[0].fecha);
+            if (isNaN(f.getTime())) return true;
+            return Math.floor((Date.now() - f.getTime()) / 86400000) <= 30;
+          }).length;
+
           return (
             <div className="flex-1 bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 flex flex-col space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3717,7 +3991,17 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
               </div>
 
               {/* Métricas Globales de Cartera y CRM */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase block">Clientes Activos</span>
+                  <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">{clientesActivosCount}</span>
+                  <span className="text-[9px] text-emerald-600/70 dark:text-emerald-400/70 block mt-0.5">Compraron en 30 días</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Clientes Inactivos</span>
+                  <span className="text-lg font-black text-slate-500 dark:text-slate-400">{clientes.length - clientesActivosCount}</span>
+                  <span className="text-[9px] text-slate-400 block mt-0.5">Sin compras en 30 días</span>
+                </div>
                 <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
                   <span className="text-[10px] text-slate-500 font-bold uppercase block">Clientes Registrados</span>
                   <span className="text-lg font-black text-slate-900 dark:text-white">{clientes.length}</span>
@@ -3730,8 +4014,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 </div>
                 <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
                   <span className="text-[10px] text-slate-500 font-bold uppercase block">Cartera por Cobrar</span>
-                  <span className="text-lg font-black text-amber-500 dark:text-amber-400">${totalCarteraCobrar.toFixed(2)}</span>
-                  <span className="text-[9px] text-slate-400 block mt-0.5">Bs. {(totalCarteraCobrar * tasaActivaBs).toFixed(2)}</span>
+                  <span className="text-lg font-black text-amber-500 dark:text-amber-400">{SIM()}{totalCarteraCobrar.toFixed(2)}</span>
+                  <span className={`text-[9px] text-slate-400 block mt-0.5 ${modoEuro() ? "hidden" : ""}`}>Bs. {(totalCarteraCobrar * tasaActivaBs).toFixed(2)}</span>
                 </div>
                 <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50">
                   <span className="text-[10px] text-slate-500 font-bold uppercase block">Clientes con Crédito</span>
@@ -3751,6 +4035,25 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   const totalCompradoUSD = compras.reduce((acc, v) => acc + (v.total || 0), 0);
                   const utilidadTotal = compras.reduce((acc, v) => acc + (v.utilidad || 0), 0);
                   const ultimaVenta = compras[0];
+                  const ticketPromedio = compras.length > 0 ? totalCompradoUSD / compras.length : 0;
+
+                  // Producto que más se repite en las compras de este cliente (por unidades),
+                  // no por número de tickets — sirve para saber qué ofrecerle primero.
+                  const productoFavorito = (() => {
+                    const acc: Record<string, number> = {};
+                    for (const v of compras) for (const l of v.lineas || []) acc[l.nombre] = (acc[l.nombre] || 0) + l.cantidad;
+                    const entradas = Object.entries(acc);
+                    return entradas.length > 0 ? entradas.sort((a, b) => b[1] - a[1])[0][0] : null;
+                  })();
+
+                  // "Activo" = compró en los últimos 30 días. Si la fecha guardada no se
+                  // puede interpretar (formato local viejo), no se castiga al cliente
+                  // marcándolo inactivo sin certeza — se asume activo si tiene historial.
+                  const fechaUltima = ultimaVenta ? new Date(ultimaVenta.fecha) : null;
+                  const diasDesdeUltima = fechaUltima && !isNaN(fechaUltima.getTime())
+                    ? Math.floor((Date.now() - fechaUltima.getTime()) / 86400000)
+                    : null;
+                  const clienteActivo = compras.length === 0 ? null : diasDesdeUltima == null ? true : diasDesdeUltima <= 30;
 
                   return (
                     <div
@@ -3764,7 +4067,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                           </span>
                           {c.saldoPendiente > 0 ? (
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30">
-                              Deuda: ${c.saldoPendiente.toFixed(2)}
+                              Deuda: {SIM()}{c.saldoPendiente.toFixed(2)}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
@@ -3774,7 +4077,14 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         </div>
 
                         <div>
-                          <div className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1">{c.nombre}</div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1">{c.nombre}</div>
+                            {clienteActivo != null && (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${clienteActivo ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-slate-400/15 text-slate-500 dark:text-slate-400"}`}>
+                                {clienteActivo ? "Activo" : "Inactivo"}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tlf: {c.telefono || "Sin teléfono"}</div>
                         </div>
 
@@ -3789,21 +4099,33 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                           <div>
                             <span className="text-[9px] text-slate-400 block uppercase font-bold">Facturado</span>
                             <span className="text-xs font-black text-teal-600 dark:text-teal-400 font-mono">
-                              ${totalCompradoUSD.toFixed(2)}
+                              {SIM()}{totalCompradoUSD.toFixed(2)}
                             </span>
                           </div>
                           <div>
                             <span className="text-[9px] text-slate-400 block uppercase font-bold">Utilidad</span>
                             <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                              +${utilidadTotal.toFixed(2)}
+                              +{SIM()}{utilidadTotal.toFixed(2)}
                             </span>
                           </div>
                         </div>
 
-                        {ultimaVenta && (
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                            <span>Última compra:</span>
-                            <span className="font-mono text-slate-700 dark:text-slate-300">{ultimaVenta.fecha.split(",")[0]}</span>
+                        {compras.length > 0 && (
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span>Última compra:</span>
+                              <span className="font-mono text-slate-700 dark:text-slate-300">{ultimaVenta.fecha.split(",")[0]}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span>Ticket promedio:</span>
+                              <span className="font-mono text-slate-700 dark:text-slate-300">{SIM()}{ticketPromedio.toFixed(2)}</span>
+                            </div>
+                            {productoFavorito && (
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="flex-shrink-0">Producto favorito:</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-300 truncate">{productoFavorito}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -3919,7 +4241,19 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             tasaVes={tasaActivaBs}
             nombreNegocio={nombreLocal}
             onPedidoConfirmado={() => { cargarRepuestosBackend(); cargarIngresosCaja(); }}
-            onVerQrModal={() => setModalQrVisible(true)}
+            onVerQrModal={() => { setSeccionConfig("qr"); setTab("configuracion"); }}
+          />
+        )}
+
+        {tab === "configuracion" && user?.tenantId && (
+          <ConfiguracionComercio
+            tenantId={user.tenantId}
+            nombreNegocio={user?.empresa || "Mi Comercio"}
+            esDuenoAdmin={user?.rol === "DUENO_ADMIN"}
+            onIrAEquipoRoles={onIrAEquipoRoles}
+            seccion={seccionConfig}
+            onSeccion={setSeccionConfig}
+            mostrarToast={mostrarToast}
           />
         )}
 
@@ -3933,16 +4267,6 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       </div>
 
       {/* ── MODAL DE COBRO MIXTO DE MOSTRADOR ── */}
-      {modalQrVisible && user?.tenantId && (
-        <ModalCatalogoQR
-          tenantId={user.tenantId}
-          nombreNegocio={user?.empresa || "Mi Comercio"}
-          onClose={() => setModalQrVisible(false)}
-          esDuenoAdmin={user?.rol === "DUENO_ADMIN"}
-          onIrAEquipoRoles={onIrAEquipoRoles}
-        />
-      )}
-
       {modalIaVisible && user?.tenantId && (
         <AsistenteIaModal
           tenantId={user.tenantId}
@@ -4013,15 +4337,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             <div className="p-3.5 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/70 dark:border-slate-700/60 space-y-1">
               <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400">
                 <span>Total a Cobrar:</span>
-                <span className="font-mono text-xl font-black text-teal-400">${totalUSD.toFixed(2)}</span>
+                <span className="font-mono text-xl font-black text-teal-400">{SIM()}{totalUSD.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center text-xs font-mono text-slate-600 dark:text-slate-300">
+              <div className={`flex justify-between items-center text-xs font-mono text-slate-600 dark:text-slate-300 ${modoEuro() ? "hidden" : ""}`}>
                 <span>En Bolívares (Bs):</span>
                 <span className="font-bold">Bs. {totalBs.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center text-xs font-mono text-slate-500 dark:text-slate-400">
+              <div className={`flex justify-between items-center text-xs font-mono text-slate-500 dark:text-slate-400 ${modoEuro() ? "hidden" : ""}`}>
                 <span>En Pesos (COP):</span>
-                <span>COP ${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+                <span>COP {SIM()}{totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
 
@@ -4032,13 +4356,13 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
               <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">1. Método de Pago</label>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 {[
-                  ["EFECTIVO_USD", " USD Efectivo", "USD"],
+                  ["EFECTIVO_USD", ` ${CODIGO()} Efectivo`, "USD"],
                   ["EFECTIVO_BS", " Bs Efectivo", "VES"],
                   ["PAGO_MOVIL", " Pago Móvil", "VES"],
                   ["PUNTO_VENTA", " Punto Débito", "VES"],
                   ["ZELLE", "Zelle / USDT", "USD"],
                   ["COP_EFECTIVO", " Pesos COP", "COP"],
-                ].map(([id, label, mon]) => (
+                ].filter(([id]) => !modoEuro() || id === "EFECTIVO_USD" || id === "PUNTO_VENTA").map(([i, l, m]) => [i, l, modoEuro() ? "USD" : m]).map(([id, label, mon]) => (
                   <button
                     key={id}
                     type="button"
@@ -4064,7 +4388,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">2. Moneda Recibida</label>
                 <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-300 dark:border-slate-700 text-[10px]">
-                  {(["USD", "VES", "COP"] as const).map((m) => (
+                  {(["USD", "VES", "COP"] as const).filter((m) => !modoEuro() || m === "USD").map((m) => (
                     <button
                       key={m}
                       type="button"
@@ -4078,7 +4402,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         monedaRecibida === m ? "bg-teal-500 text-slate-950" : "text-slate-500 dark:text-slate-400 hover:text-white"
                       }`}
                     >
-                      {m === "USD" ? "$ USD" : m === "VES" ? "Bs." : "COP"}
+                      {m === "USD" ? `${SIM()} ${CODIGO()}` : m === "VES" ? "Bs." : "COP"}
                     </button>
                   ))}
                 </div>
@@ -4098,9 +4422,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   className="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none"
                   title="Moneda en la que se entregará el vuelto"
                 >
-                  <option value="USD">Vuelto en USD ($)</option>
-                  <option value="VES">Vuelto en Bolívares (Bs)</option>
-                  <option value="COP">Vuelto en Pesos (COP)</option>
+                  <option value="USD">Vuelto en {CODIGO()} ({SIM()})</option>
+                  {!modoEuro() && <option value="VES">Vuelto en Bolívares (Bs)</option>}
+                  {!modoEuro() && <option value="COP">Vuelto en Pesos (COP)</option>}
                 </select>
               </div>
 
@@ -4165,15 +4489,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       <div className="flex items-center justify-between text-xs font-black font-mono text-teal-300">
                         <span>VUELTO A ENTREGAR:</span>
                         <span className="text-base">
-                          {monedaVuelto === "USD" ? `$${diffUSD.toFixed(2)} USD` :
+                          {monedaVuelto === "USD" ? `${SIM()}${diffUSD.toFixed(2)} ${CODIGO()}` :
                            monedaVuelto === "VES" ? `Bs. ${(diffUSD * tasaActivaBs).toFixed(2)}` :
-                           `COP $${Math.round(diffUSD * tasaCop).toLocaleString()}`}
+                           `COP ${SIM()}${Math.round(diffUSD * tasaCop).toLocaleString()}`}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[10px] font-mono text-teal-400/80 border-t border-teal-500/20 pt-1">
+                      <div className={`flex items-center justify-between text-[10px] font-mono text-teal-400/80 border-t border-teal-500/20 pt-1 ${modoEuro() ? "hidden" : ""}`}>
                         <span>Equivalencias del vuelto:</span>
                         <span>
-                          ${diffUSD.toFixed(2)} ≈ Bs. {(diffUSD * tasaActivaBs).toFixed(2)} ≈ COP ${Math.round(diffUSD * tasaCop).toLocaleString()}
+                          {SIM()}{diffUSD.toFixed(2)} ≈ Bs. {(diffUSD * tasaActivaBs).toFixed(2)} ≈ COP {SIM()}{Math.round(diffUSD * tasaCop).toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -4224,7 +4548,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
               };
 
               const metodosRapidos: [string, string, "USD"|"VES"|"COP"][] = [
-                ["EFECTIVO_USD", "$ USD Efectivo", "USD"],
+                ["EFECTIVO_USD", `${SIM()} ${CODIGO()} Efectivo`, "USD"],
                 ["EFECTIVO_BS", "Bs Efectivo", "VES"],
                 ["PAGO_MOVIL", "Pago Móvil", "VES"],
                 ["PUNTO_VENTA", "Punto Débito", "VES"],
@@ -4257,11 +4581,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
                     <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
                       <div className="text-slate-500">Total</div>
-                      <div className="font-mono font-black text-sm text-slate-900 dark:text-white">${totalUSD.toFixed(2)}</div>
+                      <div className="font-mono font-black text-sm text-slate-900 dark:text-white">{SIM()}{totalUSD.toFixed(2)}</div>
                     </div>
                     <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
                       <div className="text-slate-500">Cubierto</div>
-                      <div className="font-mono font-black text-sm text-teal-500">${totalCubierto.toFixed(2)}</div>
+                      <div className="font-mono font-black text-sm text-teal-500">{SIM()}{totalCubierto.toFixed(2)}</div>
                     </div>
                     <div className={`p-2 rounded-xl border ${
                       cubierto100
@@ -4270,7 +4594,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     }`}>
                       <div className="text-[9px]">{cubierto100 ? "Cubierto" : "Restante"}</div>
                       <div className="font-mono font-black text-sm">
-                        {cubierto100 ? (vueltoMixto > 0.005 ? `Vuelto $${vueltoMixto.toFixed(2)}` : "100% Cubierto") : `$${restante.toFixed(2)}`}
+                        {cubierto100 ? (vueltoMixto > 0.005 ? `Vuelto ${SIM()}${vueltoMixto.toFixed(2)}` : "100% Cubierto") : `${SIM()}${restante.toFixed(2)}`}
                       </div>
                     </div>
                   </div>
@@ -4280,7 +4604,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     <div className="space-y-1.5">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pagos registrados:</div>
                       {pagosMixtos.map((p) => {
-                        const fmtOrig = p.moneda === "USD" ? `$${p.montoOriginal.toFixed(2)} USD` :
+                        const fmtOrig = p.moneda === "USD" ? `${SIM()}${p.montoOriginal.toFixed(2)} USD` :
                           p.moneda === "VES" ? `Bs.${p.montoOriginal.toFixed(2)}` :
                           `COP ${Math.round(p.montoOriginal).toLocaleString("en-US")}`;
                         return (
@@ -4291,7 +4615,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-slate-600 dark:text-slate-300">{fmtOrig}</span>
-                              <span className="font-mono font-black text-teal-500">${p.montoUSD.toFixed(2)}</span>
+                              <span className="font-mono font-black text-teal-500">{SIM()}{p.montoUSD.toFixed(2)}</span>
                               <button type="button" onClick={() => setPagosMixtos(prev => prev.filter(x => x.id !== p.id))} className="text-red-400 hover:text-red-600 font-black cursor-pointer">×</button>
                             </div>
                           </div>
@@ -4354,7 +4678,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         : "bg-slate-300 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
                     }`}
                   >
-                    {cubierto100 ? "Confirmar Pago Mixto e Imprimir" : `Faltan $${restante.toFixed(2)} por cubrir`}
+                    {cubierto100 ? "Confirmar Pago Mixto e Imprimir" : `Faltan ${SIM()}${restante.toFixed(2)} por cubrir`}
                   </button>
                 </div>
               );
@@ -4416,7 +4740,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     {clienteActual.saldoPendiente > 0 && (
                       <>
                         <span>·</span>
-                        <span className="text-amber-500 font-bold">Deuda: ${clienteActual.saldoPendiente.toFixed(2)}</span>
+                        <span className="text-amber-500 font-bold">Deuda: {SIM()}{clienteActual.saldoPendiente.toFixed(2)}</span>
                       </>
                     )}
                   </div>
@@ -4440,14 +4764,14 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 <div className="p-3 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-center">
                   <span className="text-[10px] text-teal-600 dark:text-teal-400 uppercase font-bold block">Total Consumido</span>
                   <span className="text-base font-black text-teal-700 dark:text-teal-300 font-mono">
-                    ${totalGastado.toFixed(2)}
+                    {SIM()}{totalGastado.toFixed(2)}
                   </span>
-                  <span className="text-[9px] text-slate-400 block font-mono">Bs. {(totalGastado * tasaActivaBs).toFixed(2)}</span>
+                  <span className={`text-[9px] text-slate-400 block font-mono ${modoEuro() ? "hidden" : ""}`}>Bs. {(totalGastado * tasaActivaBs).toFixed(2)}</span>
                 </div>
                 <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold block">Utilidad Aportada</span>
                   <span className="text-base font-black text-emerald-700 dark:text-emerald-300 font-mono">
-                    +${utilidadTotal.toFixed(2)}
+                    +{SIM()}{utilidadTotal.toFixed(2)}
                   </span>
                   <span className="text-[9px] text-slate-400 block">
                     {totalGastado > 0 ? `Margen: ${((utilidadTotal / totalGastado) * 100).toFixed(1)}%` : "Margen 0%"}
@@ -4485,8 +4809,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="text-right">
-                            <span className="font-mono font-black text-sm text-teal-600 dark:text-teal-400">${v.total.toFixed(2)}</span>
-                            <span className="text-[10px] text-slate-400 font-mono block">Bs. {v.totalBs.toFixed(2)}</span>
+                            <span className="font-mono font-black text-sm text-teal-600 dark:text-teal-400">{SIM()}{v.total.toFixed(2)}</span>
+                            <span className={`text-[10px] text-slate-400 font-mono block ${modoEuro() ? "hidden" : ""}`}>Bs. {v.totalBs.toFixed(2)}</span>
                           </div>
                           <button
                             onClick={() => imprimirTicketComercio(v, nombreLocal, tasaActivaBs, tasaCop)}
@@ -4497,7 +4821,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                             <span>Ticket</span>
                           </button>
                           <button
-                            onClick={() => generarNotaEntregaPDF(v, nombreLocal, tasaActivaBs, tasaCop, true)}
+                            onClick={() => descargarNotaEntregaOFactura(v, nombreLocal, tasaActivaBs, tasaCop)}
                             className="px-2.5 py-1 rounded-xl bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:hover:bg-indigo-800/60 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1 cursor-pointer transition-colors"
                             title="Descargar Nota de Entrega PDF (SENIAT)"
                           >
@@ -4545,9 +4869,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                                   </div>
                                 </div>
                                 <div className="text-right flex-shrink-0">
-                                  <div className="font-mono font-bold text-slate-900 dark:text-white">${subtotal.toFixed(2)}</div>
+                                  <div className="font-mono font-bold text-slate-900 dark:text-white">{SIM()}{subtotal.toFixed(2)}</div>
                                   {utilidadLinea > 0 && (
-                                    <div className="text-[9px] text-emerald-500 font-mono">Utilidad: +${utilidadLinea.toFixed(2)}</div>
+                                    <div className="text-[9px] text-emerald-500 font-mono">Utilidad: +{SIM()}{utilidadLinea.toFixed(2)}</div>
                                   )}
                                 </div>
                               </div>
@@ -4559,8 +4883,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       {/* Resumen Financiero del Ticket */}
                       {v.costoTotal != null && v.utilidad != null && (
                         <div className="pt-1.5 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                          <span>Costo mercadería: ${v.costoTotal.toFixed(2)}</span>
-                          <span className="text-emerald-500 font-bold">Utilidad neta ticket: +${v.utilidad.toFixed(2)}</span>
+                          <span>Costo mercadería: {SIM()}{v.costoTotal.toFixed(2)}</span>
+                          <span className="text-emerald-500 font-bold">Utilidad neta ticket: +{SIM()}{v.utilidad.toFixed(2)}</span>
                         </div>
                       )}
                     </div>
@@ -4595,11 +4919,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/60 dark:border-slate-700/50 text-xs space-y-1 font-mono text-left">
               <div className="flex justify-between font-bold text-slate-900 dark:text-white">
                 <span>Total Pagado:</span>
-                <span className="text-teal-400">${ventaReciente.total.toFixed(2)}</span>
+                <span className="text-teal-400">{SIM()}{ventaReciente.total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                <span>Bolívares:</span>
-                <span>Bs. {ventaReciente.totalBs.toFixed(2)}</span>
+                <span className={modoEuro() ? "hidden" : ""}>Bolívares:</span>
+                <span className={modoEuro() ? "hidden" : ""}>Bs. {ventaReciente.totalBs.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-slate-500 dark:text-slate-400">
                 <span>Método:</span>
@@ -4611,7 +4935,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 font-sans space-y-1">
                   <div className="font-bold">Cargado a Cuentas por Cobrar:</div>
                   <div>Cliente: {ventaReciente.cliente.nombre} ({ventaReciente.cliente.documento})</div>
-                  <div className="font-mono font-bold text-amber-600 dark:text-amber-400">Saldo por cobrar: ${ventaReciente.total.toFixed(2)} USD</div>
+                  <div className="font-mono font-bold text-amber-600 dark:text-amber-400">Saldo por cobrar: {SIM()}{ventaReciente.total.toFixed(2)} USD</div>
                 </div>
               )}
               {ventaReciente.vuelto != null && ventaReciente.vuelto > 0 && (
@@ -4647,7 +4971,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 Imprimir Ticket 80mm
               </button>
               <button
-                onClick={() => generarNotaEntregaPDF(ventaReciente, nombreLocal, tasaActivaBs, tasaCop, true)}
+                onClick={() => descargarNotaEntregaOFactura(ventaReciente, nombreLocal, tasaActivaBs, tasaCop)}
                 className="flex-1 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-black text-xs cursor-pointer shadow-lg"
               >
                 Nota de Entrega PDF
@@ -4721,6 +5045,16 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       fechaVencimiento,
                     });
                     backendId = guardado.id;
+                    const ubicacionInicial = String(fd.get("ubicacion") || "").trim();
+                    if (ubicacionInicial) {
+                      // La ubicación vive por almacén en el backend — se guarda en el principal.
+                      try {
+                        const principal = (await listarAlmacenes(user.tenantId)).find((a) => a.esPrincipal);
+                        if (principal) await fijarUbicacionAlmacen(user.tenantId, { repuestoId: guardado.id, almacenId: principal.id, ubicacion: ubicacionInicial });
+                      } catch {
+                        mostrarToast("Artículo creado, pero no se pudo guardar su ubicación. Agrégala desde 'Almacenes'.", "info");
+                      }
+                    }
                     mostrarToast("Artículo registrado exitosamente en base de datos PostgreSQL", "success");
                   } catch (err: any) {
                     console.warn("Error persistiendo en backend repuestos:", err);
@@ -4860,12 +5194,12 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
               <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">Doc: {clienteAbonoSel.documento}</div>
               <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-300/60 dark:border-slate-700/50">
                 <span className="text-slate-500 dark:text-slate-400">Deuda Total:</span>
-                <span className="font-mono text-base font-black text-amber-300">${clienteAbonoSel.saldoPendiente.toFixed(2)} USD</span>
+                <span className="font-mono text-base font-black text-amber-300">{SIM()}{clienteAbonoSel.saldoPendiente.toFixed(2)} USD</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Monto a Abonar (USD)</label>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Monto a Abonar ({CODIGO()})</label>
               <div className="flex gap-2">
                 <input
                   type="number" step="0.01" max={clienteAbonoSel.saldoPendiente}
@@ -4881,8 +5215,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   Totalidad
                 </button>
               </div>
-              <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                ≈ Bs. {((Number(montoAbono) || 0) * tasaActivaBs).toFixed(2)} | COP ${((Number(montoAbono) || 0) * tasaCop).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+              <div className={`text-[10px] font-mono text-slate-500 dark:text-slate-400 ${modoEuro() ? "hidden" : ""}`}>
+                ≈ Bs. {((Number(montoAbono) || 0) * tasaActivaBs).toFixed(2)} | COP {SIM()}{((Number(montoAbono) || 0) * tasaCop).toLocaleString("en-US", { maximumFractionDigits: 0 })}
               </div>
             </div>
 
@@ -4893,11 +5227,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 onChange={(e) => setMetodoAbono(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
               >
-                <option value="PAGO_MOVIL">Pago Móvil (Bolívares)</option>
-                <option value="EFECTIVO_USD">Efectivo Divisas (USD)</option>
+                {!modoEuro() && <option value="PAGO_MOVIL">Pago Móvil (Bolívares)</option>}
+                <option value="EFECTIVO_USD">{modoEuro() ? "Efectivo (EUR)" : "Efectivo Divisas (USD)"}</option>
                 <option value="PUNTO_VENTA">Punto de Venta (Débito)</option>
-                <option value="ZELLE">Zelle / Binance USDT</option>
-                <option value="COP_EFECTIVO">Pesos Colombianos (COP)</option>
+                {!modoEuro() && <option value="ZELLE">Zelle / Binance USDT</option>}
+                {!modoEuro() && <option value="COP_EFECTIVO">Pesos Colombianos (COP)</option>}
               </select>
             </div>
 
@@ -5266,6 +5600,16 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       )}
 
       {/* ── MODAL AJUSTAR STOCK (CORRECCIÓN POR CONTEO FÍSICO) ── */}
+      {almacenModalItem && user?.tenantId && (
+        <ModalAlmacenesComercio
+          tenantId={user.tenantId}
+          producto={almacenModalItem}
+          onClose={() => setAlmacenModalItem(null)}
+          onCambio={cargarRepuestosBackend}
+          mostrarToast={mostrarToast}
+        />
+      )}
+
       {ajustarStockModalItem && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={() => setAjustarStockModalItem(null)}>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
@@ -5358,7 +5702,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         <div className="text-[10px] text-slate-500 dark:text-slate-400">Factor: {pres.factorConversion} {presentacionesModalItem.unidadMedida || 'u'} base</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-mono font-bold text-xs text-teal-400">${pres.precioVenta.toFixed(2)}</div>
+                        <div className="font-mono font-bold text-xs text-teal-400">{SIM()}{pres.precioVenta.toFixed(2)}</div>
                         <button
                           onClick={() => {
                             agregarAlCarrito(presentacionesModalItem, pres);
@@ -5832,7 +6176,7 @@ function CuentasPorCobrarPagarComercio({
           </span>
           <div className="mt-1">
             <span className={`text-2xl font-black font-mono ${subTab === "CXP" ? "text-rose-500" : "text-teal-600 dark:text-teal-400"}`}>
-              ${totalPendienteUSD.toFixed(2)}
+              {SIM()}{totalPendienteUSD.toFixed(2)}
             </span>
             <span className="text-xs text-slate-400 font-mono block mt-0.5">
               ~ Bs. {(totalPendienteUSD * tasaActivaBs).toFixed(2)}
@@ -5846,7 +6190,7 @@ function CuentasPorCobrarPagarComercio({
           </span>
           <div className="mt-1">
             <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
-              ${totalSaldadoUSD.toFixed(2)}
+              {SIM()}{totalSaldadoUSD.toFixed(2)}
             </span>
             <span className="text-xs text-slate-400 font-mono block mt-0.5">
               Cuentas liquidadas con éxito
@@ -5963,7 +6307,7 @@ function CuentasPorCobrarPagarComercio({
                     )}
                     {abonado > 0 && !esPagada && (
                       <span className="text-teal-600 dark:text-teal-400 font-bold">
-                        Abonado: ${abonado.toFixed(2)} ({pctAbonado}%)
+                        Abonado: {SIM()}{abonado.toFixed(2)} ({pctAbonado}%)
                       </span>
                     )}
                   </div>
@@ -5988,7 +6332,7 @@ function CuentasPorCobrarPagarComercio({
                         ? "text-rose-500"
                         : "text-teal-600 dark:text-teal-400"
                     }`}>
-                      ${(esPagada ? cta.montoOriginal : cta.saldoPendiente).toFixed(2)}
+                      {SIM()}{(esPagada ? cta.montoOriginal : cta.saldoPendiente).toFixed(2)}
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono block">
                       ~ Bs. {((esPagada ? cta.montoOriginal : cta.saldoPendiente) * tasaActivaBs).toFixed(2)}
@@ -6104,6 +6448,271 @@ const TIPO_CUENTA_LABELS: Record<TipoCuentaBancaria, string> = {
 
 /** "Dónde está guardado el dinero" (Caja Efectivo, Cuenta Dólares, cada banco) —
  * independiente del ledger de ventas/gastos por moneda que ya lleva MovimientoCaja. */
+type SeccionConfiguracion = "tienda" | "qr" | "pagos" | "fiscal" | "moneda";
+
+const SECCIONES_CONFIGURACION: { id: SeccionConfiguracion; etiqueta: string; ayuda: string }[] = [
+  { id: "tienda", etiqueta: "Mi Tienda", ayuda: "Nombre, logo, colores y banner de tu catálogo online." },
+  { id: "qr", etiqueta: "Catálogo y QR", ayuda: "El enlace público de tu tienda y el código QR para imprimir o compartir." },
+  { id: "pagos", etiqueta: "Métodos de Pago", ayuda: "Pago Móvil, Zelle, Binance y Bancolombia: solo aparecen a tus clientes los que tengan datos reales cargados." },
+  { id: "moneda", etiqueta: "Moneda", ayuda: "En qué moneda trabaja tu negocio. Con euro se trabaja solo en euros: sin bolívares, sin pesos y sin tasas de cambio." },
+  { id: "fiscal", etiqueta: "Facturación Fiscal", ayuda: "RIF, razón social y el rango de números de control que te asignó tu imprenta." },
+];
+
+/** Todo lo que se configura una vez y se deja (no es de uso diario), en un solo lugar y con nombres
+ * que se entienden. Reutiliza las pantallas existentes: las de tienda/QR/pagos son las mismas del
+ * antiguo modal, ahora embebidas; la fiscal salió de Administración porque es configuración, no operación. */
+function ConfiguracionComercio({ tenantId, nombreNegocio, esDuenoAdmin, onIrAEquipoRoles, seccion, onSeccion, mostrarToast }: {
+  tenantId: number;
+  nombreNegocio: string;
+  esDuenoAdmin: boolean;
+  onIrAEquipoRoles?: () => void;
+  seccion: SeccionConfiguracion;
+  onSeccion: (s: SeccionConfiguracion) => void;
+  mostrarToast: (m: string, t?: "success" | "error" | "info") => void;
+}) {
+  const seccionActual = SECCIONES_CONFIGURACION.find((s) => s.id === seccion) || SECCIONES_CONFIGURACION[0];
+  const seccionModal = seccion === "tienda" ? "perfil" : seccion === "qr" ? "qr" : "pago_movil";
+  const claseBoton = (activo: boolean) =>
+    `flex-shrink-0 text-left px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer ${
+      activo ? "bg-teal-50/80 dark:bg-teal-500/10 text-teal-900 dark:text-teal-300" : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+    }`;
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+      <div className="max-w-5xl mx-auto w-full space-y-4">
+        <div>
+          <h2 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Configuración</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Lo que se ajusta una vez y se deja: tu tienda online, cómo te pagan, tus datos fiscales y tu equipo.</p>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
+          <nav className="w-full md:w-56 flex md:flex-col gap-1 overflow-x-auto md:overflow-visible flex-shrink-0">
+            {SECCIONES_CONFIGURACION.filter((s) => !(modoEuro() && (s.id === "pagos" || s.id === "fiscal"))).map((s) => (
+              <button key={s.id} type="button" onClick={() => onSeccion(s.id)} className={claseBoton(seccion === s.id)}>
+                {s.etiqueta}
+              </button>
+            ))}
+            {esDuenoAdmin && onIrAEquipoRoles && (
+              <button type="button" onClick={onIrAEquipoRoles} className={`${claseBoton(false)} flex items-center justify-between gap-2`}>
+                <span>Equipo y Roles</span>
+                <span className="text-slate-400">→</span>
+              </button>
+            )}
+          </nav>
+
+          <div className="flex-1 min-w-0 w-full space-y-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">{seccionActual.ayuda}</p>
+            {seccion === "fiscal" ? (
+              <FacturacionFiscalComercio mostrarToast={mostrarToast} />
+            ) : seccion === "moneda" ? (
+              <MonedaNegocioComercio esDuenoAdmin={esDuenoAdmin} mostrarToast={mostrarToast} />
+            ) : (
+              <ModalCatalogoQR tenantId={tenantId} nombreNegocio={nombreNegocio} onClose={() => {}} embebido seccion={seccionModal} />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Elegir si el negocio trabaja en dólares (con tasas Bs/COP) o solo en euros. El servidor
+ * rechaza el cambio si ya hay ventas, movimientos o cuentas registrados (mezclaría monedas). */
+function MonedaNegocioComercio({ esDuenoAdmin, mostrarToast }: { esDuenoAdmin: boolean; mostrarToast: (m: string, t?: "success" | "error" | "info") => void }) {
+  const [actual, setActual] = useState<string>(() => monedaBaseGuardada());
+  const [guardando, setGuardando] = useState(false);
+
+  const cambiar = async (nueva: string) => {
+    if (nueva === actual || guardando) return;
+    setGuardando(true);
+    try {
+      const r = await actualizarMonedaBaseNegocio(nueva);
+      fijarMonedaBaseApi(r.monedaBase);
+      window.location.reload();
+    } catch (e) {
+      mostrarToast(e instanceof Error ? e.message : "No se pudo cambiar la moneda.", "error");
+      setGuardando(false);
+    }
+  };
+
+  const opciones: { id: string; titulo: string; detalle: string }[] = [
+    { id: "USD", titulo: "Dólar (USD)", detalle: "Precios en dólares, con cobro en bolívares o pesos según la tasa del día." },
+    { id: "EUR", titulo: "Euro (EUR)", detalle: "Todo en euros. No se muestran bolívares, pesos ni tasas de cambio." },
+  ];
+
+  return (
+    <div className="max-w-2xl mx-auto w-full space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {opciones.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            disabled={!esDuenoAdmin || guardando}
+            onClick={() => cambiar(o.id)}
+            className={`text-left p-4 rounded-2xl border transition-colors cursor-pointer disabled:cursor-not-allowed ${
+              actual === o.id ? "border-teal-500 bg-teal-50/80 dark:bg-teal-500/10" : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700"
+            }`}
+          >
+            <div className="font-bold text-sm text-slate-900 dark:text-white">{o.titulo}{actual === o.id ? " · en uso" : ""}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{o.detalle}</div>
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+        {esDuenoAdmin
+          ? "Solo se puede cambiar mientras el negocio no tenga ventas, movimientos ni cuentas registrados: mezclar monedas dejaría los números sin sentido."
+          : "Solo el Dueño o Administrador puede cambiar la moneda."}
+      </p>
+    </div>
+  );
+}
+
+const MODO_FISCAL_LABELS: Record<ModoFacturacionFiscal, string> = {
+  NINGUNA: "Ninguna (Nota de Entrega, no fiscal)",
+  FORMATO_LIBRE: "Formato Libre (imprenta autorizada SENIAT)",
+  MAQUINA_FISCAL: "Máquina Fiscal (próximamente)",
+};
+
+/** Numeración de Factura Fiscal real — apagada por defecto. Mientras el dueño no
+ * cargue el rango que le dio su imprenta autorizada, las ventas siguen imprimiendo
+ * Nota de Entrega (no fiscal) como siempre; nunca se inventa un número de control. */
+function FacturacionFiscalComercio({ mostrarToast }: { mostrarToast: (m: string, t?: "success" | "error" | "info") => void }) {
+  const [config, setConfig] = useState<FacturacionFiscalConfig | null>(null);
+  const [datosFiscales, setDatosFiscales] = useState<DatosFiscalesNegocio>({});
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [modoSeleccionado, setModoSeleccionado] = useState<ModoFacturacionFiscal>("NINGUNA");
+
+  const cargar = () => {
+    setCargando(true);
+    Promise.all([obtenerFacturacionFiscal(), obtenerDatosFiscalesNegocio()])
+      .then(([fiscal, datos]) => {
+        setConfig(fiscal);
+        setModoSeleccionado(fiscal.modo);
+        setDatosFiscales(datos);
+      })
+      .catch(() => mostrarToast("No se pudo cargar la configuración fiscal.", "error"))
+      .finally(() => setCargando(false));
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  if (cargando || !config) return <div className="p-8 text-center text-xs text-slate-400">Cargando...</div>;
+
+  return (
+    <div className="max-w-2xl mx-auto w-full space-y-4">
+      <div>
+        <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Facturación Fiscal</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Solo se activa si ya tienes un rango de números de control asignado por una imprenta autorizada por el SENIAT. Sin esto configurado, tus ventas siguen generando Nota de Entrega normal.
+        </p>
+      </div>
+
+      {/* Datos fiscales del negocio (RIF / Razón Social) */}
+      <form
+        className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          setGuardando(true);
+          try {
+            const actualizado = await actualizarDatosFiscalesNegocio({
+              rif: String(fd.get("rif") || "").trim(),
+              razonSocial: String(fd.get("razonSocial") || "").trim(),
+              domicilioFiscal: datosFiscales.domicilioFiscal,
+            });
+            setDatosFiscales(actualizado);
+            mostrarToast("Datos fiscales guardados.", "success");
+          } catch (err: any) {
+            mostrarToast(err?.message || "No se pudieron guardar los datos fiscales.", "error");
+          } finally {
+            setGuardando(false);
+          }
+        }}
+      >
+        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Datos del Negocio</span>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">RIF</label>
+            <input name="rif" defaultValue={datosFiscales.rif || ""} placeholder="J-12345678-9" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white font-mono" />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Razón Social</label>
+            <input name="razonSocial" defaultValue={datosFiscales.razonSocial || ""} placeholder="Ferretería Ejemplo, C.A." className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white" />
+          </div>
+        </div>
+        <button type="submit" disabled={guardando} className="px-4 py-2 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold text-xs cursor-pointer disabled:opacity-50">
+          Guardar Datos del Negocio
+        </button>
+      </form>
+
+      {/* Modo de facturación fiscal */}
+      <form
+        className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          const serie = String(fd.get("serie") || "").trim();
+          const numeroDesde = fd.get("numeroDesde") ? Number(fd.get("numeroDesde")) : undefined;
+          const numeroHasta = fd.get("numeroHasta") ? Number(fd.get("numeroHasta")) : undefined;
+          setGuardando(true);
+          try {
+            const actualizado = await actualizarFacturacionFiscal({ modo: modoSeleccionado, serie, numeroDesde, numeroHasta });
+            setConfig(actualizado);
+            mostrarToast("Configuración fiscal guardada.", "success");
+          } catch (err: any) {
+            mostrarToast(err?.message || "No se pudo guardar la configuración fiscal.", "error");
+          } finally {
+            setGuardando(false);
+          }
+        }}
+      >
+        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Modo de Facturación</span>
+        <select
+          value={modoSeleccionado}
+          onChange={(e) => setModoSeleccionado(e.target.value as ModoFacturacionFiscal)}
+          className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white"
+        >
+          <option value="NINGUNA">{MODO_FISCAL_LABELS.NINGUNA}</option>
+          <option value="FORMATO_LIBRE">{MODO_FISCAL_LABELS.FORMATO_LIBRE}</option>
+          <option value="MAQUINA_FISCAL" disabled>{MODO_FISCAL_LABELS.MAQUINA_FISCAL}</option>
+        </select>
+
+        {modoSeleccionado === "FORMATO_LIBRE" && (
+          <div className="space-y-3 p-3.5 rounded-xl bg-teal-500/5 border border-teal-500/20">
+            <p className="text-[11px] text-slate-600 dark:text-slate-300">
+              Ingresa exactamente el rango que te asignó tu imprenta autorizada. Si ya lo configuraste antes, no lo vuelvas a cambiar — sino se reinicia la numeración.
+            </p>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Serie (ej. "00")</label>
+              <input name="serie" defaultValue={config.serie || ""} placeholder="00" className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white font-mono" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Número Desde</label>
+                <input name="numeroDesde" type="number" defaultValue={config.numeroActual ?? ""} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white font-mono" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Número Hasta</label>
+                <input name="numeroHasta" type="number" defaultValue={config.numeroHasta ?? ""} className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white font-mono" />
+              </div>
+            </div>
+            {config.modo === "FORMATO_LIBRE" && config.numerosRestantes != null && (
+              <p className={`text-[11px] font-bold ${config.numerosRestantes <= 20 ? "text-amber-600 dark:text-amber-400" : "text-teal-600 dark:text-teal-400"}`}>
+                Próximo número: {config.serie}-{String(config.numeroActual).padStart(8, "0")} · {config.numerosRestantes} número{config.numerosRestantes === 1 ? "" : "s"} restante{config.numerosRestantes === 1 ? "" : "s"} en este rango
+              </p>
+            )}
+          </div>
+        )}
+
+        <button type="submit" disabled={guardando} className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer disabled:opacity-50">
+          {guardando ? "Guardando..." : "Guardar Configuración Fiscal"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function CuentasBancariasComercio({ tenantId, mostrarToast }: { tenantId: number; mostrarToast: (m: string, t?: "success" | "error" | "info") => void }) {
   const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -6134,7 +6743,7 @@ function CuentasBancariasComercio({ tenantId, mostrarToast }: { tenantId: number
         <div className="flex items-center gap-3 flex-wrap">
           {Object.entries(totalesPorMoneda).map(([m, v]) => (
             <div key={m} className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300">
-              Total {m}: <span className="text-teal-600 dark:text-teal-400">{m === "USD" ? "$" : m + " "}{v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              Total {m}: <span className="text-teal-600 dark:text-teal-400">{prefijoMoneda(m)}{v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           ))}
         </div>
@@ -6197,7 +6806,7 @@ function CuentasBancariasComercio({ tenantId, mostrarToast }: { tenantId: number
               <div>
                 <div className="text-xs font-bold text-slate-600 dark:text-slate-400 truncate">{c.nombre}</div>
                 <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white truncate">
-                  {c.moneda === "USD" ? "$" : c.moneda + " "}{Number(c.saldo).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {prefijoMoneda(c.moneda)}{Number(c.saldo).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-1">
@@ -6264,9 +6873,9 @@ function CuentasBancariasComercio({ tenantId, mostrarToast }: { tenantId: number
               <div>
                 <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Moneda</label>
                 <select name="moneda" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-sm">
-                  <option value="USD">USD</option>
-                  <option value="VES">VES</option>
-                  <option value="COP">COP</option>
+                  <option value="USD">{CODIGO()}</option>
+                  {!modoEuro() && <option value="VES">VES</option>}
+                  {!modoEuro() && <option value="COP">COP</option>}
                 </select>
               </div>
             </div>
@@ -6383,6 +6992,182 @@ function CuentasBancariasComercio({ tenantId, mostrarToast }: { tenantId: number
   );
 }
 
+/** Multi-almacén: ver dónde vive el stock de este producto y trasladar entre ubicaciones.
+ * No toca el stock total (sigue siendo la fuente de verdad para vender) — solo su reparto. */
+function ModalAlmacenesComercio({ tenantId, producto, onClose, onCambio, mostrarToast }: {
+  tenantId: number;
+  producto: ProductoComercio;
+  onClose: () => void;
+  onCambio?: () => void;
+  mostrarToast: (m: string, t?: "success" | "error" | "info") => void;
+}) {
+  const [almacenes, setAlmacenes] = useState<Almacen[]>([]);
+  const [distribucion, setDistribucion] = useState<StockAlmacen[]>([]);
+  const [sinAsignar, setSinAsignar] = useState(0);
+  const [cargando, setCargando] = useState(true);
+  const [modalNuevoAlmacen, setModalNuevoAlmacen] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = () => {
+    if (!producto.backendId) return;
+    setCargando(true);
+    Promise.all([listarAlmacenes(tenantId), obtenerDistribucionAlmacen(tenantId, producto.backendId)])
+      .then(([almacenesData, dist]) => {
+        setAlmacenes(almacenesData);
+        setDistribucion(dist.distribucion);
+        setSinAsignar(dist.sinAsignar);
+      })
+      .catch(() => mostrarToast("No se pudo cargar la distribución por almacén.", "error"))
+      .finally(() => setCargando(false));
+  };
+
+  useEffect(() => { cargar(); }, [producto.backendId]);
+
+  const cantidadEn = (almacenId: number) => distribucion.find((d) => d.almacenId === almacenId)?.cantidad || 0;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-pointer" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto cursor-default" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <h3 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">Almacenes</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-xs">{producto.nombre}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white cursor-pointer"><IconClose size={18} /></button>
+        </div>
+
+        {cargando ? (
+          <div className="p-6 text-center text-xs text-slate-400">Cargando...</div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              {almacenes.map((a) => (
+                <div key={a.id} className="p-3 rounded-xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <IconTruck size={13} className="text-indigo-500" />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{a.nombre}</span>
+                      {a.esPrincipal && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500 uppercase">Principal</span>}
+                    </div>
+                    <span className="text-sm font-mono font-black text-slate-900 dark:text-white">{cantidadEn(a.id)} {producto.unidadMedida || ""}</span>
+                  </div>
+                  <input
+                    key={`${a.id}-${distribucion.find((d) => d.almacenId === a.id)?.ubicacion ?? ""}`}
+                    defaultValue={distribucion.find((d) => d.almacenId === a.id)?.ubicacion || ""}
+                    maxLength={120}
+                    placeholder="Ubicación en este almacén (ej. Pasillo 3, Estante B)"
+                    onBlur={async (e) => {
+                      const nueva = e.target.value.trim();
+                      const actual = distribucion.find((d) => d.almacenId === a.id)?.ubicacion || "";
+                      if (nueva === actual || !producto.backendId) return;
+                      try {
+                        await fijarUbicacionAlmacen(tenantId, { repuestoId: producto.backendId, almacenId: a.id, ubicacion: nueva });
+                        mostrarToast("Ubicación guardada.", "success");
+                        cargar();
+                        onCambio?.();
+                      } catch (err: any) {
+                        mostrarToast(err?.message || "No se pudo guardar la ubicación.", "error");
+                      }
+                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white"
+                  />
+                </div>
+              ))}
+              {sinAsignar > 0 && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Sin asignar a ningún almacén</span>
+                  <span className="text-sm font-mono font-black text-amber-600 dark:text-amber-400">{sinAsignar} {producto.unidadMedida || ""}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setModalNuevoAlmacen(true)}
+                className="w-full py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-[11px] cursor-pointer border border-slate-300 dark:border-slate-700"
+              >
+                + Nuevo Almacén
+              </button>
+            </div>
+
+            {almacenes.length >= 2 && (
+              <form
+                className="space-y-3 p-3.5 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  const origenId = Number(fd.get("origenId"));
+                  const destinoId = Number(fd.get("destinoId"));
+                  const cantidad = Number(fd.get("cantidad"));
+                  if (!origenId || !destinoId || !cantidad || cantidad <= 0 || !producto.backendId) return;
+                  setGuardando(true);
+                  try {
+                    await trasladarStockAlmacen(tenantId, { repuestoId: producto.backendId, origenId, destinoId, cantidad });
+                    mostrarToast("Traslado realizado correctamente.", "success");
+                    cargar();
+                    (e.currentTarget as HTMLFormElement).reset();
+                  } catch (err: any) {
+                    mostrarToast(err?.message || "No se pudo trasladar.", "error");
+                  } finally {
+                    setGuardando(false);
+                  }
+                }}
+              >
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Trasladar entre Almacenes</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <select name="origenId" required className="px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white">
+                    {almacenes.map((a) => <option key={a.id} value={a.id}>{a.nombre} ({cantidadEn(a.id)})</option>)}
+                  </select>
+                  <select name="destinoId" required className="px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white">
+                    {almacenes.map((a) => <option key={a.id} value={a.id}>{a.nombre} ({cantidadEn(a.id)})</option>)}
+                  </select>
+                </div>
+                <input name="cantidad" type="number" step="0.01" required placeholder={`Cantidad a trasladar (${producto.unidadMedida || "unidades"})`} className="w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono" />
+                <button type="submit" disabled={guardando} className="w-full py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-black text-xs cursor-pointer disabled:opacity-50">
+                  {guardando ? "Trasladando..." : "Confirmar Traslado"}
+                </button>
+              </form>
+            )}
+          </>
+        )}
+      </div>
+
+      {modalNuevoAlmacen && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalNuevoAlmacen(false)}>
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              const nombre = String(fd.get("nombre") || "").trim();
+              const direccion = String(fd.get("direccion") || "").trim();
+              if (!nombre) return;
+              setGuardando(true);
+              try {
+                await crearAlmacen(tenantId, { nombre, direccion: direccion || undefined });
+                mostrarToast("Almacén creado.", "success");
+                setModalNuevoAlmacen(false);
+                cargar();
+              } catch (err: any) {
+                mostrarToast(err?.message || "No se pudo crear el almacén.", "error");
+              } finally {
+                setGuardando(false);
+              }
+            }}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-5 space-y-3 shadow-2xl cursor-default"
+          >
+            <h4 className="font-['Outfit'] font-black text-sm text-slate-900 dark:text-white">Nuevo Almacén</h4>
+            <input name="nombre" required placeholder="Ej. Sucursal Este" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white" />
+            <input name="direccion" placeholder="Dirección (opcional)" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white" />
+            <button type="submit" disabled={guardando} className="w-full py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer disabled:opacity-50">
+              {guardando ? "Creando..." : "Crear Almacén"}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Modal de Abono / Pago con Registro Contable
 function ModalAbonarCuentaComercio({
   cuenta,
@@ -6435,7 +7220,7 @@ function ModalAbonarCuentaComercio({
           <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700 text-xs">
             <span className="text-slate-500">Saldo pendiente:</span>
             <span className="font-mono font-black text-slate-900 dark:text-white">
-              ${saldoUSD.toFixed(2)} <span className="text-slate-400 font-normal">(Bs. {saldoBs.toFixed(2)})</span>
+              {SIM()}{saldoUSD.toFixed(2)} <span className="text-slate-400 font-normal">(Bs. {saldoBs.toFixed(2)})</span>
             </span>
           </div>
         </div>
@@ -6462,9 +7247,9 @@ function ModalAbonarCuentaComercio({
                 onChange={(e) => setMoneda(e.target.value as any)}
                 className="w-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white rounded-xl px-3 py-2 border border-slate-300 dark:border-slate-700 focus:outline-none"
               >
-                <option value="USD">USD ($)</option>
-                <option value="VES">Bolívares (Bs)</option>
-                <option value="COP">Pesos (COP)</option>
+                <option value="USD">{CODIGO()} ({SIM()})</option>
+                {!modoEuro() && <option value="VES">Bolívares (Bs)</option>}
+                {!modoEuro() && <option value="COP">Pesos (COP)</option>}
               </select>
             </div>
           </div>
@@ -6651,36 +7436,44 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
   const [modo, setModo] = useState<Modo>("mes");
   const [offset, setOffset] = useState(0); // 0 = período actual, -1 = anterior, +1 = siguiente
 
-  const rango = useMemo(() => {
+  const calcularRango = (m: Modo, o: number) => {
     const hoy = new Date();
-    if (modo === "dia") {
-      const d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + offset);
+    if (m === "dia") {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + o);
       const desde = new Date(d); desde.setHours(0, 0, 0, 0);
       const hasta = new Date(d); hasta.setHours(23, 59, 59, 999);
-      const etiqueta = offset === 0 ? "Hoy" : d.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
+      const etiqueta = o === 0 ? "Hoy" : d.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
       return { desde, hasta, etiqueta };
     }
-    if (modo === "semana") {
+    if (m === "semana") {
       const inicioSemanaActual = new Date(hoy); inicioSemanaActual.setDate(hoy.getDate() - hoy.getDay());
-      const desde = new Date(inicioSemanaActual); desde.setDate(desde.getDate() + offset * 7); desde.setHours(0, 0, 0, 0);
+      const desde = new Date(inicioSemanaActual); desde.setDate(desde.getDate() + o * 7); desde.setHours(0, 0, 0, 0);
       const hasta = new Date(desde); hasta.setDate(hasta.getDate() + 6); hasta.setHours(23, 59, 59, 999);
       const fmt = (d: Date) => d.toLocaleDateString("es-VE", { day: "numeric", month: "short" });
-      const etiqueta = offset === 0 ? "Esta semana" : `${fmt(desde)} – ${fmt(hasta)}`;
+      const etiqueta = o === 0 ? "Esta semana" : `${fmt(desde)} – ${fmt(hasta)}`;
       return { desde, hasta, etiqueta };
     }
-    const desde = new Date(hoy.getFullYear(), hoy.getMonth() + offset, 1);
-    const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + offset + 1, 0, 23, 59, 59, 999);
-    const etiqueta = offset === 0 ? "Este mes" : desde.toLocaleDateString("es-VE", { month: "long", year: "numeric" });
+    const desde = new Date(hoy.getFullYear(), hoy.getMonth() + o, 1);
+    const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + o + 1, 0, 23, 59, 59, 999);
+    const etiqueta = o === 0 ? "Este mes" : desde.toLocaleDateString("es-VE", { month: "long", year: "numeric" });
     return { desde, hasta, etiqueta };
-  }, [modo, offset]);
-
-  const enRango = (m: MovimientoCaja) => {
-    const f = new Date(m.fechaRegistro);
-    return f >= rango.desde && f <= rango.hasta;
   };
+
+  const rango = useMemo(() => calcularRango(modo, offset), [modo, offset]);
+  // Mismo tamaño de período, inmediatamente antes — para el comparativo "vs
+  // período anterior" de las 3 tarjetas de resumen.
+  const rangoAnterior = useMemo(() => calcularRango(modo, offset - 1), [modo, offset]);
+
+  const enRangoDe = (r: { desde: Date; hasta: Date }) => (m: MovimientoCaja) => {
+    const f = new Date(m.fechaRegistro);
+    return f >= r.desde && f <= r.hasta;
+  };
+  const enRango = enRangoDe(rango);
 
   const ingresosPeriodo = useMemo(() => ingresosCaja.filter(enRango), [ingresosCaja, rango]);
   const gastosPeriodo = useMemo(() => gastosCaja.filter(enRango), [gastosCaja, rango]);
+  const ingresosPeriodoAnterior = useMemo(() => ingresosCaja.filter(enRangoDe(rangoAnterior)), [ingresosCaja, rangoAnterior]);
+  const gastosPeriodoAnterior = useMemo(() => gastosCaja.filter(enRangoDe(rangoAnterior)), [gastosCaja, rangoAnterior]);
 
   const sumarPorMoneda = (movs: MovimientoCaja[]) => {
     const acc: Record<string, number> = {};
@@ -6693,6 +7486,38 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
   const utilidadPorMoneda: Record<string, number> = {};
   for (const m of monedas) utilidadPorMoneda[m] = (totalIngresos[m] || 0) - (totalGastos[m] || 0);
 
+  const totalIngresosAnterior = sumarPorMoneda(ingresosPeriodoAnterior);
+  const totalGastosAnterior = sumarPorMoneda(gastosPeriodoAnterior);
+
+  // % de cambio vs período anterior, calculado solo sobre la moneda principal
+  // (la primera / más grande de cada mapa) — null = sin base real de comparación,
+  // nunca se inventa un "+100%" contra cero.
+  const calcularCambioPct = (actual: Record<string, number>, anterior: Record<string, number>): number | null => {
+    const monedaPrincipal = Object.keys(actual)[0];
+    if (!monedaPrincipal) return null;
+    const valorAnterior = anterior[monedaPrincipal];
+    if (!valorAnterior) return null;
+    return ((actual[monedaPrincipal] - valorAnterior) / Math.abs(valorAnterior)) * 100;
+  };
+  const cambioIngresosPct = calcularCambioPct(totalIngresos, totalIngresosAnterior);
+  const cambioGastosPct = calcularCambioPct(totalGastos, totalGastosAnterior);
+  const utilidadAnteriorPorMoneda: Record<string, number> = {};
+  for (const m of new Set([...Object.keys(totalIngresosAnterior), ...Object.keys(totalGastosAnterior)])) {
+    utilidadAnteriorPorMoneda[m] = (totalIngresosAnterior[m] || 0) - (totalGastosAnterior[m] || 0);
+  }
+  const cambioUtilidadPct = calcularCambioPct(utilidadPorMoneda, utilidadAnteriorPorMoneda);
+
+  const badgeCambio = (pct: number | null, invertirColor = false) => {
+    if (pct == null) return null;
+    // Para Gastos, subir es malo (rojo) y bajar es bueno (verde) — al revés que Ingresos/Utilidad.
+    const esBueno = invertirColor ? pct <= 0 : pct >= 0;
+    return (
+      <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${esBueno ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}`}>
+        {pct >= 0 ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}% vs anterior
+      </span>
+    );
+  };
+
   // Antes se unían todas las monedas en un solo texto ("$182.25 · VES 17,320.00")
   // que se cortaba en dos líneas dentro de la tarjeta (el dólar arriba, el
   // bolívar abajo) — parecía un solo número mal escrito. Ahora van una al lado
@@ -6704,7 +7529,7 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
     return (
       <div className="flex items-baseline gap-2 flex-wrap">
         <span className={`font-['Outfit'] font-black text-2xl ${colorPrimario} truncate`}>
-          {primero ? `${primero[0] === "USD" ? "$" : primero[0] + " "}${primero[1].toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}
+          {primero ? `${prefijoMoneda(primero[0])}${primero[1].toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}
         </span>
         {resto.length > 0 && (
           <span className="text-sm font-bold text-indigo-500 dark:text-indigo-400 pl-2 border-l-2 border-slate-200 dark:border-slate-700 truncate">
@@ -6787,8 +7612,9 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
             <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ingresos</div>
           </div>
           {renderMontos(totalIngresos, "text-slate-900 dark:text-white")}
-          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-            {ingresosPeriodo.length === 0 ? "Sin ingresos en este período" : `${ingresosPeriodo.length} movimiento${ingresosPeriodo.length === 1 ? "" : "s"}`}
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+            <span>{ingresosPeriodo.length === 0 ? "Sin ingresos en este período" : `${ingresosPeriodo.length} movimiento${ingresosPeriodo.length === 1 ? "" : "s"}`}</span>
+            {badgeCambio(cambioIngresosPct)}
           </div>
         </div>
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
@@ -6799,8 +7625,9 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
             <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gastos</div>
           </div>
           {renderMontos(totalGastos, "text-slate-900 dark:text-white")}
-          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-            {gastosPeriodo.length === 0 ? "Sin gastos en este período" : `${gastosPeriodo.length} movimiento${gastosPeriodo.length === 1 ? "" : "s"}`}
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+            <span>{gastosPeriodo.length === 0 ? "Sin gastos en este período" : `${gastosPeriodo.length} movimiento${gastosPeriodo.length === 1 ? "" : "s"}`}</span>
+            {badgeCambio(cambioGastosPct, true)}
           </div>
         </div>
         <div className={`p-5 rounded-2xl border ${hayNegativo ? "bg-rose-500/5 border-rose-500/30" : "bg-emerald-500/5 border-emerald-500/30"}`}>
@@ -6811,6 +7638,7 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
             <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Balance de Caja</div>
           </div>
           {renderMontos(utilidadPorMoneda, hayNegativo ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}
+          {cambioUtilidadPct != null && <div className="mt-1">{badgeCambio(cambioUtilidadPct)}</div>}
           <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
             Ingresos − Gastos — no es tu ganancia real (no resta el costo de lo vendido, ver "Ver Utilidad")
           </div>
@@ -6838,9 +7666,9 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
             <label className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Moneda</label>
             <select value={formGasto.moneda} onChange={(e) => setFormGasto({ ...formGasto, moneda: e.target.value as "USD" | "VES" | "COP" })}
               className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm">
-              <option value="USD">USD</option>
-              <option value="VES">VES</option>
-              <option value="COP">COP</option>
+              <option value="USD">{CODIGO()}</option>
+              {!modoEuro() && <option value="VES">VES</option>}
+              {!modoEuro() && <option value="COP">COP</option>}
             </select>
           </div>
           <div className="sm:col-span-2">
@@ -6897,7 +7725,7 @@ function IngresosGastosComercio({ ingresosCaja, gastosCaja, formGasto, setFormGa
 // local que se perdía al recargar la página).
 // ══════════════════════════════════════════════════════════════════════════
 function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: number; tasaUsdVes: number; tasaUsdCop: number }) {
-  const MONEDAS = ["USD", "VES", "COP"] as const;
+  const MONEDAS = (modoEuro() ? ["USD"] : ["USD", "VES", "COP"]) as readonly ("USD" | "VES" | "COP")[];
   const [moneda, setMoneda] = useState<typeof MONEDAS[number]>("USD");
   const [turno, setTurno] = useState<Turno | null | undefined>(undefined); // undefined = cargando
   const [historial, setHistorial] = useState<Turno[] | null>(null);
@@ -7263,7 +8091,7 @@ function UtilidadComercio() {
   };
 
   const fmt = (n: number, moneda = datos?.moneda || "USD") =>
-    `${moneda === "USD" ? "$" : moneda + " "}${n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `${prefijoMoneda(moneda)}${n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="max-w-4xl mx-auto w-full space-y-5">
@@ -7967,7 +8795,7 @@ function ModalCompraProveedorComercio({
                 <div className="col-span-2 sm:col-span-4 flex items-center justify-between gap-2 pt-1">
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">
                     {granelCostoUnitario != null
-                      ? <>Costo por unidad: <span className="font-mono font-bold text-teal-600 dark:text-teal-400">${granelCostoUnitario.toFixed(4)}</span> ({granelCantidadComprada || "?"} {granelUnidadCompra} → {granelUnidadesResultantes} unidades)</>
+                      ? <>Costo por unidad: <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{SIM()}{granelCostoUnitario.toFixed(4)}</span> ({granelCantidadComprada || "?"} {granelUnidadCompra} → {granelUnidadesResultantes} unidades)</>
                       : "Completa costo total y unidades que rinde para calcular"}
                   </span>
                   <button
@@ -8089,10 +8917,10 @@ function ModalCompraProveedorComercio({
                     <tr key={idx} className="hover:bg-slate-100/60 dark:hover:bg-slate-800/40">
                       <td className="p-2.5 font-sans font-semibold text-slate-900 dark:text-white">{l.nombre}</td>
                       <td className="p-2.5 text-right font-bold text-teal-600 dark:text-teal-300">{l.cantidad}</td>
-                      <td className="p-2.5 text-right">${costoNum.toFixed(2)}</td>
-                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">${((Number(l.cantidad) || 0) * costoNum).toFixed(2)}</td>
+                      <td className="p-2.5 text-right">{SIM()}{costoNum.toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">{SIM()}{((Number(l.cantidad) || 0) * costoNum).toFixed(2)}</td>
                       <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">
-                        {pvNum > 0 ? `$${pvNum.toFixed(2)}` : "—"}
+                        {pvNum > 0 ? `${SIM()}${pvNum.toFixed(2)}` : "—"}
                       </td>
                       <td className="p-2.5 text-right">
                         {l.margenPorcentaje !== undefined ? (
@@ -8101,7 +8929,7 @@ function ModalCompraProveedorComercio({
                               ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
                               : "bg-red-500/20 text-red-600 dark:text-red-300"
                           }`}>
-                            {l.margenPorcentaje >= 0 ? "+" : ""}{l.margenPorcentaje.toFixed(1)}% (+${ganancia.toFixed(2)})
+                            {l.margenPorcentaje >= 0 ? "+" : ""}{l.margenPorcentaje.toFixed(1)}% (+{SIM()}{ganancia.toFixed(2)})
                           </span>
                         ) : "—"}
                       </td>
@@ -8147,10 +8975,10 @@ function ModalCompraProveedorComercio({
           {pagoDeContado ? (
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-500 dark:text-slate-400">Se registrará un egreso de caja por</span>
-              <span className="text-xs font-mono font-black text-teal-500 dark:text-teal-400">${totalFactura.toFixed(2)}</span>
+              <span className="text-xs font-mono font-black text-teal-500 dark:text-teal-400">{SIM()}{totalFactura.toFixed(2)}</span>
               <select value={monedaPago} onChange={(e) => setMonedaPago(e.target.value)}
                 className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-[11px] font-bold">
-                {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+                {(modoEuro() ? ["USD"] : ["USD", "VES", "COP"]).map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
           ) : (
@@ -8164,7 +8992,7 @@ function ModalCompraProveedorComercio({
                 <label className="text-[9px] text-slate-500 dark:text-slate-400 block mb-0.5">Moneda del abono</label>
                 <select value={monedaPago} onChange={(e) => setMonedaPago(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-bold">
-                  {["USD", "VES", "COP"].map((m) => <option key={m} value={m}>{m}</option>)}
+                  {(modoEuro() ? ["USD"] : ["USD", "VES", "COP"]).map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
               <div>
@@ -8180,7 +9008,7 @@ function ModalCompraProveedorComercio({
         <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 dark:text-slate-400">Total Factura:</span>
-            <div className="font-mono font-black text-xl text-teal-400">${totalFactura.toFixed(2)} USD</div>
+            <div className="font-mono font-black text-xl text-teal-400">{SIM()}{totalFactura.toFixed(2)} USD</div>
           </div>
           <div className="flex gap-2">
             <button
@@ -8379,6 +9207,20 @@ function ModalDetalleProveedorComercio({
   const [editando, setEditando] = useState(false);
 
   const totalComprado = compras.reduce((acc, c) => acc + (c.total || 0), 0);
+  const ultimaCompra = compras.length > 0
+    ? [...compras].sort((a, b) => new Date(b.fechaCompra).getTime() - new Date(a.fechaCompra).getTime())[0]
+    : null;
+  // Producto que más se le compra a este proveedor (por unidades) — para saber
+  // qué es lo que de verdad se abastece de él, no solo cuánto se le ha pagado.
+  const productoMasComprado = (() => {
+    const acc: Record<string, number> = {};
+    for (const c of compras) for (const it of c.items || []) {
+      const nombre = it.repuesto?.descripcion || "—";
+      acc[nombre] = (acc[nombre] || 0) + Number(it.cantidad);
+    }
+    const entradas = Object.entries(acc);
+    return entradas.length > 0 ? entradas.sort((a, b) => b[1] - a[1])[0][0] : null;
+  })();
 
   if (editando) {
     return (
@@ -8423,12 +9265,24 @@ function ModalDetalleProveedorComercio({
             <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Dirección</div>
             <div className="text-slate-700 dark:text-slate-200 font-semibold">{proveedor.direccion || "—"}</div>
           </div>
+          {compras.length > 0 && (
+            <>
+              <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-slate-800/40">
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Última compra</div>
+                <div className="text-slate-700 dark:text-slate-200 font-semibold font-mono">{ultimaCompra ? new Date(ultimaCompra.fechaCompra).toLocaleDateString("es-VE") : "—"}</div>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-100/60 dark:bg-slate-800/40">
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Producto que más se le compra</div>
+                <div className="text-slate-700 dark:text-slate-200 font-semibold truncate" title={productoMasComprado || "—"}>{productoMasComprado || "—"}</div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex items-center justify-between mb-1.5 flex-shrink-0">
             <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Historial de Compras</span>
-            <span className="text-xs font-mono font-black text-teal-500 dark:text-teal-400">${totalComprado.toFixed(2)} total</span>
+            <span className="text-xs font-mono font-black text-teal-500 dark:text-teal-400">{SIM()}{totalComprado.toFixed(2)} total</span>
           </div>
           {compras.length === 0 ? (
             <div className="py-6 text-center text-slate-500 dark:text-slate-400 text-xs rounded-xl bg-slate-100/60 dark:bg-slate-800/40">
@@ -8451,7 +9305,7 @@ function ModalDetalleProveedorComercio({
                       <td className="p-2.5 text-[11px]">{new Date(c.fechaCompra).toLocaleDateString()}</td>
                       <td className="p-2.5">{c.numeroFactura || "—"}</td>
                       <td className="p-2.5 text-right">{c.items?.length ?? "—"}</td>
-                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">${c.total.toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-bold text-slate-900 dark:text-white">{SIM()}{c.total.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>

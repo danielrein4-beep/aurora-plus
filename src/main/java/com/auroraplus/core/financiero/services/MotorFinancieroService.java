@@ -60,8 +60,8 @@ public class MotorFinancieroService {
     }
 
     private static void validarMoneda(String moneda) {
-        if (!java.util.Set.of("USD", "VES", "COP").contains(moneda == null ? "" : moneda))
-            throw new IllegalArgumentException("Seleccione USD, VES o COP");
+        if (!java.util.Set.of("USD", "VES", "COP", "EUR").contains(moneda == null ? "" : moneda))
+            throw new IllegalArgumentException("Seleccione USD, EUR, VES o COP");
     }
 
     private BigDecimal convertirConPrecision(Long tenantId, BigDecimal monto, String monedaOrigen, String monedaDestino, int escala) {
