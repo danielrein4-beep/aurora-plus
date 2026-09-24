@@ -38,6 +38,9 @@ public class OdontologiaAvanzadaController {
     private TasaCambioRepository tasaCambioRepository;
 
     @Autowired
+    private com.auroraplus.core.config.repositories.LicenciaTenantRepository licenciaTenantRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -79,12 +82,15 @@ public class OdontologiaAvanzadaController {
         return usuario != null && !usuario.isBlank() ? usuario : "Odontologo Tratante";
     }
 
-    // Sin tasa registrada devuelve 0 (y el plan no muestra bolívares): nunca se inventa una.
+    // La tasa de la fuente que eligió la clínica (BCV, USDT o PERSONALIZADA, ver el modal de tasas de
+    // MediClinic), la misma que usa la pantalla. Sin tasa registrada devuelve 0: nunca se inventa una.
     private BigDecimal obtenerTasaBcv(Long tenantId) {
         BigDecimal tasa = BigDecimal.ZERO;
         if (tasaCambioRepository != null) {
+            String origen = licenciaTenantRepository.findByTenantId(tenantId)
+                .map(l -> l.getOrigenTasaActiva()).filter(o -> o != null && !o.isBlank()).orElse("USDT");
             Optional<TasaCambio> tc = tasaCambioRepository
-                .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES");
+                .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoAndOrigenApiOrderByFechaActualizacionDesc(tenantId, "USD", "VES", origen);
             if (tc.isPresent() && tc.get().getTasa() != null && tc.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {
                 tasa = tc.get().getTasa();
             }
