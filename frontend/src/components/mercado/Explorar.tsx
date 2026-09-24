@@ -47,14 +47,17 @@ export default function Explorar({ onAbrir }: { onAbrir: (id: number) => void })
         <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-[#DDEFE4]/60 blur-3xl" aria-hidden="true" />
         <div className="absolute right-10 bottom-0 w-64 h-64 rounded-full bg-teal-50 blur-3xl" aria-hidden="true" />
         <div className="relative max-w-2xl space-y-5">
-          <span className="inline-flex px-3 py-1 rounded-full bg-[#EEF6F1] border border-[#CFE6D9] text-[11px] font-bold tracking-wider uppercase text-[#3E8A66]">
-            Solo fincas verificadas de Aurora
+          <span className="inline-flex items-center gap-2 pl-1.5 pr-3.5 py-1 rounded-full bg-white/80 border border-[#CFE6D9] shadow-sm text-[11px] font-bold tracking-[0.14em] uppercase text-[#3E8A66]">
+            <span className="w-5 h-5 rounded-full bg-[#57A882] text-[#ffffff] flex items-center justify-center" aria-hidden="true">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            </span>
+            Exclusivo Aurora Partners
           </span>
           <h1 className="text-3xl sm:text-5xl font-bold font-['Outfit'] leading-tight">
-            Compra y vende ganado con el historial a la vista
+            Compra y vende ganado seguro con Aurora
           </h1>
           <p className="text-sm sm:text-base text-stone-600">
-            Cada animal trae su curva de peso y sus vacunas desde el registro de la finca. Negocia por chat y recibe el animal en tu hato con un clic.
+            Solo entran fincas verificadas por Aurora. Cada animal trae su curva de peso y sus vacunas desde el registro de la finca: negocia por chat y recíbelo en tu hato con un clic.
           </p>
           <form
             onSubmit={(e) => { e.preventDefault(); cambiar({ q: busqueda.trim() || undefined }); }}
