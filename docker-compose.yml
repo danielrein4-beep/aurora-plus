@@ -37,6 +37,7 @@ services:
       start_period: 30s
     volumes:
       - aurora_db_data:/var/lib/postgresql/data
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
     networks:
       - internal
     mem_limit: ${DB_MEM_LIMIT:-1g}
