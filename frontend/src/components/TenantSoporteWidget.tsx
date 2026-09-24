@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import React, { useState, useEffect, useRef } from "react";
 import AuroraLogo from "../AuroraLogo";
 import {
@@ -118,7 +119,7 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
       setMensajes((prev) => [...prev, msg]);
       setNuevoMensaje("");
     } catch (err: any) {
-      alert("Error al enviar mensaje: " + (err.message || "Error de conexion"));
+      avisar("Error al enviar mensaje: " + (err.message || "Error de conexion"));
     } finally {
       setEnviando(false);
     }
@@ -147,7 +148,7 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
         prioridad: "MEDIA",
       });
     } catch (err: any) {
-      alert("Error al crear ticket: " + (err.message || "Error"));
+      avisar("Error al crear ticket: " + (err.message || "Error"));
     } finally {
       setEnviando(false);
     }

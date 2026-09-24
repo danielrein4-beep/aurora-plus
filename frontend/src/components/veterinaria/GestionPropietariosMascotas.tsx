@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import React, { useState } from 'react';
 import {
   IconUsers,
@@ -100,7 +101,7 @@ export default function GestionPropietariosMascotas({
       onRecargarPropietarios();
       onSeleccionarPropietario(nuevo);
     } catch (err: any) {
-      alert('Error guardando propietario: ' + err.message);
+      avisar('Error guardando propietario: ' + err.message);
     }
   };
 
@@ -138,7 +139,7 @@ export default function GestionPropietariosMascotas({
       });
       onRecargarMascotas();
     } catch (err: any) {
-      alert('Error guardando mascota: ' + err.message);
+      avisar('Error guardando mascota: ' + err.message);
     }
   };
 
@@ -153,7 +154,7 @@ export default function GestionPropietariosMascotas({
       onRecargarPropietarios();
       onRecargarMascotas();
     } catch (err: any) {
-      alert('Error eliminando: ' + err.message);
+      avisar('Error eliminando: ' + err.message);
     }
   };
 
@@ -166,7 +167,7 @@ export default function GestionPropietariosMascotas({
       }
       onRecargarMascotas();
     } catch (err: any) {
-      alert('Error eliminando mascota: ' + err.message);
+      avisar('Error eliminando mascota: ' + err.message);
     }
   };
 

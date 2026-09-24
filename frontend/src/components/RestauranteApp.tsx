@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createPortal } from "react-dom";
@@ -1692,7 +1693,7 @@ function MeserosPanel() {
       else await reactivarMesero(m.id);
       cargar();
     } catch {
-      alert("No se pudo actualizar el mesero — revisa tu conexión e inténtalo de nuevo.");
+      avisar("No se pudo actualizar el mesero — revisa tu conexión e inténtalo de nuevo.");
     }
   };
 
@@ -1947,7 +1948,7 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
     const soltarMouse = () => {
       if (seMovioRef.current) {
         const pos = posiciones[arrastrando];
-        if (pos) actualizarPosicionMesa(tenantId, arrastrando, { posX: Math.round(pos.x), posY: Math.round(pos.y), ancho: ANCHO_DEFECTO, alto: ANCHO_DEFECTO }).catch(() => alert("No se pudo guardar la nueva posición de la mesa — al recargar la página volverá a su lugar anterior."));
+        if (pos) actualizarPosicionMesa(tenantId, arrastrando, { posX: Math.round(pos.x), posY: Math.round(pos.y), ancho: ANCHO_DEFECTO, alto: ANCHO_DEFECTO }).catch(() => avisar("No se pudo guardar la nueva posición de la mesa — al recargar la página volverá a su lugar anterior."));
       }
       setArrastrando(null);
     };
@@ -3368,7 +3369,7 @@ function Reservas({ mapa }: { mapa: MapaMesaEntrada[] | null }) {
       await cambiarEstadoReserva(r.id, nuevoEstado);
       cargar();
     } catch {
-      alert("No se pudo actualizar la reserva — revisa tu conexión e inténtalo de nuevo.");
+      avisar("No se pudo actualizar la reserva — revisa tu conexión e inténtalo de nuevo.");
     }
   };
 
@@ -8200,11 +8201,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 {(buscandoCliente || guardandoCliente) && !clienteSel && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">…</span>}
               </div>
               <input value={telefonoClienteInline} onChange={(e) => setTelefonoClienteInline(e.target.value)}
-                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => alert("No se pudo guardar el teléfono del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
+                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => avisar("No se pudo guardar el teléfono del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
                 placeholder="Teléfono (opcional)" className="input-horeca w-full text-xs" />
             </div>
             <input value={nombreClienteInline} onChange={(e) => setNombreClienteInline(e.target.value)}
-              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => alert("No se pudo guardar el nombre del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
+              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => avisar("No se pudo guardar el nombre del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
               placeholder="Nombre y apellido (opcional)" className="input-horeca w-full text-xs" />
           </div>
 
@@ -8560,7 +8561,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           tasaCop={tasaCop ? Number(tasaCop.tasa) : 0}
           onClose={() => setMostrarDividirCuenta(false)}
           onSeleccionarParte={(montoParte, index, totalPartes) => {
-            alert(`Comensal #${index} de ${totalPartes} pagará $${montoParte.toFixed(2)}. Puedes registrar su pago en el panel de cobro.`);
+            avisar(`Comensal #${index} de ${totalPartes} pagará $${montoParte.toFixed(2)}. Puedes registrar su pago en el panel de cobro.`);
           }}
         />
       )}

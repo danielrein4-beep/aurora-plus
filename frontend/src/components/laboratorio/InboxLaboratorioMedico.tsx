@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import { useState, useEffect, useMemo } from "react";
 import {
   listarInboxExamenesRecibidos,
@@ -83,7 +84,7 @@ export default function InboxLaboratorioMedico({
     const nombrePaciente = examen.pacienteId ? buscarNombrePaciente(examen.pacienteId) : examen.nombreIngresado;
     const mensaje = `Hola ${nombrePaciente || ""}, recibimos los resultados de laboratorio que envió (ficha #${examen.id}). `.trim();
     if (!tel) {
-      alert("No hay un número de teléfono registrado para este paciente.");
+      avisar("No hay un número de teléfono registrado para este paciente.");
       return;
     }
     window.open(`https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`, "_blank");
@@ -106,7 +107,7 @@ export default function InboxLaboratorioMedico({
       setExamenDetalle(actualizado);
       setBusquedaVincular("");
     } catch (err: any) {
-      alert("Error al vincular: " + err.message);
+      avisar("Error al vincular: " + err.message);
     } finally {
       setVinculando(false);
     }

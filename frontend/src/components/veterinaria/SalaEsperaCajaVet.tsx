@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import React, { useState } from 'react';
 import { IconHourglass, IconCard, IconClose } from '../../Icons';
 import {
@@ -42,7 +43,7 @@ export default function SalaEsperaCajaVet({
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!checkInForm.mascotaId) {
-      alert('Seleccione una mascota');
+      avisar('Seleccione una mascota');
       return;
     }
     try {
@@ -50,7 +51,7 @@ export default function SalaEsperaCajaVet({
       setModalCheckIn(false);
       onRecargarSala();
     } catch (err: any) {
-      alert('Error en check-in: ' + err.message);
+      avisar('Error en check-in: ' + err.message);
     }
   };
 
@@ -59,7 +60,7 @@ export default function SalaEsperaCajaVet({
       await llamarAConsultorioSalaEsperaVet(tenantId, s.id, s.consultorio || 'Consultorio 1');
       onRecargarSala();
     } catch (err: any) {
-      alert('Error llamando a paciente: ' + err.message);
+      avisar('Error llamando a paciente: ' + err.message);
     }
   };
 
@@ -68,7 +69,7 @@ export default function SalaEsperaCajaVet({
       await finalizarAtencionSalaEsperaVet(tenantId, s.id);
       onRecargarSala();
     } catch (err: any) {
-      alert('Error finalizando atención: ' + err.message);
+      avisar('Error finalizando atención: ' + err.message);
     }
   };
 
@@ -88,7 +89,7 @@ export default function SalaEsperaCajaVet({
       setModalCobro(false);
       onRecargarCobros();
     } catch (err: any) {
-      alert('Error procesando cobro: ' + err.message);
+      avisar('Error procesando cobro: ' + err.message);
     }
   };
 

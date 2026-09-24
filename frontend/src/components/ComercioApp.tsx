@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import AsistenteIaModal from "./AsistenteIaModal";
 import jsPDF from "jspdf";
 import ModalCatalogoQR from "./ModalCatalogoQR";
@@ -2835,7 +2836,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       } catch (err: any) {
         console.error("Fallo al sincronizar venta en backend:", err);
         cargarRepuestosBackend(); // refresca el stock real por si otra venta concurrente ya lo cambió
-        alert(`No se pudo completar la venta: ${err instanceof Error ? err.message : "error desconocido"}\n\nEl carrito NO se vació — ajusta la cantidad o cancela.`);
+        avisar(`No se pudo completar la venta: ${err instanceof Error ? err.message : "error desconocido"}\n\nEl carrito NO se vació — ajusta la cantidad o cancela.`);
         return;
       }
     }

@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import React, { useState } from 'react';
 import { IconCard, IconClose } from '../../Icons';
 import {
@@ -43,7 +44,7 @@ export default function FinancieroVet({
       setModalCierre(false);
       onRecargar();
     } catch (err: any) {
-      alert('Error registrando cierre de caja: ' + err.message);
+      avisar('Error registrando cierre de caja: ' + err.message);
     }
   };
 

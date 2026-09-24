@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer, AreaChart, Area, ComposedChart, Bar, Line,
@@ -671,12 +672,12 @@ function VistaMercado({ dias }: { dias: number }) {
     const motivo = prompt(`Motivo para suspender a ${nombre ?? "esta finca"} del Mercado Ganadero (lo verá la finca):`);
     if (!motivo || !motivo.trim()) return;
     try { await suspenderFincaMercado(tenantId, motivo.trim()); setVersion((v) => v + 1); }
-    catch (e) { alert(e instanceof Error ? e.message : "No se pudo suspender"); }
+    catch (e) { avisar(e instanceof Error ? e.message : "No se pudo suspender"); }
   };
   const reactivar = async (tenantId: number, nombre: string | null) => {
     if (!confirm(`¿Devolverle el acceso al mercado a ${nombre ?? "esta finca"}?`)) return;
     try { await reactivarFincaMercado(tenantId); setVersion((v) => v + 1); }
-    catch (e) { alert(e instanceof Error ? e.message : "No se pudo reactivar"); }
+    catch (e) { avisar(e instanceof Error ? e.message : "No se pudo reactivar"); }
   };
   const BotonSuspender = ({ tenantId, nombre, etiqueta }: { tenantId: number | null; nombre: string | null; etiqueta: string }) => {
     if (tenantId == null) return null;

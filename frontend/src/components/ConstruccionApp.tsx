@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -2403,7 +2404,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalProyectoAbierto(false);
                   recargarProyectosEInsumos();
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando proyecto');
+                  avisar(err.message || 'Error guardando proyecto');
                 }
               }}
               className="space-y-3 text-xs"
@@ -2572,7 +2573,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalCapituloAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error creando capítulo');
+                  avisar(err.message || 'Error creando capítulo');
                 }
               }}
               className="space-y-3 text-xs"
@@ -2716,7 +2717,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalPartidaAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando partida');
+                  avisar(err.message || 'Error guardando partida');
                 }
               }}
               className="space-y-3 text-xs"
@@ -2886,7 +2887,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalValuacionAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error registrando valuación');
+                  avisar(err.message || 'Error registrando valuación');
                 }
               }}
               className="space-y-3 text-xs"
@@ -3016,7 +3017,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalInsumoAbierto(false);
                   recargarProyectosEInsumos();
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando insumo');
+                  avisar(err.message || 'Error guardando insumo');
                 }
               }}
               className="space-y-3 text-xs"
@@ -3162,11 +3163,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 const cant = Number(fd.get('cantidad'));
 
                 if (!cant || cant <= 0) {
-                  alert('La cantidad a consumir debe ser mayor a 0');
+                  avisar('La cantidad a consumir debe ser mayor a 0');
                   return;
                 }
                 if (cant > (Number(insumoConsumo.stockActual) || 0)) {
-                  alert('La cantidad supera el stock disponible');
+                  avisar('La cantidad supera el stock disponible');
                   return;
                 }
 
@@ -3177,7 +3178,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalConsumoAbierto(false);
                   recargarProyectosEInsumos();
                 } catch (err: any) {
-                  alert(err.message || 'Error procesando consumo');
+                  avisar(err.message || 'Error procesando consumo');
                 }
               }}
               className="space-y-3 text-xs"
@@ -3262,7 +3263,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalDespachoAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando guía de despacho');
+                  avisar(err.message || 'Error guardando guía de despacho');
                 }
               }}
               className="space-y-3 text-xs"
@@ -3495,7 +3496,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalBitacoraAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando en bitácora');
+                  avisar(err.message || 'Error guardando en bitácora');
                 }
               }}
               className="space-y-3 text-xs"

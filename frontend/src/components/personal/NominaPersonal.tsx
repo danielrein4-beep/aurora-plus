@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import React, { useState, useEffect, useRef } from 'react';
 import { PeriodoNomina, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { EstadoNominaBadge } from './EstadoNominaBadge';
@@ -117,7 +118,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
     }
 
     if (!motivoAjuste.trim()) {
-      alert('Debe indicar una justificación de auditoría válida.');
+      avisar('Debe indicar una justificación de auditoría válida.');
       return;
     }
 

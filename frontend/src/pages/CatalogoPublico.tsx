@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import jsPDF from "jspdf";
@@ -1155,15 +1156,15 @@ export default function CatalogoPublico() {
   const procesarPedido = async (directoAWhatsApp: boolean) => {
     if (carrito.length === 0) return;
     if (!nombreCliente.trim()) {
-      alert("Por favor ingrese su nombre y apellido");
+      avisar("Por favor ingrese su nombre y apellido");
       return;
     }
     if (!telefonoCliente.trim()) {
-      alert("Por favor ingrese su número de teléfono o WhatsApp");
+      avisar("Por favor ingrese su número de teléfono o WhatsApp");
       return;
     }
     if (tipoEntrega === "DELIVERY" && !direccionEntrega.trim()) {
-      alert("Por favor ingrese la dirección exacta de entrega");
+      avisar("Por favor ingrese la dirección exacta de entrega");
       return;
     }
 
@@ -1240,7 +1241,7 @@ export default function CatalogoPublico() {
       }
       setCarrito([]);
     } catch (err: any) {
-      alert(err.message || "Error al procesar el pedido.");
+      avisar(err.message || "Error al procesar el pedido.");
     } finally {
       setEnviandoPedido(false);
     }

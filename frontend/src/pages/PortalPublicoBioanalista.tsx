@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import {
@@ -91,15 +92,15 @@ export default function PortalPublicoBioanalista() {
 
   const ejecutarEnvioYSellado = async () => {
     if (!nombreLaboratorio.trim()) {
-      alert("Por favor indique el Nombre del Laboratorio.");
+      avisar("Por favor indique el Nombre del Laboratorio.");
       return;
     }
     if (!bioanalista.trim()) {
-      alert("Por favor indique el Nombre del Bioanalista o Responsable.");
+      avisar("Por favor indique el Nombre del Bioanalista o Responsable.");
       return;
     }
     if (adjuntos.length === 0 && !informeDetallado.trim()) {
-      alert("Debe adjuntar al menos una foto/PDF o redactar el informe técnico detallado.");
+      avisar("Debe adjuntar al menos una foto/PDF o redactar el informe técnico detallado.");
       return;
     }
 
@@ -128,7 +129,7 @@ export default function PortalPublicoBioanalista() {
       setExito(true);
       setConfirmarModal(false);
     } catch (err: any) {
-      alert("Error al sellar los resultados: " + (err.message || "Error de red"));
+      avisar("Error al sellar los resultados: " + (err.message || "Error de red"));
     } finally {
       setEnviando(false);
     }

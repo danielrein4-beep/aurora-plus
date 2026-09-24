@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import React, { useState, useEffect, useRef } from "react";
 
 function obtenerTokenSesion(): string {
@@ -207,7 +208,7 @@ export default function ModalCatalogoQR({ tenantId, nombreNegocio, onClose, esDu
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("La imagen no debe superar los 2MB.");
+      avisar("La imagen no debe superar los 2MB.");
       return;
     }
 

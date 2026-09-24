@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import InboxLaboratorioMedico from "./laboratorio/InboxLaboratorioMedico";
 import {
@@ -5029,15 +5030,15 @@ function Procedimientos({
   // Guardar Cotización
   const handleGuardarCotizacion = async (generarPdfDespues = false) => {
     if (!busquedaPaciente.trim() && !pacienteSeleccionado) {
-      alert("Por favor selecciona o ingresa el nombre del paciente.");
+      avisar("Por favor selecciona o ingresa el nombre del paciente.");
       return;
     }
     if (!nombreProcedimiento.trim()) {
-      alert("Por favor ingresa el nombre del procedimiento o cirugía.");
+      avisar("Por favor ingresa el nombre del procedimiento o cirugía.");
       return;
     }
     if (usdNum <= 0) {
-      alert("Por favor ingresa un precio base en USD mayor a 0.");
+      avisar("Por favor ingresa un precio base en USD mayor a 0.");
       return;
     }
 
@@ -6084,7 +6085,7 @@ function SalaEspera({
     e.preventDefault();
     const nombreFinal = admitirNombreManual.trim();
     if (!nombreFinal) {
-      alert("Por favor ingresa o selecciona un paciente.");
+      avisar("Por favor ingresa o selecciona un paciente.");
       return;
     }
 
@@ -7571,12 +7572,12 @@ function AgendaMedica({
   const handleGuardarCita = async (e: React.FormEvent) => {
     e.preventDefault();
     if (estaBloqueadaSeleccionada) {
-      alert("⚠️ La fecha seleccionada se encuentra BLOQUEADA. Desbloquéala primero para poder agendar pacientes.");
+      avisar("⚠️ La fecha seleccionada se encuentra BLOQUEADA. Desbloquéala primero para poder agendar pacientes.");
       return;
     }
     const nombreCompleto = `${formNombres.trim()} ${formApellidos.trim()}`.trim();
     if (!nombreCompleto) {
-      alert("Por favor ingresa el nombre del paciente.");
+      avisar("Por favor ingresa el nombre del paciente.");
       return;
     }
 
@@ -7597,7 +7598,7 @@ function AgendaMedica({
       onCambio();
       dispararToast(`¡Cita agendada con éxito para ${nombreCompleto} a las ${formHora}!`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo agendar la cita.");
+      avisar(err instanceof Error ? err.message : "No se pudo agendar la cita.");
     } finally {
       setGuardando(false);
     }
@@ -7613,7 +7614,7 @@ function AgendaMedica({
       onCambio();
       dispararToast("Cita cancelada.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo cancelar la cita.");
+      avisar(err instanceof Error ? err.message : "No se pudo cancelar la cita.");
     }
   };
 
@@ -7628,7 +7629,7 @@ function AgendaMedica({
     e.preventDefault();
     if (!citaParaReprogramar) return;
     if (fechasBloqueadas.includes(reprogFecha)) {
-      alert("La fecha destino está bloqueada. Elige otra fecha.");
+      avisar("La fecha destino está bloqueada. Elige otra fecha.");
       return;
     }
 
@@ -7642,7 +7643,7 @@ function AgendaMedica({
       dispararToast(`✓ Cita reprogramada para el ${reprogFecha} a las ${reprogHora}`);
       setCitaParaReprogramar(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo reprogramar la cita.");
+      avisar(err instanceof Error ? err.message : "No se pudo reprogramar la cita.");
     } finally {
       setReprogramando(false);
     }
@@ -7677,7 +7678,7 @@ function AgendaMedica({
       dispararToast(`¡${cita.pacienteNombre} ingresado a Sala de Espera con Turno ${codigoTurno}!`);
       onCambio();
     } catch {
-      alert("Error al transferir paciente a sala de espera.");
+      avisar("Error al transferir paciente a sala de espera.");
     }
   };
 
