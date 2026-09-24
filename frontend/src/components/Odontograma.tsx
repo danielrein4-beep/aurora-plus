@@ -129,7 +129,7 @@ export default function Odontograma({
   pacienteId,
   nombrePaciente,
   cedulaPaciente,
-  tasaBcv = 36.5,
+  tasaBcv = 0,
   onPlanCreado,
 }: OdontogramaProps) {
   const [dientes, setDientes] = useState<OdontogramaDiente[] | null>(null);
@@ -340,7 +340,7 @@ export default function Odontograma({
     return itemsPresupuesto.reduce((sum, it) => sum + it.cantidad * it.precioUnitario, 0);
   }, [itemsPresupuesto]);
 
-  const totalPresupuestoBs = totalPresupuestoUsd * (tasaBcv || 36.5);
+  const totalPresupuestoBs = totalPresupuestoUsd * tasaBcv;
 
   const imprimirPresupuesto = () => {
     window.print();
@@ -664,7 +664,7 @@ export default function Odontograma({
                       onClick={() => toggleCara(c.id)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all border ${
                         sel
-                          ? "bg-sky-600 text-white border-sky-600 shadow-sm"
+                          ? "bg-sky-600 text-[#FFFFFF] border-sky-600 shadow-sm"
                           : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/70 border-slate-200 dark:border-white/10 hover:bg-slate-200"
                       }`}
                     >
@@ -791,7 +791,7 @@ export default function Odontograma({
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Tasa BCV Aplicada</span>
                 <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                  {tasaBcv.toFixed(2)} Bs/$
+                  {tasaBcv > 0 ? `${tasaBcv.toFixed(2)} Bs/$` : "Sin tasa registrada"}
                 </span>
               </div>
             </div>
@@ -897,9 +897,11 @@ export default function Odontograma({
                 <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
                   ${totalPresupuestoUsd.toFixed(2)} USD
                 </div>
-                <div className="text-xs font-bold font-mono text-slate-500 dark:text-white/70">
-                  {totalPresupuestoBs.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs
-                </div>
+                {tasaBcv > 0 && (
+                  <div className="text-xs font-bold font-mono text-slate-500 dark:text-white/70">
+                    {totalPresupuestoBs.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs
+                  </div>
+                )}
               </div>
             </div>
 
@@ -955,7 +957,7 @@ export default function Odontograma({
                 type="button"
                 onClick={guardarComoPlan}
                 disabled={guardandoPlan || itemsPresupuesto.length === 0 || !nombrePlan.trim()}
-                className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs shadow-sm disabled:opacity-50"
+                className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] dark:bg-white dark:hover:bg-slate-100 text-[#FFFFFF] dark:text-slate-900 font-semibold text-xs shadow-sm disabled:opacity-50"
               >
                 <IconCheck size={15} />
                 <span>{guardandoPlan ? "Guardando..." : "Guardar como plan de tratamiento"}</span>

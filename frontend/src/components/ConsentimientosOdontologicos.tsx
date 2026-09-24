@@ -245,6 +245,7 @@ function PanelFirma({ onCambio }: { onCambio: (png: string | null) => void }) {
 
 export default function ConsentimientosOdontologicos({ paciente, config }: ConsentimientosOdontologicosProps) {
   const [lista, setLista] = useState<ConsentimientoResumen[]>([]);
+  const [cargandoLista, setCargandoLista] = useState(true);
   const [plantilla, setPlantilla] = useState<(typeof PLANTILLAS)[number] | null>(null);
   const [texto, setTexto] = useState("");
   const [dienteFdi, setDienteFdi] = useState("");
@@ -256,11 +257,14 @@ export default function ConsentimientosOdontologicos({ paciente, config }: Conse
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
   const cargar = async () => {
+    setCargandoLista(true);
     try {
       const res = await fetch(`/api/salud/odontologia/consentimientos?pacienteId=${paciente.id}`, { headers: authHeaders() });
       if (res.ok) setLista(await res.json());
     } catch {
       setLista([]);
+    } finally {
+      setCargandoLista(false);
     }
   };
 
@@ -440,8 +444,10 @@ export default function ConsentimientosOdontologicos({ paciente, config }: Conse
 
       <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 space-y-3">
         <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">Consentimientos firmados</h4>
-        {lista.length === 0 ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400">Este paciente no tiene consentimientos firmados.</p>
+        {cargandoLista ? (
+          <p className="text-xs text-slate-400 dark:text-slate-500">Cargando consentimientos...</p>
+        ) : lista.length === 0 ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">Aún no hay consentimientos firmados. Elige una plantilla arriba y fírmalo en pantalla.</p>
         ) : (
           <ul className="space-y-2">
             {lista.map((c) => (

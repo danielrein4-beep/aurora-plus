@@ -214,7 +214,7 @@ function CuotasPlan({
 export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
   pacienteId,
   pacienteNombre,
-  tasaBcv = 50.0,
+  tasaBcv = 0,
 }) => {
   const [planes, setPlanes] = useState<PlanTratamiento[]>([]);
   const [cargando, setCargando] = useState(false);
@@ -497,7 +497,7 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                     </span>
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Creado el {new Date(plan.fecha_creacion).toLocaleDateString()} &bull; Tasa BCV aplicable: {tasaBcv.toFixed(2)} Bs/$
+                    Creado el {new Date(plan.fecha_creacion).toLocaleDateString()}{tasaBcv > 0 ? <> &bull; Tasa BCV aplicable: {tasaBcv.toFixed(2)} Bs/$</> : null}
                   </div>
                 </div>
 
@@ -508,9 +508,11 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                     <div className="text-lg font-black font-['Outfit'] text-emerald-600 dark:text-emerald-400">
                       ${totalUsd.toFixed(2)} USD
                     </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
-                    </div>
+                    {tasaBcv > 0 && (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
+                      </div>
+                    )}
                     <div className="text-[11px] mt-1 font-mono">
                       <span className="text-slate-500 dark:text-slate-400">Pagado ${pagadoUsd.toFixed(2)}</span>
                       <span className={`ml-2 font-bold ${saldoUsd > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
@@ -523,7 +525,7 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                     <button
                       type="button"
                       onClick={() => abrirAbono(plan, saldoUsd)}
-                      className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:opacity-90 transition cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl bg-[#0F172A] dark:bg-white text-[#FFFFFF] dark:text-slate-900 text-xs font-bold hover:opacity-90 transition cursor-pointer"
                     >
                       Registrar abono
                     </button>
@@ -567,7 +569,11 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                       className="w-full p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-300 dark:border-white/15"
                     >
                       <option value="USD">Dolares</option>
-                      <option value="VES">Bolivares ({(Number(abonoMonto || 0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs)</option>
+                      <option value="VES" disabled={tasaBcv <= 0}>
+                        {tasaBcv > 0
+                          ? `Bolívares (${(Number(abonoMonto || 0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs)`
+                          : "Bolívares (registra la tasa BCV primero)"}
+                      </option>
                     </select>
                   </label>
                   <label className="block">

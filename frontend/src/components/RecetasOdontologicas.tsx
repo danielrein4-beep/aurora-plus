@@ -84,6 +84,7 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
   const [diagnostico, setDiagnostico] = useState("");
   const [indicaciones, setIndicaciones] = useState("");
   const [recetas, setRecetas] = useState<RecetaGuardada[]>([]);
+  const [cargandoRecetas, setCargandoRecetas] = useState(true);
   const [alergiasAnamnesis, setAlergiasAnamnesis] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
@@ -134,11 +135,14 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
   };
 
   const cargarRecetas = async () => {
+    setCargandoRecetas(true);
     try {
       const res = await fetch(`/api/salud/odontologia/recetas?pacienteId=${paciente.id}`, { headers: authHeaders() });
       if (res.ok) setRecetas(await res.json());
     } catch {
       setRecetas([]);
+    } finally {
+      setCargandoRecetas(false);
     }
   };
 
@@ -327,8 +331,10 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
 
       <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 space-y-3">
         <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">Recetas anteriores</h4>
-        {recetas.length === 0 ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400">Este paciente no tiene recetas odontologicas guardadas.</p>
+        {cargandoRecetas ? (
+          <p className="text-xs text-slate-400 dark:text-slate-500">Cargando recetas...</p>
+        ) : recetas.length === 0 ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">Aún no hay recetas de este paciente. La primera que guardes arriba aparecerá aquí.</p>
         ) : (
           <ul className="space-y-2">
             {recetas.map((r) => {
