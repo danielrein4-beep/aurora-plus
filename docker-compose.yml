@@ -73,6 +73,18 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-notificaciones@auroraplus.app}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Aurora+}
+      # WhatsApp: tampoco se pasaban al contenedor. Sin ellas, en el servidor los
+      # códigos del equipo, los avisos del mercado y la firma del webhook quedan
+      # apagados sin error visible.
+      PLATAFORMA_WHATSAPP_PHONE_NUMBER_ID: ${PLATAFORMA_WHATSAPP_PHONE_NUMBER_ID:-}
+      PLATAFORMA_WHATSAPP_TOKEN: ${PLATAFORMA_WHATSAPP_TOKEN:-}
+      PLATAFORMA_WHATSAPP_PLANTILLA_CODIGO: ${PLATAFORMA_WHATSAPP_PLANTILLA_CODIGO:-}
+      PLATAFORMA_WHATSAPP_PLANTILLA_AVISO: ${PLATAFORMA_WHATSAPP_PLANTILLA_AVISO:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      VERIFICACION_SIMULAR_ENVIO: "false"
+      # Cifra las cédulas y registros de hierro del Mercado Ganadero. Obligatoria
+      # y fija: si cambia, los documentos ya cargados no se pueden abrir.
+      MERCADO_DOCUMENTOS_SECRET: ${MERCADO_DOCUMENTOS_SECRET:?Defina MERCADO_DOCUMENTOS_SECRET en .env antes de levantar en producción}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
       # Monitoreo de errores: sin DSN el starter queda inactivo. En el servidor
