@@ -135,9 +135,9 @@ public class CatalogoPublicoController {
                 if (grupo != null && !grupo.isBlank()) {
                     String clave = grupo.trim();
                     if (!gruposYaAgregados.add(clave)) continue; // ya se agregó la tarjeta de este grupo
-                    productos.add(construirTarjetaAgrupada(variantesPorGrupo.get(clave), tasaVes, tasaCop));
+                    productos.add(construirTarjetaAgrupada(variantesPorGrupo.get(clave), tasaVes, tasaCop, licencia));
                 } else {
-                    productos.add(construirTarjetaRepuesto(item, tasaVes, tasaCop));
+                    productos.add(construirTarjetaRepuesto(item, tasaVes, tasaCop, licencia));
                 }
             }
         }
@@ -230,6 +230,13 @@ public class CatalogoPublicoController {
             resp.put("tasaCop", tasaCop);
         }
         resp.put("costoEnvioDelivery", licencia.getCostoEnvioDelivery());
+        Map<String, Object> impuestos = new LinkedHashMap<>();
+        impuestos.put("cobraIva", cobraIva(licencia));
+        impuestos.put("alicuotaIva", licencia.getAlicuotaIva());
+        impuestos.put("catalogoPrecioConIva", !Boolean.FALSE.equals(licencia.getCatalogoPrecioConIva()));
+        impuestos.put("igtfActivo", !modoEuro && Boolean.TRUE.equals(licencia.getIgtfActivo()));
+        impuestos.put("alicuotaIgtf", licencia.getAlicuotaIgtf());
+        resp.put("impuestos", impuestos);
         resp.put("pagoMovil", pagoMovil);
         resp.put("zelle", zelle);
         resp.put("binance", binance);
@@ -240,8 +247,32 @@ public class CatalogoPublicoController {
     }
 
     /** Tarjeta de un RepuestoItem individual (sin variantes) — mismo mapa que antes de agrupar. */
-    private Map<String, Object> construirTarjetaRepuesto(RepuestoItem item, BigDecimal tasaVes, BigDecimal tasaCop) {
-        BigDecimal precioUsd = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
+    // --- IVA en el catálogo (Configuración > Impuestos y cargos). precioUsd es SIEMPRE lo que el
+    // cliente paga (con IVA si el negocio lo cobra); precioSinIvaUsd sirve para mostrar "+ IVA".
+
+    private static boolean cobraIva(LicenciaTenant l) {
+        return l != null && Boolean.TRUE.equals(l.getCobraIva()) && !"EUR".equals(l.getMonedaBase());
+    }
+
+    private static BigDecimal factorIva(LicenciaTenant l) {
+        return BigDecimal.ONE.add(l.getAlicuotaIva().divide(new BigDecimal("100"), 6, RoundingMode.HALF_UP));
+    }
+
+    /** Lo que paga el cliente por una unidad: con IVA sumado si los precios del negocio no lo incluyen. */
+    private static BigDecimal precioFinal(RepuestoItem item, LicenciaTenant l) {
+        BigDecimal precio = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
+        if (!cobraIva(l) || Boolean.TRUE.equals(item.getExentoIva()) || !Boolean.FALSE.equals(l.getPreciosIncluyenIva())) return precio;
+        return precio.multiply(factorIva(l)).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal precioSinIva(RepuestoItem item, LicenciaTenant l) {
+        BigDecimal precio = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
+        if (!cobraIva(l) || Boolean.TRUE.equals(item.getExentoIva()) || Boolean.FALSE.equals(l.getPreciosIncluyenIva())) return precio;
+        return precio.divide(factorIva(l), 2, RoundingMode.HALF_UP);
+    }
+
+    private Map<String, Object> construirTarjetaRepuesto(RepuestoItem item, BigDecimal tasaVes, BigDecimal tasaCop, LicenciaTenant licencia) {
+        BigDecimal precioUsd = precioFinal(item, licencia);
         BigDecimal precioBs = precioUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
 
         Map<String, Object> p = new LinkedHashMap<>();
@@ -252,6 +283,8 @@ public class CatalogoPublicoController {
         p.put("categoria", item.getCategoria() != null && !item.getCategoria().isBlank() ? item.getCategoria() : "General");
         p.put("stock", item.getStockActual() != null ? item.getStockActual() : BigDecimal.ZERO);
         p.put("precioUsd", precioUsd);
+        p.put("precioSinIvaUsd", precioSinIva(item, licencia));
+        p.put("exentoIva", Boolean.TRUE.equals(item.getExentoIva()));
         p.put("precioBs", precioBs);
         if (tasaCop != null) {
             p.put("precioCop", precioUsd.multiply(tasaCop).setScale(2, RoundingMode.HALF_UP));
@@ -275,16 +308,16 @@ public class CatalogoPublicoController {
      * expone cada variante real en `variantes` para que el selector pueda vender la
      * correcta.
      */
-    private Map<String, Object> construirTarjetaAgrupada(List<RepuestoItem> variantesGrupo, BigDecimal tasaVes, BigDecimal tasaCop) {
+    private Map<String, Object> construirTarjetaAgrupada(List<RepuestoItem> variantesGrupo, BigDecimal tasaVes, BigDecimal tasaCop, LicenciaTenant licencia) {
         RepuestoItem representante = variantesGrupo.get(0);
-        Map<String, Object> p = construirTarjetaRepuesto(representante, tasaVes, tasaCop);
+        Map<String, Object> p = construirTarjetaRepuesto(representante, tasaVes, tasaCop, licencia);
         p.put("id", "grp-" + representante.getGrupoVariante().trim());
 
         BigDecimal stockTotal = BigDecimal.ZERO;
         BigDecimal precioMinUsd = null;
         List<Map<String, Object>> variantes = new ArrayList<>();
         for (RepuestoItem v : variantesGrupo) {
-            BigDecimal precioUsd = v.getPrecioVenta() != null ? v.getPrecioVenta() : BigDecimal.ZERO;
+            BigDecimal precioUsd = precioFinal(v, licencia);
             BigDecimal precioBs = precioUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
             BigDecimal stock = v.getStockActual() != null ? v.getStockActual() : BigDecimal.ZERO;
             stockTotal = stockTotal.add(stock);
@@ -296,6 +329,7 @@ public class CatalogoPublicoController {
                 ? v.getAtributoVariante() : v.getCodigoSku());
             variante.put("color", v.getColorVariante() != null && !v.getColorVariante().isBlank() ? v.getColorVariante() : null);
             variante.put("precioUsd", precioUsd);
+            variante.put("precioSinIvaUsd", precioSinIva(v, licencia));
             variante.put("precioBs", precioBs);
             if (tasaCop != null) {
                 variante.put("precioCop", precioUsd.multiply(tasaCop).setScale(2, RoundingMode.HALF_UP));
@@ -313,6 +347,7 @@ public class CatalogoPublicoController {
         // en el selector, no de estos campos de la tarjeta.
         BigDecimal precioMinReal = precioMinUsd != null ? precioMinUsd : BigDecimal.ZERO;
         p.put("precioUsd", precioMinReal);
+        p.put("precioSinIvaUsd", variantes.stream().map(v -> (BigDecimal) v.get("precioSinIvaUsd")).min(BigDecimal::compareTo).orElse(BigDecimal.ZERO));
         p.put("precioBs", precioMinReal.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP));
         if (tasaCop != null) {
             p.put("precioCop", precioMinReal.multiply(tasaCop).setScale(2, RoundingMode.HALF_UP));
@@ -384,7 +419,7 @@ public class CatalogoPublicoController {
         BigDecimal stock; // null = sin control de stock (catalogo modelo de demo)
     }
 
-    private ProductoResuelto resolverProductoReal(Long tenantId, String productoId, BigDecimal tasaVes) {
+    private ProductoResuelto resolverProductoReal(Long tenantId, String productoId, BigDecimal tasaVes, LicenciaTenant licencia) {
         if (productoId == null) return null;
         try {
             if (productoId.startsWith("rep-") && repuestoItemRepository != null) {
@@ -392,7 +427,7 @@ public class CatalogoPublicoController {
                 RepuestoItem item = repuestoItemRepository.findById(id).orElse(null);
                 if (item == null || !tenantId.equals(item.getTenantId())) return null;
                 ProductoResuelto r = new ProductoResuelto();
-                r.precio = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
+                r.precio = precioFinal(item, licencia); // el mismo precio que muestra el catálogo
                 r.stock = item.getStockActual() != null ? item.getStockActual() : BigDecimal.ZERO;
                 return r;
             }
@@ -468,7 +503,7 @@ public class CatalogoPublicoController {
         List<Map<String, Object>> itemsEstructurados = new ArrayList<>();
         BigDecimal totalUsdReal = BigDecimal.ZERO;
         for (LineaPedidoDto it : req.items) {
-            ProductoResuelto producto = resolverProductoReal(tenantId, it.productoId, tasaVes);
+            ProductoResuelto producto = resolverProductoReal(tenantId, it.productoId, tasaVes, licencia);
             if (producto == null) continue;
             BigDecimal cantidad = it.cantidad != null && it.cantidad.compareTo(BigDecimal.ZERO) > 0 ? it.cantidad : BigDecimal.ONE;
             String nombre = it.nombre != null ? it.nombre : "Articulo";

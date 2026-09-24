@@ -365,6 +365,7 @@ interface VarianteCatalogo {
   precioUsd: number;
   precioBs: number;
   precioCop?: number | null; // solo viene si el dueño configuró una tasa USD->COP
+  precioSinIvaUsd?: number;
   stock: number;
   imagenUrl?: string | null; // foto propia de ESTA variante (ej. el mismo zapato en otro color) — si no tiene, se usa la de la tarjeta
 }
@@ -379,6 +380,9 @@ interface ProductoCatalogo {
   precioUsd: number;
   precioBs: number;
   precioCop?: number | null;
+  /** precioUsd es siempre lo que paga el cliente; este es sin IVA, para mostrar "+ IVA". */
+  precioSinIvaUsd?: number;
+  exentoIva?: boolean;
   stock: number;
   unidad?: string;
   descripcion?: string;
@@ -405,6 +409,13 @@ interface DatosTienda {
   tasaCop?: number | null;
   domicilioFiscal?: string;
   costoEnvioDelivery?: number;
+  impuestos?: {
+    cobraIva: boolean;
+    alicuotaIva: number;
+    catalogoPrecioConIva: boolean;
+    igtfActivo: boolean;
+    alicuotaIgtf: number;
+  };
   pagoMovil?: {
     activo: boolean;
     banco: string;
@@ -1101,6 +1112,15 @@ export default function CatalogoPublico() {
     );
   };
 
+  // IVA según Configuración > Impuestos y cargos del negocio. precioUsd ya trae el IVA (es lo que
+  // se paga y lo que cobra el servidor); con "+ IVA" se muestra el precio sin IVA solo como vitrina.
+  const impuestosTienda = tienda?.impuestos;
+  const mostrarSinIva = !!impuestosTienda?.cobraIva && impuestosTienda.catalogoPrecioConIva === false;
+  const precioVisible = (p: { precioUsd: number; precioSinIvaUsd?: number }) =>
+    mostrarSinIva && p.precioSinIvaUsd != null ? p.precioSinIvaUsd : p.precioUsd;
+  const etiquetaIvaDe = (p: { exentoIva?: boolean }) =>
+    !impuestosTienda?.cobraIva ? null : p.exentoIva ? "Exento de IVA" : mostrarSinIva ? "+ IVA" : "IVA incluido";
+
   const subtotalUsd = useMemo(() => {
     return carrito.reduce((acc, item) => acc + item.producto.precioUsd * item.cantidad, 0);
   }, [carrito]);
@@ -1558,8 +1578,9 @@ export default function CatalogoPublico() {
         {productosFiltrados.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
             {productosFiltrados.map((prod) => {
-              const pUsd = prod.precioUsd;
+              const pUsd = precioVisible(prod);
               const pBs = Number((pUsd * tasa).toFixed(2));
+              const etiquetaIva = etiquetaIvaDe(prod);
               const tallaDefault = prod.tallas && prod.tallas.length > 0 ? prod.tallas[0] : "Estándar";
 
               return (
@@ -1620,6 +1641,7 @@ export default function CatalogoPublico() {
                           <div style={sinBs ? { display: "none" } : undefined} className="text-xs text-[#86868B] mt-1">
                             {pBs.toFixed(2)} Bs.
                           </div>
+                          {etiquetaIva && <div className="text-[10px] text-[#86868B] mt-0.5">{etiquetaIva}</div>}
                         </>
                       ) : (
                         <>
@@ -1629,6 +1651,7 @@ export default function CatalogoPublico() {
                           <div className="text-xs text-[#86868B] mt-1">
                             {SIMB}{pUsd.toFixed(2)} {COD}
                           </div>
+                          {etiquetaIva && <div className="text-[10px] text-[#86868B] mt-0.5">{etiquetaIva}</div>}
                         </>
                       )}
                     </div>
@@ -1703,17 +1726,20 @@ export default function CatalogoPublico() {
                   </h3>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="text-4xl sm:text-5xl font-black text-rose-600 tracking-tight leading-none" style={tienda.colorAcentoTienda ? { color: tienda.colorAcentoTienda } : undefined}>
-                      {SIMB}{(varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd).toFixed(2)}
+                      {SIMB}{precioVisible(varianteActual ?? productoDetalle).toFixed(2)}
                     </span>
                     <span className="text-[10px] font-bold text-neutral-400 tracking-wider uppercase">{COD}</span>
+                    {etiquetaIvaDe(productoDetalle) && (
+                      <span className="text-[10px] font-bold text-neutral-400 tracking-wider uppercase">{etiquetaIvaDe(productoDetalle)}</span>
+                    )}
                   </div>
                   <div style={sinBs ? { display: "none" } : undefined} className="mt-1.5 flex flex-col gap-0.5 text-xs font-mono text-neutral-500">
                     <span>
-                      {formatearMonto((varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd) * tasa)} Bs. <span className="text-neutral-400">(BCV)</span>
+                      {formatearMonto(precioVisible(varianteActual ?? productoDetalle) * tasa)} Bs. <span className="text-neutral-400">(BCV)</span>
                     </span>
                     {tienda?.tasaCop != null && tienda.tasaCop > 0 && (
                       <span>
-                        {formatearMonto((varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd) * tienda.tasaCop)} COP
+                        {formatearMonto(precioVisible(varianteActual ?? productoDetalle) * tienda.tasaCop)} COP
                       </span>
                     )}
                   </div>
@@ -2395,6 +2421,14 @@ export default function CatalogoPublico() {
                     <span>Total Bolívares (BCV {tasa.toFixed(2)}):</span>
                     <span className="font-bold text-rose-600 text-sm">{totalBs.toFixed(2)} Bs.</span>
                   </div>
+                  {impuestosTienda?.cobraIva && (
+                    <p className="text-[10.5px] text-neutral-400">Los montos ya incluyen el IVA ({impuestosTienda.alicuotaIva}%).</p>
+                  )}
+                  {impuestosTienda?.igtfActivo && (
+                    <p className="text-[10.5px] text-neutral-500">
+                      Si pagas en divisas se suma el IGTF ({impuestosTienda.alicuotaIgtf}%): {SIMB}{(Math.round(totalUsd * impuestosTienda.alicuotaIgtf) / 100).toFixed(2)} {COD}. Pagando en bolívares no aplica.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
