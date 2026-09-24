@@ -149,7 +149,7 @@ export default function Home() {
               onClick={() => navigate("/industrias")}
               className="text-sm font-light uppercase tracking-wide text-[#1D1D1F] border-b border-[#1D1D1F]/30 hover:border-[#1D1D1F] pb-0.5 transition-colors cursor-pointer"
             >
-              Ver los 6 rubros →
+              Ver los rubros →
             </button>
           </div>
 
