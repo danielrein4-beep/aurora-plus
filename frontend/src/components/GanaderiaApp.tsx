@@ -21,6 +21,8 @@ import { useAuth } from "../context/AuthContext";
 import { contarPendientesGanaderia, procesarColaGanaderia } from "../offlineQueueGanaderia";
 
 import BitacoraAuditoria from "./BitacoraAuditoria";
+import PersonalRoute from "./PersonalRoute";
+import PersonalPage from "../pages/Personal";
 import ModalImportarHato from "./ModalImportarHato";
 import TenantSoporteWidget from "./TenantSoporteWidget";
 import EngordeGanadero from "./EngordeGanadero";
@@ -829,6 +831,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             notificar={notificar}
             onCambio={cargarDatos}
           />
+        )}
+
+        {/* Obreros de la finca: directorio, jornadas y nómina (módulo Personal compartido). */}
+        {tab === "personal" && (
+          <PersonalRoute embebido>
+            <PersonalPage embedded />
+          </PersonalRoute>
         )}
 
         {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (

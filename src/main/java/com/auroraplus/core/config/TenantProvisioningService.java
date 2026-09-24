@@ -163,6 +163,17 @@ public class TenantProvisioningService {
             }
         }
 
+        // Ganadería incluye Personal y nómina de los obreros (directorio, jornadas y nómina).
+        if ("ganaderia".equals(moduloBackend)) {
+            for (String flag : List.of("personal", "asistencia", "nomina-avanzada")) {
+                ModuloTenant mt = new ModuloTenant();
+                mt.setTenantId(nuevoTenantId);
+                mt.setModuloNombre(flag);
+                mt.setActivo(true);
+                moduloTenantRepository.save(mt);
+            }
+        }
+
         if (Boolean.TRUE.equals(request.accesoTotal)) {
             if (licencia.getTipoLicencia().ordinal() < LicenciaTenant.TipoLicencia.INDUSTRIAL.ordinal()) {
                 licencia.setTipoLicencia(LicenciaTenant.TipoLicencia.INDUSTRIAL);

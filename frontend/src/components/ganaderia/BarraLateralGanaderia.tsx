@@ -1,4 +1,4 @@
-import { IconFileText, IconCalendar, IconChart, IconUsers, IconSyringe, IconMilk, IconPin, IconCow, IconTag, IconScale, IconCoins, IconDashboardGrid, IconUpload } from "../../Icons";
+import { IconFileText, IconCalendar, IconChart, IconUsers, IconSyringe, IconMilk, IconPin, IconCow, IconTag, IconScale, IconCoins, IconDashboardGrid, IconUpload, IconClipboardCheck } from "../../Icons";
 import type { AnimalGanaderia, PotreroGanaderia, AlertaSanitariaGanaderia } from "../../api";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { ModoVenta } from "./ModalVentaAnimales";
@@ -102,6 +102,7 @@ export default function BarraLateralGanaderia({
             { id: "sanidad" as const, Icon: IconSyringe, etiqueta: "Sanidad & Trazabilidad", badge: alertasSanitarias.length },
             { id: "eventos" as const, Icon: IconCalendar, etiqueta: "Centro de Eventos", badge: 0 },
             { id: "reportes" as const, Icon: IconChart, etiqueta: "Finanzas y reportes", badge: 0 },
+            { id: "personal" as const, Icon: IconClipboardCheck, etiqueta: "Personal y nómina", badge: 0 },
             ...(puedeVerAuditoria ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría", badge: 0 }] : []),
           ],
         },
