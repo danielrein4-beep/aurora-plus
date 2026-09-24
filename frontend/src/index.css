@@ -460,6 +460,31 @@ body {
   color: #FFFFFF !important;
 }
 
+/* El Mercado Ganadero sí se diseñó con superficies oscuras (cabecera, portada,
+   categorías, botones): ahí el texto blanco va sobre fondo oscuro a propósito,
+   así que se exceptúa de la neutralización de arriba. */
+.mercado-ganadero .text-white,
+.mercado-ganadero .text-white\/90,
+.mercado-ganadero .text-white\/85 {
+  color: #FFFFFF !important;
+}
+.mercado-ganadero .text-white\/80,
+.mercado-ganadero .text-white\/70 {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+.mercado-ganadero .text-white\/60,
+.mercado-ganadero .text-white\/50 {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* En teléfono el mercado tiene una barra de navegación fija abajo: el botón de
+   soporte sube para no taparla. */
+@media (max-width: 767px) {
+  body.con-barra-inferior .soporte-flotante {
+    bottom: 5.5rem;
+  }
+}
+
 .aurora-public-nav {
   background-color: rgba(255, 255, 255, 0.96) !important;
   border-bottom: 1px solid #E5E5EA !important;

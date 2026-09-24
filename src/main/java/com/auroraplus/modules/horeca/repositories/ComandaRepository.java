@@ -15,6 +15,12 @@ import java.util.List;
 @Repository
 public interface ComandaRepository extends JpaRepository<Comanda, Long>, JpaSpecificationExecutor<Comanda> {
 
+    /** Bloquea la comanda mientras se cobra: dos terminales no pueden cobrar la misma mesa a la vez. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM Comanda c WHERE c.id = :id")
+    java.util.Optional<Comanda> buscarConBloqueo(@org.springframework.data.repository.query.Param("id") Long id);
+
+
     List<Comanda> findByTenantIdOrderByFechaAperturaDesc(Long tenantId);
 
     List<Comanda> findByTenantIdAndEstadoOrderByFechaAperturaDesc(Long tenantId, Comanda.EstadoComanda estado);

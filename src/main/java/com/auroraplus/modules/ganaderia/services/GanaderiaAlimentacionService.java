@@ -30,7 +30,8 @@ public class GanaderiaAlimentacionService {
     @Autowired
     private MovimientoCajaRepository movimientoCajaRepository;
 
-    private static final String MONEDA_GANADERIA = "USD";
+    @Autowired
+    private com.auroraplus.core.financiero.services.MotorFinancieroService motorFinancieroService;
 
     @Transactional
     public InsumoAlimentacion registrarEntrada(Long tenantId, Long insumoId, BigDecimal cantidad, BigDecimal costoTotal, String motivo) {
@@ -66,7 +67,9 @@ public class GanaderiaAlimentacionService {
             egreso.setTenantId(tenantId);
             egreso.setTipo(MovimientoCaja.TipoMovimiento.EGRESO);
             egreso.setMonto(costoTotal);
-            egreso.setMoneda(MONEDA_GANADERIA);
+            // El costo se carga en la moneda del negocio (antes quedaba siempre en USD: una finca en
+            // pesos que compraba por 2.000.000 registraba un egreso de 2.000.000 dólares).
+            egreso.setMoneda(motorFinancieroService.obtenerMonedaBase(tenantId));
             egreso.setConcepto("Compra de insumo: " + insumo.getNombre() + " (" + cantidad + " " + insumo.getUnidadMedida() + ")");
             movimientoCajaRepository.save(egreso);
         }

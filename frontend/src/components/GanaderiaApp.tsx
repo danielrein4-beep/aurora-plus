@@ -1,3 +1,5 @@
+import { contarSinLeerMercado } from "../api";
+import { useNavigate } from "react-router-dom";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
 import {
@@ -132,6 +134,7 @@ const CATEGORIAS_GASTO_GANADERIA = [
 
 export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const tenantId = user?.tenantId ? Number(user.tenantId) : 1;
 
   // Tasas de cambio multi-moneda (configurables a mano y persistidas)
@@ -244,6 +247,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   // Pestaña principal activa
   const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
+  const [sinLeerMercado, setSinLeerMercado] = useState(0);
+  // Mensajes del mercado sin leer, para avisar en la pestaña aunque se esté en otra sección.
+  useEffect(() => {
+    const contar = () => contarSinLeerMercado().then((r) => setSinLeerMercado(Number(r.sinLeer))).catch(() => {});
+    contar();
+    const intervalo = setInterval(contar, 60_000);
+    return () => clearInterval(intervalo);
+  }, []);
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
@@ -1743,6 +1754,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
             }`}>
             <span>Centro de Reportes</span>
+          </button>
+
+          <button
+            onClick={() => navigate("/mercado")}
+            title="Abrir el Mercado Ganadero: compra y venta entre fincas de Aurora"
+            className="px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 bg-[#66B891] hover:bg-[#57A882] text-emerald-50 shadow-md shadow-[#66B891]/20">
+            <span>Mercado ganadero</span>
+            {sinLeerMercado > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] leading-none">{sinLeerMercado}</span>
+            )}
           </button>
 
           {user?.rol === "DUENO_ADMIN" && (

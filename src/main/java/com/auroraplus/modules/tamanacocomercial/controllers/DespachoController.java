@@ -256,8 +256,8 @@ public class DespachoController {
         String ticketUrl = despacho.getTicketUrl();
         if (ticketUrl != null && !ticketUrl.isEmpty()) {
             try {
-                String cleanPath = ticketUrl.startsWith("/") ? ticketUrl.substring(1) : ticketUrl;
-                java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(cleanPath));
+                java.nio.file.Path seguro = rutaTicketSegura(ticketUrl);
+                if (seguro != null) java.nio.file.Files.deleteIfExists(seguro);
             } catch (Exception ignored) {}
             despacho.setTicketUrl(null);
             despacho = despachoComercialRepository.save(despacho);
@@ -303,6 +303,20 @@ public class DespachoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * El ticketUrl viaja en el body del despacho, así que no se puede confiar en él: solo se
+     * aceptan archivos dentro de uploads/tickets. Antes, un ticketUrl como
+     * "src/main/resources/application.properties" permitía leer o borrar cualquier archivo.
+     */
+    private static java.nio.file.Path rutaTicketSegura(String ticketUrl) {
+        if (ticketUrl == null || ticketUrl.isBlank()) return null;
+        java.nio.file.Path base = java.nio.file.Paths.get("uploads", "tickets").toAbsolutePath().normalize();
+        String nombre = ticketUrl.replace('\\', '/').replaceFirst("^/?uploads/tickets/", "");
+        if (nombre.contains("/")) return null;
+        java.nio.file.Path ruta = base.resolve(nombre).normalize();
+        return ruta.startsWith(base) ? ruta : null;
+    }
+
     @GetMapping("/{id}/foto")
     public ResponseEntity<org.springframework.core.io.Resource> obtenerFotoDespacho(@PathVariable Long id) {
         Long tenantActual = TenantContext.getCurrentTenant();
@@ -313,12 +327,8 @@ public class DespachoController {
         }
 
         try {
-            String rutaFoto = despacho.getTicketUrl();
-            java.nio.file.Path path = java.nio.file.Paths.get(rutaFoto.replaceFirst("^/", ""));
-            if (!java.nio.file.Files.exists(path)) {
-                path = java.nio.file.Paths.get("uploads", rutaFoto.replaceFirst("^/?uploads/?", ""));
-            }
-            if (!java.nio.file.Files.exists(path)) {
+            java.nio.file.Path path = rutaTicketSegura(despacho.getTicketUrl());
+            if (path == null || !java.nio.file.Files.exists(path)) {
                 return ResponseEntity.notFound().build();
             }
 

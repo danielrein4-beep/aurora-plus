@@ -25,6 +25,7 @@ public class CierreCajaVetController {
     public ResponseEntity<CierreCajaVet> registrarCierre(
             @RequestParam(required = false) Long tenantId,
             @RequestBody CierreCajaVet cierre) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR");
         Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
@@ -34,6 +35,8 @@ public class CierreCajaVetController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarCierre(@PathVariable Long id) {
+        // Borrar un cierre de caja borra la evidencia de un descuadre: solo el dueño.
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN");
         cierreCajaVetService.eliminarCierre(id);
         return ResponseEntity.noContent().build();
     }

@@ -12,7 +12,7 @@ import java.util.Set;
  *   gestionar los usuarios de un negocio.
  * - FINANZAS: directorio en lectura, cobros, cortesías, planes, suspensiones,
  *   finanzas del SaaS y comisiones.
- * - ANALISTA: solo lectura del directorio, métricas, actividad y Canal Endémico.
+ * - ANALISTA: solo lectura del directorio, métricas, actividad, inteligencia y Canal Endémico.
  *
  * Todos pueden gestionar la seguridad de su propia cuenta (/seguridad).
  */
@@ -33,7 +33,7 @@ public final class PermisosSuperAdmin {
         if (ruta.startsWith("/equipo") || ruta.startsWith("/tenants/auditoria")) return false;
 
         // Lectura común a todo el equipo: directorio, analítica y vigilancia epidemiológica.
-        if (ruta.startsWith("/actividad") || ruta.startsWith("/canal-endemico")) return lectura;
+        if (ruta.startsWith("/actividad") || ruta.startsWith("/canal-endemico") || ruta.startsWith("/inteligencia")) return lectura;
         if (lectura && (ruta.equals("/tenants") || ruta.equals("/tenants/stats") || ruta.equals("/tenants/analytics")
                 || ruta.matches("/tenants/\\d+(/modulos|/usuarios)?"))) {
             return true;

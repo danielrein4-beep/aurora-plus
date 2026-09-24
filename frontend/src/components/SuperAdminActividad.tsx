@@ -17,6 +17,8 @@ const VERTICALES = [
   { id: "repuestos", tag: "COM", label: "Comercio & Retail" },
   { id: "minero", tag: "MIN", label: "Minería & Balanzas" },
   { id: "moda", tag: "MOD", label: "Moda & Calzado" },
+  { id: "construccion", tag: "CON", label: "Construcción & Obras" },
+  { id: "logistica", tag: "LOG", label: "Logística & Transporte" },
   { id: "tamanaco-comercial", tag: "TAM", label: "Tamanaco Enterprise" },
 ];
 
@@ -94,7 +96,7 @@ export default function SuperAdminActividad() {
   return (
     <div className="space-y-6">
       {/* SELECTOR DE VERTICAL CON RESUMEN */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-9 gap-3">
         {VERTICALES.map((v) => {
           const r = resumen.find((x) => x.vertical === v.id);
           const activo = v.id === vertical;

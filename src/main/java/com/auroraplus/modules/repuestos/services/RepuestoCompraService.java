@@ -24,6 +24,9 @@ import java.util.List;
 public class RepuestoCompraService {
 
     @Autowired
+    private AlmacenService almacenService;
+
+    @Autowired
     private CompraRepuestoRepository compraRepuestoRepository;
 
     @Autowired
@@ -88,7 +91,8 @@ public class RepuestoCompraService {
                 throw new RuntimeException("El costo unitario no puede ser negativo");
             }
 
-            RepuestoItem repuesto = repuestoItemRepository.findById(itemCompra.repuestoId)
+            // Con bloqueo: si una venta toca el mismo repuesto a la vez, espera en vez de pisar el stock.
+            RepuestoItem repuesto = repuestoItemRepository.buscarConBloqueoPesimista(itemCompra.repuestoId)
                 .orElseThrow(() -> new RuntimeException("Repuesto no encontrado: " + itemCompra.repuestoId));
 
             if (!repuesto.getTenantId().equals(tenantId)) {
@@ -103,6 +107,7 @@ public class RepuestoCompraService {
                 repuesto.setPrecioVenta(itemCompra.precioVenta);
             }
             repuestoItemRepository.save(repuesto);
+            almacenService.alinear(tenantId, repuesto.getId(), repuesto.getStockActual());
 
             BigDecimal subtotal = itemCompra.cantidad.multiply(itemCompra.costoUnitario);
             totalCompra = totalCompra.add(subtotal);

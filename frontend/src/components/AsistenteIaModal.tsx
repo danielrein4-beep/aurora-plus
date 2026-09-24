@@ -1,3 +1,4 @@
+import { leerSesion } from "../api";
 import React, { useState, useEffect, useRef } from "react";
 
 function SvgClose({ className = "w-5 h-5" }: { className?: string }) {
@@ -56,6 +57,12 @@ interface Props {
   onClose: () => void;
 }
 
+/** El asistente se configura con la sesión del negocio (la ruta pública ya no existe). */
+function cabecerasSesion(): Record<string, string> {
+  const token = leerSesion()?.token;
+  return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
 export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: Props) {
   const [tab, setTab] = useState<"simulador" | "config" | "meta">("simulador");
 
@@ -85,7 +92,7 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`/api/public/whatsapp/${tenantId}/config`)
+    fetch(`/api/comercio/whatsapp-ia/config`, { headers: cabecerasSesion() })
       .then((r) => r.json())
       .then((data) => {
         if (data.activa !== undefined) setActiva(data.activa);
@@ -114,9 +121,9 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
     setEnviando(true);
 
     try {
-      const res = await fetch(`/api/public/whatsapp/${tenantId}/simular`, {
+      const res = await fetch(`/api/comercio/whatsapp-ia/simular`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: cabecerasSesion(),
         body: JSON.stringify({ mensaje: texto, telefono: "584140000000" })
       });
 
@@ -151,9 +158,9 @@ export default function AsistenteIaModal({ tenantId, nombreNegocio, onClose }: P
     setGuardandoConfig(true);
     setMsgExitoConfig(null);
     try {
-      const res = await fetch(`/api/public/whatsapp/${tenantId}/config`, {
+      const res = await fetch(`/api/comercio/whatsapp-ia/config`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: cabecerasSesion(),
         body: JSON.stringify({ 
           activa, 
           saludo: saludo.trim(), 

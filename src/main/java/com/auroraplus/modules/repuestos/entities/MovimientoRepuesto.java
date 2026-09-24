@@ -63,7 +63,15 @@ public class MovimientoRepuesto {
     @Column(name = "costo_unitario", precision = 18, scale = 4)
     private BigDecimal costoUnitario;
 
-    public enum TipoMovimiento { COMPRA, VENTA, AJUSTE }
+    /** En una DEVOLUCION, la venta (movimiento VENTA) de la que vuelve la mercancía. */
+    @Column(name = "movimiento_origen_id")
+    private Long movimientoOrigenId;
+
+    public Long getMovimientoOrigenId() { return movimientoOrigenId; }
+    public void setMovimientoOrigenId(Long movimientoOrigenId) { this.movimientoOrigenId = movimientoOrigenId; }
+
+    /** DEVOLUCION: mercancía que un cliente regresa; resta en los reportes de ventas y utilidad. */
+    public enum TipoMovimiento { COMPRA, VENTA, AJUSTE, DEVOLUCION }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

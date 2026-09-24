@@ -67,7 +67,7 @@ public class InventarioRestController {
     @DeleteMapping("/pilas/{id}")
     public ResponseEntity<?> eliminarPila(@PathVariable Long id) {
         TamanacoAccessService.exigirDuenoAdmin();
-        if (!inventarioPatioRepository.existsById(id)) return ResponseEntity.notFound().build();
+        if (!inventarioPatioRepository.findById(id).filter(e -> String.valueOf(e.getTenantId()).equals(String.valueOf(com.auroraplus.core.config.TenantContext.getCurrentTenant()))).isPresent()) return ResponseEntity.notFound().build();
         inventarioPatioRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }

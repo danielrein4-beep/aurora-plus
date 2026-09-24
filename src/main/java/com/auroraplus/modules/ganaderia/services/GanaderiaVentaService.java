@@ -76,8 +76,10 @@ public class GanaderiaVentaService {
                 throw new RuntimeException("El precio de venta debe ser mayor a cero");
             }
 
-            Animal animal = animalRepository.findById(item.animalId)
-                .orElseThrow(() -> new RuntimeException("Animal no encontrado: " + item.animalId));
+            // Con bloqueo (dos ventas simultáneas del mismo animal no pasan las dos). La consulta aplica
+            // el filtro de tenant, así que un animal de otro negocio simplemente no aparece.
+            Animal animal = animalRepository.buscarConBloqueo(item.animalId).orElseThrow(() -> new RuntimeException(
+                "Violación de seguridad: Animal no encontrado o no pertenece a este tenant: " + item.animalId));
             if (!animal.getTenantId().equals(tenantId)) {
                 throw new RuntimeException("Violación de seguridad: Animal no pertenece a este tenant");
             }

@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import ModalCatalogoQR from "./ModalCatalogoQR";
 import PedidosWebPanel from "./PedidosWebPanel";
 import BitacoraAuditoria from "./BitacoraAuditoria";
+import DevolucionesComercio from "./DevolucionesComercio";
 import { useState, useMemo, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
@@ -30,6 +31,7 @@ import {
   listarPresentacionesRepuesto,
   crearPresentacionRepuesto,
   despacharPorPresentacion,
+  cobrarTicketPos,
   venderRepuestoPorVolumen,
   historialMovimientosRepuesto,
   listarProveedoresRepuesto,
@@ -2021,7 +2023,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // Dentro de "Cierres & Reportes": arqueo de caja (todos) vs. utilidad real por
   // producto (solo Dueño/Administrador — mismo criterio que el backend, ver
   // ReporteRepuestoController.exigirRol).
-  const [subCierre, setSubCierre] = useState<"caja" | "utilidad">("caja");
+  const [subCierre, setSubCierre] = useState<"caja" | "utilidad" | "devoluciones">("caja");
+  const [ticketADevolver, setTicketADevolver] = useState("");
+  const puedeDevolver = user?.rol === "DUENO_ADMIN" || user?.rol === "ENCARGADO_INVENTARIO";
   // "Administración" se expande en el propio sidebar y muestra sus submódulos
   // ahí mismo (Ingresos & Gastos / CXC-CXP / Cuentas Bancarias) — mismo patrón
   // que el "Cuentas" de Fina, en vez de pestañas horizontales dentro del panel.
@@ -2705,11 +2709,24 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
 
   useBarcodeScanner(manejarCodigoEscaneado, tab === "pos");
 
+  // Número del ticket en curso: se mantiene mientras el carrito y los pagos no cambien, así un
+  // reintento (p. ej. tras un corte de red) reusa el mismo número y el servidor reconoce que
+  // ese ticket ya se cobró en vez de cobrarlo otra vez.
+  const ticketEnCursoRef = useRef<{ numero: string; firma: string } | null>(null);
+
   // Finalizar Cobro
   const ejecutarCobro = async (esCredito = false) => {
     if (carrito.length === 0) return;
 
-    const numRecibo = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
+    const firmaCobro = JSON.stringify({
+      lineas: carrito.map((l) => [l.backendId, l.presentacionId ?? null, l.cantidad]),
+      esCredito, modoCobro, monedaRecibida, montoRecibido,
+      pagos: pagosMixtos.map((p) => [p.moneda, p.montoOriginal]),
+    });
+    if (!ticketEnCursoRef.current || ticketEnCursoRef.current.firma !== firmaCobro) {
+      ticketEnCursoRef.current = { numero: `TKT-${Math.floor(100000 + Math.random() * 900000)}`, firma: firmaCobro };
+    }
+    const numRecibo = ticketEnCursoRef.current.numero;
     
     // Calcular monto recibido en USD equivalente
     let recibidoEnUSD = totalUSD;
@@ -2807,24 +2824,36 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     // la cantidad o cancele.
     if (user?.tenantId) {
       try {
-        for (const item of carrito) {
-          if (!item.backendId) continue;
-          const claveIdemp = `${numRecibo}-${item.backendId}-${item.presentacionId || "base"}-${Date.now()}`;
-          if (item.presentacionId) {
-            // TODO: despacharPorPresentacion aún no soporta venta a crédito (solo venderRepuestoPorVolumen la
-            // soporta) — extenderlo igual antes de ofrecer crédito en ventas por presentación fraccionada.
-            await despacharPorPresentacion(item.presentacionId, user.tenantId, item.cantidad, monedaRecibida, ingresado || undefined, claveIdemp);
-          } else {
-            await venderRepuestoPorVolumen(
-              item.backendId, user.tenantId, item.cantidad, monedaRecibida, ingresado || undefined, claveIdemp,
-              undefined, esCredito ? 0 : undefined, esCredito ? 15 : undefined,
-              esCredito ? clienteParaVenta.nombre : undefined
-            );
-          }
+        // Todo el ticket en una sola operación: si una línea falla (p. ej. stock), no queda nada
+        // descontado ni cobrado. El pago mixto entra a caja en cada moneda real, y el crédito
+        // funciona también para presentaciones fraccionadas.
+        const lineas = carrito
+          .filter((item) => item.backendId)
+          .map((item) => ({ repuestoId: Number(item.backendId), presentacionId: item.presentacionId ?? null, cantidad: item.cantidad }));
+        let yaEstabaCobrada = false;
+        if (lineas.length > 0) {
+          const esMixto = modoCobro === "mixto" && !esCredito;
+          const resultado = await cobrarTicketPos({
+            numeroTicket: numRecibo,
+            lineas,
+            monedaPago: esMixto ? undefined : monedaRecibida,
+            metodoPago: esMixto || esCredito ? undefined : metodoPagoSel,
+            montoRecibido: esMixto ? undefined : (ingresado || undefined),
+            pagos: esMixto ? pagosMixtos.map((p) => ({ moneda: p.moneda, monto: p.montoOriginal, metodo: p.metodo })) : undefined,
+            vuelto: esMixto && vueltoFinal > 0 ? vueltoFinal : undefined,
+            monedaVuelto: esMixto && vueltoFinal > 0 ? monedaVuelto : undefined,
+            montoPagadoAhora: esCredito ? 0 : undefined,
+            diasCredito: esCredito ? 15 : undefined,
+            nombreCliente: esCredito ? clienteParaVenta.nombre : undefined,
+          });
+          yaEstabaCobrada = resultado.yaProcesado;
         }
+        ticketEnCursoRef.current = null;
         cargarRepuestosBackend();
         cargarIngresosCaja();
-        mostrarToast("Venta registrada y sincronizada en base de datos (Kárdex y Caja actualizados)", "success");
+        mostrarToast(yaEstabaCobrada
+          ? "Esta venta ya estaba registrada: no se cobró dos veces"
+          : "Venta registrada y sincronizada en base de datos (Kárdex y Caja actualizados)", "success");
       } catch (err: any) {
         console.error("Fallo al sincronizar venta en backend:", err);
         cargarRepuestosBackend(); // refresca el stock real por si otra venta concurrente ya lo cambió
@@ -4307,10 +4336,25 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   Utilidad Real
                 </button>
               )}
+              {puedeDevolver && (
+                <button
+                  onClick={() => setSubCierre("devoluciones")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    subCierre === "devoluciones" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400"
+                  }`}
+                >
+                  Devoluciones
+                </button>
+              )}
             </div>
 
             {subCierre === "caja" ? (
               <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
+            ) : subCierre === "devoluciones" && puedeDevolver ? (
+              <DevolucionesComercio
+                ticketInicial={ticketADevolver}
+                onDevuelto={(mensaje) => { mostrarToast(mensaje, "success"); cargarRepuestosBackend(); cargarIngresosCaja(); }}
+              />
             ) : (
               <UtilidadComercio />
             )}
@@ -4894,6 +4938,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                             <span className="font-mono font-black text-sm text-teal-600 dark:text-teal-400">{SIM()}{v.total.toFixed(2)}</span>
                             <span className={`text-[10px] text-slate-400 font-mono block ${modoEuro() ? "hidden" : ""}`}>Bs. {v.totalBs.toFixed(2)}</span>
                           </div>
+                          {puedeDevolver && v.numero.startsWith("TKT-") && (
+                            <button
+                              onClick={() => { setTicketADevolver(v.numero); setClienteHistorialModal(null); setTab("cierre"); setSubCierre("devoluciones"); }}
+                              className="px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/30 dark:hover:bg-rose-800/50 text-[10px] font-bold text-rose-700 dark:text-rose-300 cursor-pointer transition-colors"
+                              title="Devolver productos de esta venta"
+                            >
+                              Devolver
+                            </button>
+                          )}
                           <button
                             onClick={() => imprimirTicketComercio(v, nombreLocal, tasaActivaBs, tasaCop)}
                             className="px-2.5 py-1 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-[10px] font-bold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer transition-colors"

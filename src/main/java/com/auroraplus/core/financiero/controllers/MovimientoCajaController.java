@@ -39,6 +39,7 @@ public class MovimientoCajaController {
 
     @PostMapping
     public ResponseEntity<MovimientoCaja> registrar(@RequestParam Long tenantId, @RequestBody RegistrarMovimientoRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         if (request.tipo != MovimientoCaja.TipoMovimiento.INGRESO && request.tipo != MovimientoCaja.TipoMovimiento.EGRESO) {
             throw new RuntimeException("Solo se pueden registrar movimientos manuales de tipo INGRESO o EGRESO");
         }
@@ -82,6 +83,7 @@ public class MovimientoCajaController {
      */
     @PostMapping("/cuenta")
     public ResponseEntity<MovimientoCaja> registrarCuentaManual(@RequestParam Long tenantId, @RequestBody RegistrarCuentaManualRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         if (request.tipo != MovimientoCaja.TipoMovimiento.CXC && request.tipo != MovimientoCaja.TipoMovimiento.CXP) {
             throw new RuntimeException("Este endpoint solo registra cuentas manuales de tipo CXC o CXP");
         }
@@ -110,6 +112,7 @@ public class MovimientoCajaController {
     /** Registra un pago (total o parcial) sobre una cuenta por pagar/cobrar existente. */
     @PostMapping("/{id}/abonar")
     public ResponseEntity<MovimientoCaja> abonar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody AbonarRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         return ResponseEntity.ok(motorFinancieroService.abonarMovimiento(tenantId, id, request.monto, request.moneda));
     }
 
@@ -127,6 +130,7 @@ public class MovimientoCajaController {
      */
     @PostMapping("/{id}/comprobante")
     public ResponseEntity<?> subirComprobante(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody ComprobantePagoRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         if (request.capturaBase64 == null || request.capturaBase64.isBlank() || !request.capturaBase64.startsWith("data:image")) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", "La captura debe ser una imagen válida"));
         }

@@ -20,10 +20,11 @@ import java.util.List;
  * saber CÓMO se reparte ese total entre ubicaciones físicas, y poder
  * trasladar cantidad de una a otra.
  *
- * Límite honesto (documentado, no escondido): una venta de mostrador
- * descuenta el total sin preguntar de qué almacén salió físicamente — si el
- * negocio necesita que cada venta también descuente un almacén específico en
- * tiempo real, eso es una Fase 2 que toca RepuestoConversionService.
+ * Cada vez que el total cambia (venta, compra, ajuste, devolución, importación)
+ * se llama a {@link #alinear}: lo que sale se descuenta primero del almacén
+ * principal y luego de los demás; lo que entra llega al principal. Así la suma
+ * por almacén no se despega del total (antes las ventas no tocaban el reparto y
+ * los almacenes mostraban mercancía que ya no existía).
  */
 @Service
 public class AlmacenService {
@@ -77,7 +78,11 @@ public class AlmacenService {
         return almacenRepository.findByTenantIdOrderByEsPrincipalDescNombreAsc(tenantId);
     }
 
+    /** Reparto por almacén; si venía descuadrado de antes (ventas viejas que no lo tocaban), lo corrige al consultarlo. */
+    @Transactional
     public List<StockAlmacen> distribucion(Long tenantId, Long repuestoId) {
+        repuestoItemRepository.findById(repuestoId).filter(r -> r.getTenantId().equals(tenantId))
+            .ifPresent(r -> alinear(tenantId, repuestoId, r.getStockActual()));
         return stockAlmacenRepository.findByTenantIdAndRepuestoId(tenantId, repuestoId);
     }
 
@@ -115,6 +120,51 @@ public class AlmacenService {
             });
         filaDestino.setCantidad(filaDestino.getCantidad().add(cantidad));
         stockAlmacenRepository.save(filaDestino);
+    }
+
+    /**
+     * Deja la suma por almacén igual al stock total del repuesto. Si el negocio no usa almacenes
+     * (nunca se creó el principal) no hace nada: el principal nace con todo el stock existente.
+     * Corrige también descuadres viejos, porque compara contra el total y no contra un delta.
+     */
+    @Transactional
+    public void alinear(Long tenantId, Long repuestoId, BigDecimal stockTotal) {
+        if (stockTotal == null) return;
+        Almacen principal = almacenRepository.findByTenantIdAndEsPrincipalTrue(tenantId).orElse(null);
+        if (principal == null) return;
+        List<StockAlmacen> filas = new java.util.ArrayList<>(stockAlmacenRepository.findByTenantIdAndRepuestoId(tenantId, repuestoId));
+        BigDecimal asignado = filas.stream().map(StockAlmacen::getCantidad).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal diferencia = stockTotal.max(BigDecimal.ZERO).subtract(asignado);
+        if (diferencia.signum() == 0) return;
+
+        if (diferencia.signum() > 0) {
+            StockAlmacen filaPrincipal = filas.stream().filter(f -> f.getAlmacenId().equals(principal.getId())).findFirst()
+                .orElseGet(() -> {
+                    StockAlmacen nueva = new StockAlmacen();
+                    nueva.setTenantId(tenantId);
+                    nueva.setAlmacenId(principal.getId());
+                    nueva.setRepuestoId(repuestoId);
+                    nueva.setCantidad(BigDecimal.ZERO);
+                    return nueva;
+                });
+            filaPrincipal.setCantidad(filaPrincipal.getCantidad().add(diferencia));
+            stockAlmacenRepository.save(filaPrincipal);
+            return;
+        }
+
+        // Sale mercancía: primero del principal, luego de los almacenes con más cantidad.
+        filas.sort(java.util.Comparator
+            .comparing((StockAlmacen f) -> !f.getAlmacenId().equals(principal.getId()))
+            .thenComparing(StockAlmacen::getCantidad, java.util.Comparator.reverseOrder()));
+        BigDecimal porQuitar = diferencia.negate();
+        for (StockAlmacen fila : filas) {
+            if (porQuitar.signum() == 0) break;
+            BigDecimal quita = fila.getCantidad().min(porQuitar);
+            if (quita.signum() <= 0) continue;
+            fila.setCantidad(fila.getCantidad().subtract(quita));
+            stockAlmacenRepository.save(fila);
+            porQuitar = porQuitar.subtract(quita);
+        }
     }
 
     public List<StockAlmacen> ubicacionesDelTenant(Long tenantId) {

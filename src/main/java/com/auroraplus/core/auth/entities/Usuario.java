@@ -86,6 +86,15 @@ public class Usuario {
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public Rol getRol() { return rol; }
+
+    /** "soporte-superadmin" es el usuario con que el super-admin entra a un negocio: ningún negocio puede crearlo. */
+    @jakarta.persistence.PrePersist
+    @jakarta.persistence.PreUpdate
+    void validarNombreReservado() {
+        if (username != null && username.trim().toLowerCase().startsWith("soporte-superadmin")) {
+            throw new IllegalArgumentException("Ese nombre de usuario está reservado");
+        }
+    }
     public void setRol(Rol rol) { this.rol = rol; }
     public String getNombreCompleto() { return nombreCompleto; }
     public void setNombreCompleto(String nombreCompleto) { this.nombreCompleto = nombreCompleto; }

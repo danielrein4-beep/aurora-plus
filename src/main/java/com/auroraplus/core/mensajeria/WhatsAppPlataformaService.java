@@ -42,6 +42,47 @@ public class WhatsAppPlataformaService {
     @Value("${PLATAFORMA_WHATSAPP_PLANTILLA_CODIGO:}")
     private String plantilla;
 
+    /** Plantilla "Utilidad" con un solo parámetro {{1}} para avisos de la plataforma (p. ej. el Mercado Ganadero). */
+    @Value("${PLATAFORMA_WHATSAPP_PLANTILLA_AVISO:}")
+    private String plantillaAviso;
+
+    public boolean avisosConfigurados() {
+        return !phoneNumberId.isBlank() && !token.isBlank() && !plantillaAviso.isBlank();
+    }
+
+    /** Envía un aviso corto con la plantilla de avisos. Lanza excepción si Meta lo rechaza. */
+    public void enviarAviso(String telefonoE164, String texto) {
+        if (!avisosConfigurados()) {
+            throw new IllegalStateException("La plantilla de avisos de WhatsApp no está configurada");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("messaging_product", "whatsapp");
+        body.put("to", telefonoE164.replace("+", ""));
+        body.put("type", "template");
+        body.put("template", Map.of(
+            "name", plantillaAviso,
+            "language", Map.of("code", "es"),
+            "components", List.of(Map.of("type", "body", "parameters", List.of(Map.of("type", "text", "text", texto))))
+        ));
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + "/" + phoneNumberId + "/messages"))
+                .header("Authorization", "Bearer " + token)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body), StandardCharsets.UTF_8))
+                .build();
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.error("WhatsApp de plataforma (aviso) respondió {}: {}", response.statusCode(), response.body());
+                throw new RuntimeException("No se pudo enviar el aviso por WhatsApp");
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("No se pudo enviar el aviso por WhatsApp: " + e.getMessage(), e);
+        }
+    }
+
     public boolean estaConfigurado() {
         return !phoneNumberId.isBlank() && !token.isBlank() && !plantilla.isBlank();
     }

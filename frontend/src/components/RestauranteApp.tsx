@@ -276,7 +276,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const [ventasHoy, setVentasHoy] = useState<{ total: number; moneda: string } | null>(null);
   const cargarVentasHoy = () => {
     monedaBase(tenantId)
-      .then((moneda) => resumenPeriodoAbierto(tenantId, moneda).then((r) => setVentasHoy({ total: Number(r.totalIngresos), moneda })))
+      .then((moneda) => resumenPeriodoAbierto(tenantId, moneda).then((r) => setVentasHoy(r.arqueoCiego ? null : { total: Number(r.totalIngresos), moneda })))
       .catch(() => setVentasHoy(null));
   };
   const registrarVenta = (_monto: number, _metodo: string) => {
@@ -10916,7 +10916,13 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
           </p>
         </div>
 
-        {resumen && (
+        {resumen?.arqueoCiego && (
+          <p className="text-xs text-slate-600 dark:text-white/60 bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
+            Arqueo ciego: cuenta el efectivo de la gaveta y declara lo que tienes. El sistema compara con lo esperado al cerrar
+            ({resumen.cantidadMovimientos} movimientos en el período).
+          </p>
+        )}
+        {resumen && !resumen.arqueoCiego && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
               <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Ingresos</div>
@@ -10927,7 +10933,7 @@ function CierreDeCaja({ tenantId }: { tenantId: number }) {
               <div className="font-['Outfit'] font-black text-lg text-red-500">{fmtNumero(resumen.totalEgresos, moneda)}</div>
             </div>
             <div className="bg-slate-100/60 dark:bg-white/5 rounded-xl p-3.5">
-              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Esperado en caja</div>
+              <div className="text-[10px] text-slate-500 dark:text-white/40 uppercase tracking-wider">Efectivo esperado</div>
               <div className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{fmtNumero(resumen.montoEsperadoEnCaja, moneda)}</div>
             </div>
           </div>

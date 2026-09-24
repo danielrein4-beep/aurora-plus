@@ -64,6 +64,12 @@ public class HorecaController {
     public ResponseEntity<Comanda> agregarConsumo(
             @PathVariable Long comandaId,
             @RequestParam BigDecimal montoItem) {
+        // Consumo suelto sin ítem ni receta: reservado a quien maneja la caja.
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR");
+        // Un monto negativo aquí bajaba el total sin ítem ni rastro; los descuentos van como ítem "CARGOS".
+        if (montoItem == null || montoItem.signum() <= 0) {
+            throw new RuntimeException("El monto del consumo debe ser mayor que cero");
+        }
         Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(horecaService.agregarConsumo(comandaId, tenantId, montoItem));
     }

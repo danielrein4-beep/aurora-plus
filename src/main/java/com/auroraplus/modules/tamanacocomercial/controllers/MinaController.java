@@ -64,7 +64,7 @@ public class MinaController {
     @Transactional
     public ResponseEntity<Map<String, String>> eliminarPermanente(@PathVariable Long id) {
         TamanacoAccessService.exigirDuenoAdmin();
-        if (!minaRepository.existsById(id)) {
+        if (!minaRepository.findById(id).filter(e -> String.valueOf(e.getTenantId()).equals(String.valueOf(com.auroraplus.core.config.TenantContext.getCurrentTenant()))).isPresent()) {
             return ResponseEntity.notFound().build();
         }
         try {

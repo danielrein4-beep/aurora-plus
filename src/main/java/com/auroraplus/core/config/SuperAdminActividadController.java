@@ -56,7 +56,8 @@ public class SuperAdminActividadController {
             new Metrica("comandas", "Comandas", "comandas", "fecha_apertura", "total_consumo", "fecha_anulacion IS NULL"),
             new Metrica("reservas", "Reservas", "reservas_horeca", "fecha_creacion")
         )),
-        new Vertical("repuestos", List.of("repuestos", "ferreteria"), List.of(
+        new Vertical("repuestos", List.of("repuestos", "ferreteria", "comercio", "retail", "farmacia"), List.of(
+            new Metrica("ventasPos", "Ventas del POS", "ventas_mostrador", "fecha_registro", "total", null),
             new Metrica("ventas", "Ventas mostrador", "ventas_comerciales", "fecha", "total_usd", null),
             new Metrica("ventasRetail", "Ventas retail", "ventas_retail", "fecha_registro", "total", null),
             new Metrica("productos", "Productos creados", "productos_comerciales", "created_at"),
@@ -69,6 +70,15 @@ public class SuperAdminActividadController {
         new Vertical("moda", List.of("moda"), List.of(
             new Metrica("ventasModa", "Ventas", "ventas_moda", "fecha", "total", null),
             new Metrica("productosModa", "Productos en catálogo", "productos_moda", null)
+        )),
+        new Vertical("construccion", List.of("construccion"), List.of(
+            new Metrica("proyectos", "Proyectos de obra", "proyectos_construccion", "created_at", "monto_presupuesto_total", null),
+            new Metrica("valuaciones", "Valuaciones emitidas", "valuaciones_construccion", "fecha_emision", "monto_neto_a_cobrar", null),
+            new Metrica("bitacora", "Entradas de bitácora", "bitacora_construccion", "fecha"),
+            new Metrica("despachosObra", "Despachos a obra", "despachos_construccion", "fecha_hora_salida")
+        )),
+        new Vertical("logistica", List.of("logistica"), List.of(
+            new Metrica("rutas", "Rutas despachadas", "rutas_transporte", "fecha_despacho", "costo_flete", null)
         )),
         new Vertical("tamanaco-comercial", List.of("tamanaco-comercial"), List.of(
             new Metrica("facturas", "Facturas emitidas", "facturas_comercial", "fecha_emision", "total", null),
@@ -290,7 +300,8 @@ public class SuperAdminActividadController {
     private static boolean esColumnaDate(Metrica m) {
         return switch (m.tabla() + "." + m.columnaFecha()) {
             case "salud_citas.fecha", "salud_odontologia_evolucion_sesiones.fecha_sesion", "registros_ordeno.fecha",
-                 "registros_peso.fecha", "facturas_comercial.fecha_emision" -> true;
+                 "registros_peso.fecha", "facturas_comercial.fecha_emision",
+                 "valuaciones_construccion.fecha_emision", "bitacora_construccion.fecha" -> true;
             default -> false;
         };
     }

@@ -4,8 +4,55 @@
     {
       "name": "aurora-frontend-claude",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev", "--", "--port", "8445", "--strictPort"],
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "8445",
+        "--strictPort"
+      ],
       "port": 8445,
+      "autoPort": false
+    },
+    {
+      "name": "aurora-frontend-mercado-prueba",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "8447",
+        "--strictPort"
+      ],
+      "env": {
+        "AURORA_API_TARGET": "http://localhost:8090"
+      },
+      "port": 8447,
+      "autoPort": false
+    },
+    {
+      "name": "aurora-landing-companera",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:/Users/Windows/Projects/aurora-plus-landing-companera/frontend",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "8448",
+        "--strictPort"
+      ],
+      "env": {
+        "AURORA_API_TARGET": "http://localhost:8090"
+      },
+      "port": 8448,
       "autoPort": false
     }
   ]

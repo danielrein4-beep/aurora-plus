@@ -47,9 +47,10 @@ public class TesoreriaService {
         LocalDateTime desde = ultimoArqueo.map(ArqueoCaja::getFechaArqueo).orElse(LocalDateTime.of(2000, 1, 1, 0, 0));
 
         // 1. Extraer movimientos del período (desde el último cierre hasta ahora)
-        BigDecimal totalIngresos = movimientoCajaRepository.sumarMontoPorTipoYMonedaEntreFechas(
+        // Solo efectivo: un cobro por pago móvil o tarjeta no está en la gaveta que el cajero cuenta.
+        BigDecimal totalIngresos = movimientoCajaRepository.sumarEfectivoPorTipoYMonedaEntreFechas(
             tenantId, moneda, MovimientoCaja.TipoMovimiento.INGRESO, desde, ahora);
-        BigDecimal totalEgresos = movimientoCajaRepository.sumarMontoPorTipoYMonedaEntreFechas(
+        BigDecimal totalEgresos = movimientoCajaRepository.sumarEfectivoPorTipoYMonedaEntreFechas(
             tenantId, moneda, MovimientoCaja.TipoMovimiento.EGRESO, desde, ahora);
 
         // 2. Calcular diferencia matemática real del período
