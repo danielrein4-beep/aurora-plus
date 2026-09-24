@@ -10,6 +10,7 @@ import {
   type RegistroPesoGanaderia,
 } from "../api";
 import { fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
+import { useConfirmar } from "./ganaderia/DialogoConfirmar";
 
 /**
  * Control de engorde del hato: GDP (ganancia diaria de peso) de cada animal activo,
@@ -40,6 +41,7 @@ function colorGdp(gdp: number | null) {
 }
 
 export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, onCambio }: Props) {
+  const { confirmar, dialogo } = useConfirmar();
   const [filas, setFilas] = useState<FilaEngordeGanaderia[]>([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState("");
@@ -120,7 +122,7 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
   };
 
   const borrar = async (animalId: number, registro: RegistroPesoGanaderia) => {
-    if (!window.confirm(`¿Eliminar el pesaje de ${fmt(registro.pesoKg)} kg del ${fechaCorta(registro.fecha)}?`)) return;
+    if (!(await confirmar(`¿Eliminar el pesaje de ${fmt(registro.pesoKg)} kg del ${fechaCorta(registro.fecha)}?`, { accion: "Eliminar pesaje", peligro: true }))) return;
     setGuardando(true);
     try {
       await eliminarPesoGanaderia(registro.id);
@@ -164,6 +166,7 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
 
   return (
     <div className="space-y-5 text-left">
+      {dialogo}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Engorde del Hato</h3>
@@ -190,7 +193,7 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
         ].map(k => (
           <div key={k.etiqueta} className="rounded-2xl border border-slate-200 bg-white p-4">
             <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">{k.etiqueta}</div>
-            <div className={`font-mono font-black text-xl mt-1 ${k.clase}`}>{k.valor}</div>
+            <div className={`tabular-nums font-black text-xl mt-1 ${k.clase}`}>{k.valor}</div>
           </div>
         ))}
       </div>
@@ -243,28 +246,28 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
                   title="Ver, registrar y corregir pesajes"
                 >
                   <td className="p-3">
-                    <span className="font-mono font-semibold text-teal-800">{f.arete}</span>
+                    <span className="tabular-nums font-semibold text-teal-800">{f.arete}</span>
                     <span className="ml-2 text-slate-700">{f.nombre || f.tipoAnimal || ""}</span>
                     {f.raza && <span className="ml-1 text-slate-400">· {f.raza}</span>}
                   </td>
                   <td className="p-3 text-slate-600">{f.potrero || (f.lote ? null : "—")}{f.lote ? <span className="text-slate-400">{f.potrero ? " · " : ""}{f.lote}</span> : null}</td>
-                  <td className="p-3 text-right font-mono text-slate-700">
+                  <td className="p-3 text-right tabular-nums text-slate-700">
                     {f.pesoInicial != null ? `${fmt(f.pesoInicial)} kg` : "—"}
                     {f.fechaInicial && <div className="text-[10px] text-slate-400">{fechaCorta(f.fechaInicial)}</div>}
                   </td>
-                  <td className="p-3 text-right font-mono text-slate-900">
+                  <td className="p-3 text-right tabular-nums text-slate-900">
                     {f.pesoUltimo != null ? `${fmt(f.pesoUltimo)} kg` : "—"}
                     {f.fechaUltimo && <div className="text-[10px] text-slate-400">{fechaCorta(f.fechaUltimo)}</div>}
                   </td>
-                  <td className="p-3 text-right font-mono text-slate-600">{fmt(f.dias)}</td>
-                  <td className="p-3 text-right font-mono text-slate-700">{f.gananciaTotalKg != null ? `${f.gananciaTotalKg >= 0 ? "+" : ""}${fmt(f.gananciaTotalKg)} kg` : "—"}</td>
-                  <td className={`p-3 text-right font-mono font-bold ${colorGdp(f.gdpKgDia)}`}>
+                  <td className="p-3 text-right tabular-nums text-slate-600">{fmt(f.dias)}</td>
+                  <td className="p-3 text-right tabular-nums text-slate-700">{f.gananciaTotalKg != null ? `${f.gananciaTotalKg >= 0 ? "+" : ""}${fmt(f.gananciaTotalKg)} kg` : "—"}</td>
+                  <td className={`p-3 text-right tabular-nums font-bold ${colorGdp(f.gdpKgDia)}`}>
                     {f.gdpKgDia != null ? `${fmt(f.gdpKgDia, 3)}` : "—"}
                   </td>
-                  <td className={`p-3 text-right font-mono ${colorGdp(f.gdpUltimoPeriodoKgDia)}`}>
+                  <td className={`p-3 text-right tabular-nums ${colorGdp(f.gdpUltimoPeriodoKgDia)}`}>
                     {f.gdpUltimoPeriodoKgDia != null ? `${fmt(f.gdpUltimoPeriodoKgDia, 3)}` : "—"}
                   </td>
-                  <td className="p-3 text-right font-mono text-slate-600">{f.cantidadPesajes}</td>
+                  <td className="p-3 text-right tabular-nums text-slate-600">{f.cantidadPesajes}</td>
                 </tr>
                 {expandido === f.animalId && (
                   <tr className="bg-slate-50/70">
@@ -288,7 +291,7 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
                                         <input type="date" max={fechaLocalISO()} value={ed.fecha} onChange={e => setEdicion(p => ({ ...p, [r.id]: { ...ed, fecha: e.target.value } }))} className={campo} />
                                       ) : fechaCorta(r.fecha)}
                                     </td>
-                                    <td className="p-2 text-right font-mono">
+                                    <td className="p-2 text-right tabular-nums">
                                       {ed ? (
                                         <input type="number" min="0" step="0.5" value={ed.pesoKg} onChange={e => setEdicion(p => ({ ...p, [r.id]: { ...ed, pesoKg: e.target.value } }))} className={`${campo} w-24 text-right`} />
                                       ) : fmt(r.pesoKg, 1)}

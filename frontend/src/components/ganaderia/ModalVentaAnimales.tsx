@@ -5,6 +5,7 @@ import {
   type AnimalGanaderia,
 } from "../../api";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
+import { num } from "./formato";
 
 export type ModoVenta = "INDIVIDUAL" | "MULTIPLE";
 
@@ -288,7 +289,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                           )}
                           className="rounded accent-teal-700 focus:ring-0"
                         />
-                        <span className="font-mono text-teal-800">{a.arete}</span>
+                        <span className="tabular-nums text-teal-800">{a.arete}</span>
                         <span className="truncate">{a.nombre || a.tipoAnimal}{a.raza ? ` · ${a.raza}` : ""}</span>
                       </label>
                       {isSel ? (
@@ -300,7 +301,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                             value={pesosVenta[a.id] ?? String(a.pesoActual || "")}
                             onFocus={e => e.target.select()}
                             onChange={e => setPesosVenta(prev => ({ ...prev, [a.id]: e.target.value }))}
-                            className="w-20 px-2 py-1 rounded-md border border-slate-300 bg-white text-right font-mono text-[11px] text-slate-900 focus:border-teal-600 focus:outline-none"
+                            className="w-20 px-2 py-1 rounded-md border border-slate-300 bg-white text-right tabular-nums text-[11px] text-slate-900 focus:border-teal-600 focus:outline-none"
                           />
                           <span className="text-[10px] text-slate-500">kg</span>
                         </div>
@@ -343,7 +344,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                 placeholder="Ej. 480"
                 value={formVenta.pesoSalida || ""}
                 onChange={e => setFormVenta({ ...formVenta, pesoSalida: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums"
               />
             </div>
           )}
@@ -359,7 +360,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                 placeholder="Ej. 2.20"
                 value={formVenta.precioPorKg || ""}
                 onChange={e => setFormVenta({ ...formVenta, precioPorKg: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-emerald-300 font-mono"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-emerald-300 tabular-nums"
               />
             </div>
             <div>
@@ -376,13 +377,13 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                 placeholder="Ej. 1100"
                 value={formVenta.precioPorKg > 0 ? totalEstimado.toFixed(2) : (formVenta.precioUSD || "")}
                 onChange={e => setFormVenta({ ...formVenta, precioUSD: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono disabled:opacity-60"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums disabled:opacity-60"
               />
             </div>
           </div>
           {formVenta.precioPorKg > 0 && (
             <p className="text-[10px] text-emerald-400 -mt-1">
-              {pesoTotalSeleccion} kg × ${formVenta.precioPorKg}/kg = ${totalEstimado.toFixed(2)} USD
+              {pesoTotalSeleccion} kg × ${formVenta.precioPorKg}/kg = ${num(totalEstimado, 2)} USD
               {ventaModo === "MULTIPLE" ? " (repartido por el peso real de cada animal)" : ""}
             </p>
           )}

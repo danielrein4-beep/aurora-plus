@@ -365,7 +365,7 @@ export default function ModalVacunacion({
                               }}
                               className="rounded text-emerald-500 focus:ring-0"
                             />
-                            <span className="font-mono text-emerald-400">{a.arete}</span>
+                            <span className="tabular-nums text-emerald-400">{a.arete}</span>
                             <span>{a.nombre || a.tipoAnimal}</span>
                           </div>
                           <span className="text-[10px] text-slate-400">{a.lote || a.potrero?.nombre || ""}</span>
@@ -475,7 +475,7 @@ export default function ModalVacunacion({
                         min="0"
                         value={nuevaVacunaForm.diasRetiroLeche}
                         onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasRetiroLeche: Number(e.target.value) })}
-                        className="w-full p-2 rounded-lg bg-slate-900 border border-rose-500/30 text-rose-300 font-mono font-bold text-xs"
+                        className="w-full p-2 rounded-lg bg-slate-900 border border-rose-500/30 text-rose-300 tabular-nums font-bold text-xs"
                       />
                     </div>
                     <div>
@@ -486,7 +486,7 @@ export default function ModalVacunacion({
                         min="0"
                         value={nuevaVacunaForm.diasRetiroCarne}
                         onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasRetiroCarne: Number(e.target.value) })}
-                        className="w-full p-2 rounded-lg bg-slate-900 border border-amber-500/30 text-amber-300 font-mono font-bold text-xs"
+                        className="w-full p-2 rounded-lg bg-slate-900 border border-amber-500/30 text-amber-300 tabular-nums font-bold text-xs"
                       />
                     </div>
                     <div>
@@ -497,7 +497,7 @@ export default function ModalVacunacion({
                         min="0"
                         value={nuevaVacunaForm.diasParaRefuerzo}
                         onChange={e => setNuevaVacunaForm({ ...nuevaVacunaForm, diasParaRefuerzo: Number(e.target.value) })}
-                        className="w-full p-2 rounded-lg bg-slate-900 border border-sky-500/30 text-sky-300 font-mono font-bold text-xs"
+                        className="w-full p-2 rounded-lg bg-slate-900 border border-sky-500/30 text-sky-300 tabular-nums font-bold text-xs"
                       />
                     </div>
                   </div>
@@ -537,7 +537,7 @@ export default function ModalVacunacion({
                       : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                   }`}>
                     <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1"><IconMilk size={10} /> Retiro Leche</span>
-                    <span className="font-bold font-mono text-xs">{vacunaSel.diasRetiroLeche ?? 0} días</span>
+                    <span className="font-bold tabular-nums text-xs">{vacunaSel.diasRetiroLeche ?? 0} días</span>
                   </div>
 
                   <div className={`p-2 rounded-xl border text-center ${
@@ -546,12 +546,12 @@ export default function ModalVacunacion({
                       : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                   }`}>
                     <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1"><IconMeat size={10} /> Retiro Carne</span>
-                    <span className="font-bold font-mono text-xs">{vacunaSel.diasRetiroCarne ?? 0} días</span>
+                    <span className="font-bold tabular-nums text-xs">{vacunaSel.diasRetiroCarne ?? 0} días</span>
                   </div>
 
                   <div className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-center">
                     <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1"><IconRefresh size={10} /> Próx. Refuerzo</span>
-                    <span className="font-bold font-mono text-xs">{vacunaSel.diasParaRefuerzo ?? 0} días</span>
+                    <span className="font-bold tabular-nums text-xs">{vacunaSel.diasParaRefuerzo ?? 0} días</span>
                   </div>
                 </div>
               )}
@@ -565,7 +565,7 @@ export default function ModalVacunacion({
                   type="text"
                   value={formVacuna.lote}
                   onChange={e => setFormVacuna({ ...formVacuna, lote: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums"
                   placeholder="Ej. B-2026-09"
                 />
               </div>
@@ -579,7 +579,7 @@ export default function ModalVacunacion({
                   placeholder="0,00"
                   value={formVacuna.costo || ""}
                   onChange={e => setFormVacuna({ ...formVacuna, costo: Number(e.target.value) })}
-                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums"
                 />
               </div>
             </div>

@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { IconEdit, IconCow, IconCoins, IconUpload } from "../../Icons";
 import { type AnimalGanaderia, type PotreroGanaderia, type AlertaSanitariaGanaderia, type PrenezActualGanaderia, descargarInventarioHatoPdf } from "../../api";
 import { BotonPdf } from "../ReportesCampoGanaderia";
+import { kg } from "./formato";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { ModoVenta } from "./ModalVentaAnimales";
 import type { Notificar, TabGanaderia, SubInventario, SubSanidad } from "./tipos";
@@ -115,8 +116,15 @@ export default function SeccionHato({
   const totalPrenadas = prenezPorPadrote.reduce((s, g) => s + g.prenadas, 0);
 
   // Filtrado de animales
+  // Mismas categorías que la matriz ("Ver fichas" de Becerros incluye los TERNERO); los vendidos aparte.
+  const esActivo = (a: AnimalGanaderia) => a.estado === "ACTIVO" || !a.estado;
+  const vendidos = animales.filter(a => a.estado === "VENDIDO").length;
   const animalesFiltrados = animales.filter(a => {
-    const coincideCat = filtroCategoria === "TODOS" || a.tipoAnimal?.toUpperCase() === filtroCategoria.toUpperCase();
+    const categoria = categoriasHato.find(c => c.key === filtroCategoria);
+    const coincideCat = filtroCategoria === "TODOS" ? esActivo(a)
+      : filtroCategoria === "VENDIDOS" ? a.estado === "VENDIDO"
+      : categoria ? esActivo(a) && categoria.filter(a)
+      : a.tipoAnimal?.toUpperCase() === filtroCategoria.toUpperCase();
     const coincideBusqueda =
       a.arete.toLowerCase().includes(busquedaArete.toLowerCase()) ||
       (a.nombre && a.nombre.toLowerCase().includes(busquedaArete.toLowerCase())) ||
@@ -184,7 +192,7 @@ export default function SeccionHato({
           <button
             onClick={exportarInventarioXLSX}
             className="apple-glass-btn text-xs font-bold px-3.5 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer">
-            Descargar XLSX
+            Descargar Excel
           </button>
         </div>
       </div>
@@ -222,10 +230,10 @@ export default function SeccionHato({
                           <span>{cat.label}</span>
                         </button>
                       </td>
-                      <td className="p-4 text-center font-mono font-black text-emerald-500 dark:text-emerald-400 text-sm">
+                      <td className="p-4 text-center tabular-nums font-black text-emerald-500 dark:text-emerald-400 text-sm">
                         {cat.count}
                       </td>
-                      <td className="p-4 text-center font-mono text-slate-600 dark:text-white/70">
+                      <td className="p-4 text-center tabular-nums text-slate-600 dark:text-white/70">
                         {cat.pesoPromedio > 0 ? `${cat.pesoPromedio} kg` : "-"}
                       </td>
                       <td className="p-4 text-center">
@@ -233,7 +241,7 @@ export default function SeccionHato({
                           <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
                             <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct}%` }} />
                           </div>
-                          <span className="font-mono text-[11px] text-slate-400">{pct}%</span>
+                          <span className="tabular-nums text-[11px] text-slate-400">{pct}%</span>
                         </div>
                       </td>
                       <td className="p-4 text-right">
@@ -247,7 +255,7 @@ export default function SeccionHato({
                     {expandida && desglosePorRaza(animalesActivos.filter(cat.filter)).map(g => (
                       <tr key={`${cat.key}-${g.raza}`} className="bg-slate-50/70 dark:bg-white/[0.02]">
                         <td className="py-2.5 pl-11 pr-4 text-slate-700 dark:text-white/80">{g.raza}</td>
-                        <td className="py-2.5 px-4 text-center font-mono font-bold text-slate-900 dark:text-white">{g.cabezas}</td>
+                        <td className="py-2.5 px-4 text-center tabular-nums font-bold text-slate-900 dark:text-white">{g.cabezas}</td>
                         <td colSpan={3} className="py-2.5 px-4 text-slate-600 dark:text-white/60">
                           {g.prenadas > 0 ? (
                             <span>
@@ -273,11 +281,11 @@ export default function SeccionHato({
                       </div>
                     )}
                   </td>
-                  <td className="p-4 text-center font-mono text-emerald-500 dark:text-emerald-400 text-base">{totalAnimales}</td>
-                  <td className="p-4 text-center font-mono text-slate-600 dark:text-white/70">
+                  <td className="p-4 text-center tabular-nums text-emerald-500 dark:text-emerald-400 text-base">{totalAnimales}</td>
+                  <td className="p-4 text-center tabular-nums text-slate-600 dark:text-white/70">
                     {Math.round(animalesActivos.reduce((sum, a) => sum + (a.pesoActual || 0), 0) / Math.max(1, totalAnimales))} kg
                   </td>
-                  <td className="p-4 text-center font-mono text-slate-400">100%</td>
+                  <td className="p-4 text-center tabular-nums text-slate-400">100%</td>
                   <td className="p-4 text-right">
                     <button
                       onClick={() => { setFiltroCategoria("TODOS"); setSubInventario("fichas"); }}
@@ -295,7 +303,7 @@ export default function SeccionHato({
             <div className="flex items-baseline justify-between gap-3">
               <h4 className="font-['Outfit'] font-black text-base text-slate-900 dark:text-white">Preñez por padrote</h4>
               <span className="text-xs text-slate-500 dark:text-white/50">
-                <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">{totalPrenadas}</span> hembras preñadas
+                <span className="tabular-nums font-black text-emerald-600 dark:text-emerald-400">{totalPrenadas}</span> hembras preñadas
               </span>
             </div>
             {prenezPorPadrote.length === 0 ? (
@@ -314,7 +322,7 @@ export default function SeccionHato({
                         {[...g.porRaza.entries()].map(([raza, n]) => `${n} ${raza}`).join(" · ")}
                       </div>
                     </div>
-                    <div className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400 flex-shrink-0">{g.prenadas}</div>
+                    <div className="tabular-nums font-black text-sm text-emerald-600 dark:text-emerald-400 flex-shrink-0">{g.prenadas}</div>
                   </div>
                 ))}
               </div>
@@ -329,16 +337,20 @@ export default function SeccionHato({
           {/* Barra de Filtros y Búsqueda */}
           <div className="apple-glass rounded-2xl p-4 border border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs">
             <div className="flex flex-wrap items-center gap-2">
-              {["TODOS", "VACA", "TORO", "NOVILLA", "TERNERO", "MAUTA", "NOVILLO"].map(cat => (
+              {[
+                { key: "TODOS", label: `Activos (${animalesActivos.length})` },
+                ...matrizConteos.filter(c => c.count > 0).map(c => ({ key: c.key, label: `${c.label} (${c.count})` })),
+                ...(vendidos > 0 ? [{ key: "VENDIDOS", label: `Vendidos (${vendidos})` }] : []),
+              ].map(cat => (
                 <button
-                  key={cat}
-                  onClick={() => setFiltroCategoria(cat)}
-                  className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
-                    filtroCategoria === cat
-                      ? "bg-emerald-500 text-white shadow-sm"
-                      : "apple-glass-btn text-slate-600 dark:text-white/60"
+                  key={cat.key}
+                  onClick={() => setFiltroCategoria(cat.key)}
+                  className={`px-3.5 py-1.5 rounded-full font-semibold transition-all cursor-pointer ${
+                    filtroCategoria === cat.key
+                      ? "bg-teal-700 !text-white shadow-sm"
+                      : "bg-white border border-slate-200 text-slate-600 hover:border-teal-300"
                   }`}>
-                  {cat}
+                  {cat.label}
                 </button>
               ))}
             </div>
@@ -367,7 +379,7 @@ export default function SeccionHato({
                 className="apple-glass rounded-3xl p-5 border border-white/10 hover-card text-left space-y-4 relative overflow-hidden">
                 <div className="flex items-start justify-between">
                   <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono font-bold text-emerald-500 dark:text-emerald-400">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] tabular-nums font-bold text-emerald-500 dark:text-emerald-400">
                       ARETE: {animal.arete}
                     </div>
                     <h4 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white mt-1">
@@ -386,11 +398,11 @@ export default function SeccionHato({
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-white/5 text-xs">
                   <div>
                     <span className="text-slate-400 dark:text-white/40 text-[10px] block">Peso Actual</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{animal.pesoActual ? `${animal.pesoActual} kg` : "Sin pesar"}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{animal.pesoActual ? kg(animal.pesoActual) : "Sin pesar"}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 dark:text-white/40 text-[10px] block">Potrero Asignado</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400 truncate block">
+                    <span className={`font-bold truncate block ${animal.potrero ? "text-slate-800 dark:text-white" : "text-amber-700"}`}>
                       {animal.potrero?.nombre || "Sin potrero"}
                     </span>
                   </div>
@@ -458,25 +470,25 @@ export default function SeccionHato({
             <div className="space-y-3 text-xs">
               <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                 <span className="font-bold text-slate-900 dark:text-white">Vacas en Ordeño Activo</span>
-                <span className="font-mono font-bold text-sky-400 text-base">
+                <span className="tabular-nums font-bold text-sky-400 text-base">
                   {animalesActivos.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA" && a.estadoProductivo === "ORDEÑO").length}
                 </span>
               </div>
               <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                 <span className="font-bold text-slate-900 dark:text-white">Hembras Gestantes Confirmadas</span>
-                <span className="font-mono font-bold text-purple-400 text-base">
+                <span className="tabular-nums font-bold text-purple-400 text-base">
                   {animalesActivos.filter(a => a.estadoReproductivo === "PREÑADA").length}
                 </span>
               </div>
               <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                 <span className="font-bold text-slate-900 dark:text-white">Novillos en Fase de Engorde</span>
-                <span className="font-mono font-bold text-amber-400 text-base">
+                <span className="tabular-nums font-bold text-amber-400 text-base">
                   {animalesActivos.filter(a => a.tipoAnimal === "NOVILLO").length}
                 </span>
               </div>
               <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
                 <span className="font-bold text-slate-900 dark:text-white">Crías Lactantes en Corral</span>
-                <span className="font-mono font-bold text-emerald-400 text-base">
+                <span className="tabular-nums font-bold text-emerald-400 text-base">
                   {animalesActivos.filter(a => a.tipoAnimal === "TERNERO" || a.tipoAnimal === "BECERRA").length}
                 </span>
               </div>
@@ -517,10 +529,10 @@ export default function SeccionHato({
                           key={a.id}
                           onClick={() => { setTab("sanidad"); setSubSanidad("individual"); setAnimalFichaId(a.id); }}
                           className="hover:bg-white/5 cursor-pointer transition-colors">
-                          <td className="p-3 font-mono font-bold text-emerald-400">{a.arete}</td>
+                          <td className="p-3 tabular-nums font-bold text-emerald-400">{a.arete}</td>
                           <td className="p-3 text-slate-900 dark:text-white">{a.nombre || "—"}</td>
                           <td className="p-3 text-slate-500 dark:text-white/60">{a.tipoAnimal}</td>
-                          <td className="p-3 font-mono text-slate-900 dark:text-white">{a.pesoActual ? `${a.pesoActual} kg` : "Sin pesar"}</td>
+                          <td className="p-3 tabular-nums text-slate-900 dark:text-white">{a.pesoActual ? `${a.pesoActual} kg` : "Sin pesar"}</td>
                           <td className="p-3 text-sky-500 dark:text-sky-400">{a.potrero?.nombre || "Sin potrero"}</td>
                           <td className="p-3">
                             {alertasAnimal.length === 0 ? (

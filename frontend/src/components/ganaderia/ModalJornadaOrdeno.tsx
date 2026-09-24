@@ -3,6 +3,7 @@ import { IconBolt, IconMilk } from "../../Icons";
 import { registrarOrdenoGanaderia, type AnimalGanaderia, type RegistroOrdenoGanaderia } from "../../api";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import type { MonedasConfig, Notificar } from "./tipos";
+import { num } from "./formato";
 
 /** Vacas y novillas del hato activo: las que entran en la jornada de ordeño. */
 export function vacasDeOrdeno(animalesActivos: AnimalGanaderia[]) {
@@ -100,9 +101,9 @@ export default function ModalJornadaOrdeno({
     if (fallidas.length > 0) {
       notificar(`Se guardaron ${nuevosOrdenos.length} de ${filasValidas.length} registros. No se pudo registrar: ${fallidas.join(", ")} — revisa tu conexión e inténtalo de nuevo con esas vacas.`);
     } else if (mastitisCount > 0) {
-      notificar(`Jornada guardada: ${litrosComercialesTotal.toFixed(1)} L comerciales (${destinoLabel}). ¡Atención! ${mastitisCount} vaca(s) aislada(s) con Mastitis.`);
+      notificar(`Jornada guardada: ${num(litrosComercialesTotal, 1)} L comerciales (${destinoLabel}). ¡Atención! ${mastitisCount} vaca(s) aislada(s) con Mastitis.`);
     } else {
-      notificar(`Jornada registrada: ${litrosComercialesTotal.toFixed(1)} L recolectados (${destinoLabel}) por $${ingresoUSD} USD.`);
+      notificar(`Jornada registrada: ${num(litrosComercialesTotal, 1)} L recolectados (${destinoLabel}) por $${ingresoUSD} USD.`);
     }
   };
 
@@ -150,7 +151,7 @@ export default function ModalJornadaOrdeno({
                 type="date"
                 value={vaqueraFecha}
                 onChange={e => setVaqueraFecha(e.target.value)}
-                className="w-full p-2 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs"
+                className="w-full p-2 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums text-xs"
               />
             </div>
 
@@ -203,7 +204,7 @@ export default function ModalJornadaOrdeno({
                   step="0.01"
                   value={vaqueraPrecioUSD}
                   onChange={e => setVaqueraPrecioUSD(Math.max(0, Number(e.target.value)))}
-                  className="w-full p-2 pl-7 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
+                  className="w-full p-2 pl-7 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums font-bold text-xs"
                 />
               </div>
             </div>
@@ -221,7 +222,7 @@ export default function ModalJornadaOrdeno({
                     step="0.5"
                     value={vaqueraTasaVES}
                     onChange={e => setVaqueraTasaVES(Math.max(1, Number(e.target.value)))}
-                    className="w-full p-2 pl-9 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
+                    className="w-full p-2 pl-9 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums font-bold text-xs"
                   />
                 </div>
               ) : monedasConfig.COP ? (
@@ -233,11 +234,11 @@ export default function ModalJornadaOrdeno({
                     step="10"
                     value={tasaCOP}
                     readOnly
-                    className="w-full p-2 pl-11 rounded-xl bg-slate-900 border border-white/15 text-white font-mono font-bold text-xs"
+                    className="w-full p-2 pl-11 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums font-bold text-xs"
                   />
                 </div>
               ) : (
-                <div className="p-2 rounded-xl bg-slate-900 border border-white/15 text-slate-400 font-mono text-xs">
+                <div className="p-2 rounded-xl bg-slate-900 border border-white/15 text-slate-400 tabular-nums text-xs">
                   USD ($) Fijo
                 </div>
               )}
@@ -256,11 +257,11 @@ export default function ModalJornadaOrdeno({
             <div className="p-3.5 rounded-2xl bg-white/5 border border-sky-500/30 space-y-0.5">
               <span className="text-sky-400 text-[10px] uppercase block font-bold">Litros Comerciales</span>
               <div className="font-['Outfit'] font-black text-xl text-sky-400">
-                {litrosComerciales.toFixed(1)} L
+                {num(litrosComerciales, 1)} L
               </div>
               {litrosMastitis > 0 && (
                 <span className="text-[10px] text-red-400 font-bold block">
-                  −{litrosMastitis.toFixed(1)} L descarte (Mastitis)
+                  −{num(litrosMastitis, 1)} L descarte (Mastitis)
                 </span>
               )}
             </div>
@@ -271,7 +272,7 @@ export default function ModalJornadaOrdeno({
                 {vaqueraDestino === "TANQUE" ? "Al Tanque" : "Venta Directa"}
               </div>
               <span className="text-[10px] text-slate-400 block">
-                Prom. {promedioPorVaca.toFixed(1)} L/vaca
+                Prom. {num(promedioPorVaca, 1)} L/vaca
               </span>
             </div>
 
@@ -281,13 +282,13 @@ export default function ModalJornadaOrdeno({
                 ${ingresoUSD}
               </div>
               {monedasConfig.VES && (
-                <span className="text-[10px] text-emerald-300/80 font-mono block">
+                <span className="text-[10px] text-emerald-300/80 tabular-nums block">
                   Bs. {ingresoVES}
                 </span>
               )}
               {monedasConfig.COP && (
-                <span className="text-[10px] text-sky-300/80 font-mono block">
-                  COP ${Math.round(Number(ingresoUSD) * tasaCOP).toLocaleString()}
+                <span className="text-[10px] text-sky-300/80 tabular-nums block">
+                  COP ${num(Math.round(Number(ingresoUSD) * tasaCOP), 0)}
                 </span>
               )}
             </div>
@@ -340,11 +341,11 @@ export default function ModalJornadaOrdeno({
                           ? "bg-amber-500/10 hover:bg-amber-500/15"
                           : "hover:bg-white/5"
                       }`}>
-                      <td className="p-3 text-center text-slate-500 font-mono">{idx + 1}</td>
+                      <td className="p-3 text-center text-slate-500 tabular-nums">{idx + 1}</td>
                     
                       <td className="p-3">
                         <div className="font-bold text-white flex items-center gap-2">
-                          <span className="font-mono text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                          <span className="tabular-nums text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30">
                             {fila.arete}
                           </span>
                           <span>{fila.nombre}</span>
@@ -375,7 +376,7 @@ export default function ModalJornadaOrdeno({
                                 if (nextInput) nextInput.focus();
                               }
                             }}
-                            className="w-full p-2 rounded-xl bg-slate-950 border border-white/20 focus:border-emerald-400 focus:bg-emerald-950/20 text-white font-mono font-bold text-sm text-center outline-none transition-all shadow-inner"
+                            className="w-full p-2 rounded-xl bg-slate-950 border border-white/20 focus:border-emerald-400 focus:bg-emerald-950/20 text-white tabular-nums font-bold text-sm text-center outline-none transition-all shadow-inner"
                           />
                         </td>
                       )}
@@ -400,13 +401,13 @@ export default function ModalJornadaOrdeno({
                                 if (nextInput) nextInput.focus();
                               }
                             }}
-                            className="w-full p-2 rounded-xl bg-slate-950 border border-white/20 focus:border-emerald-400 focus:bg-emerald-950/20 text-white font-mono font-bold text-sm text-center outline-none transition-all shadow-inner"
+                            className="w-full p-2 rounded-xl bg-slate-950 border border-white/20 focus:border-emerald-400 focus:bg-emerald-950/20 text-white tabular-nums font-bold text-sm text-center outline-none transition-all shadow-inner"
                           />
                         </td>
                       )}
 
-                      <td className="p-3 font-mono font-black text-sm text-white">
-                        {totalFila > 0 ? `${totalFila.toFixed(1)} L` : "-"}
+                      <td className="p-3 tabular-nums font-black text-sm text-white">
+                        {totalFila > 0 ? `${num(totalFila, 1)} L` : "-"}
                       </td>
 
                       <td className="p-2">
@@ -484,7 +485,7 @@ export default function ModalJornadaOrdeno({
                 type="button"
                 onClick={guardarJornadaVaquera}
                 className="btn-cyber-neon text-white font-black text-xs px-6 py-2.5 rounded-xl shadow-lg hover:scale-105 cursor-pointer transition-all">
-                Guardar Jornada ({litrosComerciales.toFixed(1)} L • ${ingresoUSD})
+                Guardar Jornada ({num(litrosComerciales, 1)} L • ${ingresoUSD})
               </button>
             </div>
           </div>

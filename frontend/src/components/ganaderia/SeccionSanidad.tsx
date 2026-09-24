@@ -4,6 +4,7 @@ import { obtenerGdpGanaderia, obtenerVacunasPorAnimal, obtenerMedicamentosPorAni
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { Notificar, SubSanidad } from "./tipos";
+import { verFecha } from "./formato";
 
 interface Props {
   alertas: TableroAlertasGanaderia | null;
@@ -35,6 +36,12 @@ export default function SeccionSanidad({
   const [fichaPesos, setFichaPesos] = useState<RegistroPesoGanaderia[]>([]);
   const [fichaGdp, setFichaGdp] = useState<GdpGanaderiaResponse | null>(null);
   const [cargandoFicha, setCargandoFicha] = useState(false);
+  // Buscador del selector de ficha: con cientos de animales una lista de botones no sirve.
+  const [busquedaFicha, setBusquedaFicha] = useState("");
+  const terminoFicha = busquedaFicha.trim().toLowerCase();
+  const animalesFicha = terminoFicha
+    ? animales.filter(a => a.id === animalFichaId || a.arete.toLowerCase().includes(terminoFicha) || (a.nombre || "").toLowerCase().includes(terminoFicha))
+    : animales;
 
   // Carga la ficha completa del animal elegido: vacunas, tratamientos, reproducción y curva de peso.
   useEffect(() => {
@@ -154,14 +161,14 @@ export default function SeccionSanidad({
                     : "bg-amber-500/10 border-amber-500/30 text-amber-300"
                 }`}
               >
-                <div className="flex items-center justify-between font-mono font-bold text-[11px]">
+                <div className="flex items-center justify-between tabular-nums font-bold text-[11px]">
                   <span className="px-1.5 py-0.5 rounded bg-black/30">Arete: {alerta.animal?.arete}</span>
                   <span className="text-[10px] uppercase font-bold">{alerta.tipo.replace("_", " ")}</span>
                 </div>
                 <div className="font-bold text-white text-xs">{alerta.producto || "Tratamiento"}</div>
                 <p className="text-[11px] opacity-90 leading-tight">{alerta.mensaje}</p>
-                <div className="text-[10px] text-white/50 font-mono pt-1">
-                  Fecha: {alerta.fechaRelevante}
+                <div className="text-[10px] text-white/50 tabular-nums pt-1">
+                  Fecha: {verFecha(alerta.fechaRelevante)}
                 </div>
               </div>
             ))}
@@ -196,14 +203,26 @@ export default function SeccionSanidad({
           <div className="p-4 rounded-3xl apple-glass border border-white/10 space-y-3">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 min-w-0">
               <label className="text-xs font-bold text-slate-700 dark:text-white/70">
-                Seleccionar Animal por Arete para ver Ficha Completa:
+                Ficha del animal
               </label>
+              <input
+                type="search"
+                value={busquedaFicha}
+                onChange={e => {
+                  setBusquedaFicha(e.target.value);
+                  const t = e.target.value.trim().toLowerCase();
+                  const unico = t ? animales.filter(a => a.arete.toLowerCase().includes(t) || (a.nombre || "").toLowerCase().includes(t)) : [];
+                  if (unico.length === 1) setAnimalFichaId(unico[0].id);
+                }}
+                placeholder="Buscar por arete o nombre..."
+                className="w-full sm:w-56 px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:border-teal-600 focus:outline-none"
+              />
               <select
                 value={animalFichaId || ""}
                 onChange={(e) => setAnimalFichaId(Number(e.target.value))}
-                className="w-full sm:w-auto max-w-full min-w-0 truncate px-4 py-2 rounded-xl bg-slate-800 border border-white/15 text-white font-mono font-bold text-xs cursor-pointer focus:border-emerald-500"
+                className="w-full sm:w-auto max-w-full min-w-0 truncate px-4 py-2 rounded-xl bg-slate-800 border border-white/15 text-white tabular-nums font-bold text-xs cursor-pointer focus:border-emerald-500"
               >
-                {animales.map((a) => (
+                {animalesFicha.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.arete} - {a.nombre || "Sin nombre"} ({a.raza || a.especie}) · {a.tipoAnimal} {a.lote ? `[${a.lote}]` : ""}
                   </option>
@@ -211,23 +230,11 @@ export default function SeccionSanidad({
               </select>
             </div>
 
-            {/* Pills de selección rápida con scroll horizontal */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
-              {animales.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => setAnimalFichaId(a.id)}
-                  className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    animalFichaId === a.id
-                      ? "bg-emerald-500 text-white shadow-md"
-                      : "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10"
-                  }`}
-                >
-                  {a.arete} {a.nombre ? `· ${a.nombre}` : ""}
-                </button>
-              ))}
-            </div>
+            {terminoFicha && (
+              <div className="text-[11px] text-slate-500">
+                {animalesFicha.length === 0 ? `Ningún animal coincide con "${busquedaFicha}".` : `${animalesFicha.length} animal(es) coinciden.`}
+              </div>
+            )}
           </div>
 
           {/* Ficha Consolidada del Animal Seleccionado */}
@@ -241,7 +248,7 @@ export default function SeccionSanidad({
                 <div className="p-6 rounded-3xl apple-glass border border-emerald-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <span className="font-['Outfit'] font-black text-3xl font-mono text-emerald-500 dark:text-emerald-400">
+                      <span className="font-['Outfit'] font-black text-3xl tabular-nums text-emerald-500 dark:text-emerald-400">
                         {animalSel.arete}
                       </span>
                       {animalSel.nombre && (
@@ -298,7 +305,7 @@ export default function SeccionSanidad({
                         <span>{animalSel.lote || "Sin Lote Asignado"}</span>
                       </div>
                       {animalSel.valorEstimado && (
-                        <div className="text-[10px] text-slate-400 font-mono">
+                        <div className="text-[10px] text-slate-400 tabular-nums">
                           Costo / Valor: ${animalSel.valorEstimado} USD
                         </div>
                       )}
@@ -323,14 +330,14 @@ export default function SeccionSanidad({
                         <span className="text-sky-400"><IconScale size={16} /></span>
                         <span>Control de Peso & GDP</span>
                       </h4>
-                      <span className="font-mono font-bold text-sky-400 text-sm">
+                      <span className="tabular-nums font-bold text-sky-400 text-sm">
                         {animalSel.pesoActual} kg
                       </span>
                     </div>
 
                     <div className="p-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-between">
                       <span className="text-xs text-sky-300 font-medium">Ganancia Diaria (GDP):</span>
-                      <span className="font-mono font-black text-sm text-white">
+                      <span className="tabular-nums font-black text-sm text-white">
                         {fichaGdp?.gdpKgDia != null ? `${fichaGdp.gdpKgDia >= 0 ? "+" : ""}${Number(fichaGdp.gdpKgDia).toFixed(2)} kg/día` : "Faltan pesajes"}
                       </span>
                     </div>
@@ -344,8 +351,8 @@ export default function SeccionSanidad({
                       ) : (
                         <div className="space-y-1.5 max-h-48 overflow-y-auto">
                           {fichaPesos.map((p) => (
-                            <div key={p.id} className="p-2 rounded-xl bg-white/5 text-xs flex justify-between font-mono">
-                              <span className="text-slate-400">{p.fecha}</span>
+                            <div key={p.id} className="p-2 rounded-xl bg-white/5 text-xs flex justify-between tabular-nums">
+                              <span className="text-slate-400">{verFecha(p.fecha)}</span>
                               <span className="font-bold text-white">{p.pesoKg} kg</span>
                             </div>
                           ))}
@@ -389,10 +396,10 @@ export default function SeccionSanidad({
                             <div key={v.id} className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs space-y-1">
                               <div className="flex justify-between font-bold text-white">
                                 <span>{v.vacuna?.nombre || "Vacuna Sanitaria"}</span>
-                                <span className="text-emerald-400 font-mono text-[11px]">${v.costo || 0} USD</span>
+                                <span className="text-emerald-400 tabular-nums text-[11px]">${v.costo || 0} USD</span>
                               </div>
-                              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                                <span>Fecha: {v.fechaAplicacion}</span>
+                              <div className="flex justify-between text-[10px] text-slate-400 tabular-nums">
+                                <span>Fecha: {verFecha(v.fechaAplicacion)}</span>
                                 <span>Lote: {v.lote || "S/L"}</span>
                               </div>
                               {v.veterinarioResponsable && (
@@ -400,7 +407,7 @@ export default function SeccionSanidad({
                               )}
                               {v.fechaProximaDosis && (
                                 <div className={`text-[10px] font-bold ${refuerzoVencido ? "text-rose-400" : "text-amber-400"}`}>
-                                  {refuerzoVencido ? "Refuerzo VENCIDO: " : "Proximo refuerzo: "}{v.fechaProximaDosis}
+                                  {refuerzoVencido ? "Refuerzo VENCIDO: " : "Proximo refuerzo: "}{verFecha(v.fechaProximaDosis)}
                                 </div>
                               )}
                             </div>
@@ -426,25 +433,25 @@ export default function SeccionSanidad({
                               <div key={m.id} className="p-2.5 rounded-xl bg-rose-500/5 border border-rose-500/15 text-xs space-y-1">
                                 <div className="flex justify-between font-bold text-white">
                                   <span>{m.medicamento?.nombre || "Tratamiento"}</span>
-                                  <span className="text-rose-300 font-mono text-[11px]">${m.costo || 0} USD</span>
+                                  <span className="text-rose-300 tabular-nums text-[11px]">${m.costo || 0} USD</span>
                                 </div>
                                 {m.motivoDiagnostico && (
                                   <div className="text-[10px] text-slate-300">{m.motivoDiagnostico}</div>
                                 )}
-                                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                                  <span>Fecha: {m.fechaAplicacion}</span>
+                                <div className="flex justify-between text-[10px] text-slate-400 tabular-nums">
+                                  <span>Fecha: {verFecha(m.fechaAplicacion)}</span>
                                   {m.veterinarioResponsable && <span>Vet: {m.veterinarioResponsable}</span>}
                                 </div>
                                 {(retiroLecheActivo || retiroCarneActivo) && (
                                   <div className="flex flex-wrap gap-1.5 pt-1">
                                     {retiroLecheActivo && (
                                       <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">
-                                        Retiro leche hasta {m.fechaFinRetiroLeche}
+                                        Retiro leche hasta {verFecha(m.fechaFinRetiroLeche)}
                                       </span>
                                     )}
                                     {retiroCarneActivo && (
                                       <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">
-                                        Retiro carne hasta {m.fechaFinRetiroCarne}
+                                        Retiro carne hasta {verFecha(m.fechaFinRetiroCarne)}
                                       </span>
                                     )}
                                   </div>
@@ -489,12 +496,12 @@ export default function SeccionSanidad({
                                   <span className="uppercase">{e.tipo}</span>
                                   <span className="text-purple-400 text-[10px]">{e.resultado || "REGISTRADO"}</span>
                                 </div>
-                                <div className="text-[10px] text-slate-400 font-mono">
-                                  Fecha: {e.fecha}
+                                <div className="text-[10px] text-slate-400 tabular-nums">
+                                  Fecha: {verFecha(e.fecha)}
                                 </div>
                                 {e.fechaProbableParto && (
                                   <div className="text-[10px] text-emerald-400 font-bold">
-                                    Parto estimado: {e.fechaProbableParto}
+                                    Parto estimado: {verFecha(e.fechaProbableParto)}
                                   </div>
                                 )}
                               </div>
@@ -556,7 +563,7 @@ export default function SeccionSanidad({
                               {nombreLote}
                             </h4>
                           </div>
-                          <span className="font-mono font-black text-xl text-emerald-400">
+                          <span className="tabular-nums font-black text-xl text-emerald-400">
                             {totalCabezas} <span className="text-xs font-normal text-slate-400">cab.</span>
                           </span>
                         </div>
@@ -564,7 +571,7 @@ export default function SeccionSanidad({
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="p-2 rounded-xl bg-white/5">
                             <span className="text-[10px] text-slate-400 block">Peso Promedio</span>
-                            <span className="font-mono font-bold text-white text-sm">{pesoPromedio} kg</span>
+                            <span className="tabular-nums font-bold text-white text-sm">{pesoPromedio} kg</span>
                           </div>
                           <div className="p-2 rounded-xl bg-white/5">
                             <span className="text-[10px] text-slate-400 block">Composición</span>
@@ -580,7 +587,7 @@ export default function SeccionSanidad({
                         {alertasLote.length > 0 ? (
                           <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-300 flex items-center justify-between">
                             <span className="inline-flex items-center gap-1"><IconWarning size={12} /> Vacunas / Retiros pendientes:</span>
-                            <span className="font-black font-mono">{alertasLote.length}</span>
+                            <span className="font-black tabular-nums">{alertasLote.length}</span>
                           </div>
                         ) : (
                           <div className="text-[11px] text-emerald-400 flex items-center gap-1">
@@ -601,7 +608,7 @@ export default function SeccionSanidad({
                                   setSubSanidad("individual");
                                 }}
                                 title={`Ver ficha individual de ${a.arete}`}
-                                className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-emerald-600 text-white font-mono text-[10px] font-bold transition-colors cursor-pointer"
+                                className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-emerald-600 text-white tabular-nums text-[10px] font-bold transition-colors cursor-pointer"
                               >
                                 {a.arete}
                               </button>

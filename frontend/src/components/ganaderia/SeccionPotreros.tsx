@@ -2,6 +2,7 @@ import { type AnimalGanaderia, type PotreroGanaderia, descargarReportePotrerosPd
 import GanaderiaMapa from "../GanaderiaMapa";
 import { BotonPdf } from "../ReportesCampoGanaderia";
 import type { Notificar, SubPotreros } from "./tipos";
+import { num } from "./formato";
 
 interface Props {
   animales: AnimalGanaderia[];
@@ -125,11 +126,11 @@ export default function SeccionPotreros({
                               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: pot.color || "#94A3B8" }} />
                               <div>
                                 <div className="font-semibold text-slate-900">{pot.nombre}</div>
-                                <div className="font-mono text-[10px] text-slate-400">{pot.codigo || `POT-${pot.id}`}</div>
+                                <div className="tabular-nums text-[10px] text-slate-400">{pot.codigo || `POT-${pot.id}`}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-800">{area > 0 ? `${area} ha` : "—"}</td>
+                          <td className="p-3 text-right tabular-nums text-slate-800">{area > 0 ? `${area} ha` : "—"}</td>
                           <td className="p-3 text-slate-700">{pot.tipoPasto || <span className="text-slate-400">Sin definir</span>}</td>
                           <td className="p-3">
                             <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -145,11 +146,11 @@ export default function SeccionPotreros({
                               {listo && <span className="ml-1 font-semibold text-teal-700">· listo para usar</span>}
                             </div>
                           </td>
-                          <td className={`p-3 text-right font-mono font-bold ${sobrecargado ? "text-rose-600" : "text-slate-900"}`}>
+                          <td className={`p-3 text-right tabular-nums font-bold ${sobrecargado ? "text-rose-600" : "text-slate-900"}`}>
                             {ocupantes}
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-600">{pot.capacidadAnimales ?? "—"}</td>
-                          <td className="p-3 text-right font-mono text-slate-600">{area > 0 ? `${(ocupantes / area).toFixed(2)} cab/ha` : "—"}</td>
+                          <td className="p-3 text-right tabular-nums text-slate-600">{pot.capacidadAnimales ?? "—"}</td>
+                          <td className="p-3 text-right tabular-nums text-slate-600">{area > 0 ? `${num((ocupantes / area), 2)} cab/ha` : "—"}</td>
                           <td className="p-3">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
@@ -173,13 +174,13 @@ export default function SeccionPotreros({
                   <tfoot className="bg-slate-50 border-t border-slate-200 text-[11px] font-bold text-slate-700">
                     <tr>
                       <td className="p-3">Total ({potreros.length} potreros)</td>
-                      <td className="p-3 text-right font-mono">{haTotal.toFixed(1)} ha</td>
+                      <td className="p-3 text-right tabular-nums">{num(haTotal, 1)} ha</td>
                       <td className="p-3" colSpan={2}>
                         {potreros.filter(p => p.estado === "EN_DESCANSO").length} en descanso
                       </td>
-                      <td className="p-3 text-right font-mono">{animalesActivos.length - sinPotrero}</td>
+                      <td className="p-3 text-right tabular-nums">{animalesActivos.length - sinPotrero}</td>
                       <td className="p-3" />
-                      <td className="p-3 text-right font-mono">{haTotal > 0 ? `${((animalesActivos.length - sinPotrero) / haTotal).toFixed(2)} cab/ha` : "—"}</td>
+                      <td className="p-3 text-right tabular-nums">{haTotal > 0 ? `${num(((animalesActivos.length - sinPotrero) / haTotal), 2)} cab/ha` : "—"}</td>
                       <td className="p-3" />
                     </tr>
                   </tfoot>

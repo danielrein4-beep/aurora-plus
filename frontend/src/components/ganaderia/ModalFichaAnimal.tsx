@@ -44,7 +44,7 @@ export default function ModalFichaAnimal({ animal, onCerrar }: Props) {
           <div className="font-bold text-slate-900 dark:text-white text-base">
             {animal.nombre || `Animal ${animal.arete}`}
           </div>
-          <div>Arete: <span className="font-mono font-bold text-emerald-400">{animal.arete}</span></div>
+          <div>Arete: <span className="tabular-nums font-bold text-emerald-400">{animal.arete}</span></div>
           <div>Raza: {animal.raza} • Sexo: {animal.sexo}</div>
           <div>Peso: {animal.pesoActual} kg</div>
         </div>

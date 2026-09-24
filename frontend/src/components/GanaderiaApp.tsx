@@ -16,7 +16,7 @@ import {
   tasaVigente, actualizarTasa,
 } from "../api";
 
-import { AuroraGradientDef, IconCheckCircle, IconClose, IconCow, IconDownload } from "../Icons";
+import { AuroraGradientDef, IconCheckCircle, IconClose, IconCow, IconDownload, IconWarning } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { contarPendientesGanaderia, procesarColaGanaderia } from "../offlineQueueGanaderia";
 
@@ -57,6 +57,7 @@ import SeccionSanidad from "./ganaderia/SeccionSanidad";
 import BarraLateralGanaderia from "./ganaderia/BarraLateralGanaderia";
 import BarraSuperiorGanaderia from "./ganaderia/BarraSuperiorGanaderia";
 import type { TabGanaderia, SubPotreros, SubInventario, SubSanidad } from "./ganaderia/tipos";
+import { tonoAviso } from "./ganaderia/formato";
 
 interface Props {
   onSalir: () => void;
@@ -236,7 +237,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   const notificar = (msg: string) => {
     setNotificacion(msg);
-    setTimeout(() => setNotificacion(null), 3500);
+    // Un error se lee con más calma que un "listo".
+    setTimeout(() => setNotificacion(actual => (actual === msg ? null : actual)), tonoAviso(msg) === "exito" ? 3500 : 6500);
   };
 
   // Cargar datos iniciales desde el backend
@@ -519,7 +521,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario Hato");
     XLSX.writeFile(wb, "Inventario_Hato_Aurora.xlsx");
-    notificar("Reporte XLSX exportado correctamente.");
+    notificar("Excel del inventario descargado.");
   };
 
   return (
@@ -528,8 +530,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
       {/* Notificación Flotante */}
       {notificacion && (
-        <div className="fixed top-5 right-5 z-[2100] apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
-          <IconCheckCircle size={18} />
+        <div
+          role={tonoAviso(notificacion) === "error" ? "alert" : "status"}
+          className={`fixed top-5 right-5 z-[2100] max-w-md px-5 py-3 rounded-2xl border shadow-lg text-xs font-semibold flex items-start gap-3 animate-fade-in ${
+            tonoAviso(notificacion) === "error"
+              ? "bg-rose-50 border-rose-200 text-rose-800"
+              : tonoAviso(notificacion) === "aviso"
+                ? "bg-amber-50 border-amber-200 text-amber-800"
+                : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          }`}
+        >
+          <span className="flex-shrink-0 mt-px">
+            {tonoAviso(notificacion) === "exito" ? <IconCheckCircle size={18} /> : <IconWarning size={18} />}
+          </span>
           <span>{notificacion}</span>
         </div>
       )}

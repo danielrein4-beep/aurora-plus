@@ -191,7 +191,7 @@ export default function ModalAltaAnimal({
                     type="date"
                     value={formAnimal.fechaNacimiento}
                     onChange={e => setFormAnimal({ ...formAnimal, fechaNacimiento: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white tabular-nums text-xs"
                   />
                 </div>
               </div>
@@ -225,7 +225,7 @@ export default function ModalAltaAnimal({
                     placeholder="Ej. 850"
                     value={formAnimal.costoCompra}
                     onChange={e => setFormAnimal({ ...formAnimal, costoCompra: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white tabular-nums text-xs"
                   />
                 </div>
                 <div>
@@ -234,7 +234,7 @@ export default function ModalAltaAnimal({
                     type="date"
                     value={formAnimal.fechaCompra}
                     onChange={e => setFormAnimal({ ...formAnimal, fechaCompra: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white tabular-nums text-xs"
                   />
                 </div>
               </div>
@@ -250,7 +250,7 @@ export default function ModalAltaAnimal({
                 placeholder="Ej. V-105"
                 value={formAnimal.arete}
                 onChange={e => setFormAnimal({ ...formAnimal, arete: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums font-bold"
               />
             </div>
             <div>
@@ -335,7 +335,7 @@ export default function ModalAltaAnimal({
                 onFocus={e => e.target.select()}
                 value={formAnimal.pesoActual || ""}
                 onChange={e => setFormAnimal({ ...formAnimal, pesoActual: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums"
               />
             </div>
             <div>

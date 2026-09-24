@@ -3,6 +3,7 @@ import { IconCheckCircle, IconDownload, IconTruck } from "../../Icons";
 import { registrarDespachoLecheTanque, tasaVigente, actualizarTasa, descargarNotaEntregaDespachoLechePdf, type TanqueLeche, type VentaLecheTanque } from "../../api";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import type { MonedasConfig, Notificar } from "./tipos";
+import { num } from "./formato";
 
 interface Props {
   tanqueLeche: TanqueLeche | null;
@@ -64,7 +65,7 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
       return;
     }
     if (litros > stockActual) {
-      notificar(`Stock insuficiente en el tanque (${stockActual.toFixed(1)} L disponibles). No se pueden despachar ${litros} L.`);
+      notificar(`Stock insuficiente en el tanque (${num(stockActual, 1)} L disponibles). No se pueden despachar ${litros} L.`);
       return;
     }
     if (!formVentaLeche.compradorOPlanta.trim()) {
@@ -98,7 +99,7 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
 
       onDespachado(res.tanque, res.venta);
       setUltimoDespachoLecheId(res.venta?.id ?? null);
-      notificar(`Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
+      notificar(`Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${num((litros * precio), 2)} USD.`);
       setFormVentaLeche({
         fecha: fechaLocalISO(),
         litrosVendidos: 0,
@@ -172,9 +173,9 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
         {/* Alerta de Stock Actual Disponible en Tanque */}
         <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 flex items-center justify-between">
           <div className="space-y-0.5">
-            <span className="text-[10px] uppercase font-bold text-sky-400">Stock Actual en Tanque</span>
-            <div className="font-mono font-black text-xl text-white">
-              {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} <span className="text-xs text-slate-400">L disponibles</span>
+            <span className="text-[10px] uppercase font-bold text-sky-400">Leche en el tanque</span>
+            <div className="tabular-nums font-black text-xl text-white">
+              {num((tanqueLeche?.stockActualLitros ?? 0), 0)} <span className="text-xs text-slate-400">L disponibles</span>
             </div>
           </div>
           <button
@@ -194,7 +195,7 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
                 required
                 value={formVentaLeche.fecha}
                 onChange={e => setFormVentaLeche({ ...formVentaLeche, fecha: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-xs focus:border-sky-500 focus:outline-none"
+                className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white tabular-nums text-xs focus:border-sky-500 focus:outline-none"
               />
             </div>
 
@@ -209,7 +210,7 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
                 value={formVentaLeche.litrosVendidos || ""}
                 onChange={e => setFormVentaLeche({ ...formVentaLeche, litrosVendidos: Number(e.target.value) })}
                 onFocus={e => e.target.select()}
-                className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-sky-400 font-mono font-bold text-sm focus:border-sky-500 focus:outline-none"
+                className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-sky-400 tabular-nums font-bold text-sm focus:border-sky-500 focus:outline-none"
               />
             </div>
           </div>
@@ -239,7 +240,7 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
                   required
                   value={formVentaLeche.precioLitroUSD}
                   onChange={e => setFormVentaLeche({ ...formVentaLeche, precioLitroUSD: Number(e.target.value) })}
-                  className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-800 border border-white/15 text-emerald-400 font-mono font-bold text-xs focus:border-emerald-500 focus:outline-none"
+                  className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-800 border border-white/15 text-emerald-400 tabular-nums font-bold text-xs focus:border-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -272,23 +273,23 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
           <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-slate-400 font-medium text-xs">Total Facturado (USD):</span>
-              <span className="font-mono font-black text-xl text-emerald-400">
-                ${(formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD).toFixed(2)} USD
+              <span className="tabular-nums font-black text-xl text-emerald-400">
+                ${num((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD), 2)} USD
               </span>
             </div>
             {monedasConfig.VES && formVentaLeche.monedaPago === "VES" && (
               <div className="flex items-center justify-between text-[11px] text-emerald-300">
                 <span>Equivalente en Bolívares:</span>
-                <span className="font-mono font-bold">
-                  Bs. {((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="tabular-nums font-bold">
+                  Bs. {num(((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaBCV), 2)}
                 </span>
               </div>
             )}
             {monedasConfig.COP && formVentaLeche.monedaPago === "COP" && (
               <div className="flex items-center justify-between text-[11px] text-sky-300">
                 <span>Equivalente en Pesos:</span>
-                <span className="font-mono font-bold">
-                  COP ${Math.round((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaCOP).toLocaleString()}
+                <span className="tabular-nums font-bold">
+                  COP ${num(Math.round((formVentaLeche.litrosVendidos * formVentaLeche.precioLitroUSD) * tasaCOP), 0)}
                 </span>
               </div>
             )}
@@ -304,7 +305,7 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
                   value={formVentaLeche.montoRecibido}
                   placeholder={equivalenteDespachoLeche().toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   onChange={e => setFormVentaLeche({ ...formVentaLeche, montoRecibido: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-white/5 border border-slate-300/80 dark:border-white/15 text-sm font-mono text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-white/5 border border-slate-300/80 dark:border-white/15 text-sm tabular-nums text-slate-900 dark:text-white"
                 />
                 <span className="text-[10px] text-slate-500 dark:text-white/40">
                   Vacío = equivalente a la tasa configurada. Escriba lo que pagó la planta si fue otra tasa.
@@ -323,7 +324,7 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
             <button
               type="submit"
               className="px-5 py-2.5 rounded-xl btn-cyber-neon text-white text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Confirmar Despacho & Descontar Stock</span>
+              <span className="inline-flex items-center gap-1.5"><IconTruck size={14} /> Confirmar despacho</span>
             </button>
           </div>
         </form>

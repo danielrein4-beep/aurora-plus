@@ -82,9 +82,9 @@ export default function SeccionEventos({
             </button>
             <button
               onClick={() => setCeloAbierto(true)}
-              className="w-full text-left p-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-bold cursor-pointer flex items-center justify-between border border-purple-500/20">
+              className="w-full text-left p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 font-semibold cursor-pointer flex items-center justify-between border border-teal-200">
               <span>• Celos & Detección para IA</span>
-              <span className="text-[10px] text-purple-300">Registrar →</span>
+              <span className="text-[10px] font-bold text-teal-700">Registrar →</span>
             </button>
           </div>
         </div>
@@ -98,9 +98,9 @@ export default function SeccionEventos({
           <div className="space-y-1 text-xs">
             <button
               onClick={abrirVaqueraRapida}
-              className="w-full text-left p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold cursor-pointer flex items-center justify-between">
+              className="w-full text-left p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 font-semibold cursor-pointer flex items-center justify-between border border-teal-200">
               <span>• Ordeño Rápido (Modo Vaquera)</span>
-              <span className="text-[10px] bg-emerald-500/30 px-1.5 py-0.5 rounded text-emerald-300">Teclado →</span>
+              <span className="text-[10px] font-bold text-teal-700">Teclado →</span>
             </button>
             <button
               onClick={() => setOrdenoAbierto(true)}
@@ -110,9 +110,9 @@ export default function SeccionEventos({
             </button>
             <button
               onClick={() => setModalVentaLeche(true)}
-              className="w-full text-left p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 font-bold cursor-pointer flex items-center justify-between">
+              className="w-full text-left p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 font-semibold cursor-pointer flex items-center justify-between border border-teal-200">
               <span>• Venta Cisterna / Planta (Tanque)</span>
-              <span className="text-[10px] bg-sky-500/30 px-1.5 py-0.5 rounded text-sky-300">Despacho →</span>
+              <span className="text-[10px] font-bold text-teal-700">Despacho →</span>
             </button>
             <button
               onClick={() => {
@@ -176,9 +176,9 @@ export default function SeccionEventos({
             </button>
             <button
               onClick={() => setMastitisAbierta(true)}
-              className="w-full text-left p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-bold cursor-pointer flex items-center justify-between border border-rose-500/20">
+              className="w-full text-left p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 font-semibold cursor-pointer flex items-center justify-between border border-teal-200">
               <span>• Mastitis (Prueba CMT & Retiro Leche)</span>
-              <span className="text-[10px] text-rose-300">Registrar →</span>
+              <span className="text-[10px] font-bold text-teal-700">Registrar →</span>
             </button>
             <button
               onClick={() => setVacunaAbierta({})}

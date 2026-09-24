@@ -1,6 +1,7 @@
 import { IconTruck, IconMilk, IconEdit, IconSettings } from "../../Icons";
 import type { RegistroOrdenoGanaderia, TanqueLeche, VentaLecheTanque } from "../../api";
 import type { MonedasConfig } from "./tipos";
+import { num, verFecha, verTurno } from "./formato";
 
 interface Props {
   monedasConfig: MonedasConfig;
@@ -55,7 +56,7 @@ export default function SeccionProduccion({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
           <div className="text-xs text-slate-400 font-medium">Producción Total Registrada</div>
-          <div className="font-['Outfit'] font-black text-3xl text-sky-500 dark:text-sky-400">
+          <div className="font-['Outfit'] font-black text-3xl text-slate-900 dark:text-white">
             {ordenos.reduce((sum, o) => sum + (Number(o.cantidadLitros) || 0), 0).toFixed(1)} L
           </div>
           <div className="text-[11px] text-slate-500 dark:text-white/40">En {ordenos.length} registros individuales</div>
@@ -63,11 +64,11 @@ export default function SeccionProduccion({
 
         <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
           <div className="text-xs text-slate-400 font-medium">Valor de la leche ordeñada (USD)</div>
-          <div className="font-['Outfit'] font-black text-3xl text-emerald-500 dark:text-emerald-400">
+          <div className="font-['Outfit'] font-black text-3xl text-teal-700 dark:text-teal-300">
             ${ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0).toFixed(2)}
           </div>
           <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
-            <span>{precioLecheUSD > 0 ? `Precio actual: $${precioLecheUSD.toFixed(2)} por litro` : "Precio del litro sin fijar"}</span>
+            <span>{precioLecheUSD > 0 ? `Precio actual: $${num(precioLecheUSD, 2)} por litro` : "Precio del litro sin fijar"}</span>
             <button
               type="button"
               onClick={() => setModalEditarPrecioLeche(true)}
@@ -79,7 +80,7 @@ export default function SeccionProduccion({
 
         <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
           <div className="text-xs text-slate-400 font-medium">Equivalente en Moneda Local</div>
-          <div className="font-['Outfit'] font-black text-2xl text-purple-500 dark:text-purple-400">
+          <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
             {monedasConfig.VES && (
               <div>Bs. {(ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             )}
@@ -91,7 +92,7 @@ export default function SeccionProduccion({
             )}
           </div>
           <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
-            <span>{monedasConfig.VES ? `Tasa Bs: ${tasaBCV.toFixed(2)}` : "Configuración de monedas"}</span>
+            <span>{monedasConfig.VES ? `Tasa Bs: ${num(tasaBCV, 2)}` : "Configuración de monedas"}</span>
             <button onClick={() => setModalEditarTasas(true)} className="text-purple-400 hover:text-purple-300 font-bold ml-2 underline cursor-pointer">
               <span className="inline-flex items-center gap-1"><IconSettings size={11} /> Monedas & Tasas</span>
             </button>
@@ -105,10 +106,10 @@ export default function SeccionProduccion({
           <span className="text-sky-400"><IconMilk size={26} /></span>
           <div>
             <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
-              Tanque Frío: {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} L en Stock
+              Tanque Frío: {num((tanqueLeche?.stockActualLitros ?? 0), 0)} L en el tanque
             </h4>
             <p className="text-xs text-slate-500 dark:text-white/50">
-              Capacidad {(tanqueLeche?.capacidadLitros ?? 2000).toLocaleString()} L • Temperatura {tanqueLeche?.temperaturaCelsius ?? 4.0}°C
+              Capacidad {num((tanqueLeche?.capacidadLitros ?? 2000), 0)} L • Temperatura {tanqueLeche?.temperaturaCelsius ?? 4.0}°C
             </p>
           </div>
         </div>
@@ -154,7 +155,7 @@ export default function SeccionProduccion({
             <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
               {ordenos.map(o => (
                 <tr key={o.id} className="hover:bg-white/5 transition-colors">
-                  <td className="p-4 font-mono">{o.fecha}</td>
+                  <td className="p-4 tabular-nums">{verFecha(o.fecha)}</td>
                   <td className="p-4 font-bold text-slate-900 dark:text-white">
                     {o.animal?.arete} - {o.animal?.nombre || "Sin nombre"}
                   </td>
@@ -162,7 +163,7 @@ export default function SeccionProduccion({
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                       o.turno === "MANANA" ? "bg-amber-500/15 text-amber-500" : "bg-indigo-500/15 text-indigo-400"
                     }`}>
-                      {o.turno}
+                      {verTurno(o.turno)}
                     </span>
                   </td>
                   <td className="p-4">
@@ -178,7 +179,7 @@ export default function SeccionProduccion({
                   <td className="p-4 text-slate-400">{o.porcentajeGrasa || 3.8}% / {o.porcentajeProteina || 3.2}%</td>
                   <td className="p-4 font-bold text-emerald-500">${Number(o.montoVenta || 0).toFixed(2)}</td>
                   {monedasConfig.VES && (
-                    <td className="p-4 text-right font-mono text-slate-500 dark:text-white/70">
+                    <td className="p-4 text-right tabular-nums text-slate-500 dark:text-white/70">
                       Bs. {(Number(o.montoVenta || 0) * tasaBCV).toFixed(2)}
                     </td>
                   )}
@@ -227,10 +228,10 @@ export default function SeccionProduccion({
               <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
                 {ventasLeche.map(v => (
                   <tr key={v.id} className="hover:bg-white/5 transition-colors">
-                    <td className="p-4 font-mono">{v.fecha}</td>
+                    <td className="p-4 tabular-nums">{verFecha(v.fecha)}</td>
                     <td className="p-4 font-bold text-slate-900 dark:text-white">{v.compradorOPlanta}</td>
                     <td className="p-4 font-bold text-sky-400">{v.litrosVendidos} L</td>
-                    <td className="p-4 font-mono">${Number(v.precioLitroUSD).toFixed(4)}</td>
+                    <td className="p-4 tabular-nums">${Number(v.precioLitroUSD).toFixed(4)}</td>
                     <td className="p-4 font-bold text-emerald-400">${Number(v.totalUSD).toFixed(2)}</td>
                     <td className="p-4">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/15">

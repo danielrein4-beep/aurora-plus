@@ -28,14 +28,14 @@ export const kg = (v: number | null | undefined, decimales = 0) => (v == null ? 
 export const litros = (v: number | null | undefined, decimales = 1) => (v == null ? "—" : `${num(v, decimales)} L`);
 
 /** "2026-09-12" (o con hora) -> "12/09/2026". Vacío -> "—". */
-export function fecha(iso: string | null | undefined): string {
+export function verFecha(iso: string | null | undefined): string {
   if (!iso) return "—";
   const [a, m, d] = iso.slice(0, 10).split("-");
   return d && m && a ? `${d}/${m}/${a}` : iso;
 }
 
 const TURNOS: Record<string, string> = { MANANA: "Mañana", TARDE: "Tarde", DOBLE: "Doble" };
-export const turno = (t: string | null | undefined) => (t ? TURNOS[t] ?? t : "—");
+export const verTurno = (t: string | null | undefined) => (t ? TURNOS[t] ?? t : "—");
 
 /**
  * Lo escrito en un campo numérico: acepta coma decimal; vacío -> undefined
@@ -52,3 +52,16 @@ export function aNumero(valor: string | number | null | undefined): number | und
 
 /** Peso vivo de una unidad ganadera (UG): 450 kg. */
 export const KG_POR_UG = 450;
+
+export type TonoAviso = "exito" | "aviso" | "error";
+
+/**
+ * Tono de un aviso según su texto: los errores en rojo, las validaciones del formulario en
+ * ámbar y el resto como éxito (verde). Evita que un "No se pudo…" salga con check verde.
+ */
+export function tonoAviso(mensaje: string): TonoAviso {
+  const m = mensaje.trim().toLowerCase();
+  if (/^(no se pudo|error|no hay |stock insuficiente)|fall[óo]|rechaz|inválid|revisa tu conexión|revise la conexión/.test(m)) return "error";
+  if (/^(debe|debes|indique|indica|selecciona|seleccione|ingrese|ingresa|el monto|la cantidad|ningún|no se ingresaron|demasiados)|¡atención!/.test(m)) return "aviso";
+  return "exito";
+}

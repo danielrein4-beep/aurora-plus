@@ -4,6 +4,7 @@ import { registrarOrdenoGanaderia, type AnimalGanaderia, type RegistroOrdenoGana
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import type { MonedasConfig } from "./tipos";
 import type { Notificar } from "./tipos";
+import { num } from "./formato";
 
 interface Props {
   animales: AnimalGanaderia[];
@@ -102,7 +103,7 @@ export default function ModalOrdeno({
                 placeholder="Ej. 12,5"
                 value={formOrdeno.cantidadLitros || ""}
                 onChange={e => setFormOrdeno({ ...formOrdeno, cantidadLitros: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-sky-400 font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-sky-400 tabular-nums font-bold"
               />
             </div>
           </div>
@@ -128,7 +129,7 @@ export default function ModalOrdeno({
                 step="0.01"
                 value={formOrdeno.precioVentaLitro}
                 onChange={e => setFormOrdeno({ ...formOrdeno, precioVentaLitro: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-emerald-400 font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-emerald-400 tabular-nums font-bold"
               />
             </div>
           </div>
@@ -144,7 +145,7 @@ export default function ModalOrdeno({
                     ? "bg-sky-500/20 border-sky-400 text-sky-400 shadow-md shadow-sky-500/20"
                     : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
                 }`}>
-                <span className="inline-flex items-center gap-1.5"><IconMilk size={13} /> Al Tanque (Stock)</span>
+                <span className="inline-flex items-center gap-1.5"><IconMilk size={13} /> Al tanque</span>
               </button>
               <button
                 type="button"
@@ -166,10 +167,10 @@ export default function ModalOrdeno({
 
           <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
             <span className="text-slate-400 font-medium">Liquidación estimada:</span>
-            <span className="font-mono font-bold text-emerald-400">
-              ${(formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro).toFixed(2)} USD
-              {monedasConfig.VES && ` • Bs. ${((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaBCV).toFixed(2)}`}
-              {monedasConfig.COP && ` • COP $${Math.round((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaCOP).toLocaleString()}`}
+            <span className="tabular-nums font-bold text-emerald-400">
+              ${num((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro), 2)} USD
+              {monedasConfig.VES && ` • Bs. ${num(((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaBCV), 2)}`}
+              {monedasConfig.COP && ` • COP $${num(Math.round((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaCOP), 0)}`}
             </span>
           </div>
 

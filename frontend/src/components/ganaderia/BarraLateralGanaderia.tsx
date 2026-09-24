@@ -51,7 +51,7 @@ export default function BarraLateralGanaderia({
     <button
       onClick={onSalir}
       className="flex items-center gap-3 text-left group cursor-pointer px-5 py-4 border-b border-slate-200"
-      title="Volver al Hub General"
+      title="Volver al inicio de Aurora"
     >
       <div className="w-10 h-10 rounded-md border border-slate-200 bg-white text-slate-700 flex items-center justify-center overflow-hidden group-hover:border-teal-300 transition-colors flex-shrink-0">
         <span className="font-semibold tracking-[-0.06em] text-sm" aria-label="Aurora Plus">A+</span>
@@ -93,7 +93,7 @@ export default function BarraLateralGanaderia({
             { id: "potreros" as const, Icon: IconPin, etiqueta: "Potreros", badge: 0 },
             { id: "engorde" as const, Icon: IconScale, etiqueta: "Engorde (GDP)", badge: 0 },
             { id: "sociedades" as const, Icon: IconUsers, etiqueta: "Ceba en sociedad", badge: 0 },
-            { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción & Pesajes", badge: 0 },
+            { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción de leche", badge: 0 },
           ],
         },
         {
@@ -101,7 +101,7 @@ export default function BarraLateralGanaderia({
           items: [
             { id: "sanidad" as const, Icon: IconSyringe, etiqueta: "Sanidad & Trazabilidad", badge: alertasSanitarias.length },
             { id: "eventos" as const, Icon: IconCalendar, etiqueta: "Centro de Eventos", badge: 0 },
-            { id: "reportes" as const, Icon: IconChart, etiqueta: "Centro de Reportes", badge: 0 },
+            { id: "reportes" as const, Icon: IconChart, etiqueta: "Finanzas y reportes", badge: 0 },
             ...(puedeVerAuditoria ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría", badge: 0 }] : []),
           ],
         },
@@ -197,7 +197,7 @@ export default function BarraLateralGanaderia({
         onClick={onSalir}
         className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left"
       >
-        ← Salir al Hub
+        ← Volver a Aurora
       </button>
     </div>
   </aside>

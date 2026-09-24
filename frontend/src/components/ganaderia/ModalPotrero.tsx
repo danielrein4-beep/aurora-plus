@@ -107,7 +107,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
                 placeholder="Ej. POT-05"
                 value={formPotrero.codigo}
                 onChange={e => setFormPotrero({ ...formPotrero, codigo: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums font-bold"
               />
             </div>
             <div>
@@ -170,7 +170,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
                 required
                 value={formPotrero.areaHectareas}
                 onChange={e => setFormPotrero({ ...formPotrero, areaHectareas: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums"
               />
             </div>
             <div>
@@ -180,7 +180,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
                 onFocus={e => e.target.select()}
                 value={formPotrero.capacidadAnimales}
                 onChange={e => setFormPotrero({ ...formPotrero, capacidadAnimales: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums"
               />
             </div>
           </div>

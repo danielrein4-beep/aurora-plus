@@ -65,16 +65,16 @@ export default function SeccionPanel({
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
                   <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
-                    Checklist de Primeros Pasos para tu Finca
+                    Primeros pasos en tu finca
                   </h3>
-                  <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+                  <span className="text-[11px] tabular-nums px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
                     {pasosCompletados} de 3 completados
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
                   {pasosCompletados === 3
                     ? "¡Felicidades! Has completado la configuración esencial de tu predio."
-                    : "Configura tu predio en 3 pasos clave para desbloquear el control agronómico completo:"}
+                    : "Tres pasos para tener tu finca lista en Aurora:"}
                 </p>
               </div>
             </div>
@@ -244,7 +244,7 @@ export default function SeccionPanel({
             </div>
             <div className="grid grid-cols-2 divide-x divide-slate-200 text-center">
               <div className="px-1.5">
-                <div className="text-xl font-black text-slate-900 font-['Outfit']">{litrosHoy.toFixed(1)}</div>
+                <div className="text-xl font-black text-slate-900 font-['Outfit']">{num(litrosHoy, 1)}</div>
                 <div className="text-[10px] font-medium text-slate-500 mt-0.5">Litros Hoy</div>
               </div>
               <div className="px-1.5">
@@ -256,8 +256,8 @@ export default function SeccionPanel({
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
               <span>
-                ${ingresosLecheHoy.toFixed(2)} USD
-                {monedasConfig.VES && ` · Bs. ${(ingresosLecheHoy * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                ${num(ingresosLecheHoy, 2)} USD
+                {monedasConfig.VES && ` · Bs. ${num((ingresosLecheHoy * tasaBCV), 2)}`}
               </span>
             </div>
           </div>
@@ -302,13 +302,13 @@ export default function SeccionPanel({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 font-medium">Stock en Tanque</span>
-              <span className="text-[11px] font-mono font-bold text-sky-700">
+              <span className="text-[11px] text-slate-500 font-medium">Leche en el tanque</span>
+              <span className="text-[11px] tabular-nums font-bold text-sky-700">
                 {Math.round(((tanqueLeche?.stockActualLitros ?? 0) / (tanqueLeche?.capacidadLitros ?? 2000)) * 100)}%
               </span>
             </div>
             <div className="font-['Outfit'] font-black text-2xl text-slate-900">
-              {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} <span className="text-xs font-normal text-slate-500">/ {(tanqueLeche?.capacidadLitros ?? 2000).toLocaleString()} L</span>
+              {num((tanqueLeche?.stockActualLitros ?? 0), 0)} <span className="text-xs font-normal text-slate-500">/ {num((tanqueLeche?.capacidadLitros ?? 2000), 0)} L</span>
             </div>
             <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
               <div
@@ -319,14 +319,14 @@ export default function SeccionPanel({
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-            <div className="text-[11px] text-slate-500 font-medium">Valor Comercial del Stock</div>
+            <div className="text-[11px] text-slate-500 font-medium">Valor de la leche en el tanque</div>
             <div className="font-['Outfit'] font-black text-2xl text-emerald-700">
-              ${((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${num(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD), 2)}
             </div>
             <div className="text-[10px] text-slate-500">
-              A ${precioLecheUSD.toFixed(2)} USD/L
-              {monedasConfig.VES && ` • Bs. ${(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              {monedasConfig.COP && ` • COP $${Math.round(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaCOP).toLocaleString()}`}
+              A ${num(precioLecheUSD, 2)} USD/L
+              {monedasConfig.VES && ` • Bs. ${num((((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaBCV), 2)}`}
+              {monedasConfig.COP && ` • COP $${num(Math.round(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaCOP), 0)}`}
             </div>
           </div>
 

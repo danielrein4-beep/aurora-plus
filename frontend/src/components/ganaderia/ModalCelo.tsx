@@ -89,7 +89,7 @@ export default function ModalCelo({ animales, animalesActivos, tenantId, notific
                 required
                 value={formCelo.fecha}
                 onChange={e => setFormCelo({ ...formCelo, fecha: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums"
               />
             </div>
             <div>
@@ -122,7 +122,7 @@ export default function ModalCelo({ animales, animalesActivos, tenantId, notific
               value={formCelo.horaOptimaIA}
               onChange={e => setFormCelo({ ...formCelo, horaOptimaIA: e.target.value })}
               placeholder="Ej. Detectado AM → Inseminar PM (12 horas después)"
-              className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-[11px]"
+              className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums text-[11px]"
             />
             <p className="text-[10px] text-purple-400 mt-1 flex items-start gap-1">
               <IconBulb size={12} className="shrink-0 mt-0.5" /> Al guardar, el estado reproductivo de la hembra cambiará automáticamente a <strong>EN_ESPERA</strong>.

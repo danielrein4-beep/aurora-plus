@@ -71,7 +71,7 @@ export default function ModalDatosFiscales({ notificar, onCerrar }: Props) {
               value={formDatosFiscales.rif}
               onChange={e => setFormDatosFiscales({ ...formDatosFiscales, rif: e.target.value })}
               placeholder="Ej. J-12345678-9"
-              className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono focus:border-purple-500 focus:outline-none"
+              className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white tabular-nums focus:border-purple-500 focus:outline-none"
             />
           </div>
           <div>

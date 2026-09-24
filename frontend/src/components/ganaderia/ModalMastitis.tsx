@@ -136,7 +136,7 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
                 placeholder="Ej. 4"
                 value={formMastitis.diasRetiroLeche || ""}
                 onChange={e => setFormMastitis({ ...formMastitis, diasRetiroLeche: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 tabular-nums font-bold"
               />
             </div>
           </div>
@@ -162,7 +162,7 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
                 placeholder="0,00"
                 value={formMastitis.costo || ""}
                 onChange={e => setFormMastitis({ ...formMastitis, costo: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums"
               />
             </div>
           </div>

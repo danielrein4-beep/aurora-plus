@@ -52,7 +52,7 @@ export default function ModalTasasMonedas({ tasaBCV, tasaCOP, monedasConfig, onG
             <div className="space-y-2">
               <div className="flex items-center justify-between p-2 rounded-xl bg-white/5">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-emerald-400">USD ($)</span>
+                  <span className="tabular-nums font-bold text-emerald-400">USD ($)</span>
                   <span className="text-[10px] text-slate-400">Dólar Estadounidense (Moneda Base)</span>
                 </div>
                 <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full">Fija</span>
@@ -60,7 +60,7 @@ export default function ModalTasasMonedas({ tasaBCV, tasaCOP, monedasConfig, onG
 
               <label className="flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-purple-400">VES (Bs.)</span>
+                  <span className="tabular-nums font-bold text-purple-400">VES (Bs.)</span>
                   <span className="text-[10px] text-slate-400">Bolívares (Tasa Oficial / Mercado)</span>
                 </div>
                 <input
@@ -73,7 +73,7 @@ export default function ModalTasasMonedas({ tasaBCV, tasaCOP, monedasConfig, onG
 
               <label className="flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-sky-400">COP ($)</span>
+                  <span className="tabular-nums font-bold text-sky-400">COP ($)</span>
                   <span className="text-[10px] text-slate-400">Pesos Colombianos (Frontera)</span>
                 </div>
                 <input
@@ -92,7 +92,7 @@ export default function ModalTasasMonedas({ tasaBCV, tasaCOP, monedasConfig, onG
               Tasa Bolívares (Bs. por 1 USD)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-xs">Bs.</span>
+              <span className="absolute left-3 top-2.5 text-slate-400 tabular-nums font-bold text-xs">Bs.</span>
               <input
                 name="tasaBcv"
                 type="number"
@@ -101,7 +101,7 @@ export default function ModalTasasMonedas({ tasaBCV, tasaCOP, monedasConfig, onG
                 min="0.01"
                 defaultValue={tasaBCV}
                 required
-                className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-emerald-500 focus:outline-none"
+                className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white tabular-nums text-sm focus:border-emerald-500 focus:outline-none"
                 placeholder="Ej. 850.00"
               />
             </div>
@@ -113,7 +113,7 @@ export default function ModalTasasMonedas({ tasaBCV, tasaCOP, monedasConfig, onG
               Tasa Pesos Colombianos (COP por 1 USD)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-xs">COP $</span>
+              <span className="absolute left-3 top-2.5 text-slate-400 tabular-nums font-bold text-xs">COP $</span>
               <input
                 name="tasaCop"
                 type="number"
@@ -122,7 +122,7 @@ export default function ModalTasasMonedas({ tasaBCV, tasaCOP, monedasConfig, onG
                 min="1"
                 defaultValue={tasaCOP}
                 required
-                className="w-full pl-14 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
+                className="w-full pl-14 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white tabular-nums text-sm focus:border-sky-500 focus:outline-none"
                 placeholder="4150"
               />
             </div>

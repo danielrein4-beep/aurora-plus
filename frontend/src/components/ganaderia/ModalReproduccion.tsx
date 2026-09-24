@@ -93,7 +93,7 @@ export default function ModalReproduccion({ animalesActivos, valoresIniciales, t
               type="date"
               value={formRepro.fechaProbableParto}
               onChange={e => setFormRepro({ ...formRepro, fechaProbableParto: e.target.value })}
-              className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
+              className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums"
             />
           </div>
 
