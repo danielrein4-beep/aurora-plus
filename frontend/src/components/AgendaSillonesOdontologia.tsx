@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { type Paciente } from "../api";
+import { type Paciente, leerSesion } from "../api";
 
 // El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
 // no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
@@ -42,6 +42,26 @@ const SILLONES = [
   { id: "BOX_QUIRURGICO", nombre: "Box Quirurgico - Implantes & Cirugia", color: "border-cyan-500/40 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300" },
 ];
 
+const ESTADOS_CITA = [
+  { id: "PROGRAMADA", nombre: "Programada" },
+  { id: "CONFIRMADA", nombre: "Confirmada" },
+  { id: "EN_SALA", nombre: "En sala" },
+  { id: "EN_ATENCION", nombre: "En sillon" },
+  { id: "COMPLETADA", nombre: "Completada" },
+  { id: "NO_ASISTIO", nombre: "No asistio" },
+  { id: "CANCELADA", nombre: "Cancelada" },
+];
+
+const ESTADO_CITA_ESTILO: Record<string, string> = {
+  PROGRAMADA: "border-slate-300 bg-white text-slate-600 dark:border-white/15 dark:bg-white/5 dark:text-slate-300",
+  CONFIRMADA: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  EN_SALA: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  EN_ATENCION: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+  COMPLETADA: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  NO_ASISTIO: "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  CANCELADA: "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300 line-through",
+};
+
 export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps> = ({
   pacientes,
   pacienteActivoId,
@@ -57,7 +77,7 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
 
   // Formulario nueva cita
   const [pacienteId, setPacienteId] = useState<number>(pacienteActivoId || (pacientes && pacientes[0] ? pacientes[0].id : 1));
-  const [odontologo, setOdontologo] = useState("Dra. Odontologo Titular");
+  const [odontologo, setOdontologo] = useState(() => leerSesion()?.username || "");
   const [especialidad, setEspecialidad] = useState("ODONTOLOGIA_GENERAL");
   const [sillonBox, setSillonBox] = useState("SILLON_1");
   const [horaInicio, setHoraInicio] = useState("09:00");
@@ -115,13 +135,37 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
         setNotificacion("Cita agendada correctamente sin colisiones.");
         cargarCitas();
         setTimeout(() => setNotificacion(""), 3500);
-      } else if (res.status === 409) {
-        setErrorColision("Colision de horario: El sillon ya esta reservado en ese intervalo.");
       } else {
-        setErrorColision("Error al registrar la cita.");
+        const cuerpo = await res.json().catch(() => null);
+        setErrorColision(
+          cuerpo?.message ||
+            (res.status === 409
+              ? "Colision de horario: el sillon o el especialista ya estan ocupados en ese intervalo."
+              : "Error al registrar la cita.")
+        );
       }
     } catch {
       setErrorColision("Fallo de conexion al guardar la cita.");
+    }
+  };
+
+  const handleCambiarEstado = async (citaId: number, estado: string) => {
+    try {
+      const res = await fetch(`/api/salud/odontologia/agenda/${citaId}/estado`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${obtenerTokenSesion()}`,
+        },
+        body: JSON.stringify({ estado }),
+      });
+      if (!res.ok) {
+        setNotificacion("No se pudo actualizar el estado de la cita.");
+        return;
+      }
+      setCitas((prev) => prev.map((c) => (c.id === citaId ? { ...c, estado } : c)));
+    } catch {
+      setNotificacion("Fallo de conexion al actualizar la cita.");
     }
   };
 
@@ -214,8 +258,22 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
                         <span className="font-black text-emerald-600 dark:text-emerald-400 font-mono">
                           {c.hora_inicio.substring(0, 5)} - {c.hora_fin.substring(0, 5)}
                         </span>
-                        <span className="text-slate-500 dark:text-slate-400 font-semibold">{c.especialidad}</span>
+                        <select
+                          value={c.estado}
+                          onChange={(e) => handleCambiarEstado(c.id, e.target.value)}
+                          className={`px-2 py-0.5 rounded-lg border text-[10px] font-bold cursor-pointer ${
+                            ESTADO_CITA_ESTILO[c.estado] || ESTADO_CITA_ESTILO.PROGRAMADA
+                          }`}
+                          title="Estado de la cita"
+                        >
+                          {ESTADOS_CITA.map((e) => (
+                            <option key={e.id} value={e.id}>
+                              {e.nombre}
+                            </option>
+                          ))}
+                        </select>
                       </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">{c.especialidad}</div>
 
                       <div>
                         <div className="font-bold text-slate-900 dark:text-white text-sm">{c.nombre_paciente}</div>
@@ -295,6 +353,7 @@ export const AgendaSillonesOdontologia: React.FC<AgendaSillonesOdontologiaProps>
                   <input
                     type="text"
                     required
+                    placeholder="Nombre del odontologo"
                     value={odontologo}
                     onChange={(e) => setOdontologo(e.target.value)}
                     className="w-full p-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white"

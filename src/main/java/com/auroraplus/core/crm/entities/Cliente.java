@@ -48,6 +48,22 @@ public class Cliente {
     @Column(name = "descuento_automatico_porcentaje", precision = 5, scale = 2)
     private BigDecimal descuentoAutomaticoPorcentaje;
 
+    // Datos de crédito de Comercio (POS mostrador) — opcionales, null para clientes de otras verticales.
+    private String direccion;
+
+    @Column(name = "limite_credito", precision = 18, scale = 2)
+    private BigDecimal limiteCredito;
+
+    @Column(name = "saldo_pendiente", precision = 18, scale = 2)
+    private BigDecimal saldoPendiente;
+
+    public String getDireccion() { return direccion; }
+    public void setDireccion(String direccion) { this.direccion = direccion; }
+    public BigDecimal getLimiteCredito() { return limiteCredito; }
+    public void setLimiteCredito(BigDecimal limiteCredito) { this.limiteCredito = limiteCredito; }
+    public BigDecimal getSaldoPendiente() { return saldoPendiente; }
+    public void setSaldoPendiente(BigDecimal saldoPendiente) { this.saldoPendiente = saldoPendiente; }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }

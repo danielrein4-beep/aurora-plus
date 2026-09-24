@@ -44,6 +44,13 @@ public class ComisionPlataforma {
     @Column(nullable = false)
     private LocalDateTime fecha = LocalDateTime.now();
 
+    @Column(length = 200)
+    private String descripcion;
+
+    /** Pago de suscripción (factura de Aurora) en el que se cobró esta comisión. */
+    @Column(name = "pago_id")
+    private Long pagoId;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -62,4 +69,8 @@ public class ComisionPlataforma {
     public void setPagada(Boolean pagada) { this.pagada = pagada; }
     public LocalDateTime getFecha() { return fecha; }
     public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
+    public String getDescripcion() { return descripcion; }
+    public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
+    public Long getPagoId() { return pagoId; }
+    public void setPagoId(Long pagoId) { this.pagoId = pagoId; }
 }

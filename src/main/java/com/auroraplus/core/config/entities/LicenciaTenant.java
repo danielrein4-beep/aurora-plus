@@ -95,6 +95,25 @@ public class LicenciaTenant {
     @Column(name = "domicilio_fiscal", columnDefinition = "TEXT")
     private String domicilioFiscal;
 
+    // Facturación fiscal real (Formato Libre autorizado por imprenta SENIAT) — OPCIONAL
+    // y apagado por defecto ("NINGUNA"). Mientras el dueño no cargue el rango que le dio
+    // su imprenta autorizada, los documentos de venta siguen siendo Nota de Entrega (no
+    // fiscal) como siempre: nunca se inventa un número de control sin que el negocio
+    // tenga de verdad ese rango asignado — eso sería ilegal, peor que no tener factura.
+    // "MAQUINA_FISCAL" queda reservado para cuando se integre un modelo de impresora
+    // fiscal específico (cada marca/protocolo es una integración de hardware aparte).
+    @Column(name = "modo_facturacion_fiscal", nullable = false, length = 20)
+    private String modoFacturacionFiscal = "NINGUNA"; // NINGUNA | FORMATO_LIBRE | MAQUINA_FISCAL
+
+    @Column(name = "factura_serie", length = 10)
+    private String facturaSerie;
+
+    @Column(name = "factura_numero_actual")
+    private Long facturaNumeroActual;
+
+    @Column(name = "factura_numero_hasta")
+    private Long facturaNumeroHasta;
+
     // Estaciones de cocina de Horeca (ej. "COCINA,PARRILLA,BAR") — antes venían
     // fijas (COCINA/PARRILLA/BAR/COCINA_FRIA) en el frontend, pero no todos los
     // negocios tienen esas 4 zonas exactas. Null = usa las 4 por defecto.
@@ -274,6 +293,14 @@ public class LicenciaTenant {
     public void setRazonSocial(String razonSocial) { this.razonSocial = razonSocial; }
     public String getDomicilioFiscal() { return domicilioFiscal; }
     public void setDomicilioFiscal(String domicilioFiscal) { this.domicilioFiscal = domicilioFiscal; }
+    public String getModoFacturacionFiscal() { return modoFacturacionFiscal; }
+    public void setModoFacturacionFiscal(String modoFacturacionFiscal) { this.modoFacturacionFiscal = modoFacturacionFiscal; }
+    public String getFacturaSerie() { return facturaSerie; }
+    public void setFacturaSerie(String facturaSerie) { this.facturaSerie = facturaSerie; }
+    public Long getFacturaNumeroActual() { return facturaNumeroActual; }
+    public void setFacturaNumeroActual(Long facturaNumeroActual) { this.facturaNumeroActual = facturaNumeroActual; }
+    public Long getFacturaNumeroHasta() { return facturaNumeroHasta; }
+    public void setFacturaNumeroHasta(Long facturaNumeroHasta) { this.facturaNumeroHasta = facturaNumeroHasta; }
     public String getZonasCocina() { return zonasCocina; }
     public void setZonasCocina(String zonasCocina) { this.zonasCocina = zonasCocina; }
     public String getZonasMesa() { return zonasMesa; }

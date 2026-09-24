@@ -74,14 +74,24 @@ public class AuroraWhatsappIaService {
             return resp;
         }
 
-        BigDecimal tasaVes = BigDecimal.valueOf(50.0);
-        if (tasaCambioRepository != null) {
+        // Sin tasa cargada NO se inventa una: ves/cop quedan en cero y el bot solo cotiza en las monedas
+        // que el dueno realmente configuro (dolar siempre; bolivares y pesos si hay tasa; euro si el negocio es solo euro).
+        boolean modoEuro = "EUR".equals(licencia.getMonedaBase());
+        BigDecimal ves = BigDecimal.ZERO;
+        BigDecimal cop = BigDecimal.ZERO;
+        if (tasaCambioRepository != null && !modoEuro) {
             Optional<TasaCambio> tc = tasaCambioRepository
                 .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES");
             if (tc.isPresent() && tc.get().getTasa() != null && tc.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {
-                tasaVes = tc.get().getTasa();
+                ves = tc.get().getTasa();
+            }
+            Optional<TasaCambio> tcCop = tasaCambioRepository
+                .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "COP");
+            if (tcCop.isPresent() && tcCop.get().getTasa() != null && tcCop.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {
+                cop = tcCop.get().getTasa();
             }
         }
+        Tasas tasaVes = new Tasas(ves, cop, modoEuro);
 
         String msgLower = mensajeCliente.toLowerCase().trim();
         String nombreTienda = licencia.getNombreEmpresa();
@@ -89,8 +99,7 @@ public class AuroraWhatsappIaService {
         // 1. Deteccion de Intencion: TASA DE CAMBIO
         if (msgLower.contains("tasa") || msgLower.contains("dolar") || msgLower.contains("dólar") || msgLower.contains("bcv") || msgLower.contains("a como reciben") || msgLower.contains("a cuánto")) {
             resp.intencion = "CONSULTA_TASA";
-            resp.textoRespuesta = "Hola. En " + nombreTienda + " estamos trabajando con la tasa oficial BCV de " 
-                + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$. ¿En que articulo o producto te podemos ayudar hoy?";
+            resp.textoRespuesta = "Hola. En " + nombreTienda + " " + tasaVes.respuestaTasa() + " ¿En que articulo o producto te podemos ayudar hoy?";
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
             return resp;
         }
@@ -111,7 +120,7 @@ public class AuroraWhatsappIaService {
                         + "Telefono: 04141112233\n"
                         + "RIF / C.I.: J-12345678-0\n"
                         + "Titular: " + nombreTienda + "\n\n"
-                        + "Tasa BCV del dia: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$.\n"
+                        + tasaVes.lineaTasa()
                         + "Por favor envianos el capture del comprobante cuando realices el pago.";
                 } else {
                     // Cero alucinaciones para comercios reales en produccion
@@ -132,7 +141,7 @@ public class AuroraWhatsappIaService {
                     + "Telefono: " + telf + "\n"
                     + "RIF / C.I.: " + doc + "\n"
                     + "Titular: " + titular + "\n\n"
-                    + "Tasa BCV del dia: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$.\n"
+                    + tasaVes.lineaTasa()
                     + "Por favor envianos el capture del comprobante cuando realices el pago.";
             }
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
@@ -152,9 +161,9 @@ public class AuroraWhatsappIaService {
                 || msgLower.contains("como pagar") || msgLower.contains("cómo pagar") || msgLower.contains("que aceptan") || msgLower.contains("qué aceptan")) {
             resp.intencion = "CONSULTA_METODOS_PAGO";
             resp.textoRespuesta = "En " + nombreTienda + " aceptamos:\n"
-                + "- Pago Movil (a tasa oficial BCV de " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
-                + "- Efectivo (USD y Bolivares)\n"
-                + "- Binance Pay (USDT)\n"
+                + (tasaVes.euro() ? "" : "- Pago Movil" + (tasaVes.hayVes() ? " (a tasa oficial BCV de " + tasaVes.ves().setScale(2, RoundingMode.HALF_UP) + " Bs/$)" : "") + "\n")
+                + (tasaVes.euro() ? "- Efectivo (EUR)\n" : "- Efectivo (USD" + (tasaVes.hayVes() ? " y Bolivares" : "") + ")\n")
+                + (tasaVes.euro() ? "" : "- Binance Pay (USDT)\n")
                 + "- Transferencias bancarias nacionales\n"
                 + "- Punto de venta en tienda\n\n"
                 + "Indicanos que articulo deseas o solicita 'pago movil' para enviarte los datos de cancelacion.";
@@ -209,7 +218,7 @@ public class AuroraWhatsappIaService {
         // 8. Deteccion de Intencion: CATALOGO / LINK DE COMPRA
         if (msgLower.contains("catalogo") || msgLower.contains("catálogo") || msgLower.contains("lista de precios") || msgLower.contains("que venden") || msgLower.contains("qué venden")) {
             resp.intencion = "CONSULTA_CATALOGO";
-            resp.textoRespuesta = "Puedes explorar todo nuestro catalogo disponible con precios en $ y Bs. directamente aqui: "
+            resp.textoRespuesta = "Puedes explorar todo nuestro catalogo disponible con precios en " + tasaVes.monedasTexto() + " directamente aqui: "
                 + "https://auroraplus.app/catalogo/" + tenantId + "\n"
                 + "Alli puedes seleccionar tus productos y enviar tu pedido en un clic.";
             guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
@@ -271,11 +280,55 @@ public class AuroraWhatsappIaService {
 
         // 13. Respuesta por defecto orientadora (Fallback seguro)
         resp.intencion = "ORIENTACION_GENERAL";
-        resp.textoRespuesta = "Gracias por contactar a " + nombreTienda + ". Puedo ayudarte con disponibilidad de inventario, precios en USD/Bs., tasa BCV del dia o datos de Pago Movil. Tambien puedes ver nuestro catalogo digital en: https://auroraplus.app/catalogo/" + tenantId;
+        resp.textoRespuesta = "Gracias por contactar a " + nombreTienda + ". Puedo ayudarte con disponibilidad de inventario, precios en " + tasaVes.monedasTexto() + ", tasas del dia o datos de Pago Movil. Tambien puedes ver nuestro catalogo digital en: https://auroraplus.app/catalogo/" + tenantId;
         guardarConversacion(tenantId, telefonoCliente, mensajeCliente, resp.textoRespuesta, resp.intencion);
         return resp;
     }
-    private String buscarEnInventario(Long tenantId, String consulta, BigDecimal tasaVes, String nombreTienda) {
+    /** Tasas reales del negocio. Cero = no configurada (nunca se rellena con un valor inventado). */
+    private record Tasas(BigDecimal ves, BigDecimal cop, boolean euro) {
+        boolean hayVes() { return ves.compareTo(BigDecimal.ZERO) > 0; }
+        boolean hayCop() { return cop.compareTo(BigDecimal.ZERO) > 0; }
+
+        /** Precio del producto en todas las monedas disponibles para este negocio. */
+        String precio(BigDecimal pUsd) {
+            if (euro) return "EUR " + pUsd.setScale(2, RoundingMode.HALF_UP);
+            StringBuilder sb = new StringBuilder("$" + pUsd.setScale(2, RoundingMode.HALF_UP) + " USD");
+            if (hayVes()) sb.append(" / ").append(pUsd.multiply(ves).setScale(2, RoundingMode.HALF_UP)).append(" Bs. (Tasa BCV: ").append(ves.setScale(2, RoundingMode.HALF_UP)).append(" Bs/$)");
+            if (hayCop()) sb.append(" / COP ").append(pUsd.multiply(cop).setScale(0, RoundingMode.HALF_UP).toPlainString());
+            return sb.toString();
+        }
+
+        /** Renglon de tasas para mensajes de pago (vacio si no hay ninguna). */
+        String lineaTasa() {
+            if (euro) return "";
+            StringBuilder sb = new StringBuilder();
+            if (hayVes()) sb.append("Tasa BCV del dia: ").append(ves.setScale(2, RoundingMode.HALF_UP)).append(" Bs/$.\n");
+            if (hayCop()) sb.append("Tasa del dia en pesos: ").append(cop.setScale(0, RoundingMode.HALF_UP).toPlainString()).append(" COP/$.\n");
+            return sb.toString();
+        }
+
+        /** Respuesta a "cual es la tasa". */
+        String respuestaTasa() {
+            if (euro) return "trabajamos unicamente en euros, sin tasas de cambio.";
+            if (!hayVes() && !hayCop()) return "trabajamos con precios en dolares. Aun no tenemos una tasa del dia cargada; escribe 'asesor' y te confirmamos el monto en otras monedas.";
+            StringBuilder sb = new StringBuilder("estamos trabajando con");
+            if (hayVes()) sb.append(" la tasa oficial BCV de ").append(ves.setScale(2, RoundingMode.HALF_UP)).append(" Bs/$");
+            if (hayVes() && hayCop()) sb.append(" y");
+            if (hayCop()) sb.append(" ").append(cop.setScale(0, RoundingMode.HALF_UP).toPlainString()).append(" COP por dolar");
+            return sb.append(".").toString();
+        }
+
+        String monedasTexto() {
+            if (euro) return "euros (EUR)";
+            String t = "$";
+            if (hayVes() && hayCop()) return t + ", Bs. y COP";
+            if (hayVes()) return t + " y Bs.";
+            if (hayCop()) return t + " y COP";
+            return t;
+        }
+    }
+
+    private String buscarEnInventario(Long tenantId, String consulta, Tasas tasaVes, String nombreTienda) {
         String[] palabras = consulta.replaceAll("[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]", "").split("\\s+");
         List<String> keywords = new ArrayList<>();
         for (String w : palabras) {
@@ -298,9 +351,8 @@ public class AuroraWhatsappIaService {
                 boolean match = keywords.stream().anyMatch(k -> desc.contains(k) || sku.contains(k));
                 if (match) {
                     BigDecimal pUsd = item.getPrecioVenta() != null ? item.getPrecioVenta() : BigDecimal.ZERO;
-                    BigDecimal pBs = pUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
                     return "Si, tenemos disponible: *" + item.getDescripcion() + "*\n"
-                        + "Precio: $" + pUsd + " USD / " + pBs + " Bs. (Tasa BCV: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
+                        + "Precio: " + tasaVes.precio(pUsd) + "\n"
                         + "Stock actual: " + item.getStockActual() + " " + (item.getUnidadBase() != null ? item.getUnidadBase() : "Pza") + ".\n\n"
                         + "¿Deseas que te lo reservemos o prefieres entrega con delivery?";
                 }
@@ -316,9 +368,8 @@ public class AuroraWhatsappIaService {
                 boolean match = keywords.stream().anyMatch(k -> nom.contains(k) || sku.contains(k));
                 if (match) {
                     BigDecimal pUsd = art.getPrecioVenta() != null ? art.getPrecioVenta() : BigDecimal.ZERO;
-                    BigDecimal pBs = pUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
                     return "Si, tenemos disponible: *" + art.getNombre() + "*\n"
-                        + "Precio: $" + pUsd + " USD / " + pBs + " Bs. (Tasa BCV: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
+                        + "Precio: " + tasaVes.precio(pUsd) + "\n"
                         + "Stock actual: " + art.getStockActual() + " " + (art.getUnidadMedida() != null ? art.getUnidadMedida() : "Unidad") + ".\n\n"
                         + "¿Deseas que te lo reservemos o prefieres entrega con delivery?";
                 }
@@ -344,9 +395,8 @@ public class AuroraWhatsappIaService {
                 String key = (String) d[0];
                 if (keywords.stream().anyMatch(k -> k.contains(key) || key.contains(k))) {
                     BigDecimal pUsd = BigDecimal.valueOf((Double) d[2]).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal pBs = pUsd.multiply(tasaVes).setScale(2, RoundingMode.HALF_UP);
                     return "Si, tenemos disponible: *" + d[1] + "*\n"
-                        + "Precio: $" + pUsd + " USD / " + pBs + " Bs. (Tasa BCV: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$)\n"
+                        + "Precio: " + tasaVes.precio(pUsd) + "\n"
                         + "Stock actual: " + d[3] + " " + d[4] + ".\n\n"
                         + "Deseas que te lo reservemos o prefieres entrega con delivery?";
                 }
@@ -372,7 +422,7 @@ public class AuroraWhatsappIaService {
      * Proporciona respuestas contextualizadas de comercio electronico cuando
      * las intenciones estaticas y busqueda local no encuentran un resultado exacto.
      */
-    private String consultarGemini15Flash(Long tenantId, String nombreTienda, BigDecimal tasaVes, String mensajeCliente, LicenciaTenant licencia) {
+    private String consultarGemini15Flash(Long tenantId, String nombreTienda, Tasas tasaVes, String mensajeCliente, LicenciaTenant licencia) {
         String key = (geminiApiKey != null) ? geminiApiKey.trim() : "";
         if (key.isEmpty() || key.equalsIgnoreCase("TU_API_KEY_AQUI")) {
             log.debug("Gemini API Key no configurada. Omitiendo invocacion generativa.");
@@ -385,7 +435,7 @@ public class AuroraWhatsappIaService {
                     + "Tu funcion es asesorar al cliente de forma amable, precisa y profesional.\n"
                     + "Datos del negocio:\n"
                     + "- Nombre: " + nombreTienda + "\n"
-                    + "- Tasa de cambio oficial del dia: " + tasaVes.setScale(2, RoundingMode.HALF_UP) + " Bs/$\n"
+                    + "- Monedas y tasas: " + (tasaVes.euro() ? "solo euros, sin tasas de cambio" : "precios base en dolares" + (tasaVes.hayVes() ? "; tasa BCV " + tasaVes.ves().setScale(2, RoundingMode.HALF_UP) + " Bs/$" : "; sin tasa en bolivares cargada") + (tasaVes.hayCop() ? "; " + tasaVes.cop().setScale(0, RoundingMode.HALF_UP).toPlainString() + " COP/$" : "")) + "\n"
                     + "- Catalogo online: https://auroraplus.app/catalogo/" + tenantId + "\n"
                     + "Reglas estrictas de respuesta:\n"
                     + "1. Responde de forma concisa (maximo 2 a 3 oraciones cortas).\n"

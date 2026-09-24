@@ -45,7 +45,8 @@ public class CierreCajaController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarCierre(@PathVariable Long id) {
-        AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
+        // Borrar un cierre de caja borra la evidencia de un descuadre: solo el dueño.
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         cierreCajaService.eliminarCierre(tenantId, id);
         auditoriaService.registrar(tenantId, "SALUD", "ELIMINAR", "CierreCaja", id, "Eliminó un cierre de caja");

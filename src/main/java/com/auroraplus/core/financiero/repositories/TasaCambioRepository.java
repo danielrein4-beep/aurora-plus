@@ -9,6 +9,18 @@ import java.util.Optional;
 
 @Repository
 public interface TasaCambioRepository extends JpaRepository<TasaCambio, Long> {
+
+    /**
+     * Tasas registradas por una compra a proveedor (origen COMPRA) son el precio al que se compró,
+     * no la tasa con la que se cobra: al convertir se prefieren las demás (oficial, manual...).
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT t FROM TasaCambio t WHERE t.tenantId = :tenantId AND t.monedaOrigen = :origen "
+        + "AND t.monedaDestino = :destino AND (t.origenApi IS NULL OR t.origenApi <> 'COMPRA') ORDER BY t.fechaActualizacion DESC")
+    java.util.List<TasaCambio> buscarTasasDeCobro(@org.springframework.data.repository.query.Param("tenantId") Long tenantId,
+        @org.springframework.data.repository.query.Param("origen") String origen,
+        @org.springframework.data.repository.query.Param("destino") String destino,
+        org.springframework.data.domain.Pageable pagina);
+
     Optional<TasaCambio> findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(
         Long tenantId, String monedaOrigen, String monedaDestino);
 

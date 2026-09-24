@@ -57,6 +57,31 @@ function manejarSesionVencida() {
   }
 }
 
+// Modo euro: la app trabaja internamente con "USD" como moneda base y aquí, en el único borde
+// con el servidor, la traduce a "EUR" al enviar y de vuelta a "USD" al recibir. Solo actúa cuando
+// el negocio eligió euro (fijarMonedaBaseApi("EUR")); en cualquier otro caso no toca nada.
+// Se guarda por negocio en el navegador para que la primera carga (antes de consultar la
+// configuración al servidor) ya sepa en qué moneda traducir.
+const claveMonedaBase = () => `aurora_moneda_base:${leerSesion()?.tenantId ?? 0}`;
+export function monedaBaseGuardada(): string {
+  try { return localStorage.getItem(claveMonedaBase()) === "EUR" ? "EUR" : "USD"; } catch { return "USD"; }
+}
+export function fijarMonedaBaseApi(m: string) {
+  try { localStorage.setItem(claveMonedaBase(), m === "EUR" ? "EUR" : "USD"); } catch { /* sin almacenamiento: se resuelve con la consulta al servidor */ }
+}
+function traducirMoneda(v: unknown, de: string, a: string): unknown {
+  if (Array.isArray(v)) return v.map((x) => traducirMoneda(x, de, a));
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      const clave = k === de ? a : k;
+      out[clave] = /^moneda/i.test(k) && k !== "monedaBase" && val === de ? a : traducirMoneda(val, de, a);
+    }
+    return out;
+  }
+  return v;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const sesion = leerSesion();
   const headers: Record<string, string> = {
@@ -69,7 +94,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(path, { ...options, headers });
+    const cuerpo = monedaBaseGuardada() === "EUR" && typeof options.body === "string" && !path.includes("moneda-base")
+      ? JSON.stringify(traducirMoneda(JSON.parse(options.body), "USD", "EUR")) : options.body;
+    res = await fetch(path, { ...options, headers, body: cuerpo });
   } catch {
     // fetch() rechaza (no responde con un status) cuando el navegador no
     // pudo ni siquiera contactar al servidor: sin internet, DNS caído, el
@@ -102,7 +129,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(mensaje, res.status);
   }
   if (res.status === 204) return undefined as T;
-  return res.json();
+  const datos = await res.json();
+  return (monedaBaseGuardada() === "EUR" && !path.includes("moneda-base") ? traducirMoneda(datos, "EUR", "USD") : datos) as T;
 }
 
 // Formulario público de "Contáctanos" (Nosotros.tsx) — antes solo hacía
@@ -238,6 +266,32 @@ export function obtenerDatosFiscalesNegocio(): Promise<DatosFiscalesNegocio> {
 
 export function actualizarDatosFiscalesNegocio(datos: DatosFiscalesNegocio): Promise<DatosFiscalesNegocio> {
   return request("/api/config/mi-negocio/datos-fiscales", { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// Facturación Fiscal real (Formato Libre autorizado por imprenta SENIAT) — apagada
+// por defecto ("NINGUNA"). Ver FacturacionFiscalService en el backend: nunca se
+// inventa un número de control sin que el negocio tenga de verdad ese rango asignado.
+export type ModoFacturacionFiscal = "NINGUNA" | "FORMATO_LIBRE" | "MAQUINA_FISCAL";
+
+export interface FacturacionFiscalConfig {
+  modo: ModoFacturacionFiscal;
+  serie?: string | null;
+  numeroActual?: number | null;
+  numeroHasta?: number | null;
+  numerosRestantes?: number | null;
+}
+
+export function obtenerFacturacionFiscal(): Promise<FacturacionFiscalConfig> {
+  return request("/api/config/mi-negocio/facturacion-fiscal");
+}
+
+export function actualizarFacturacionFiscal(datos: { modo: ModoFacturacionFiscal; serie?: string; numeroDesde?: number; numeroHasta?: number }): Promise<FacturacionFiscalConfig> {
+  return request("/api/config/mi-negocio/facturacion-fiscal", { method: "PUT", body: JSON.stringify(datos) });
+}
+
+/** Reserva y devuelve el siguiente número de control fiscal, o {} si el negocio no tiene Formato Libre activo. */
+export function siguienteNumeroControlFiscal(): Promise<{ numeroControl?: string }> {
+  return request("/api/config/mi-negocio/facturacion-fiscal/siguiente-numero", { method: "POST" });
 }
 
 /** Zonas/estaciones de cocina de Horeca (ej. COCINA, PARRILLA, BAR) — cada negocio arma las suyas; sin configurar trae las 4 clásicas por defecto. */
@@ -711,7 +765,23 @@ export interface OdontogramaDiente {
   numeroFdi: number;
   estado: EstadoDiente;
   notas: string | null;
+  caras?: string[] | null;
   fechaActualizacion: string;
+}
+
+export interface OdontogramaHistorialEntrada {
+  id: number;
+  numero_fdi: number;
+  estado: EstadoDiente;
+  caras_json: string | null;
+  notas: string | null;
+  usuario: string | null;
+  fecha_registro: string;
+}
+
+export async function listarHistorialOdontograma(pacienteId: number, numeroFdi?: number): Promise<OdontogramaHistorialEntrada[]> {
+  const filtro = numeroFdi ? `&numeroFdi=${numeroFdi}` : "";
+  return request<OdontogramaHistorialEntrada[]>(`/api/salud/odontograma/historial?pacienteId=${pacienteId}${filtro}`);
 }
 
 export async function listarOdontograma(pacienteId: number): Promise<OdontogramaDiente[]> {
@@ -721,7 +791,7 @@ export async function listarOdontograma(pacienteId: number): Promise<Odontograma
 export async function actualizarDienteOdontograma(
   pacienteId: number,
   numeroFdi: number,
-  datos: { estado: EstadoDiente; notas?: string }
+  datos: { estado: EstadoDiente; notas?: string; caras?: string[] }
 ): Promise<OdontogramaDiente> {
   return request<OdontogramaDiente>(`/api/salud/odontograma/diente`, {
     method: "PUT",
@@ -2024,10 +2094,13 @@ export function obtenerItemsComanda(tenantId: number, comandaId: number): Promis
 export interface ResumenPeriodoAbierto {
   desde: string;
   hasta: string;
-  totalIngresos: number;
-  totalEgresos: number;
-  montoEsperadoEnCaja: number;
+  /** Solo el dueño recibe las cifras: para el cajero el arqueo es ciego y vienen vacías. */
+  totalIngresos?: number;
+  totalEgresos?: number;
+  /** Efectivo que debería haber en la gaveta (lo mismo que calcula el cierre). */
+  montoEsperadoEnCaja?: number;
   cantidadMovimientos: number;
+  arqueoCiego?: boolean;
 }
 
 export function resumenPeriodoAbierto(tenantId: number, moneda: string): Promise<ResumenPeriodoAbierto> {
@@ -2390,6 +2463,10 @@ export interface Cliente {
   telefono: string | null;
   correo: string | null;
   fechaRegistro: string;
+  // Solo Comercio (crédito de mostrador) — null en clientes de otras verticales.
+  direccion?: string | null;
+  limiteCredito?: number | null;
+  saldoPendiente?: number | null;
 }
 
 export interface MetricasCliente {
@@ -2409,12 +2486,49 @@ export function obtenerCliente(tenantId: number, id: number): Promise<Cliente> {
   return request(`/api/crm/clientes/${id}?tenantId=${tenantId}`);
 }
 
-export function crearCliente(tenantId: number, datos: { nombre?: string; identificacionRif?: string; telefono?: string; correo?: string }): Promise<Cliente> {
+type DatosClienteRequest = {
+  nombre?: string; identificacionRif?: string; telefono?: string; correo?: string;
+  direccion?: string; limiteCredito?: number; saldoPendiente?: number;
+};
+
+export function crearCliente(tenantId: number, datos: DatosClienteRequest): Promise<Cliente> {
   return request(`/api/crm/clientes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
 }
 
-export function editarCliente(tenantId: number, id: number, datos: { nombre?: string; identificacionRif?: string; telefono?: string; correo?: string }): Promise<Cliente> {
+export function editarCliente(tenantId: number, id: number, datos: DatosClienteRequest): Promise<Cliente> {
   return request(`/api/crm/clientes/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// ─── Ventas del POS de Comercio (detalle completo, antes solo en localStorage) ───
+export interface VentaMostradorServidor {
+  id: number;
+  numero: string;
+  fechaRegistro: string;
+  detalleJson: string;
+}
+
+export interface VentaMostradorRequest {
+  numero: string;
+  clienteNombre?: string;
+  clienteDocumento?: string;
+  total: number;
+  utilidad?: number;
+  metodoPago?: string;
+  esCredito: boolean;
+  fechaIso?: string;
+  detalleJson: string;
+}
+
+export function guardarVentaMostrador(tenantId: number, venta: VentaMostradorRequest): Promise<VentaMostradorServidor> {
+  return request(`/api/comercio/ventas?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(venta) });
+}
+
+export function guardarVentasMostradorLote(tenantId: number, ventas: VentaMostradorRequest[]): Promise<{ guardadas: number; omitidas: number }> {
+  return request(`/api/comercio/ventas/lote?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(ventas) });
+}
+
+export function listarVentasMostrador(tenantId: number): Promise<VentaMostradorServidor[]> {
+  return request(`/api/comercio/ventas?tenantId=${tenantId}`);
 }
 
 export function eliminarCliente(tenantId: number, id: number): Promise<void> {
@@ -2519,11 +2633,20 @@ export function obtenerCanalEndemico(cie10: string, anio: number): Promise<Canal
 
 /** Vista consolidada de TODA la red (solo super-admin). */
 export function diagnosticosFrecuentesRed(limite = 20): Promise<DiagnosticoFrecuente[]> {
-  return request(`/api/super-admin/canal-endemico/diagnosticos-frecuentes?limite=${limite}`);
+  return requestSuperAdmin(`/api/super-admin/canal-endemico/diagnosticos-frecuentes?limite=${limite}`);
 }
 
 export function obtenerCanalEndemicoRed(cie10: string, anio: number): Promise<CanalEndemico> {
-  return request(`/api/super-admin/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+  return requestSuperAdmin(`/api/super-admin/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+}
+
+/** Canal de UNA clínica visto desde el super-admin (mismo cálculo que ve el médico). */
+export function diagnosticosFrecuentesClinicaRed(tenantId: number, limite = 20): Promise<DiagnosticoFrecuente[]> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/salud/${tenantId}/canal-endemico/diagnosticos-frecuentes?limite=${limite}`);
+}
+
+export function obtenerCanalEndemicoClinicaRed(tenantId: number, cie10: string, anio: number): Promise<CanalEndemico> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/salud/${tenantId}/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
 }
 
 export interface CasosPorClinica {
@@ -2532,7 +2655,7 @@ export interface CasosPorClinica {
 }
 
 export function desglosePorClinicaRed(cie10: string, anio: number): Promise<CasosPorClinica[]> {
-  return request(`/api/super-admin/canal-endemico/desglose-por-clinica?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+  return requestSuperAdmin(`/api/super-admin/canal-endemico/desglose-por-clinica?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
 }
 
 // --- Importación de historiales epidemiológicos desde Excel (ver
@@ -2737,6 +2860,7 @@ async function requestSuperAdmin<T>(path: string, options: RequestInit = {}): Pr
     try {
       const parsed = JSON.parse(errorText);
       if (parsed.error) msg = parsed.error;
+      else if (parsed.message) msg = parsed.message;
     } catch {}
 
     if (res.status === 401) {
@@ -2957,17 +3081,124 @@ export async function subirExamenPortalLaboratorioPublico(
   return res.json();
 }
 
-export async function loginSuperAdminApi(username: string, password: string): Promise<string> {
+/** Si la cuenta tiene segundo factor y no se envió `codigo`, vuelve `{ requiere2fa: true }` sin token. */
+export async function loginSuperAdminApi(username: string, password: string, codigo?: string): Promise<{ token?: string; requiere2fa?: boolean }> {
   // Nunca fingir un login de super-admin exitoso — antes esto aceptaba
   // "admin"/"admin123" o "ceo"/"aurora2026" como puerta trasera hardcodeada
   // cada vez que el backend rechazaba o no respondía, sin importar si el
   // rechazo era real. Un token real, firmado por el backend, es la única
   // forma válida de entrar al panel de super-admin.
-  const data = await requestSuperAdmin<{ token: string }>("/api/auth/login-super-admin", {
+  const data = await requestSuperAdmin<{ token?: string; requiere2fa?: string }>("/api/auth/login-super-admin", {
     method: "POST",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, codigo }),
   });
-  return data.token;
+  if (data.requiere2fa === "true") return { requiere2fa: true };
+  return { token: data.token };
+}
+
+// --- Seguridad de la cuenta de administración (2FA y contraseña)
+
+export type RolEquipoSuperAdmin = "PROPIETARIO" | "SOPORTE" | "FINANZAS" | "ANALISTA";
+
+export interface PerfilSuperAdmin {
+  username: string;
+  nombreCompleto: string | null;
+  rol: RolEquipoSuperAdmin;
+  totpActivo: boolean;
+  debeCambiarClave: boolean;
+  email: string | null;
+  telefono: string | null;
+}
+
+export type CanalContactoSuperAdmin = "EMAIL" | "TELEFONO";
+export type AccionContactoSuperAdmin = "AGREGAR" | "CAMBIAR" | "QUITAR";
+
+export interface SolicitudContactoSuperAdmin {
+  solicitudId: number;
+  pideCodigoActual: boolean;
+  pideCodigoNuevo: boolean;
+  destinos: string[];
+  /** Solo desarrollo: el código quedó en el log del servidor. */
+  simulado: boolean;
+}
+
+/** Envía los códigos: al dato actual (cambiar/quitar) y al nuevo (agregar/cambiar). */
+export function solicitarCambioContactoSuperAdmin(datos: { canal: CanalContactoSuperAdmin; accion: AccionContactoSuperAdmin; valor?: string; password: string }): Promise<SolicitudContactoSuperAdmin> {
+  return requestSuperAdmin("/api/super-admin/seguridad/contacto/solicitar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function confirmarCambioContactoSuperAdmin(datos: { solicitudId: number; codigoActual?: string; codigoNuevo?: string }): Promise<{ email: string | null; telefono: string | null }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/contacto/confirmar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+// --- "Olvidé mi contraseña" del equipo de administración (público, sin sesión)
+
+/** Siempre responde lo mismo exista o no la cuenta (no revela usuarios). */
+export function solicitarRecuperacionClaveSuperAdmin(username: string): Promise<{ mensaje: string; simulado: boolean }> {
+  return requestSuperAdmin("/api/auth/super-admin/recuperar-clave/solicitar", { method: "POST", body: JSON.stringify({ username }) });
+}
+
+export function confirmarRecuperacionClaveSuperAdmin(datos: { username: string; codigoEmail?: string; codigoTelefono?: string; nuevaClave: string }): Promise<{ mensaje: string }> {
+  return requestSuperAdmin("/api/auth/super-admin/recuperar-clave/confirmar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function obtenerEstadoSeguridadSuperAdmin(): Promise<PerfilSuperAdmin> {
+  return requestSuperAdmin("/api/super-admin/seguridad/estado");
+}
+
+// --- Equipo de administración (solo PROPIETARIO)
+
+export interface MiembroEquipoSuperAdmin {
+  id: number;
+  username: string;
+  nombreCompleto: string | null;
+  rol: RolEquipoSuperAdmin;
+  email: string | null;
+  telefono: string | null;
+  activo: boolean;
+  totpActivo: boolean;
+  debeCambiarClave: boolean;
+  fechaCreacion: string;
+  ultimoAcceso: string | null;
+  esUstedMismo: boolean;
+  /** Solo viene al crear o resetear: se muestra una única vez. */
+  claveTemporal?: string;
+}
+
+export function listarEquipoSuperAdmin(): Promise<MiembroEquipoSuperAdmin[]> {
+  return requestSuperAdmin("/api/super-admin/equipo");
+}
+
+export function crearMiembroEquipoSuperAdmin(datos: { username: string; nombreCompleto: string; rol: RolEquipoSuperAdmin }): Promise<MiembroEquipoSuperAdmin> {
+  return requestSuperAdmin("/api/super-admin/equipo", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function cambiarRolMiembroSuperAdmin(id: number, rol: RolEquipoSuperAdmin): Promise<MiembroEquipoSuperAdmin> {
+  return requestSuperAdmin(`/api/super-admin/equipo/${id}/rol`, { method: "PUT", body: JSON.stringify({ rol }) });
+}
+
+export function cambiarActivoMiembroSuperAdmin(id: number, activo: boolean): Promise<MiembroEquipoSuperAdmin> {
+  return requestSuperAdmin(`/api/super-admin/equipo/${id}/activo`, { method: "POST", body: JSON.stringify({ activo }) });
+}
+
+export function resetearAccesoMiembroSuperAdmin(id: number): Promise<MiembroEquipoSuperAdmin> {
+  return requestSuperAdmin(`/api/super-admin/equipo/${id}/resetear-acceso`, { method: "POST" });
+}
+
+export function iniciar2faSuperAdmin(password: string): Promise<{ secreto: string; uri: string }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/2fa/iniciar", { method: "POST", body: JSON.stringify({ password }) });
+}
+
+export function confirmar2faSuperAdmin(codigo: string): Promise<{ totpActivo: boolean }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/2fa/confirmar", { method: "POST", body: JSON.stringify({ codigo }) });
+}
+
+export function desactivar2faSuperAdmin(password: string, codigo: string): Promise<{ totpActivo: boolean }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/2fa/desactivar", { method: "POST", body: JSON.stringify({ password, codigo }) });
+}
+
+export function cambiarClaveSuperAdmin(actual: string, nueva: string, codigo?: string): Promise<{ token: string }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/cambiar-clave", { method: "POST", body: JSON.stringify({ actual, nueva, codigo }) });
 }
 
 export async function listarTenantsSuperAdmin(): Promise<LicenciaTenant[]> {
@@ -3118,6 +3349,24 @@ export interface RegistrarPagoSuperAdminRequest {
   meses?: number;
   dias?: number;
   notas?: string;
+  /** Comisiones pendientes (mercado ganadero) que se cobran en esta factura. */
+  comisionIds?: number[];
+}
+
+export interface ComisionPlataforma {
+  id: number;
+  tenantId: number;
+  origen: string;
+  descripcion: string | null;
+  montoBase: number;
+  porcentaje: number;
+  montoComision: number;
+  pagada: boolean;
+  fecha: string;
+}
+
+export function listarComisionesPendientesSuperAdmin(tenantId: number): Promise<ComisionPlataforma[]> {
+  return requestSuperAdmin(`/api/super-admin/comisiones?pagada=false&tenantId=${tenantId}`);
 }
 
 export interface RegalarTiempoSuperAdminRequest {
@@ -3283,6 +3532,58 @@ export interface MovimientoRepuesto {
   fechaRegistro: string;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// MULTI-ALMACÉN — capa aditiva sobre el stock total (ver AlmacenService en
+// backend): registra cómo se reparte el stock entre ubicaciones y permite
+// trasladar; no cambia cómo se vende ni el kárdex.
+// ═══════════════════════════════════════════════════════════════════════
+export interface Almacen {
+  id: number;
+  tenantId: number;
+  nombre: string;
+  direccion?: string | null;
+  esPrincipal: boolean;
+  activo: boolean;
+  fechaCreacion: string;
+}
+
+export interface StockAlmacen {
+  id: number;
+  tenantId: number;
+  almacenId: number;
+  repuestoId: number;
+  cantidad: number;
+  ubicacion?: string | null; // posición física dentro de este almacén (ej. "Pasillo 3, Estante B")
+}
+
+export function listarUbicacionesAlmacen(tenantId: number): Promise<StockAlmacen[]> {
+  return request(`/api/repuestos/almacenes/ubicaciones?tenantId=${tenantId}`);
+}
+
+export function fijarUbicacionAlmacen(tenantId: number, datos: { repuestoId: number; almacenId: number; ubicacion: string }): Promise<StockAlmacen> {
+  return request(`/api/repuestos/almacenes/ubicacion?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function listarAlmacenes(tenantId: number): Promise<Almacen[]> {
+  return request(`/api/repuestos/almacenes?tenantId=${tenantId}`);
+}
+
+export function crearAlmacen(tenantId: number, datos: { nombre: string; direccion?: string }): Promise<Almacen> {
+  return request(`/api/repuestos/almacenes?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function actualizarAlmacen(tenantId: number, id: number, datos: { nombre?: string; direccion?: string; activo?: boolean }): Promise<Almacen> {
+  return request(`/api/repuestos/almacenes/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function obtenerDistribucionAlmacen(tenantId: number, repuestoId: number): Promise<{ distribucion: StockAlmacen[]; sinAsignar: number }> {
+  return request(`/api/repuestos/almacenes/distribucion/${repuestoId}?tenantId=${tenantId}`);
+}
+
+export function trasladarStockAlmacen(tenantId: number, datos: { repuestoId: number; origenId: number; destinoId: number; cantidad: number }): Promise<void> {
+  return request(`/api/repuestos/almacenes/trasladar?tenantId=${tenantId}`, { method: "POST", body: JSON.stringify(datos) });
+}
+
 export interface ProveedorRepuesto {
   id: number;
   tenantId: number;
@@ -3429,6 +3730,65 @@ export function crearPresentacionRepuesto(
   return request(`/api/repuestos/presentaciones?${params.toString()}`, {
     method: "POST",
   });
+}
+
+export interface TicketPosRequest {
+  numeroTicket: string;
+  lineas: { repuestoId: number; presentacionId: number | null; cantidad: number }[];
+  monedaPago?: string;
+  /** EFECTIVO, PAGO_MOVIL, TARJETA...: el arqueo de caja solo cuenta el efectivo. */
+  metodoPago?: string;
+  montoRecibido?: number;
+  pagos?: { moneda: string; monto: number; metodo?: string }[];
+  vuelto?: number;
+  monedaVuelto?: string;
+  /** Venta a crédito: cuánto paga ahora (0 = todo a crédito). */
+  montoPagadoAhora?: number;
+  diasCredito?: number;
+  clienteId?: number;
+  nombreCliente?: string;
+}
+
+/**
+ * Cobra el ticket completo del POS en una sola transacción: si una línea falla no queda nada
+ * a medias, y si el ticket ya se cobró (reintento tras un corte de red) devuelve yaProcesado.
+ */
+export function cobrarTicketPos(datos: TicketPosRequest): Promise<{ yaProcesado: boolean; total: number | null }> {
+  return request(`/api/repuestos/ventas/ticket`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface LineaVendidaTicket {
+  movimientoId: number;
+  repuestoId: number;
+  codigoSku: string;
+  descripcion: string;
+  cantidad: number;
+  total: number | null;
+  devuelto: number;
+}
+
+export function lineasDeTicketPos(numero: string): Promise<LineaVendidaTicket[]> {
+  return request(`/api/repuestos/ventas/ticket/${encodeURIComponent(numero)}/lineas`);
+}
+
+export interface ResultadoDevolucion {
+  yaProcesada: boolean;
+  montoDevuelto: number | null;
+  rebajadoDeCredito: number | null;
+  reembolsadoEnCaja: number | null;
+  monedaReembolso: string | null;
+}
+
+/** Devolución total o parcial de un ticket: el stock vuelve y el dinero sale de caja (o rebaja el crédito). */
+export function devolverTicketPos(datos: {
+  numeroTicket: string;
+  lineas: { movimientoId: number; cantidad: number }[];
+  motivo: string;
+  monedaReembolso?: string;
+  metodoReembolso?: string;
+  clave: string;
+}): Promise<ResultadoDevolucion> {
+  return request(`/api/repuestos/ventas/devolucion`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export function despacharPorPresentacion(
@@ -4811,6 +5171,69 @@ export async function obtenerAnalyticsSuperAdmin(periodo?: string, fechaRef?: st
   return requestSuperAdmin<SaasAnalyticsResponse>(`/api/super-admin/tenants/analytics${q}`);
 }
 
+// --- Actividad operativa por vertical (super-admin): qué registran los tenants, no lo que pagan.
+
+export interface ResumenActividadVertical {
+  vertical: string;
+  totalTenants: number;
+  tenantsConActividad: number;
+  registrosPeriodo: number;
+}
+
+export interface TotalMetricaActividad {
+  clave: string;
+  etiqueta: string;
+  conFecha: boolean;
+  total: number;
+  periodo: number | null;
+  monto: number | null;
+}
+
+export interface ValorMetricaTenant {
+  total: number;
+  periodo: number | null;
+  monto: number | null;
+}
+
+export interface TenantActividad {
+  tenantId: number;
+  nombreEmpresa: string;
+  moduloPrincipal: string;
+  activa: boolean;
+  plan: string;
+  usuarios: number;
+  ultimaActividad: string | null;
+  metricas: Record<string, ValorMetricaTenant>;
+}
+
+export interface DetalleActividadVertical {
+  vertical: string;
+  dias: number;
+  metricaPrincipal: string;
+  totales: TotalMetricaActividad[];
+  serie: { fecha: string; cantidad: number }[];
+  tenants: TenantActividad[];
+}
+
+export function obtenerResumenActividadSuperAdmin(dias: number): Promise<ResumenActividadVertical[]> {
+  return requestSuperAdmin(`/api/super-admin/actividad/resumen?dias=${dias}`);
+}
+
+export interface ActividadTenant {
+  tenantId: number;
+  dias: number;
+  ultimaActividad: string | null;
+  metricas: (TotalMetricaActividad & { vertical: string })[];
+}
+
+export function obtenerActividadTenantSuperAdmin(tenantId: number, dias: number): Promise<ActividadTenant> {
+  return requestSuperAdmin(`/api/super-admin/actividad/tenant/${tenantId}?dias=${dias}`);
+}
+
+export function obtenerDetalleActividadSuperAdmin(vertical: string, dias: number): Promise<DetalleActividadVertical> {
+  return requestSuperAdmin(`/api/super-admin/actividad/${encodeURIComponent(vertical)}?dias=${dias}`);
+}
+
 
 // =========================================================================
 // SISTEMA DE SOPORTE & ASISTENCIA AL TENANT (TICKETS Y CHAT EN VIVO)
@@ -5554,4 +5977,386 @@ export function cambiarEstadoCuadrillaConstruccionApi(id: number, estado: string
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ estado })
   });
+}
+
+// --- Inteligencia del super-admin (ver SuperAdminInteligenciaController) ---
+
+export interface TenantInteligenciaBase {
+  tenantId: number;
+  nombreEmpresa: string | null;
+  moduloPrincipal: string | null;
+  plan: string | null;
+  activa: boolean | null;
+  fechaAlta: string | null;
+}
+
+export interface ClinicaInteligencia extends TenantInteligenciaBase {
+  consultasPeriodo: number;
+  consultasTotal: number;
+  pacientes: number;
+  medicos: number;
+  ultimaConsulta: string | null;
+  especialidad: string | null;
+  doctor: string | null;
+  topDiagnosticos: { cie10: string; casos: number }[];
+}
+
+export interface InteligenciaSalud {
+  resumen: { clinicas: number; clinicasConActividad: number; consultasPeriodo: number; pacientes: number };
+  topDiagnosticos: { cie10: string; casos: number; clinicas: number }[];
+  tendencia: { fecha: string; consultas: number }[];
+  clinicas: ClinicaInteligencia[];
+}
+
+export interface ProductoTopInteligencia {
+  nombre: string;
+  cantidad: number;
+  monto: number;
+  comercios: number;
+}
+
+export interface ComercioInteligencia extends TenantInteligenciaBase {
+  ventasPeriodo: number;
+  montoPeriodo: number;
+  utilidadPeriodo: number;
+  ticketPromedio: number;
+  ultimaVenta: string | null;
+  productos: number;
+  categorias: string[];
+  topProducto: string | null;
+}
+
+export interface InteligenciaComercio {
+  resumen: { comercios: number; comerciosConVentas: number; ventasPeriodo: number; montoPeriodo: number; utilidadPeriodo: number; ticketPromedio: number };
+  porRubro: { rubro: string; comercios: number; ventas: number; monto: number }[];
+  topProductos: ProductoTopInteligencia[];
+  tendencia: { fecha: string; ventas: number; monto: number }[];
+  comercios: ComercioInteligencia[];
+}
+
+export interface DetalleComercioInteligencia {
+  topProductos: ProductoTopInteligencia[];
+  tendencia: { fecha: string; ventas: number; monto: number }[];
+  metodosPago: { metodo: string; ventas: number; monto: number }[];
+}
+
+export type Semaforo = "VERDE" | "AMARILLO" | "ROJO";
+
+export interface SaludCliente extends TenantInteligenciaBase {
+  puntaje: number;
+  semaforo: Semaforo;
+  motivos: string[];
+  ultimaActividad: string | null;
+  diasSinActividad: number | null;
+  usoUltimos14: number;
+  usoPrevios14: number;
+  estadoPago: "AL_DIA" | "POR_VENCER" | "VENCIDO" | "SIN_PAGOS";
+  diasParaVencer: number | null;
+  pagandoEsteMes: boolean;
+  ticketsAbiertos: number;
+}
+
+export interface InteligenciaNegocio {
+  resumen: { mrr: number; arr: number; clientesPagando: number; arpu: number; pagosOtraMoneda: number };
+  serie: { mes: string; mrr: number; clientesPagando: number; nuevos: number; perdidos: number; churnPct: number | null }[];
+  semaforo: Record<Semaforo, number>;
+  clientes: SaludCliente[];
+}
+
+export function obtenerInteligenciaSalud(dias: number): Promise<InteligenciaSalud> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/salud?dias=${dias}`);
+}
+
+export function obtenerInteligenciaComercio(dias: number): Promise<InteligenciaComercio> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/comercio?dias=${dias}`);
+}
+
+export function obtenerDetalleComercioInteligencia(tenantId: number, dias: number): Promise<DetalleComercioInteligencia> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/comercio/${tenantId}?dias=${dias}`);
+}
+
+export function obtenerInteligenciaNegocio(): Promise<InteligenciaNegocio> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/negocio`);
+}
+
+// --- Mercado ganadero entre fincas de Aurora (ver MercadoGanaderoController) ---
+
+export type CategoriaMercado = "PADROTE" | "VACA_PARIDA" | "VACA_ORDENO" | "NOVILLA" | "MAUTE" | "CEBA";
+
+/** Cómo se ve una finca en el mercado: anónima ("Finca en Barinas #K7Q") hasta cerrar el trato. */
+export interface PerfilMercado {
+  nombre: string;
+  revelado: boolean;
+  verificado: boolean;
+  mesesEnAurora: number | null;
+  diasEnAurora: number | null;
+  ventas: number;
+  compras: number;
+  calificacion: number | null;
+  totalCalificaciones: number;
+}
+
+export interface ReferenciaPrecioMercado {
+  promedio: number;
+  minimo: number;
+  maximo: number;
+  muestras: number;
+  alcance: string;
+}
+
+export interface PublicacionMercado {
+  id: number;
+  titulo: string;
+  categoria: CategoriaMercado | null;
+  precio: number;
+  tipoPrecio: "POR_CABEZA" | "POR_KG";
+  estadoRegion: string | null;
+  negociable: boolean;
+  estado: "ACTIVA" | "VENDIDA" | "RETIRADA";
+  fechaPublicacion: string;
+  miniatura: string | null;
+  /** En un lote, peso promedio por animal. */
+  peso: number | null;
+  /** Animales en la publicación: 1, o varios si es un lote. */
+  cantidad: number;
+  pesoTotal: number | null;
+  raza: string | null;
+  sexo: "MACHO" | "HEMBRA" | string;
+  tipoAnimal: string | null;
+  arete: string | null;
+  edadMeses: number | null;
+  esMia: boolean;
+  guardado: boolean;
+  ofertasPendientes: number;
+  totalFotos: number;
+  precioFinal: number | null;
+  fechaCierre: string | null;
+  vendedor: PerfilMercado;
+  mejorOferta?: number | null;
+  referencia?: ReferenciaPrecioMercado | null;
+}
+
+export interface OfertaMercado {
+  id: number;
+  monto: number;
+  estado: "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "RETIRADA";
+  fecha: string;
+  mensaje: string | null;
+  /** Referencia opaca de la finca compradora (el vendedor no ve su número interno). */
+  compradorRef?: string;
+  comprador?: PerfilMercado;
+  traspasado?: boolean;
+}
+
+export interface ContactoMercado {
+  nombre: string | null;
+  telefono: string | null;
+  email: string | null;
+}
+
+export interface DetallePublicacionMercado extends PublicacionMercado {
+  descripcion: string | null;
+  municipio: string | null;
+  fotos: { id: number; imagen: string }[];
+  pesos: { fecha: string; pesoKg: number }[];
+  vacunas: { nombre: string; enfermedadPrevenida: string | null; fechaAplicacion: string; animales: number }[];
+  /** Solo en lotes: cada animal con su peso (el arete se ve al cerrar el trato). */
+  animales?: { arete: string | null; raza: string | null; sexo: string; peso: number | null; edadMeses: number | null }[];
+  referencia: ReferenciaPrecioMercado | null;
+  ofertas?: OfertaMercado[];
+  misOfertas?: OfertaMercado[];
+  contraparte?: ContactoMercado;
+  ofertaCerrada: { id: number; monto: number; traspasado: boolean } | null;
+  yaCalifique?: boolean;
+  animalRecibidoId?: number;
+  datosOcultos?: boolean;
+}
+
+export interface FiltrosMercado {
+  categoria?: CategoriaMercado;
+  raza?: string;
+  sexo?: string;
+  estadoRegion?: string;
+  pesoMin?: number;
+  pesoMax?: number;
+  precioMax?: number;
+  q?: string;
+  orden?: "recientes" | "precio_asc" | "precio_desc" | "peso_desc";
+}
+
+export interface ResumenMercado {
+  total: number;
+  categorias: { categoria: CategoriaMercado; total: number }[];
+  razas: { raza: string; total: number }[];
+  estados: { estado: string; total: number }[];
+  tratosCerrados: number;
+}
+
+export interface MiPuestoMercado {
+  resumen: { activas: number; ofertasPendientes: number; vendidas: number; montoVendido: number };
+  publicaciones: PublicacionMercado[];
+}
+
+export interface PublicarMercadoRequest {
+  animalId?: number;
+  /** Varios animales = venta por lote. */
+  animalIds?: number[];
+  categoria: CategoriaMercado;
+  titulo?: string;
+  precio: number;
+  tipoPrecio: "POR_CABEZA" | "POR_KG";
+  estadoRegion?: string;
+  municipio?: string;
+  descripcion?: string;
+  negociable: boolean;
+  fotos?: string[];
+  miniatura?: string;
+}
+
+export interface ConversacionMercado {
+  publicacionId: number;
+  compradorRef: string;
+  titulo: string;
+  estado: string;
+  miniatura: string | null;
+  soyVendedor: boolean;
+  otraFinca: string;
+  ultimaFecha: string;
+  ultimoMensaje: string;
+  sinLeer: number;
+}
+
+export interface MensajeMercado {
+  id: number;
+  esMio: boolean;
+  emisorNombre: string | null;
+  contenido: string;
+  esSistema: boolean;
+  fecha: string;
+}
+
+export function listarMercadoGanadero(filtros: FiltrosMercado = {}): Promise<PublicacionMercado[]> {
+  const params = new URLSearchParams();
+  Object.entries(filtros).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") params.append(k, String(v)); });
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return request(`/api/ganaderia/mercado/publicaciones${query}`);
+}
+
+export function obtenerResumenMercado(): Promise<ResumenMercado> {
+  return request(`/api/ganaderia/mercado/resumen`);
+}
+
+export function obtenerMiPuestoMercado(): Promise<MiPuestoMercado> {
+  return request(`/api/ganaderia/mercado/mi-puesto`);
+}
+
+export function listarMisOfertasMercado(): Promise<{ oferta: OfertaMercado; publicacion: PublicacionMercado }[]> {
+  return request(`/api/ganaderia/mercado/mis-ofertas`);
+}
+
+export function listarGuardadosMercado(): Promise<PublicacionMercado[]> {
+  return request(`/api/ganaderia/mercado/guardados`);
+}
+
+export function guardarPublicacionMercado(id: number, guardar: boolean): Promise<{ guardado: boolean }> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}/guardar`, { method: guardar ? "POST" : "DELETE" });
+}
+
+export function obtenerPublicacionMercado(id: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}`);
+}
+
+export function publicarEnMercado(datos: PublicarMercadoRequest): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarPublicacionMercado(id: number, datos: PublicarMercadoRequest): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function retirarPublicacionMercado(id: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}/retirar`, { method: "POST" });
+}
+
+export function ofertarEnMercado(id: number, monto: number, mensaje?: string): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}/ofertas`, { method: "POST", body: JSON.stringify({ monto, mensaje }) });
+}
+
+export function aceptarOfertaMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/aceptar`, { method: "POST" });
+}
+
+export function rechazarOfertaMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/rechazar`, { method: "POST" });
+}
+
+export function recibirAnimalMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/recibir`, { method: "POST" });
+}
+
+export function calificarTratoMercado(ofertaId: number, estrellas: number, comentario?: string): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/calificar`, { method: "POST", body: JSON.stringify({ estrellas, comentario }) });
+}
+
+export function obtenerCondicionesMercado(): Promise<{ aceptadas: boolean; version: number }> {
+  return request(`/api/ganaderia/mercado/condiciones`);
+}
+
+export function aceptarCondicionesMercado(): Promise<{ aceptadas: boolean; version: number }> {
+  return request(`/api/ganaderia/mercado/condiciones/aceptar`, { method: "POST" });
+}
+
+export function listarConversacionesMercado(): Promise<ConversacionMercado[]> {
+  return request(`/api/ganaderia/mercado/conversaciones`);
+}
+
+export function contarSinLeerMercado(): Promise<{ sinLeer: number }> {
+  return request(`/api/ganaderia/mercado/sin-leer`);
+}
+
+export function listarMensajesMercado(publicacionId: number, comprador?: string): Promise<MensajeMercado[]> {
+  const query = comprador ? `?comprador=${encodeURIComponent(comprador)}` : "";
+  return request(`/api/ganaderia/mercado/publicaciones/${publicacionId}/mensajes${query}`);
+}
+
+export function enviarMensajeMercado(publicacionId: number, contenido: string, comprador?: string): Promise<{ mensajes: MensajeMercado[]; datosOcultos: boolean }> {
+  return request(`/api/ganaderia/mercado/publicaciones/${publicacionId}/mensajes`, {
+    method: "POST",
+    body: JSON.stringify({ contenido, comprador }),
+  });
+}
+
+export function obtenerComisionesMercado(): Promise<{ pendiente: number; comisiones: { id: number; descripcion: string | null; montoComision: number; pagada: boolean; fecha: string }[] }> {
+  return request(`/api/ganaderia/mercado/comisiones`);
+}
+
+export interface PanelMercadoSuperAdmin {
+  resumen: {
+    publicacionesActivas: number; tratosPeriodo: number; volumenPeriodo: number; comisionesGeneradas: number;
+    comisionesPendientes: number; comisionesCobradas: number; intentosContactoPeriodo: number;
+  };
+  alertas: {
+    id: number; tipo: string; fecha: string; contenido: string; publicacionId: number | null; titulo: string | null;
+    fincaTenantId: number; finca: string | null; otraFincaTenantId: number | null; otraFinca: string | null;
+  }[];
+  sospechas: {
+    tipo: string; publicacionId: number; titulo: string; fecha: string; detalle: string;
+    vendedorTenantId: number; vendedor: string | null; compradorTenantId: number | null; comprador: string | null;
+  }[];
+  suspendidas: { tenantId: number; finca: string | null; motivo: string; suspendidoPor: string | null; fecha: string }[];
+}
+
+export function suspenderFincaMercado(tenantId: number, motivo: string): Promise<{ suspendida: boolean }> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/mercado-ganadero/fincas/${tenantId}/suspender`, {
+    method: "POST",
+    body: JSON.stringify({ motivo }),
+  });
+}
+
+export function reactivarFincaMercado(tenantId: number): Promise<{ suspendida: boolean }> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/mercado-ganadero/fincas/${tenantId}/reactivar`, { method: "POST" });
+}
+
+export function obtenerMercadoGanaderoSuperAdmin(dias: number): Promise<PanelMercadoSuperAdmin> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/mercado-ganadero?dias=${dias}`);
 }

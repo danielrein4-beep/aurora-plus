@@ -17,7 +17,13 @@ public class ComisionPlataformaController {
     private ComisionPlataformaRepository comisionPlataformaRepository;
 
     @GetMapping
-    public List<ComisionPlataforma> listar(@RequestParam(required = false) Boolean pagada) {
+    public List<ComisionPlataforma> listar(@RequestParam(required = false) Boolean pagada,
+                                           @RequestParam(required = false) Long tenantId) {
+        if (tenantId != null) {
+            return pagada != null
+                ? comisionPlataformaRepository.findByTenantIdAndPagadaOrderByFechaAsc(tenantId, pagada)
+                : comisionPlataformaRepository.findByTenantId(tenantId);
+        }
         return pagada != null ? comisionPlataformaRepository.findByPagada(pagada) : comisionPlataformaRepository.findAll();
     }
 

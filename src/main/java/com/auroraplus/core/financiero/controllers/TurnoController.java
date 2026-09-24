@@ -22,6 +22,7 @@ public class TurnoController {
     @PostMapping("/abrir")
     public ResponseEntity<Turno> abrir(@RequestParam Long tenantId, @RequestParam String idCajero,
                                         @RequestParam BigDecimal montoBase, @RequestParam String moneda) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA", "MESERO");
         return ResponseEntity.ok(turnoService.abrirTurno(tenantId, idCajero, montoBase, moneda));
     }
 
@@ -39,11 +40,13 @@ public class TurnoController {
     @PostMapping("/{id}/egresos")
     public ResponseEntity<MovimientoCaja> registrarEgreso(@PathVariable Long id, @RequestParam Long tenantId,
                                                             @RequestParam BigDecimal monto, @RequestParam(required = false) String concepto) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA", "MESERO");
         return ResponseEntity.ok(turnoService.registrarEgreso(id, tenantId, monto, concepto));
     }
 
     @PostMapping("/{id}/cerrar")
     public ResponseEntity<Turno> cerrar(@PathVariable Long id, @RequestParam Long tenantId, @RequestParam BigDecimal montoDeclarado) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA", "MESERO");
         return ResponseEntity.ok(turnoService.cerrarTurno(id, tenantId, montoDeclarado));
     }
 }

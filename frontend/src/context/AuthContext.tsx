@@ -67,7 +67,7 @@ export interface CuentaRegistrada {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  completarRegistro: (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string; industria?: string }) => Promise<void>;
+  completarRegistro: (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string; industria?: string; nombreCompleto?: string }) => Promise<void>;
   completeOnboarding: (data: Partial<User>) => void;
   marcarPrimerIngresoCompletado: () => void;
   reportPayment: (payment: Omit<PaymentRecord, "id" | "fecha" | "estado">) => void;
@@ -228,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Registro de autoservicio — SIEMPRE contra el backend real, ver esRechazoRealDelBackend arriba.
-  const completarRegistro = async (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string; industria?: string }) => {
+  const completarRegistro = async (datos: RegistroNegocio & { modules?: string[]; metodoPagoPreferido?: string; industria?: string; nombreCompleto?: string }) => {
     // El registro SIEMPRE crea el tenant contra el backend real. Un rechazo real (ej. "Ya existe
     // una cuenta con este correo") se muestra tal cual; una falla de conexión real avisa que no
     // hay conexión — nunca se finge que se creó una cuenta que en realidad no existe en el backend.

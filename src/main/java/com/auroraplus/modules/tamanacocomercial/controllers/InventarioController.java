@@ -42,6 +42,7 @@ public class InventarioController {
 
     @PutMapping("/productos/{id}")
     public ResponseEntity<?> actualizarProducto(@PathVariable Long id, @RequestBody ProductoComercial update) {
+        com.auroraplus.modules.tamanacocomercial.services.TamanacoAccessService.exigirDuenoAdmin();
         Long tenantId = TenantContext.getCurrentTenant();
         return productoRepository.findById(id)
             .filter(p -> tenantId != null && tenantId.equals(p.getTenantId()))
@@ -60,7 +61,7 @@ public class InventarioController {
     @DeleteMapping("/productos/{id}")
     public ResponseEntity<?> eliminarProducto(@PathVariable Long id) {
         TamanacoAccessService.exigirDuenoAdmin();
-        if (!productoRepository.existsById(id)) return ResponseEntity.notFound().build();
+        if (!productoRepository.findById(id).filter(e -> String.valueOf(e.getTenantId()).equals(String.valueOf(com.auroraplus.core.config.TenantContext.getCurrentTenant()))).isPresent()) return ResponseEntity.notFound().build();
         productoRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }

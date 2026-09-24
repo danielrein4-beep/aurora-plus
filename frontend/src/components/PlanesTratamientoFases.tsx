@@ -30,6 +30,7 @@ interface ItemPlan {
   fecha_realizado: string | null;
   odontologo_responsable: string | null;
   kit_descargado: boolean;
+  detalle_insumos?: string | null;
 }
 
 interface PlanTratamiento {
@@ -39,9 +40,175 @@ interface PlanTratamiento {
   monto_total_usd: number;
   monto_total_ves: number;
   monto_pagado_usd: number;
+  pagado_al_financiar_usd?: number | null;
   notas: string | null;
   fecha_creacion: string;
   items: ItemPlan[];
+}
+
+interface CuotaPlan {
+  id: number;
+  numero: number;
+  fecha_vencimiento: string;
+  monto_usd: number;
+  pagado_usd: number;
+  pendiente_usd: number;
+  estado: "PAGADA" | "PARCIAL" | "VENCIDA" | "PENDIENTE";
+}
+
+const ESTILO_CUOTA: Record<CuotaPlan["estado"], string> = {
+  PAGADA: "text-emerald-700 dark:text-emerald-300",
+  PARCIAL: "text-sky-700 dark:text-sky-300",
+  VENCIDA: "text-rose-700 dark:text-rose-300 font-black",
+  PENDIENTE: "text-slate-600 dark:text-slate-300",
+};
+
+// Financiamiento de un plan en cuotas: los abonos se aplican a las cuotas en orden.
+function CuotasPlan({
+  planId,
+  saldoUsd,
+  financiado,
+  onCambio,
+}: {
+  planId: number;
+  saldoUsd: number;
+  financiado: boolean;
+  onCambio: () => void;
+}) {
+  const [cuotas, setCuotas] = useState<CuotaPlan[]>([]);
+  const [formAbierto, setFormAbierto] = useState(false);
+  const [numero, setNumero] = useState("3");
+  const [dias, setDias] = useState("30");
+  const [primera, setPrimera] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [error, setError] = useState("");
+
+  const cargar = async () => {
+    if (!financiado) {
+      setCuotas([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/salud/odontologia/planes/${planId}/cuotas`, {
+        headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
+      });
+      if (res.ok) setCuotas(await res.json());
+    } catch {
+      setCuotas([]);
+    }
+  };
+
+  useEffect(() => {
+    cargar();
+  }, [planId, financiado, saldoUsd]);
+
+  const crear = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    try {
+      const res = await fetch(`/api/salud/odontologia/planes/${planId}/cuotas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${obtenerTokenSesion()}` },
+        body: JSON.stringify({ numeroCuotas: Number(numero), fechaPrimera: primera, diasEntreCuotas: Number(dias) }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || `error ${res.status}`);
+      setFormAbierto(false);
+      onCambio();
+    } catch (err) {
+      setError(`No se pudieron crear las cuotas: ${err instanceof Error ? err.message : "fallo de conexion"}.`);
+    }
+  };
+
+  const eliminar = async () => {
+    try {
+      const res = await fetch(`/api/salud/odontologia/planes/${planId}/cuotas`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
+      });
+      if (!res.ok) throw new Error(`error ${res.status}`);
+      onCambio();
+    } catch (err) {
+      setError(`No se pudieron quitar las cuotas: ${err instanceof Error ? err.message : "fallo de conexion"}.`);
+    }
+  };
+
+  const montoCuota = Number(numero) > 0 ? saldoUsd / Number(numero) : 0;
+
+  return (
+    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Plan de pagos</span>
+        {!formAbierto && saldoUsd > 0 && (
+          <button
+            type="button"
+            onClick={() => setFormAbierto(true)}
+            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-white/15 font-semibold"
+          >
+            {financiado ? "Refinanciar saldo" : "Financiar en cuotas"}
+          </button>
+        )}
+      </div>
+
+      {formAbierto && (
+        <form onSubmit={crear} className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+          <label className="block">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Cuotas</span>
+            <input type="number" min="2" max="60" required value={numero} onChange={(e) => setNumero(e.target.value)} className="w-full p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-300 dark:border-white/15" />
+          </label>
+          <label className="block">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Primera cuota</span>
+            <input type="date" required value={primera} onChange={(e) => setPrimera(e.target.value)} className="w-full p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-300 dark:border-white/15" />
+          </label>
+          <label className="block">
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Cada (dias)</span>
+            <input type="number" min="7" max="90" required value={dias} onChange={(e) => setDias(e.target.value)} className="w-full p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-300 dark:border-white/15" />
+          </label>
+          <div className="text-slate-500 dark:text-slate-400">
+            {Number(numero) > 0 && <>~${montoCuota.toFixed(2)} por cuota</>}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setFormAbierto(false)} className="flex-1 p-2 rounded-xl border border-slate-300 dark:border-white/15 font-semibold">
+              Cancelar
+            </button>
+            <button type="submit" className="flex-1 p-2 rounded-xl bg-emerald-600 text-white font-bold">
+              Crear
+            </button>
+          </div>
+        </form>
+      )}
+
+      {error && <div className="text-rose-600 dark:text-rose-400 font-semibold">{error}</div>}
+
+      {cuotas.length > 0 ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+            {cuotas.map((c) => (
+              <div key={c.id} className="p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10">
+                <div className="flex justify-between">
+                  <span className="font-bold">#{c.numero}</span>
+                  <span className={ESTILO_CUOTA[c.estado]}>{c.estado}</span>
+                </div>
+                <div className="font-mono font-bold">${Number(c.monto_usd).toFixed(2)}</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {new Date(`${c.fecha_vencimiento}T00:00:00`).toLocaleDateString("es-VE")}
+                  {c.estado === "PARCIAL" && ` - falta $${Number(c.pendiente_usd).toFixed(2)}`}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={eliminar} className="text-slate-500 hover:text-rose-600 font-semibold">
+            Quitar cuotas (volver a pago libre)
+          </button>
+        </>
+      ) : (
+        !formAbierto && <p className="text-slate-500 dark:text-slate-400">Pago libre: los abonos se registran sin calendario.</p>
+      )}
+    </div>
+  );
 }
 
 export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
@@ -70,6 +237,68 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
   const agregarItemNuevo = () => setItemsNuevos((prev) => [...prev, { ...itemVacio }]);
 
   const quitarItemNuevo = (idx: number) => setItemsNuevos((prev) => prev.filter((_, i) => i !== idx));
+
+  // Abono en curso: un solo formulario abierto a la vez, identificado por el plan.
+  const [abonoPlanId, setAbonoPlanId] = useState<number | null>(null);
+  const [abonoMonto, setAbonoMonto] = useState("");
+  const [abonoMetodo, setAbonoMetodo] = useState("EFECTIVO");
+  const [abonoMoneda, setAbonoMoneda] = useState<"USD" | "VES">("USD");
+  const [abonoReferencia, setAbonoReferencia] = useState("");
+  const [abonoClave, setAbonoClave] = useState("");
+  const [registrandoAbono, setRegistrandoAbono] = useState(false);
+
+  const abrirAbono = (plan: PlanTratamiento, saldoUsd: number) => {
+    setAbonoPlanId(plan.id);
+    setAbonoMonto(saldoUsd.toFixed(2));
+    setAbonoMetodo("EFECTIVO");
+    setAbonoMoneda("USD");
+    setAbonoReferencia("");
+    // La clave se fija al abrir el formulario: un doble clic o un reintento
+    // reutiliza la misma y el backend no duplica el cobro en caja.
+    setAbonoClave(`odonto-abono-${plan.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  };
+
+  const handleRegistrarAbono = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (abonoPlanId == null) return;
+    const montoUsd = Number(abonoMonto);
+    if (!Number.isFinite(montoUsd) || montoUsd <= 0) {
+      setNotificacion("No se pudo registrar: el monto del abono debe ser mayor a cero.");
+      setTimeout(() => setNotificacion(""), 3500);
+      return;
+    }
+    setRegistrandoAbono(true);
+    try {
+      const res = await fetch(`/api/salud/odontologia/planes/${abonoPlanId}/abonos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${obtenerTokenSesion()}`,
+        },
+        body: JSON.stringify({
+          claveIdempotencia: abonoClave,
+          montoUsd,
+          monedaPago: abonoMoneda,
+          montoRecibido: abonoMoneda === "VES" ? Number((montoUsd * tasaBcv).toFixed(2)) : montoUsd,
+          metodoPago: abonoMetodo,
+          referenciaPago: abonoReferencia.trim() || null,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setAbonoPlanId(null);
+        setNotificacion(data?.mensaje || "Abono registrado en caja.");
+        cargarPlanes();
+      } else {
+        setNotificacion(`No se pudo registrar el abono: ${data?.message || `error ${res.status}`}.`);
+      }
+    } catch {
+      setNotificacion("Fallo de conexion — el abono NO se registro.");
+    } finally {
+      setRegistrandoAbono(false);
+      setTimeout(() => setNotificacion(""), 4500);
+    }
+  };
 
   useEffect(() => {
     cargarPlanes();
@@ -203,7 +432,7 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
             </span>
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Planes progresivos para {pacienteNombre || "Paciente Activo"} con descarga automatica de insumos
+            Planes progresivos para {pacienteNombre || "Paciente Activo"} con abonos enlazados a caja
           </p>
         </div>
 
@@ -257,9 +486,11 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                     <h4 className="font-['Outfit'] font-black text-lg text-slate-900 dark:text-white">{plan.nombre_plan}</h4>
                     <span
                       className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                        plan.estado === "APROBADO"
+                        plan.estado === "APROBADO" || plan.estado === "COMPLETADO"
                           ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
-                          : "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40"
+                          : plan.estado === "EN_CURSO"
+                            ? "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/40"
+                            : "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40"
                       }`}
                     >
                       {plan.estado}
@@ -280,7 +511,23 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                     <div className="text-[11px] text-slate-500 dark:text-slate-400">
                       {totalVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs.
                     </div>
+                    <div className="text-[11px] mt-1 font-mono">
+                      <span className="text-slate-500 dark:text-slate-400">Pagado ${pagadoUsd.toFixed(2)}</span>
+                      <span className={`ml-2 font-bold ${saldoUsd > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {saldoUsd > 0 ? `Saldo $${saldoUsd.toFixed(2)}` : "Pagado completo"}
+                      </span>
+                    </div>
                   </div>
+
+                  {saldoUsd > 0 && plan.estado !== "CANCELADO" && abonoPlanId !== plan.id && (
+                    <button
+                      type="button"
+                      onClick={() => abrirAbono(plan, saldoUsd)}
+                      className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:opacity-90 transition cursor-pointer"
+                    >
+                      Registrar abono
+                    </button>
+                  )}
 
                   {plan.estado === "PROPUESTO" && (
                     <button
@@ -293,6 +540,82 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                   )}
                 </div>
               </div>
+
+              {abonoPlanId === plan.id && (
+                <form
+                  onSubmit={handleRegistrarAbono}
+                  className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs"
+                >
+                  <label className="block">
+                    <span className="block text-slate-500 dark:text-slate-400 mb-1">Monto (USD) *</span>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      max={saldoUsd.toFixed(2)}
+                      required
+                      value={abonoMonto}
+                      onChange={(e) => setAbonoMonto(e.target.value)}
+                      className="w-full p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-300 dark:border-white/15 font-mono"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block text-slate-500 dark:text-slate-400 mb-1">Paga en</span>
+                    <select
+                      value={abonoMoneda}
+                      onChange={(e) => setAbonoMoneda(e.target.value as "USD" | "VES")}
+                      className="w-full p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-300 dark:border-white/15"
+                    >
+                      <option value="USD">Dolares</option>
+                      <option value="VES">Bolivares ({(Number(abonoMonto || 0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2 })} Bs)</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="block text-slate-500 dark:text-slate-400 mb-1">Metodo</span>
+                    <select
+                      value={abonoMetodo}
+                      onChange={(e) => setAbonoMetodo(e.target.value)}
+                      className="w-full p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-300 dark:border-white/15"
+                    >
+                      <option value="EFECTIVO">Efectivo</option>
+                      <option value="PAGO_MOVIL">Pago movil</option>
+                      <option value="TRANSFERENCIA">Transferencia</option>
+                      <option value="PUNTO_VENTA">Punto de venta</option>
+                      <option value="ZELLE">Zelle</option>
+                      <option value="OTRO">Otro</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="block text-slate-500 dark:text-slate-400 mb-1">Referencia</span>
+                    <input
+                      type="text"
+                      value={abonoReferencia}
+                      onChange={(e) => setAbonoReferencia(e.target.value)}
+                      className="w-full p-2 rounded-xl bg-white dark:bg-black/30 border border-slate-300 dark:border-white/15"
+                    />
+                  </label>
+                  <div className="flex gap-2 col-span-2 md:col-span-1">
+                    <button
+                      type="button"
+                      onClick={() => setAbonoPlanId(null)}
+                      className="flex-1 p-2 rounded-xl border border-slate-300 dark:border-white/15 font-semibold"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={registrandoAbono}
+                      className="flex-1 p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:opacity-50"
+                    >
+                      {registrandoAbono ? "..." : "Cobrar"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {(saldoUsd > 0 || plan.pagado_al_financiar_usd != null) && plan.estado !== "CANCELADO" && (
+                <CuotasPlan planId={plan.id} saldoUsd={saldoUsd} financiado={plan.pagado_al_financiar_usd != null} onCambio={cargarPlanes} />
+              )}
 
               {/* Fases clinicas e items */}
               <div className="space-y-4">
@@ -329,13 +652,17 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
                                 <div>
                                   <div className="font-bold text-slate-900 dark:text-white">{item.procedimiento}</div>
                                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                    Cara: {item.cara || "General"} &bull; Responsable: {item.odontologo_responsable || "Dra. Titular"}
-                                    {item.kit_descargado && (
-                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-2">
-                                        &bull; Insumos descontados de stock
-                                      </span>
-                                    )}
+                                    Cara: {item.cara || "General"} &bull; Responsable: {item.odontologo_responsable || "Sin asignar"}
                                   </div>
+                                  {item.detalle_insumos && (
+                                    <div
+                                      className={`text-[11px] mt-0.5 ${
+                                        item.kit_descargado ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
+                                      }`}
+                                    >
+                                      {item.detalle_insumos}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 

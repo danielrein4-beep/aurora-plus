@@ -14,6 +14,9 @@ interface Props {
   nombreFinca: string;
   /** Solo el dueño ve la bitácora de auditoría. */
   puedeVerAuditoria: boolean;
+  /** Mensajes sin leer del Mercado ganadero. */
+  sinLeerMercado: number;
+  abrirMercado: () => void;
   abrirVaqueraRapida: () => void;
   abrirVentaAnimales: (modo: ModoVenta) => void;
   onSalir: () => void;
@@ -26,7 +29,7 @@ interface Props {
 
 /** Menú lateral de Ganadería: identidad de la finca, secciones, acciones rápidas y soporte. */
 export default function BarraLateralGanaderia({
-  alertasSanitarias, animales, potreros, puedeImportarHato, sidebarAbierto, tab, nombreFinca, puedeVerAuditoria,
+  alertasSanitarias, animales, potreros, puedeImportarHato, sidebarAbierto, tab, nombreFinca, puedeVerAuditoria, sinLeerMercado, abrirMercado,
   abrirVaqueraRapida, abrirVentaAnimales, onSalir, setAltaAnimal, setAperturaSoporte,
   setModalImportarHato, setSidebarAbierto, setTab,
 }: Props) {
@@ -140,6 +143,18 @@ export default function BarraLateralGanaderia({
         >
           <span className="text-slate-400"><IconCoins size={16} /></span>
           <span className="flex-1 text-left">Vender animales</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { abrirMercado(); setSidebarAbierto(false); }}
+          title="Compra y venta entre fincas de Aurora"
+          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900"
+        >
+          <span className="text-slate-400"><IconCoins size={16} /></span>
+          <span className="flex-1 text-left">Mercado ganadero</span>
+          {sinLeerMercado > 0 && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500 text-white">{sinLeerMercado}</span>
+          )}
         </button>
         {puedeImportarHato && (
           <button

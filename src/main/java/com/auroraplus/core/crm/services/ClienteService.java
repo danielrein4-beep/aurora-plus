@@ -61,6 +61,16 @@ public class ClienteService {
         return clienteRepository.save(cliente);
     }
 
+    /** Datos de crédito que solo usa Comercio — método aparte para no cambiar las firmas que ya usa Horeca. */
+    @Transactional
+    public Cliente aplicarDatosComercio(Long id, Long tenantId, String direccion, java.math.BigDecimal limiteCredito, java.math.BigDecimal saldoPendiente) {
+        Cliente cliente = obtener(id, tenantId);
+        if (direccion != null) cliente.setDireccion(direccion.isBlank() ? null : direccion.trim());
+        if (limiteCredito != null) cliente.setLimiteCredito(limiteCredito);
+        if (saldoPendiente != null) cliente.setSaldoPendiente(saldoPendiente);
+        return clienteRepository.save(cliente);
+    }
+
     @Transactional
     public Cliente editar(Long id, Long tenantId, String nombre, String identificacionRif, String telefono, String correo) {
         Cliente cliente = obtener(id, tenantId);

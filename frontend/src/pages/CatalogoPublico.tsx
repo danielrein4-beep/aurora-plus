@@ -401,6 +401,7 @@ interface DatosTienda {
   bannerBase64?: string | null;
   estiloBannerTienda?: string | null;
   tasaVes: number;
+  monedaBase?: string; // "EUR" = negocio solo en euros: sin Bs, COP ni tasas
   tasaCop?: number | null;
   domicilioFiscal?: string;
   costoEnvioDelivery?: number;
@@ -672,8 +673,8 @@ function generarComprobantePedidoPDF(
   doc.text("Cant.", margin + 2, y);
   doc.text("Código", margin + 16, y);
   doc.text("Producto", margin + 45, y);
-  doc.text("P. Unit. (USD)", margin + 130, y, { align: "right" });
-  doc.text("Subtotal USD", colRight - 2, y, { align: "right" });
+  doc.text(`P. Unit. (${COD})`, margin + 130, y, { align: "right" });
+  doc.text(`Subtotal ${COD}`, colRight - 2, y, { align: "right" });
   y += 3;
   doc.setDrawColor(210, 210, 210);
   doc.line(margin, y, colRight, y);
@@ -688,8 +689,8 @@ function generarComprobantePedidoPDF(
     doc.text(String(item.cantidad), margin + 2, y);
     doc.text(item.codigo || "-", margin + 16, y);
     doc.text(nombre, margin + 45, y);
-    doc.text(`$${item.precioUnitarioUsd.toFixed(2)}`, margin + 130, y, { align: "right" });
-    doc.text(`$${subtotal.toFixed(2)}`, colRight - 2, y, { align: "right" });
+    doc.text(`${SIMB}${item.precioUnitarioUsd.toFixed(2)}`, margin + 130, y, { align: "right" });
+    doc.text(`${SIMB}${subtotal.toFixed(2)}`, colRight - 2, y, { align: "right" });
     y += 6;
     if (y > 250) {
       doc.addPage();
@@ -717,8 +718,8 @@ function generarComprobantePedidoPDF(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(20, 20, 20);
-  doc.text("TOTAL USD:", totX, y);
-  doc.text(`$${pedido.totalUsd.toFixed(2)}`, colRight - 2, y, { align: "right" });
+  doc.text(`TOTAL ${COD}:`, totX, y);
+  doc.text(`${SIMB}${pedido.totalUsd.toFixed(2)}`, colRight - 2, y, { align: "right" });
 
   y += 15;
   doc.setFont("helvetica", "italic");
@@ -729,6 +730,10 @@ function generarComprobantePedidoPDF(
   doc.save(`Pedido_${pedido.numeroPedido}.pdf`);
 }
 
+// Símbolo y código de la moneda del negocio; se fijan al cargar la tienda (los PDFs los leen fuera del componente).
+let SIMB = "$";
+let COD = "USD";
+
 export default function CatalogoPublico() {
   const { tenantId } = useParams<{ tenantId: string }>();
 
@@ -736,7 +741,7 @@ export default function CatalogoPublico() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [moneda, setMoneda] = useState<"USD" | "VES">("USD");
+  const [monedaElegida, setMoneda] = useState<"USD" | "VES">("USD");
   const [busqueda, setBusqueda] = useState("");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("TODOS");
   const [categoriasAbiertas, setCategoriasAbiertas] = useState(false);
@@ -914,7 +919,13 @@ export default function CatalogoPublico() {
     fetchCatalogo();
   }, [tenantId]);
 
-  const tasa = tienda?.tasaVes && tienda.tasaVes > 0 ? tienda.tasaVes : 50;
+  // Sin tasa cargada por el negocio no se inventa una: en cero no se muestra nada en bolívares.
+  const tasa = tienda?.tasaVes && tienda.tasaVes > 0 ? tienda.tasaVes : 0;
+  const esEuro = tienda?.monedaBase === "EUR";
+  SIMB = esEuro ? "€" : "$";
+  COD = esEuro ? "EUR" : "USD";
+  const sinBs = esEuro || !(tasa > 0);
+  const moneda = sinBs ? "USD" : monedaElegida;
 
   // Bs y COP se cotizan en montos grandes (miles/millones) — con separador de miles
   // se leen de un vistazo; toFixed(2) puro los deja ilegibles ("8485460.00 Bs").
@@ -1352,12 +1363,12 @@ export default function CatalogoPublico() {
           {/* Selector de Moneda y Carrito */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             {/* Tasa BCV Pill */}
-            <div className="hidden md:flex items-center px-3 py-1 rounded-full bg-neutral-100/90 border border-neutral-200/80 text-[11px] font-mono text-neutral-600">
+            <div style={sinBs ? { display: "none" } : undefined} className="hidden md:flex items-center px-3 py-1 rounded-full bg-neutral-100/90 border border-neutral-200/80 text-[11px] font-mono text-neutral-600">
               BCV: {tasa.toFixed(2)} Bs/$
             </div>
 
             {/* Toggle de Moneda */}
-            <div className="flex items-center p-1 rounded-full bg-neutral-100 border border-neutral-200 text-xs">
+            <div style={sinBs ? { display: "none" } : undefined} className="flex items-center p-1 rounded-full bg-neutral-100 border border-neutral-200 text-xs">
               <button
                 type="button"
                 onClick={() => setMoneda("USD")}
@@ -1604,9 +1615,9 @@ export default function CatalogoPublico() {
                       {moneda === "USD" ? (
                         <>
                           <div className="text-base font-medium text-[#1D1D1F] tracking-tight leading-none" style={tienda.colorAcentoTienda ? { color: tienda.colorAcentoTienda } : undefined}>
-                            ${pUsd.toFixed(2)}
+                            {SIMB}{pUsd.toFixed(2)}
                           </div>
-                          <div className="text-xs text-[#86868B] mt-1">
+                          <div style={sinBs ? { display: "none" } : undefined} className="text-xs text-[#86868B] mt-1">
                             {pBs.toFixed(2)} Bs.
                           </div>
                         </>
@@ -1616,7 +1627,7 @@ export default function CatalogoPublico() {
                             {pBs.toFixed(2)} Bs.
                           </div>
                           <div className="text-xs text-[#86868B] mt-1">
-                            ${pUsd.toFixed(2)} USD
+                            {SIMB}{pUsd.toFixed(2)} {COD}
                           </div>
                         </>
                       )}
@@ -1692,11 +1703,11 @@ export default function CatalogoPublico() {
                   </h3>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="text-4xl sm:text-5xl font-black text-rose-600 tracking-tight leading-none" style={tienda.colorAcentoTienda ? { color: tienda.colorAcentoTienda } : undefined}>
-                      ${(varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd).toFixed(2)}
+                      {SIMB}{(varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd).toFixed(2)}
                     </span>
-                    <span className="text-[10px] font-bold text-neutral-400 tracking-wider uppercase">USD</span>
+                    <span className="text-[10px] font-bold text-neutral-400 tracking-wider uppercase">{COD}</span>
                   </div>
-                  <div className="mt-1.5 flex flex-col gap-0.5 text-xs font-mono text-neutral-500">
+                  <div style={sinBs ? { display: "none" } : undefined} className="mt-1.5 flex flex-col gap-0.5 text-xs font-mono text-neutral-500">
                     <span>
                       {formatearMonto((varianteActual ? varianteActual.precioUsd : productoDetalle.precioUsd) * tasa)} Bs. <span className="text-neutral-400">(BCV)</span>
                     </span>
@@ -1944,7 +1955,7 @@ export default function CatalogoPublico() {
                   {pedidoConfirmado.metodoPago === "ZELLE" && tienda.zelle?.activo && (
                     <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-xs space-y-1 text-left">
                       <span className="font-bold text-neutral-900 block">Zelle</span>
-                      <p className="text-[11px] text-neutral-600">Envía <strong className="text-black">${pedidoConfirmado.totalUsd.toFixed(2)} USD</strong> a:</p>
+                      <p className="text-[11px] text-neutral-600">Envía <strong className="text-black">{SIMB}{pedidoConfirmado.totalUsd.toFixed(2)} {COD}</strong> a:</p>
                       <p className="font-mono font-bold text-neutral-900">{tienda.zelle.correo}</p>
                       {tienda.zelle.titular && <p className="text-[11px] text-neutral-600">Titular: {tienda.zelle.titular}</p>}
                     </div>
@@ -2146,12 +2157,12 @@ export default function CatalogoPublico() {
                           onChange={(e) => setMetodoPago(e.target.value)}
                           className="w-full px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-900 font-medium focus:outline-none focus:border-neutral-950 focus:bg-white"
                         >
-                          {tienda.pagoMovil?.activo && <option value="PAGO_MOVIL">Pago Móvil (Bolívares al BCV)</option>}
-                          {tienda.binance?.activo && <option value="BINANCE">Binance Pay (USDT sin comisiones)</option>}
-                          {tienda.zelle?.activo && <option value="ZELLE">Zelle</option>}
-                          {tienda.bancolombia?.activo && <option value="BANCOLOMBIA">Bancolombia</option>}
-                          <option value="EFECTIVO_USD">Efectivo Divisas ($ USD)</option>
-                          <option value="EFECTIVO_BS">Efectivo Bolívares (Bs.)</option>
+                          {!sinBs && tienda.pagoMovil?.activo && <option value="PAGO_MOVIL">Pago Móvil (Bolívares al BCV)</option>}
+                          {!esEuro && tienda.binance?.activo && <option value="BINANCE">Binance Pay (USDT sin comisiones)</option>}
+                          {!esEuro && tienda.zelle?.activo && <option value="ZELLE">Zelle</option>}
+                          {!esEuro && tienda.bancolombia?.activo && <option value="BANCOLOMBIA">Bancolombia</option>}
+                          <option value="EFECTIVO_USD">{esEuro ? "Efectivo (€ EUR)" : "Efectivo Divisas ($ USD)"}</option>
+                          {!sinBs && <option value="EFECTIVO_BS">Efectivo Bolívares (Bs.)</option>}
                           <option value="TRANSFERENCIA">Transferencia Bancaria</option>
                         </select>
                       </div>
@@ -2231,7 +2242,7 @@ export default function CatalogoPublico() {
                         <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-xs space-y-1">
                           <span className="font-bold text-neutral-900 block">Zelle</span>
                           <p className="text-[11px] text-neutral-600">
-                            Envía <strong className="text-black">${totalUsd.toFixed(2)} USD</strong> a:
+                            Envía <strong className="text-black">{SIMB}{totalUsd.toFixed(2)} {COD}</strong> a:
                           </p>
                           <p className="font-mono font-bold text-neutral-900">{tienda.zelle.correo}</p>
                           {tienda.zelle.titular && <p className="text-[11px] text-neutral-600">Titular: {tienda.zelle.titular}</p>}
@@ -2295,7 +2306,7 @@ export default function CatalogoPublico() {
                                 {item.tallaSeleccionada}
                               </span>
                               <span className="font-mono text-rose-600 font-bold">
-                                ${item.producto.precioUsd.toFixed(2)} c/u
+                                {SIMB}{item.producto.precioUsd.toFixed(2)} c/u
                               </span>
                             </div>
                           </div>
@@ -2349,7 +2360,7 @@ export default function CatalogoPublico() {
               <div className="sticky bottom-0 p-6 border-t border-neutral-200 bg-white/95 backdrop-blur-sm shadow-[0_-8px_24px_rgba(0,0,0,0.05)] space-y-3">
                 <div className="flex justify-between items-baseline text-sm">
                   <span className="text-neutral-500 font-mono">Subtotal ({totalItems} artículo{totalItems === 1 ? "" : "s"})</span>
-                  <span className="font-bold text-neutral-900 font-mono">${subtotalUsd.toFixed(2)} USD</span>
+                  <span className="font-bold text-neutral-900 font-mono">{SIMB}{subtotalUsd.toFixed(2)} {COD}</span>
                 </div>
                 <button
                   type="button"
@@ -2368,19 +2379,19 @@ export default function CatalogoPublico() {
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs text-neutral-500 font-mono">
                     <span>Subtotal Divisas:</span>
-                    <span className="font-bold text-neutral-900">${subtotalUsd.toFixed(2)} USD</span>
+                    <span className="font-bold text-neutral-900">{SIMB}{subtotalUsd.toFixed(2)} {COD}</span>
                   </div>
                   {costoEnvio > 0 && (
                     <div className="flex justify-between text-xs text-neutral-500 font-mono">
                       <span>Envío (Delivery):</span>
-                      <span className="font-bold text-neutral-900">${costoEnvio.toFixed(2)} USD</span>
+                      <span className="font-bold text-neutral-900">{SIMB}{costoEnvio.toFixed(2)} {COD}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-xs text-neutral-500 font-mono">
                     <span>Total Divisas:</span>
-                    <span className="font-bold text-neutral-900">${totalUsd.toFixed(2)} USD</span>
+                    <span className="font-bold text-neutral-900">{SIMB}{totalUsd.toFixed(2)} {COD}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-neutral-500 font-mono">
+                  <div style={sinBs ? { display: "none" } : undefined} className="flex justify-between text-xs text-neutral-500 font-mono">
                     <span>Total Bolívares (BCV {tasa.toFixed(2)}):</span>
                     <span className="font-bold text-rose-600 text-sm">{totalBs.toFixed(2)} Bs.</span>
                   </div>

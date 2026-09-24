@@ -90,6 +90,13 @@ public class MovimientoCaja {
     @Column(name = "captura_pago_base64", columnDefinition = "TEXT")
     private String capturaPagoBase64;
 
+    /** EFECTIVO, PAGO_MOVIL, TARJETA, ZELLE... Null en movimientos anteriores (se cuentan como efectivo en el arqueo). */
+    @Column(name = "metodo_pago", length = 30)
+    private String metodoPago;
+
+    public String getMetodoPago() { return metodoPago; }
+    public void setMetodoPago(String metodoPago) { this.metodoPago = metodoPago != null && metodoPago.length() > 30 ? metodoPago.substring(0, 30) : metodoPago; }
+
     public enum TipoMovimiento { INGRESO, EGRESO, CXC, CXP }
 
     // Getters y Setters

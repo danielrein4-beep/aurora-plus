@@ -35,6 +35,15 @@ public class ModuloTenantController {
     @Autowired
     private com.auroraplus.core.inventario.repositories.ArticuloRepository articuloRepository;
 
+    @Autowired
+    private FacturacionFiscalService facturacionFiscalService;
+
+    @Autowired
+    private com.auroraplus.modules.repuestos.repositories.RepuestoItemRepository repuestoItemRepository;
+
+    @Autowired
+    private com.auroraplus.core.financiero.repositories.MovimientoCajaRepository movimientoCajaRepository;
+
     @GetMapping("/mis-modulos")
     public List<String> misModulos() {
         Long tenantId = TenantContext.getCurrentTenant();
@@ -149,7 +158,8 @@ public class ModuloTenantController {
     // este mismo campo, así que basta con exponerlo acá para que todo el
     // motor financiero (tasas, conversiones, caja) lo respete de una.
 
-    private static final List<String> MONEDAS_VALIDAS = List.of("USD", "VES", "COP");
+    // EUR = "modo euro": el negocio trabaja SOLO en euros (sin bolívares, pesos ni tasas de cambio).
+    private static final List<String> MONEDAS_VALIDAS = List.of("USD", "EUR", "VES", "COP");
 
     public static class MonedaBaseResponse {
         public String monedaBase;
@@ -180,8 +190,14 @@ public class ModuloTenantController {
         Long tenantId = TenantContext.getCurrentTenant();
         LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
-        if (!request.monedaBase.equals(licencia.getMonedaBase()) && !articuloRepository.findByTenantId(tenantId).isEmpty())
-            throw new IllegalStateException("Ya hay inventario valorado en " + licencia.getMonedaBase() + ". Cambiar la moneda requiere revisar y convertir los saldos existentes.");
+        // Cambiar la moneda con datos ya valorados reinterpretaría cada precio guardado (un "10" en
+        // dólares pasaría a ser "10" euros sin conversión): se bloquea si hay inventario (Horeca o
+        // Comercio) o movimientos de caja.
+        boolean hayDatosValorados = !articuloRepository.findByTenantId(tenantId).isEmpty()
+            || !repuestoItemRepository.findByTenantId(tenantId).isEmpty()
+            || !movimientoCajaRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId).isEmpty();
+        if (!request.monedaBase.equals(licencia.getMonedaBase()) && hayDatosValorados)
+            throw new IllegalStateException("Ya hay inventario o movimientos valorados en " + licencia.getMonedaBase() + ". Cambiar la moneda requiere revisar y convertir los saldos existentes.");
         licencia.setMonedaBase(request.monedaBase);
         licenciaTenantRepository.save(licencia);
         return new MonedaBaseResponse(licencia.getMonedaBase());
@@ -260,6 +276,71 @@ public class ModuloTenantController {
         licencia.setDomicilioFiscal(request.domicilioFiscal);
         licenciaTenantRepository.save(licencia);
         return obtenerDatosFiscales();
+    }
+
+    // --- Facturación Fiscal (Formato Libre autorizado por imprenta SENIAT) —
+    // apagado por defecto ("NINGUNA"). Ver FacturacionFiscalService.
+
+    public static class FacturacionFiscalResponse {
+        public String modo; // NINGUNA | FORMATO_LIBRE | MAQUINA_FISCAL
+        public String serie;
+        public Long numeroActual;
+        public Long numeroHasta;
+        public Long numerosRestantes; // null si no hay límite configurado
+    }
+
+    @GetMapping("/mi-negocio/facturacion-fiscal")
+    public FacturacionFiscalResponse obtenerFacturacionFiscal() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        FacturacionFiscalResponse r = new FacturacionFiscalResponse();
+        r.modo = licencia.getModoFacturacionFiscal();
+        r.serie = licencia.getFacturaSerie();
+        r.numeroActual = licencia.getFacturaNumeroActual();
+        r.numeroHasta = licencia.getFacturaNumeroHasta();
+        r.numerosRestantes = (licencia.getFacturaNumeroActual() != null && licencia.getFacturaNumeroHasta() != null)
+            ? licencia.getFacturaNumeroHasta() - licencia.getFacturaNumeroActual() + 1
+            : null;
+        return r;
+    }
+
+    public static class ActualizarFacturacionFiscalRequest {
+        public String modo;
+        public String serie;
+        public Long numeroDesde; // solo se usa la primera vez / al recargar un rango nuevo
+        public Long numeroHasta;
+    }
+
+    @PutMapping("/mi-negocio/facturacion-fiscal")
+    public FacturacionFiscalResponse actualizarFacturacionFiscal(@RequestBody ActualizarFacturacionFiscalRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+
+        if (request.modo != null) {
+            if (!List.of("NINGUNA", "FORMATO_LIBRE", "MAQUINA_FISCAL").contains(request.modo)) {
+                throw new RuntimeException("Modo de facturación fiscal inválido");
+            }
+            if ("FORMATO_LIBRE".equals(request.modo)) {
+                if (request.serie == null || request.serie.isBlank()) throw new RuntimeException("Falta la serie asignada por tu imprenta");
+                if (request.numeroDesde == null || request.numeroHasta == null) throw new RuntimeException("Falta el rango de números de control asignado por tu imprenta");
+                if (request.numeroDesde > request.numeroHasta) throw new RuntimeException("El número inicial no puede ser mayor al final");
+                licencia.setFacturaSerie(request.serie.trim());
+                licencia.setFacturaNumeroActual(request.numeroDesde);
+                licencia.setFacturaNumeroHasta(request.numeroHasta);
+            }
+            licencia.setModoFacturacionFiscal(request.modo);
+        }
+        licenciaTenantRepository.save(licencia);
+        return obtenerFacturacionFiscal();
+    }
+
+    @PostMapping("/mi-negocio/facturacion-fiscal/siguiente-numero")
+    public Map<String, String> siguienteNumeroControl() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        String numero = facturacionFiscalService.siguienteNumeroControl(tenantId);
+        return numero != null ? Map.of("numeroControl", numero) : Map.of();
     }
 
     // --- Zonas de cocina de Horeca: antes venían fijas en el frontend

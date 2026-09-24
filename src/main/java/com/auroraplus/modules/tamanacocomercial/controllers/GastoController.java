@@ -77,7 +77,7 @@ public class GastoController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         TamanacoAccessService.exigirDuenoAdmin();
-        if (gastoRepository.existsById(id)) {
+        if (gastoRepository.findById(id).filter(e -> String.valueOf(e.getTenantId()).equals(String.valueOf(com.auroraplus.core.config.TenantContext.getCurrentTenant()))).isPresent()) {
             gastoRepository.deleteById(id);
             return ResponseEntity.ok().build();
         }

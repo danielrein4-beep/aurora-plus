@@ -60,8 +60,8 @@ public class MotorFinancieroService {
     }
 
     private static void validarMoneda(String moneda) {
-        if (!java.util.Set.of("USD", "VES", "COP").contains(moneda == null ? "" : moneda))
-            throw new IllegalArgumentException("Seleccione USD, VES o COP");
+        if (!java.util.Set.of("USD", "VES", "COP", "EUR").contains(moneda == null ? "" : moneda))
+            throw new IllegalArgumentException("Seleccione USD, EUR, VES o COP");
     }
 
     private BigDecimal convertirConPrecision(Long tenantId, BigDecimal monto, String monedaOrigen, String monedaDestino, int escala) {
@@ -111,18 +111,23 @@ public class MotorFinancieroService {
                 }
             }
         }
-        var directa = tasaCambioRepository
-            .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, monedaOrigen, monedaDestino);
+        var directa = tasaPreferida(tenantId, monedaOrigen, monedaDestino);
         if (directa.isPresent()) {
             return monto.multiply(directa.get().getTasa()).setScale(escala, RoundingMode.HALF_UP);
         }
 
-        var inversa = tasaCambioRepository
-            .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, monedaDestino, monedaOrigen);
+        var inversa = tasaPreferida(tenantId, monedaDestino, monedaOrigen);
         if (inversa.isPresent()) {
             return monto.divide(inversa.get().getTasa(), escala, RoundingMode.HALF_UP);
         }
         return null;
+    }
+
+    /** La tasa más reciente que no venga de una compra; si solo hay de compras, esa (comportamiento anterior). */
+    private java.util.Optional<TasaCambio> tasaPreferida(Long tenantId, String origen, String destino) {
+        var deCobro = tasaCambioRepository.buscarTasasDeCobro(tenantId, origen, destino, org.springframework.data.domain.PageRequest.of(0, 1));
+        if (!deCobro.isEmpty()) return java.util.Optional.of(deCobro.get(0));
+        return tasaCambioRepository.findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, origen, destino);
     }
 
     /**
@@ -335,7 +340,7 @@ public class MotorFinancieroService {
      */
     @Transactional
     public MovimientoCaja abonarMovimiento(Long tenantId, Long movimientoId, BigDecimal montoAbono, String monedaAbono) {
-        MovimientoCaja cuenta = movimientoCajaRepository.findById(movimientoId)
+        MovimientoCaja cuenta = movimientoCajaRepository.buscarConBloqueo(movimientoId)
             .orElseThrow(() -> new RuntimeException("Movimiento no encontrado"));
         if (!cuenta.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: movimiento no pertenece a este tenant");

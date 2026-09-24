@@ -9,4 +9,5 @@ import java.util.List;
 public interface ComisionPlataformaRepository extends JpaRepository<ComisionPlataforma, Long> {
     List<ComisionPlataforma> findByTenantId(Long tenantId);
     List<ComisionPlataforma> findByPagada(Boolean pagada);
+    List<ComisionPlataforma> findByTenantIdAndPagadaOrderByFechaAsc(Long tenantId, Boolean pagada);
 }

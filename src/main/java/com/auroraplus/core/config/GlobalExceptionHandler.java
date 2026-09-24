@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -40,6 +41,19 @@ public class GlobalExceptionHandler {
      * comanda que está ABIERTA", etc.) — se devuelven como 400 con ese
      * mensaje intacto.
      */
+    /**
+     * ResponseStatusException es una RuntimeException, asi que sin este manejador
+     * el de abajo la convertia en 400: un 403 de permisos, un 404 de "no encontrado"
+     * o un 409 de colision llegaban como 400 y con el mensaje ensuciado
+     * ("403 FORBIDDEN \"Acceso denegado\""). Se respeta el codigo que eligio quien la lanzo.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, String>> manejarResponseStatus(ResponseStatusException ex) {
+        log.warn("Error {}: {}", ex.getStatusCode().value(), ex.getReason());
+        String mensaje = ex.getReason() != null ? ex.getReason() : "Ocurrió un error inesperado";
+        return ResponseEntity.status(ex.getStatusCode()).body(Map.of("message", mensaje));
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> manejarRuntimeException(RuntimeException ex) {
         log.warn("Error de negocio: {}", ex.getMessage());

@@ -33,16 +33,28 @@ public class ClienteController {
         public String identificacionRif;
         public String telefono;
         public String correo;
+        // Opcionales — solo los manda Comercio (crédito de mostrador)
+        public String direccion;
+        public java.math.BigDecimal limiteCredito;
+        public java.math.BigDecimal saldoPendiente;
     }
 
     @PostMapping
     public ResponseEntity<Cliente> crear(@RequestParam Long tenantId, @RequestBody ClienteRequest request) {
-        return ResponseEntity.ok(clienteService.crear(tenantId, request.nombre, request.identificacionRif, request.telefono, request.correo));
+        Cliente creado = clienteService.crear(tenantId, request.nombre, request.identificacionRif, request.telefono, request.correo);
+        if (request.direccion != null || request.limiteCredito != null || request.saldoPendiente != null) {
+            creado = clienteService.aplicarDatosComercio(creado.getId(), tenantId, request.direccion, request.limiteCredito, request.saldoPendiente);
+        }
+        return ResponseEntity.ok(creado);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Cliente> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody ClienteRequest request) {
-        return ResponseEntity.ok(clienteService.editar(id, tenantId, request.nombre, request.identificacionRif, request.telefono, request.correo));
+        Cliente editado = clienteService.editar(id, tenantId, request.nombre, request.identificacionRif, request.telefono, request.correo);
+        if (request.direccion != null || request.limiteCredito != null || request.saldoPendiente != null) {
+            editado = clienteService.aplicarDatosComercio(id, tenantId, request.direccion, request.limiteCredito, request.saldoPendiente);
+        }
+        return ResponseEntity.ok(editado);
     }
 
     @DeleteMapping("/{id}")

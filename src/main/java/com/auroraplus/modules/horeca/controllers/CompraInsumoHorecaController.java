@@ -49,6 +49,7 @@ public class CompraInsumoHorecaController {
 
     @PostMapping
     public ResponseEntity<CompraInsumoHoreca> registrar(@RequestParam Long tenantId, @RequestBody CompraRequest request) {
+        com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR");
         List<CompraInsumoHorecaService.ItemCompraInsumo> items = new ArrayList<>();
         for (ItemCompraRequest itemReq : request.items) {
             CompraInsumoHorecaService.ItemCompraInsumo item = new CompraInsumoHorecaService.ItemCompraInsumo();

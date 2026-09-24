@@ -94,14 +94,27 @@ public class VentaController {
                 Long prodId = ((Number) itemMap.get("productoId")).longValue();
                 BigDecimal cantidad = new BigDecimal(itemMap.get("cantidad").toString());
 
-                ProductoComercial prod = productoRepository.findById(prodId).orElse(null);
+                if (cantidad.signum() <= 0) {
+                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor que cero");
+                }
+                // findById no aplica el filtro de tenant: se exige que el producto sea de este negocio.
+                Long tenantSesion = TenantContext.getCurrentTenant();
+                ProductoComercial prod = productoRepository.findById(prodId)
+                        .filter(pr -> tenantSesion != null && tenantSesion.equals(pr.getTenantId()))
+                        .orElse(null);
                 if (prod == null) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Producto con ID " + prodId + " no encontrado"));
+                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "Producto con ID " + prodId + " no encontrado");
                 }
 
-                BigDecimal precioUnitario = itemMap.get("precioUnitarioUsd") != null
-                        ? new BigDecimal(itemMap.get("precioUnitarioUsd").toString())
-                        : (prod.getPrecioUsd() != null ? prod.getPrecioUsd() : BigDecimal.ZERO);
+                // El precio sale del catálogo; solo el dueño puede cobrar un precio distinto.
+                BigDecimal precioCatalogo = prod.getPrecioUsd() != null ? prod.getPrecioUsd() : BigDecimal.ZERO;
+                BigDecimal precioPedido = itemMap.get("precioUnitarioUsd") != null
+                        ? new BigDecimal(itemMap.get("precioUnitarioUsd").toString()) : precioCatalogo;
+                if (precioPedido.signum() < 0) {
+                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio no puede ser negativo");
+                }
+                BigDecimal precioUnitario = precioPedido.compareTo(precioCatalogo) == 0
+                        || "DUENO_ADMIN".equals(com.auroraplus.core.auth.AuthContext.getRol()) ? precioPedido : precioCatalogo;
 
                 DetalleVentaComercial detalle = new DetalleVentaComercial(prod, cantidad, precioUnitario);
                 detalle.setTenantId(tenantId);
@@ -110,7 +123,11 @@ public class VentaController {
                 totalUsd = totalUsd.add(detalle.getSubtotalUsd());
 
                 BigDecimal stockAnt = prod.getStockActual() != null ? prod.getStockActual() : BigDecimal.ZERO;
-                BigDecimal nuevoStock = stockAnt.subtract(cantidad).max(BigDecimal.ZERO);
+                if (stockAnt.compareTo(cantidad) < 0) {
+                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT,
+                        "Stock insuficiente de " + prod.getNombre() + ": hay " + stockAnt.stripTrailingZeros().toPlainString());
+                }
+                BigDecimal nuevoStock = stockAnt.subtract(cantidad);
                 prod.setStockActual(nuevoStock);
                 productoRepository.save(prod);
 
@@ -145,9 +162,11 @@ public class VentaController {
             VentaComercial guardada = ventaRepository.save(venta);
             return ResponseEntity.status(HttpStatus.CREATED).body(guardada);
 
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e; // lanzar (no devolver) hace que la transacción se deshaga: nada de stock descontado a medias
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Error procesando venta: " + e.getMessage()));
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Error procesando venta: " + e.getMessage(), e);
         }
     }
 

@@ -6,17 +6,29 @@ import {
 import {
   diagnosticosFrecuentesSalud, obtenerCanalEndemico,
   diagnosticosFrecuentesRed, obtenerCanalEndemicoRed, desglosePorClinicaRed,
+  diagnosticosFrecuentesClinicaRed, obtenerCanalEndemicoClinicaRed,
   importarHistoricoExcel, type ResultadoImportacionHistorica,
   type DiagnosticoFrecuente, type CanalEndemico as CanalEndemicoData, type CasosPorClinica,
 } from "../api";
 import { generarPdfCanalEndemico, type PuntoCanalPdf } from "../utils/pdfReports";
 import { IconDownload } from "../Icons";
+import Cie10Buscador from "./Cie10Buscador";
 
 interface Props {
   /** "medico": el médico ve solo su propio canal (aislado por tenant). "red": vista consolidada de toda la plataforma (solo super-admin). */
   modo: "medico" | "red";
   clinicaNombre?: string;
   doctorNombre?: string;
+  /** Solo en modo "red": limita el canal a una clínica/médico concreto (el super-admin mirando un tenant). */
+  tenantId?: number;
+  /** Solo en modo "red": nombre de cada clínica para el desglose, en vez del ID. */
+  nombresClinica?: Record<number, string>;
+  /** Solo en modo "red": al tocar una clínica del desglose, ver su canal con el mismo diagnóstico. */
+  onElegirClinica?: (tenantId: number, cie10: string) => void;
+  /** Avisa qué diagnóstico se está mirando, para conservarlo al cambiar de vista. */
+  onCambioDiagnostico?: (cie10: string) => void;
+  /** Diagnóstico con el que arranca (por ejemplo, el que se venía mirando en la red). */
+  cie10Inicial?: string;
 }
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -58,10 +70,12 @@ interface PuntoCanal {
   casosActual: number;
 }
 
-export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Props) {
+export default function CanalEndemico({ modo, clinicaNombre, doctorNombre, tenantId, nombresClinica, onElegirClinica, onCambioDiagnostico, cie10Inicial }: Props) {
   const anioActual = new Date().getFullYear();
   const [diagnosticos, setDiagnosticos] = useState<DiagnosticoFrecuente[]>([]);
-  const [cie10, setCie10] = useState("");
+  const [cie10, setCie10] = useState(cie10Inicial ?? "");
+  const [descripcionCie10, setDescripcionCie10] = useState("");
+  const deUnaClinica = modo === "red" && tenantId != null;
   const [anio, setAnio] = useState(anioActual);
   const [granularidad, setGranularidad] = useState<Granularidad>("semana");
   const [canal, setCanal] = useState<CanalEndemicoData | null>(null);
@@ -73,31 +87,38 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
   const inputArchivoRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const listar = modo === "red" ? diagnosticosFrecuentesRed : diagnosticosFrecuentesSalud;
+    const listar = deUnaClinica
+      ? (limite: number) => diagnosticosFrecuentesClinicaRed(tenantId!, limite)
+      : modo === "red" ? diagnosticosFrecuentesRed : diagnosticosFrecuentesSalud;
     listar(20)
       .then((lista) => {
         setDiagnosticos(lista);
         setCie10((actual) => actual || (lista[0]?.cie10 ?? ""));
       })
       .catch(() => {});
-  }, [modo]);
+  }, [modo, tenantId]);
 
   useEffect(() => {
     if (!cie10) return;
+    onCambioDiagnostico?.(cie10);
     setCargando(true);
     setError(null);
-    const obtener = modo === "red" ? obtenerCanalEndemicoRed : obtenerCanalEndemico;
-    obtener(cie10, anio)
+    obtenerSegunModo(cie10, anio)
       .then(setCanal)
       .catch(() => setError("No se pudo cargar el canal endémico para este diagnóstico."))
       .finally(() => setCargando(false));
 
-    if (modo === "red") {
+    if (modo === "red" && !deUnaClinica) {
       desglosePorClinicaRed(cie10, anio).then(setDesglose).catch(() => setDesglose([]));
     } else {
       setDesglose([]);
     }
-  }, [cie10, anio, modo]);
+  }, [cie10, anio, modo, tenantId]);
+
+  function obtenerSegunModo(codigo: string, anioElegido: number) {
+    if (deUnaClinica) return obtenerCanalEndemicoClinicaRed(tenantId!, codigo, anioElegido);
+    return modo === "red" ? obtenerCanalEndemicoRed(codigo, anioElegido) : obtenerCanalEndemico(codigo, anioElegido);
+  }
 
   const datosCanal: PuntoCanal[] = useMemo(() => {
     if (!canal) return [];
@@ -201,8 +222,7 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
       setResultadoImportacion(resultado);
       // Recargar el canal para reflejar los datos recién importados.
       if (cie10) {
-        const obtener = modo === "red" ? obtenerCanalEndemicoRed : obtenerCanalEndemico;
-        obtener(cie10, anio).then(setCanal).catch(() => {});
+        obtenerSegunModo(cie10, anio).then(setCanal).catch(() => {});
       }
     } catch (err) {
       setResultadoImportacion({ filasImportadas: 0, filasConError: 1, errores: [{ numeroFila: 0, motivo: err instanceof Error ? err.message : "Error al importar el archivo" }] });
@@ -248,10 +268,12 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
     <div className="space-y-5">
       <div className="apple-glass rounded-2xl p-5">
         <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-1">
-          {modo === "red" ? "Canal Endémico — Toda la Red" : "Canal Endémico"}
+          {deUnaClinica ? `Canal Endémico — ${clinicaNombre || `Clínica #${tenantId}`}` : modo === "red" ? "Canal Endémico — Toda la Red" : "Canal Endémico"}
         </h3>
         <p className="text-xs text-slate-500 dark:text-white/50 mb-4">
-          {modo === "red"
+          {deUnaClinica
+            ? "Diagnósticos de esta clínica comparados con su propio historial."
+            : modo === "red"
             ? "Vigilancia epidemiológica consolidada de todas las clínicas de la plataforma, calculada a partir de los diagnósticos CIE-10 de cada consulta."
             : "Comportamiento de tus diagnósticos en el tiempo, comparado con tu propio promedio histórico."}
         </p>
@@ -261,7 +283,7 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
             <label className="text-[11px] text-slate-500 dark:text-white/50">Diagnóstico frecuente</label>
             <select
               value={diagnosticos.some((d) => d.cie10 === cie10) ? cie10 : ""}
-              onChange={(e) => setCie10(e.target.value)}
+              onChange={(e) => { setCie10(e.target.value); setDescripcionCie10(""); }}
               className="px-3 py-2 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-[#071a2e]/70 text-slate-900 dark:text-white text-xs"
             >
               <option value="">— elegir —</option>
@@ -272,13 +294,16 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] text-slate-500 dark:text-white/50">O escribe un código CIE-10</label>
-            <input
-              value={cie10}
-              onChange={(e) => setCie10(e.target.value.toUpperCase())}
-              placeholder="Ej. A90"
-              className="px-3 py-2 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-[#071a2e]/70 text-slate-900 dark:text-white text-xs w-28"
-            />
+            <label className="text-[11px] text-slate-500 dark:text-white/50">O busca la enfermedad por nombre o código</label>
+            <div className="w-72">
+              <Cie10Buscador
+                key={cie10}
+                valorCodigo={cie10}
+                valorDescripcion={descripcionCie10}
+                onSeleccionar={(d) => { setDescripcionCie10(d.descripcion); setCie10(d.codigo); }}
+                placeholder="Ej. gripe, dengue, fiebre, J11"
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -314,7 +339,7 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
             <label className="text-[11px] text-slate-500 dark:text-white/50 opacity-0 select-none">Acciones</label>
             <div className="flex gap-2">
               <input ref={inputArchivoRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleArchivoElegido} />
-              <button
+              {!deUnaClinica && <button
                 type="button"
                 onClick={handleSeleccionarArchivo}
                 disabled={importando}
@@ -322,7 +347,7 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
                 title="Importar historial epidemiológico desde un archivo Excel (.xlsx)"
               >
                 {importando ? "Importando…" : "Importar historial (Excel)"}
-              </button>
+              </button>}
               <button
                 type="button"
                 onClick={handleDescargarPdf}
@@ -556,7 +581,7 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
             )}
           </div>
 
-          {modo === "red" && (
+          {modo === "red" && !deUnaClinica && (
             <div className="apple-glass rounded-2xl p-5">
               <h4 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm mb-4">Desglose por clínica — {anio}</h4>
               {desglose.length === 0 ? (
@@ -566,14 +591,19 @@ export default function CanalEndemico({ modo, clinicaNombre, doctorNombre }: Pro
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-left text-slate-500 dark:text-white/50 border-b border-slate-200/60 dark:border-white/10">
-                        <th className="py-2 pr-4">Tenant ID</th>
+                        <th className="py-2 pr-4">Clínica</th>
                         <th className="py-2">Casos</th>
                       </tr>
                     </thead>
                     <tbody>
                       {desglose.map((d) => (
-                        <tr key={d.tenantId} className="border-b border-slate-100/60 dark:border-white/5">
-                          <td className="py-2 pr-4 text-slate-800 dark:text-white">{d.tenantId}</td>
+                        <tr
+                          key={d.tenantId}
+                          onClick={onElegirClinica ? () => onElegirClinica(d.tenantId, cie10) : undefined}
+                          className={`border-b border-slate-100/60 dark:border-white/5 ${onElegirClinica ? "cursor-pointer hover:bg-sky-500/5" : ""}`}
+                          title={onElegirClinica ? "Ver el canal endémico de esta clínica" : undefined}
+                        >
+                          <td className="py-2 pr-4 text-slate-800 dark:text-white">{nombresClinica?.[d.tenantId] ?? `Clínica #${d.tenantId}`}</td>
                           <td className="py-2 text-slate-800 dark:text-white">{d.totalCasos}</td>
                         </tr>
                       ))}

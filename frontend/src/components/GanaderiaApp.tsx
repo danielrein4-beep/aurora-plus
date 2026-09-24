@@ -1,3 +1,5 @@
+import { contarSinLeerMercado } from "../api";
+import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 
@@ -96,6 +98,7 @@ const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
 
 export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const tenantId = user?.tenantId ? Number(user.tenantId) : 1;
 
   // Tasas de cambio multi-moneda (configurables a mano y persistidas)
@@ -197,6 +200,14 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [tab, setTab] = useState<TabGanaderia>("resumen");
   const [sidebarAbierto, setSidebarAbierto] = useState(false);
   const [aperturaSoporte, setAperturaSoporte] = useState(0);
+  const [sinLeerMercado, setSinLeerMercado] = useState(0);
+  // Mensajes del mercado sin leer, para avisar en el menú aunque se esté en otra sección.
+  useEffect(() => {
+    const contar = () => contarSinLeerMercado().then((r) => setSinLeerMercado(Number(r.sinLeer))).catch(() => {});
+    contar();
+    const intervalo = setInterval(contar, 60_000);
+    return () => clearInterval(intervalo);
+  }, []);
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<SubSanidad>("individual");
@@ -545,6 +556,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         tab={tab}
         nombreFinca={user?.empresa || "Mi Finca"}
         puedeVerAuditoria={user?.rol === "DUENO_ADMIN"}
+        sinLeerMercado={sinLeerMercado}
+        abrirMercado={() => navigate("/mercado")}
         abrirVaqueraRapida={abrirVaqueraRapida}
         abrirVentaAnimales={abrirVentaAnimales}
         onSalir={onSalir}
