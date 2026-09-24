@@ -49,7 +49,8 @@ public class UsuarioController {
     }
 
     @PostMapping
-    public ResponseEntity<?> crearUsuario(@RequestParam Long tenantId, @RequestBody Usuario nuevo) {
+    public ResponseEntity<?> crearUsuario(@RequestBody Usuario nuevo) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
 
         if (nuevo.getEmail() == null || nuevo.getEmail().trim().isEmpty() ||

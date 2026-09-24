@@ -26,7 +26,8 @@ public class MinaController {
     }
 
     @PostMapping
-    public ResponseEntity<Mina> crear(@RequestParam Long tenantId, @RequestBody Mina mina) {
+    public ResponseEntity<Mina> crear(@RequestBody Mina mina) {
+        Long tenantId = TenantContext.getCurrentTenant();
         mina.setTenantId(tenantId);
         Mina guardada = minaRepository.save(mina);
         return ResponseEntity.status(201).body(guardada);

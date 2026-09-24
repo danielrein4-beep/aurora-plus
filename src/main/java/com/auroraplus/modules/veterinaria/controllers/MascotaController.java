@@ -28,10 +28,9 @@ public class MascotaController {
 
     @GetMapping
     public List<Mascota> listar(
-            @RequestParam(required = false) Long tenantId,
             @RequestParam(required = false) Long propietarioId,
             @RequestParam(required = false) String buscar) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
         if (propietarioId != null) {
             return mascotaService.listarPorPropietario(tenantActivo, propietarioId);
@@ -40,8 +39,8 @@ public class MascotaController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Mascota> obtener(@PathVariable Long id, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Mascota> obtener(@PathVariable Long id) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
         return mascotaService.obtenerPorId(tenantActivo, id)
             .map(ResponseEntity::ok)
@@ -49,8 +48,8 @@ public class MascotaController {
     }
 
     @GetMapping("/microchip/{microchip}")
-    public ResponseEntity<Mascota> buscarPorMicrochip(@PathVariable String microchip, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Mascota> buscarPorMicrochip(@PathVariable String microchip) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
         return mascotaService.obtenerPorMicrochip(tenantActivo, microchip)
             .map(ResponseEntity::ok)
@@ -58,8 +57,8 @@ public class MascotaController {
     }
 
     @PostMapping
-    public ResponseEntity<Mascota> registrar(@RequestParam(required = false) Long tenantId, @RequestBody Mascota mascota) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Mascota> registrar(@RequestBody Mascota mascota) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }
@@ -67,8 +66,8 @@ public class MascotaController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Mascota> actualizar(@PathVariable Long id, @RequestParam(required = false) Long tenantId, @RequestBody Mascota datos) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Mascota> actualizar(@PathVariable Long id, @RequestBody Mascota datos) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         datos.setId(id);
         return ResponseEntity.ok(mascotaService.registrarOActualizar(tenantActivo, datos));
     }

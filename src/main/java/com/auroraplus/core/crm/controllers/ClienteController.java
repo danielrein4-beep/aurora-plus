@@ -1,5 +1,6 @@
 package com.auroraplus.core.crm.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.crm.entities.Cliente;
 import com.auroraplus.core.crm.services.ClienteService;
 import com.auroraplus.core.crm.services.MetricasClienteDTO;
@@ -19,12 +20,14 @@ public class ClienteController {
     private ClienteService clienteService;
 
     @GetMapping
-    public List<Cliente> listar(@RequestParam Long tenantId, @RequestParam(required = false) String q) {
+    public List<Cliente> listar(@RequestParam(required = false) String q) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return (q != null && !q.isBlank()) ? clienteService.buscar(tenantId, q) : clienteService.listar(tenantId);
     }
 
     @GetMapping("/{id}")
-    public Cliente obtener(@PathVariable Long id, @RequestParam Long tenantId) {
+    public Cliente obtener(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return clienteService.obtener(id, tenantId);
     }
 
@@ -40,7 +43,8 @@ public class ClienteController {
     }
 
     @PostMapping
-    public ResponseEntity<Cliente> crear(@RequestParam Long tenantId, @RequestBody ClienteRequest request) {
+    public ResponseEntity<Cliente> crear(@RequestBody ClienteRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Cliente creado = clienteService.crear(tenantId, request.nombre, request.identificacionRif, request.telefono, request.correo);
         if (request.direccion != null || request.limiteCredito != null || request.saldoPendiente != null) {
             creado = clienteService.aplicarDatosComercio(creado.getId(), tenantId, request.direccion, request.limiteCredito, request.saldoPendiente);
@@ -49,7 +53,8 @@ public class ClienteController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Cliente> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody ClienteRequest request) {
+    public ResponseEntity<Cliente> editar(@PathVariable Long id, @RequestBody ClienteRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Cliente editado = clienteService.editar(id, tenantId, request.nombre, request.identificacionRif, request.telefono, request.correo);
         if (request.direccion != null || request.limiteCredito != null || request.saldoPendiente != null) {
             editado = clienteService.aplicarDatosComercio(id, tenantId, request.direccion, request.limiteCredito, request.saldoPendiente);
@@ -58,18 +63,21 @@ public class ClienteController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         clienteService.eliminar(id, tenantId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/metricas")
-    public MetricasClienteDTO metricas(@PathVariable Long id, @RequestParam Long tenantId) {
+    public MetricasClienteDTO metricas(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return clienteService.metricas(id, tenantId);
     }
 
     @GetMapping("/{id}/tickets")
-    public List<Comanda> tickets(@PathVariable Long id, @RequestParam Long tenantId) {
+    public List<Comanda> tickets(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return clienteService.tickets(id, tenantId);
     }
 }

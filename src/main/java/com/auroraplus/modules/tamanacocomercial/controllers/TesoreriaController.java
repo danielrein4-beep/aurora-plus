@@ -54,7 +54,8 @@ public class TesoreriaController {
     }
 
     @PostMapping("/ingresos")
-    public ResponseEntity<?> registrarIngreso(@RequestParam Long tenantId, @RequestBody Ingreso ingreso) {
+    public ResponseEntity<?> registrarIngreso(@RequestBody Ingreso ingreso) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         if (ingreso.getClienteOrigen() == null || ingreso.getClienteOrigen().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "El cliente u origen del pago es obligatorio"));
@@ -108,7 +109,8 @@ public class TesoreriaController {
     }
 
     @PostMapping("/cambios")
-    public ResponseEntity<?> registrarCambio(@RequestParam Long tenantId, @RequestBody CambioMoneda cambio) {
+    public ResponseEntity<?> registrarCambio(@RequestBody CambioMoneda cambio) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         if (cambio.getMonedaOrigen() == null || cambio.getMonedaDestino() == null)
             return ResponseEntity.badRequest().body(Map.of("error", "Moneda origen y destino son obligatorias"));

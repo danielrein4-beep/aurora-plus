@@ -1,5 +1,6 @@
 package com.auroraplus.modules.comercio.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.comercio.entities.VentaMostrador;
 import com.auroraplus.modules.comercio.repositories.VentaMostradorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,14 +40,16 @@ public class VentaMostradorController {
      * del navegador) devuelve la ya guardada en vez de duplicarla. */
     @PostMapping
     @Transactional
-    public ResponseEntity<VentaMostrador> guardar(@RequestParam Long tenantId, @RequestBody VentaRequest req) {
+    public ResponseEntity<VentaMostrador> guardar(@RequestBody VentaRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(guardarUna(tenantId, req));
     }
 
     /** Migración única del historial que vivía en el navegador — cada fila se guarda con la misma regla idempotente. */
     @PostMapping("/lote")
     @Transactional
-    public ResponseEntity<Map<String, Integer>> guardarLote(@RequestParam Long tenantId, @RequestBody List<VentaRequest> lote) {
+    public ResponseEntity<Map<String, Integer>> guardarLote(@RequestBody List<VentaRequest> lote) {
+        Long tenantId = TenantContext.getCurrentTenant();
         int guardadas = 0;
         List<String> omitidas = new ArrayList<>();
         for (VentaRequest req : lote) {
@@ -61,7 +64,8 @@ public class VentaMostradorController {
     }
 
     @GetMapping
-    public List<VentaMostrador> listar(@RequestParam Long tenantId) {
+    public List<VentaMostrador> listar() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ventaRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId, PageRequest.of(0, LIMITE_LISTADO));
     }
 

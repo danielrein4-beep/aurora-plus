@@ -57,7 +57,8 @@ public class EmpleadoController {
     }
 
     @PostMapping
-    public Empleado crear(@RequestParam Long tenantId, @RequestBody Empleado empleado) {
+    public Empleado crear(@RequestBody Empleado empleado) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         empleado.setTenantId(tenantId);
         if (empleado.getActivo() == null) empleado.setActivo(true);
@@ -67,7 +68,8 @@ public class EmpleadoController {
     }
 
     @PutMapping("/{id}")
-    public Empleado actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Empleado detalles) {
+    public Empleado actualizar(@PathVariable Long id, @RequestBody Empleado detalles) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         Empleado emp = empleadoRepository.findById(id)
@@ -87,7 +89,8 @@ public class EmpleadoController {
     }
 
     @PostMapping("/{id}/pagar")
-    public Gasto pagarNomina(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Map<String, Object> payload) {
+    public Gasto pagarNomina(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         Empleado emp = empleadoRepository.findById(id)

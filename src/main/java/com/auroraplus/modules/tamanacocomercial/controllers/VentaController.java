@@ -52,7 +52,8 @@ public class VentaController {
 
     @PostMapping
     @Transactional
-    public ResponseEntity<?> registrarVenta(@RequestParam Long tenantId, @RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> registrarVenta(@RequestBody Map<String, Object> payload) {
+        Long tenantId = TenantContext.getCurrentTenant();
         try {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> itemsList = (List<Map<String, Object>>) payload.get("items");
@@ -172,7 +173,8 @@ public class VentaController {
 
     @PutMapping("/{id}/anular")
     @Transactional
-    public ResponseEntity<?> anularVenta(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<?> anularVenta(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         VentaComercial v = ventaRepository.findById(id).orElse(null);

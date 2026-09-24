@@ -23,10 +23,9 @@ public class CierreCajaVetController {
 
     @PostMapping
     public ResponseEntity<CierreCajaVet> registrarCierre(
-            @RequestParam(required = false) Long tenantId,
             @RequestBody CierreCajaVet cierre) {
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR");
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }

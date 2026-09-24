@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.dto.NominaPagoRequestDTO;
 import com.auroraplus.modules.tamanacocomercial.dto.NominaSemanaResponseDTO;
 import com.auroraplus.modules.tamanacocomercial.entities.CierreSemana;
@@ -29,7 +30,8 @@ public class NominaController {
     private CierreSemanaService cierreSemanaService;
 
     @GetMapping("/semana")
-    public ResponseEntity<?> calcularSemana(@RequestParam Long tenantId, @RequestParam(required = false) String fecha) {
+    public ResponseEntity<?> calcularSemana(@RequestParam(required = false) String fecha) {
+        Long tenantId = TenantContext.getCurrentTenant();
         try {
             NominaSemanaResponseDTO respuesta = nominaService.calcularSemana(tenantId, fecha);
             return ResponseEntity.ok(respuesta);
@@ -47,11 +49,11 @@ public class NominaController {
 
     @PostMapping("/cerrar-semana")
     public ResponseEntity<?> cerrarSemana(
-            @RequestParam Long tenantId,
             @RequestParam(required = false) String fecha,
             @RequestParam(required = false) String notas,
             @RequestParam(required = false) String usuario,
             @RequestParam(value = "archivo", required = false) MultipartFile archivo) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         try {
             LocalDate f = (fecha != null && !fecha.isBlank()) ? LocalDate.parse(fecha) : LocalDate.now();
@@ -64,8 +66,9 @@ public class NominaController {
     }
 
     @PostMapping("/reabrir-semana")
-    public ResponseEntity<?> reabrirSemana(@RequestParam Long tenantId, @RequestParam(required = false) String fecha,
+    public ResponseEntity<?> reabrirSemana(@RequestParam(required = false) String fecha,
                                             @RequestParam(required = false) String usuario) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         try {
             LocalDate f = (fecha != null && !fecha.isBlank()) ? LocalDate.parse(fecha) : LocalDate.now();
@@ -77,8 +80,9 @@ public class NominaController {
     }
 
     @PostMapping({"/{id}/ajuste", "/ajuste"})
-    public ResponseEntity<?> guardarAjusteRapido(@RequestParam Long tenantId, @PathVariable(required = false) Long id,
+    public ResponseEntity<?> guardarAjusteRapido(@PathVariable(required = false) Long id,
                                                   @RequestBody Map<String, Object> payload) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         try {
             Long idNomina = id != null ? id : (payload.get("id") != null ? Long.valueOf(payload.get("id").toString()) : null);
@@ -94,7 +98,8 @@ public class NominaController {
     }
 
     @PostMapping({"/pagar", "/registrar-pago"})
-    public ResponseEntity<?> registrarPago(@RequestParam Long tenantId, @RequestBody NominaPagoRequestDTO request) {
+    public ResponseEntity<?> registrarPago(@RequestBody NominaPagoRequestDTO request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         try {
             Gasto gastoCreado = nominaService.pagarNomina(tenantId, request);

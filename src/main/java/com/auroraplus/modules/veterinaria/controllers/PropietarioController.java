@@ -27,15 +27,15 @@ public class PropietarioController {
     }
 
     @GetMapping
-    public List<Propietario> listar(@RequestParam(required = false) Long tenantId, @RequestParam(required = false) String buscar) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public List<Propietario> listar(@RequestParam(required = false) String buscar) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
         return propietarioService.buscar(tenantActivo, buscar);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Propietario> obtener(@PathVariable Long id, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Propietario> obtener(@PathVariable Long id) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
         return propietarioService.obtenerPorId(tenantActivo, id)
             .map(ResponseEntity::ok)
@@ -43,8 +43,8 @@ public class PropietarioController {
     }
 
     @GetMapping("/identificacion/{identificacion}")
-    public ResponseEntity<Propietario> buscarPorIdentificacion(@PathVariable String identificacion, @RequestParam(required = false) Long tenantId) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Propietario> buscarPorIdentificacion(@PathVariable String identificacion) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         asegurarFiltroTenant();
         return propietarioService.obtenerPorIdentificacion(tenantActivo, identificacion)
             .map(ResponseEntity::ok)
@@ -52,8 +52,8 @@ public class PropietarioController {
     }
 
     @PostMapping
-    public ResponseEntity<Propietario> registrar(@RequestParam(required = false) Long tenantId, @RequestBody Propietario propietario) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Propietario> registrar(@RequestBody Propietario propietario) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }
@@ -61,8 +61,8 @@ public class PropietarioController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Propietario> actualizar(@PathVariable Long id, @RequestParam(required = false) Long tenantId, @RequestBody Propietario datos) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+    public ResponseEntity<Propietario> actualizar(@PathVariable Long id, @RequestBody Propietario datos) {
+        Long tenantActivo = TenantContext.getCurrentTenant();
         datos.setId(id);
         return ResponseEntity.ok(propietarioService.registrarOActualizar(tenantActivo, datos));
     }

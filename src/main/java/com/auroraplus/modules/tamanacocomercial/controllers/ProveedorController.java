@@ -47,7 +47,8 @@ public class ProveedorController {
     }
 
     @PostMapping
-    public ResponseEntity<?> crear(@RequestParam Long tenantId, @RequestBody Proveedor proveedor) {
+    public ResponseEntity<?> crear(@RequestBody Proveedor proveedor) {
+        Long tenantId = TenantContext.getCurrentTenant();
         if (proveedor.getNombre() == null || proveedor.getNombre().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "El nombre del proveedor es obligatorio"));
         }
@@ -66,7 +67,8 @@ public class ProveedorController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Proveedor datos) {
+    public ResponseEntity<?> actualizar(@PathVariable Long id, @RequestBody Proveedor datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Long tenantActual = TenantContext.getCurrentTenant();
         return proveedorRepository.findById(id)
             .filter(p -> tenantActual != null && tenantActual.equals(p.getTenantId()))
@@ -93,7 +95,8 @@ public class ProveedorController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> desactivar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<?> desactivar(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Long tenantActual = TenantContext.getCurrentTenant();
         return proveedorRepository.findById(id)
             .filter(p -> tenantActual != null && tenantActual.equals(p.getTenantId()))
@@ -197,7 +200,8 @@ public class ProveedorController {
     }
 
     @PostMapping("/{id}/nota")
-    public ResponseEntity<?> agregarNota(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> agregarNota(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        Long tenantId = TenantContext.getCurrentTenant();
         String texto = payload.get("nota");
         if (texto == null || texto.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "La nota no puede estar vacía"));

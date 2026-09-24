@@ -38,7 +38,8 @@ public class InventarioRestController {
     }
 
     @PostMapping("/pilas")
-    public ResponseEntity<?> crearPila(@RequestParam Long tenantId, @RequestBody InventarioPatio pila) {
+    public ResponseEntity<?> crearPila(@RequestBody InventarioPatio pila) {
+        Long tenantId = TenantContext.getCurrentTenant();
         if (pila.getMina() == null || pila.getMina().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "La mina es obligatoria"));
         }

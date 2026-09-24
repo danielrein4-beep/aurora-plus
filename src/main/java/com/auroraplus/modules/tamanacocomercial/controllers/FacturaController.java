@@ -36,7 +36,8 @@ public class FacturaController {
 
     @PostMapping
     @Transactional
-    public ResponseEntity<?> crearFactura(@RequestParam Long tenantId, @RequestBody Factura factura) {
+    public ResponseEntity<?> crearFactura(@RequestBody Factura factura) {
+        Long tenantId = TenantContext.getCurrentTenant();
 
         Factura ultimaFactura = facturaRepository.findTopByOrderByNumeroControlDesc();
         int siguienteNumero = 1;
@@ -86,7 +87,8 @@ public class FacturaController {
     }
 
     @PostMapping("/{id}/retencion")
-    public ResponseEntity<?> aplicarRetencion(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody Retencion retencion) {
+    public ResponseEntity<?> aplicarRetencion(@PathVariable Long id, @RequestBody Retencion retencion) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         Optional<Factura> facturaOpt = facturaRepository.findById(id)

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.horeca.entities.FastBarTrago;
 import com.auroraplus.modules.horeca.repositories.FastBarTragoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,12 +24,14 @@ public class FastBarController {
     private FastBarTragoRepository fastBarTragoRepository;
 
     @GetMapping
-    public List<FastBarTrago> listar(@RequestParam Long tenantId) {
+    public List<FastBarTrago> listar() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return fastBarTragoRepository.findByTenantId(tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<FastBarTrago> crear(@RequestParam Long tenantId, @RequestBody FastBarTrago trago) {
+    public ResponseEntity<FastBarTrago> crear(@RequestBody FastBarTrago trago) {
+        Long tenantId = TenantContext.getCurrentTenant();
         trago.setTenantId(tenantId);
         return ResponseEntity.ok(fastBarTragoRepository.save(trago));
     }

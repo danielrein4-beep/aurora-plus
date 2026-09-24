@@ -24,7 +24,8 @@ public class ProveedorRepuestoController {
     }
 
     @PostMapping
-    public ResponseEntity<ProveedorRepuesto> crear(@RequestParam Long tenantId, @RequestBody ProveedorRepuesto proveedor) {
+    public ResponseEntity<ProveedorRepuesto> crear(@RequestBody ProveedorRepuesto proveedor) {
+        Long tenantId = TenantContext.getCurrentTenant();
         AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         if (proveedor.getNombre() == null || proveedor.getNombre().isBlank()) {
             throw new RuntimeException("El nombre del proveedor es obligatorio");

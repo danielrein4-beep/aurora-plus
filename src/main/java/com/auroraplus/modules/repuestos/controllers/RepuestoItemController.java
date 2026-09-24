@@ -49,19 +49,22 @@ public class RepuestoItemController {
     }
 
     @GetMapping("/sku/{codigoSku}")
-    public ResponseEntity<RepuestoItem> buscarPorSku(@PathVariable String codigoSku, @RequestParam Long tenantId) {
+    public ResponseEntity<RepuestoItem> buscarPorSku(@PathVariable String codigoSku) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return repuestoItemRepository.findByCodigoSkuAndTenantId(codigoSku, tenantId)
             .map(ResponseEntity::ok)
             .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/oem/{codigoOem}")
-    public List<RepuestoItem> buscarPorOem(@PathVariable String codigoOem, @RequestParam Long tenantId) {
+    public List<RepuestoItem> buscarPorOem(@PathVariable String codigoOem) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return repuestoItemRepository.findByCodigoOriginalOemAndTenantId(codigoOem, tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<RepuestoItem> crear(@RequestParam Long tenantId, @RequestBody RepuestoItem item) {
+    public ResponseEntity<RepuestoItem> crear(@RequestBody RepuestoItem item) {
+        Long tenantId = TenantContext.getCurrentTenant();
         AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         if (item.getCodigoSku() == null || item.getCodigoSku().isBlank()) {
             throw new RuntimeException("El código SKU es obligatorio");
@@ -107,7 +110,8 @@ public class RepuestoItemController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         RepuestoItem item = repuestoItemRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
@@ -121,7 +125,8 @@ public class RepuestoItemController {
 
     /** Kárdex: historial completo de compras/ventas/ajustes de un ítem, para auditar cualquier descuadre. */
     @GetMapping("/{id}/movimientos")
-    public List<MovimientoRepuesto> historialMovimientos(@PathVariable Long id, @RequestParam Long tenantId) {
+    public List<MovimientoRepuesto> historialMovimientos(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         RepuestoItem item = repuestoItemRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Repuesto no encontrado"));
         if (!item.getTenantId().equals(tenantId)) {
@@ -137,7 +142,7 @@ public class RepuestoItemController {
      * RepuestoConversionService.registrarCobroVenta.
      */
     @PostMapping("/{id}/vender")
-    public ResponseEntity<Map<String, Object>> venderPorVolumen(@PathVariable Long id, @RequestParam Long tenantId,
+    public ResponseEntity<Map<String, Object>> venderPorVolumen(@PathVariable Long id,
                                                                   @RequestParam BigDecimal cantidad,
                                                                   @RequestParam(required = false) String monedaPago,
                                                                   @RequestParam(required = false) BigDecimal montoRecibido,
@@ -146,6 +151,7 @@ public class RepuestoItemController {
                                                                   @RequestParam(required = false) BigDecimal montoPagadoAhora,
                                                                   @RequestParam(required = false) Integer diasCredito,
                                                                   @RequestParam(required = false) String nombreClienteManual) {
+        Long tenantId = TenantContext.getCurrentTenant();
         RepuestoConversionService.ResultadoVenta resultado = repuestoConversionService.venderPorVolumen(
             id, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, clienteId, montoPagadoAhora, diasCredito, nombreClienteManual);
         return ResponseEntity.ok(Map.of(
@@ -162,8 +168,9 @@ public class RepuestoItemController {
 
     /** Corrección de inventario tras un conteo físico — ver RepuestoConversionService.ajustarStock. */
     @PostMapping("/{id}/ajustar-stock")
-    public ResponseEntity<RepuestoItem> ajustarStock(@PathVariable Long id, @RequestParam Long tenantId,
+    public ResponseEntity<RepuestoItem> ajustarStock(@PathVariable Long id,
                                                        @RequestBody AjusteStockRequest datos) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO", "ADMINISTRADOR_FINCA");
         RepuestoItem actualizado = repuestoConversionService.ajustarStock(id, tenantId, datos.stockReal, datos.motivo);
         return ResponseEntity.ok(actualizado);
@@ -201,7 +208,8 @@ public class RepuestoItemController {
      */
     @PostMapping("/importar-lote")
     @Transactional
-    public ResponseEntity<ResultadoImportacion> importarLote(@RequestParam Long tenantId, @RequestBody List<ItemImportacion> items) {
+    public ResponseEntity<ResultadoImportacion> importarLote(@RequestBody List<ItemImportacion> items) {
+        Long tenantId = TenantContext.getCurrentTenant();
         AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         ResultadoImportacion resultado = new ResultadoImportacion();
         for (int i = 0; i < items.size(); i++) {

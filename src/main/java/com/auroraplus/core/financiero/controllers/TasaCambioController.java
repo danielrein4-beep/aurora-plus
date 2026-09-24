@@ -1,5 +1,6 @@
 package com.auroraplus.core.financiero.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.config.entities.LicenciaTenant;
 import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.financiero.entities.TasaCambio;
@@ -55,7 +56,8 @@ public class TasaCambioController {
 
     /** Registra una tasa nueva (queda historial — nunca se sobreescribe la anterior). */
     @PostMapping
-    public ResponseEntity<TasaCambio> actualizar(@RequestParam Long tenantId, @RequestBody ActualizarTasaRequest request) {
+    public ResponseEntity<TasaCambio> actualizar(@RequestBody ActualizarTasaRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA");
         if (request.tasa == null || request.tasa.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La tasa debe ser mayor a cero");
@@ -83,8 +85,9 @@ public class TasaCambioController {
      * caminos de escritura sobre la misma serie, no duplicados.
      */
     @PostMapping("/actualizar-externa")
-    public ResponseEntity<TasaCambio> actualizarExterna(@RequestParam Long tenantId, @RequestParam String fuente,
+    public ResponseEntity<TasaCambio> actualizarExterna(@RequestParam String fuente,
                                                           @RequestParam(defaultValue = "VES") String monedaDestino) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA");
         String origenGuardado;
         BigDecimal tasa;
@@ -110,8 +113,9 @@ public class TasaCambioController {
      * histórico: la más reciente sin importar de qué origen vino.
      */
     @GetMapping("/vigente")
-    public TasaCambio vigente(@RequestParam Long tenantId, @RequestParam String monedaOrigen, @RequestParam String monedaDestino,
+    public TasaCambio vigente(@RequestParam String monedaOrigen, @RequestParam String monedaDestino,
                                @RequestParam(required = false) String origen) {
+        Long tenantId = TenantContext.getCurrentTenant();
         if (origen != null && !origen.isBlank()) {
             return tasaCambioRepository.findTopByTenantIdAndMonedaOrigenAndMonedaDestinoAndOrigenApiOrderByFechaActualizacionDesc(
                     tenantId, monedaOrigen, monedaDestino, origen)
@@ -124,7 +128,8 @@ public class TasaCambioController {
 
     /** Historial completo de fluctuación entre dos monedas. */
     @GetMapping("/historial")
-    public List<TasaCambio> historial(@RequestParam Long tenantId, @RequestParam String monedaOrigen, @RequestParam String monedaDestino) {
+    public List<TasaCambio> historial(@RequestParam String monedaOrigen, @RequestParam String monedaDestino) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return tasaCambioRepository.findByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(
             tenantId, monedaOrigen, monedaDestino);
     }
@@ -137,7 +142,8 @@ public class TasaCambioController {
 
     /** Convierte un monto entre dos monedas (o a la moneda base del tenant si no se indica destino) usando la tasa vigente. */
     @PostMapping("/convertir")
-    public ResponseEntity<BigDecimal> convertir(@RequestParam Long tenantId, @RequestBody ConvertirRequest request) {
+    public ResponseEntity<BigDecimal> convertir(@RequestBody ConvertirRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         if (request.monedaDestino == null || request.monedaDestino.isBlank()) {
             return ResponseEntity.ok(motorFinancieroService.convertirAMonedaBase(tenantId, request.monto, request.monedaOrigen));
         }
@@ -146,7 +152,8 @@ public class TasaCambioController {
 
     /** Moneda base configurada para el tenant — la que usan por defecto sus reportes y su caja. */
     @GetMapping("/moneda-base")
-    public String monedaBase(@RequestParam Long tenantId) {
+    public String monedaBase() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return licenciaTenantRepository.findByTenantId(tenantId)
             .map(LicenciaTenant::getMonedaBase)
             .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));

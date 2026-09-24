@@ -1,5 +1,6 @@
 package com.auroraplus.modules.repuestos.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.Almacen;
 import com.auroraplus.modules.repuestos.entities.StockAlmacen;
 import com.auroraplus.modules.repuestos.services.AlmacenService;
@@ -20,7 +21,8 @@ public class AlmacenController {
     private AlmacenService almacenService;
 
     @GetMapping
-    public List<Almacen> listar(@RequestParam Long tenantId) {
+    public List<Almacen> listar() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return almacenService.listar(tenantId);
     }
 
@@ -30,7 +32,8 @@ public class AlmacenController {
     }
 
     @PostMapping
-    public ResponseEntity<Almacen> crear(@RequestParam Long tenantId, @RequestBody CrearAlmacenRequest req) {
+    public ResponseEntity<Almacen> crear(@RequestBody CrearAlmacenRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.status(HttpStatus.CREATED).body(almacenService.crear(tenantId, req.nombre, req.direccion));
     }
 
@@ -41,12 +44,14 @@ public class AlmacenController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Almacen> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody ActualizarAlmacenRequest req) {
+    public ResponseEntity<Almacen> actualizar(@PathVariable Long id, @RequestBody ActualizarAlmacenRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(almacenService.actualizar(tenantId, id, req.nombre, req.direccion, req.activo));
     }
 
     @GetMapping("/distribucion/{repuestoId}")
-    public ResponseEntity<Map<String, Object>> distribucion(@PathVariable Long repuestoId, @RequestParam Long tenantId) {
+    public ResponseEntity<Map<String, Object>> distribucion(@PathVariable Long repuestoId) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(Map.of(
             "distribucion", almacenService.distribucion(tenantId, repuestoId),
             "sinAsignar", almacenService.sinAsignar(tenantId, repuestoId)
@@ -61,13 +66,15 @@ public class AlmacenController {
     }
 
     @PostMapping("/trasladar")
-    public ResponseEntity<Void> trasladar(@RequestParam Long tenantId, @RequestBody TrasladarRequest req) {
+    public ResponseEntity<Void> trasladar(@RequestBody TrasladarRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         almacenService.trasladar(tenantId, req.repuestoId, req.origenId, req.destinoId, req.cantidad);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/ubicaciones")
-    public List<StockAlmacen> ubicaciones(@RequestParam Long tenantId) {
+    public List<StockAlmacen> ubicaciones() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return almacenService.ubicacionesDelTenant(tenantId);
     }
 
@@ -78,7 +85,8 @@ public class AlmacenController {
     }
 
     @PutMapping("/ubicacion")
-    public ResponseEntity<StockAlmacen> fijarUbicacion(@RequestParam Long tenantId, @RequestBody UbicacionRequest req) {
+    public ResponseEntity<StockAlmacen> fijarUbicacion(@RequestBody UbicacionRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(almacenService.fijarUbicacion(tenantId, req.almacenId, req.repuestoId, req.ubicacion));
     }
 }

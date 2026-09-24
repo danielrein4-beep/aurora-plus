@@ -23,9 +23,8 @@ public class ProcedimientoVeterinarioController {
 
     @PostMapping
     public ResponseEntity<ProcedimientoVeterinario> crear(
-            @RequestParam(required = false) Long tenantId,
             @RequestBody ProcedimientoVeterinario proc) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }

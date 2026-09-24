@@ -154,7 +154,8 @@ public class DespachoController {
     }
 
     @PostMapping("/cuota")
-    public CuotaDespacho crearCuota(@RequestParam Long tenantId, @RequestBody CuotaDespacho cuota) {
+    public CuotaDespacho crearCuota(@RequestBody CuotaDespacho cuota) {
+        Long tenantId = TenantContext.getCurrentTenant();
         cuotaDespachoRepository.findTopByEstadoOrderByCreatedAtDesc("ACTIVA").ifPresent(c -> {
             c.setEstado("COMPLETADA");
             cuotaDespachoRepository.save(c);
@@ -171,7 +172,8 @@ public class DespachoController {
     }
 
     @PostMapping
-    public DespachoComercial guardarDespacho(@RequestParam Long tenantId, @RequestBody DespachoComercial despacho) {
+    public DespachoComercial guardarDespacho(@RequestBody DespachoComercial despacho) {
+        Long tenantId = TenantContext.getCurrentTenant();
         LocalDate fechaOp = despacho.getFechaDespacho() != null ? despacho.getFechaDespacho().toLocalDate() : LocalDate.now();
         if (cierreSemanaService.estaSemanaCerrada(fechaOp)) {
             throw new org.springframework.web.server.ResponseStatusException(
@@ -191,7 +193,8 @@ public class DespachoController {
     }
 
     @PutMapping("/{id}")
-    public DespachoComercial editarDespacho(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody DespachoComercial detalles) {
+    public DespachoComercial editarDespacho(@PathVariable Long id, @RequestBody DespachoComercial detalles) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Long tenantActual = TenantContext.getCurrentTenant();
         DespachoComercial despacho = despachoComercialRepository.findById(id)
                 .filter(d -> tenantActual != null && tenantActual.equals(d.getTenantId()))
@@ -224,8 +227,9 @@ public class DespachoController {
     }
 
     @PostMapping("/{id}/ticket")
-    public DespachoComercial subirTicket(@PathVariable Long id, @RequestParam Long tenantId,
+    public DespachoComercial subirTicket(@PathVariable Long id,
                                           @RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        Long tenantId = TenantContext.getCurrentTenant();
         Long tenantActual = TenantContext.getCurrentTenant();
         DespachoComercial despacho = despachoComercialRepository.findById(id)
                 .filter(d -> tenantActual != null && tenantActual.equals(d.getTenantId()))
@@ -248,7 +252,8 @@ public class DespachoController {
     }
 
     @DeleteMapping("/{id}/ticket")
-    public DespachoComercial eliminarTicket(@PathVariable Long id, @RequestParam Long tenantId) {
+    public DespachoComercial eliminarTicket(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Long tenantActual = TenantContext.getCurrentTenant();
         DespachoComercial despacho = despachoComercialRepository.findById(id)
                 .filter(d -> tenantActual != null && tenantActual.equals(d.getTenantId()))
@@ -267,7 +272,8 @@ public class DespachoController {
     }
 
     @DeleteMapping("/{id}")
-    public void eliminarDespacho(@PathVariable Long id, @RequestParam Long tenantId) {
+    public void eliminarDespacho(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         Long tenantActual = TenantContext.getCurrentTenant();
         Optional<DespachoComercial> d = despachoComercialRepository.findById(id)

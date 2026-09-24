@@ -146,16 +146,10 @@ public class SaasSoporteController {
     // =========================================================================
 
     @GetMapping("/api/tenant/soporte/tickets")
-    public List<Map<String, Object>> listarTicketsTenant(
-        @RequestParam(required = false) Long tenantId,
-        @RequestHeader(value = "X-Tenant-Id", required = false) Long headerTenantId
-    ) {
+    public List<Map<String, Object>> listarTicketsTenant() {
         Long tid = TenantContext.getCurrentTenant();
         if (tid == null) {
-            tid = (headerTenantId != null ? headerTenantId : tenantId);
-        }
-        if (tid == null) {
-            tid = 1L;
+            throw new RuntimeException("Tenant no identificado en la sesión");
         }
 
         List<SaasSoporteTicket> tickets = ticketRepository.findByTenantIdOrderByFechaActualizacionDesc(tid);
@@ -182,18 +176,11 @@ public class SaasSoporteController {
 
     @PostMapping("/api/tenant/soporte/tickets")
     public ResponseEntity<SaasSoporteTicket> crearTicketTenant(
-        @RequestBody Map<String, Object> body,
-        @RequestHeader(value = "X-Tenant-Id", required = false) Long headerTenantId
+        @RequestBody Map<String, Object> body
     ) {
         Long tid = TenantContext.getCurrentTenant();
         if (tid == null) {
-            if (body.get("tenantId") != null) {
-                tid = Long.valueOf(body.get("tenantId").toString());
-            } else if (headerTenantId != null) {
-                tid = headerTenantId;
-            } else {
-                tid = 1L;
-            }
+            throw new RuntimeException("Tenant no identificado en la sesión");
         }
 
         String nombreEmpresa = (String) body.get("nombreEmpresa");

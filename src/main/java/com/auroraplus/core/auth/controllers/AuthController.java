@@ -3,6 +3,7 @@ package com.auroraplus.core.auth.controllers;
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auth.entities.Usuario;
 import com.auroraplus.core.auth.services.AuthService;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.config.TenantProvisioningService;
 import com.auroraplus.core.config.entities.LicenciaTenant;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -171,19 +172,22 @@ public class AuthController {
     }
 
     @PostMapping("/usuarios")
-    public ResponseEntity<Usuario> crearUsuario(@RequestParam Long tenantId, @RequestBody CrearUsuarioRequest request) {
+    public ResponseEntity<Usuario> crearUsuario(@RequestBody CrearUsuarioRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         exigirDuenoAdmin();
         return ResponseEntity.ok(authService.crearUsuario(tenantId, request.username, request.password, request.rol, request.nombreCompleto));
     }
 
     @GetMapping("/usuarios")
-    public List<Usuario> listarUsuarios(@RequestParam Long tenantId) {
+    public List<Usuario> listarUsuarios() {
+        Long tenantId = TenantContext.getCurrentTenant();
         exigirDuenoAdmin();
         return authService.listarUsuarios(tenantId);
     }
 
     @PostMapping("/usuarios/{usuarioId}/desactivar")
-    public ResponseEntity<Void> desactivarUsuario(@RequestParam Long tenantId, @PathVariable Long usuarioId) {
+    public ResponseEntity<Void> desactivarUsuario(@PathVariable Long usuarioId) {
+        Long tenantId = TenantContext.getCurrentTenant();
         exigirDuenoAdmin();
         authService.desactivarUsuario(tenantId, usuarioId);
         return ResponseEntity.ok().build();

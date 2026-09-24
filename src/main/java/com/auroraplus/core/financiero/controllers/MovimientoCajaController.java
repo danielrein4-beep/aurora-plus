@@ -1,5 +1,6 @@
 package com.auroraplus.core.financiero.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
 import com.auroraplus.core.financiero.services.MotorFinancieroService;
@@ -38,7 +39,8 @@ public class MovimientoCajaController {
     }
 
     @PostMapping
-    public ResponseEntity<MovimientoCaja> registrar(@RequestParam Long tenantId, @RequestBody RegistrarMovimientoRequest request) {
+    public ResponseEntity<MovimientoCaja> registrar(@RequestBody RegistrarMovimientoRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         if (request.tipo != MovimientoCaja.TipoMovimiento.INGRESO && request.tipo != MovimientoCaja.TipoMovimiento.EGRESO) {
             throw new RuntimeException("Solo se pueden registrar movimientos manuales de tipo INGRESO o EGRESO");
@@ -58,8 +60,8 @@ public class MovimientoCajaController {
 
     /** Historial de movimientos del tenant, más recientes primero. Filtra por tipo si se indica. */
     @GetMapping
-    public List<MovimientoCaja> listar(@RequestParam Long tenantId,
-                                        @RequestParam(required = false) MovimientoCaja.TipoMovimiento tipo) {
+    public List<MovimientoCaja> listar(@RequestParam(required = false) MovimientoCaja.TipoMovimiento tipo) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return tipo != null
             ? movimientoCajaRepository.findByTenantIdAndTipoOrderByFechaRegistroDesc(tenantId, tipo)
             : movimientoCajaRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId);
@@ -82,7 +84,8 @@ public class MovimientoCajaController {
      * para cuando de verdad no hay una operación de inventario detrás.
      */
     @PostMapping("/cuenta")
-    public ResponseEntity<MovimientoCaja> registrarCuentaManual(@RequestParam Long tenantId, @RequestBody RegistrarCuentaManualRequest request) {
+    public ResponseEntity<MovimientoCaja> registrarCuentaManual(@RequestBody RegistrarCuentaManualRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         if (request.tipo != MovimientoCaja.TipoMovimiento.CXC && request.tipo != MovimientoCaja.TipoMovimiento.CXP) {
             throw new RuntimeException("Este endpoint solo registra cuentas manuales de tipo CXC o CXP");
@@ -111,7 +114,8 @@ public class MovimientoCajaController {
 
     /** Registra un pago (total o parcial) sobre una cuenta por pagar/cobrar existente. */
     @PostMapping("/{id}/abonar")
-    public ResponseEntity<MovimientoCaja> abonar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody AbonarRequest request) {
+    public ResponseEntity<MovimientoCaja> abonar(@PathVariable Long id, @RequestBody AbonarRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         return ResponseEntity.ok(motorFinancieroService.abonarMovimiento(tenantId, id, request.monto, request.moneda));
     }
@@ -129,7 +133,8 @@ public class MovimientoCajaController {
      * dispositivo o limpiar caché.
      */
     @PostMapping("/{id}/comprobante")
-    public ResponseEntity<?> subirComprobante(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody ComprobantePagoRequest request) {
+    public ResponseEntity<?> subirComprobante(@PathVariable Long id, @RequestBody ComprobantePagoRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         if (request.capturaBase64 == null || request.capturaBase64.isBlank() || !request.capturaBase64.startsWith("data:image")) {
             return ResponseEntity.badRequest().body(java.util.Map.of("error", "La captura debe ser una imagen válida"));

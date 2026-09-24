@@ -40,7 +40,8 @@ public class EscandalloRecetaController {
     }
 
     @GetMapping("/{id}")
-    public EscandalloReceta obtener(@PathVariable Long id, @RequestParam Long tenantId) {
+    public EscandalloReceta obtener(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -57,7 +58,8 @@ public class EscandalloRecetaController {
     }
 
     @PostMapping
-    public ResponseEntity<EscandalloReceta> crear(@RequestParam Long tenantId, @RequestBody CrearEscandalloRequest request) {
+    public ResponseEntity<EscandalloReceta> crear(@RequestBody CrearEscandalloRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = new EscandalloReceta();
         escandallo.setTenantId(tenantId);
         escandallo.setNombrePlato(request.nombrePlato);
@@ -78,7 +80,8 @@ public class EscandalloRecetaController {
 
     /** Agrega una línea de ingrediente directo o sub-receta. Exactamente uno de ingredienteSku/subEscandalloId. */
     @PostMapping("/{id}/ingredientes")
-    public ResponseEntity<EscandalloReceta> agregarIngrediente(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody IngredienteRequest request) {
+    public ResponseEntity<EscandalloReceta> agregarIngrediente(@PathVariable Long id, @RequestBody IngredienteRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -131,7 +134,8 @@ public class EscandalloRecetaController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<EscandalloReceta> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EditarEscandalloRequest request) {
+    public ResponseEntity<EscandalloReceta> editar(@PathVariable Long id, @RequestBody EditarEscandalloRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -163,8 +167,8 @@ public class EscandalloRecetaController {
     public ResponseEntity<EscandalloReceta> editarIngrediente(
             @PathVariable Long id,
             @PathVariable Long detalleId,
-            @RequestParam Long tenantId,
             @RequestBody EditarIngredienteRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -207,8 +211,8 @@ public class EscandalloRecetaController {
     @DeleteMapping("/{id}/ingredientes/{detalleId}")
     public ResponseEntity<EscandalloReceta> eliminarIngrediente(
             @PathVariable Long id,
-            @PathVariable Long detalleId,
-            @RequestParam Long tenantId) {
+            @PathVariable Long detalleId) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -232,7 +236,8 @@ public class EscandalloRecetaController {
     // la validación de que la receta sea de este tenant — cualquier cuenta
     // podía leer el escandallo/costeo de CUALQUIER otro tenant adivinando el id.
     @GetMapping("/{id}/ingredientes")
-    public List<DetalleReceta> listarIngredientes(@PathVariable Long id, @RequestParam Long tenantId) {
+    public List<DetalleReceta> listarIngredientes(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -242,7 +247,8 @@ public class EscandalloRecetaController {
     }
 
     @PostMapping("/{id}/recalcular-costo")
-    public ResponseEntity<EscandalloReceta> recalcularCosto(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<EscandalloReceta> recalcularCosto(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ResponseEntity.ok(escandalloService.recalcularCosto(id, tenantId));
     }
 
@@ -255,7 +261,8 @@ public class EscandalloRecetaController {
      * y se avisa que quedó oculta en vez de borrada.
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<EscandalloReceta> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<EscandalloReceta> eliminar(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -277,7 +284,8 @@ public class EscandalloRecetaController {
 
     /** Muestra/oculta la receta del catálogo de Venta Rápida sin borrarla (para recetas que ya tienen ventas y no se pueden eliminar). */
     @PatchMapping("/{id}/activo")
-    public ResponseEntity<EscandalloReceta> cambiarActivo(@PathVariable Long id, @RequestParam Long tenantId, @RequestParam boolean activo) {
+    public ResponseEntity<EscandalloReceta> cambiarActivo(@PathVariable Long id, @RequestParam boolean activo) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {
@@ -289,7 +297,8 @@ public class EscandalloRecetaController {
 
     /** Define si este producto pasa por el tablero de cocina (KDS) o se entrega de una vez (bebida embotellada, snack, combo sin cocción). */
     @PatchMapping("/{id}/requiere-cocina")
-    public ResponseEntity<EscandalloReceta> cambiarRequiereCocina(@PathVariable Long id, @RequestParam Long tenantId, @RequestParam boolean requiereCocina) {
+    public ResponseEntity<EscandalloReceta> cambiarRequiereCocina(@PathVariable Long id, @RequestParam boolean requiereCocina) {
+        Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
         if (!escandallo.getTenantId().equals(tenantId)) {

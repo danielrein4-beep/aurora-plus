@@ -1,5 +1,6 @@
 package com.auroraplus.core.inventario.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.inventario.entities.Articulo;
 import com.auroraplus.core.inventario.entities.PresentacionArticulo;
 import com.auroraplus.core.inventario.repositories.ArticuloRepository;
@@ -29,8 +30,9 @@ public class PresentacionArticuloController {
     }
 
     @PostMapping
-    public ResponseEntity<PresentacionArticulo> crear(@RequestParam Long tenantId, @RequestParam Long articuloId,
+    public ResponseEntity<PresentacionArticulo> crear(@RequestParam Long articuloId,
                                                         @RequestBody PresentacionArticulo presentacion) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Articulo articulo = articuloRepository.findById(articuloId)
             .orElseThrow(() -> new RuntimeException("Artículo no encontrado: " + articuloId));
         if (!articulo.getTenantId().equals(tenantId)) {

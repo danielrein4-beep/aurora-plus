@@ -64,7 +64,8 @@ public class CompraRepuestoController {
 
     @PostMapping
     @org.springframework.transaction.annotation.Transactional
-    public ResponseEntity<CompraRepuesto> registrar(@RequestParam Long tenantId, @RequestBody CompraRequest request) {
+    public ResponseEntity<CompraRepuesto> registrar(@RequestBody CompraRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         List<RepuestoCompraService.ItemCompra> items = request.items.stream().map(i -> {
             RepuestoCompraService.ItemCompra item = new RepuestoCompraService.ItemCompra();
