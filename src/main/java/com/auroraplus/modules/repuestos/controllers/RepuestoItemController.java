@@ -69,6 +69,7 @@ public class RepuestoItemController {
         item.setTenantId(tenantId);
         if (item.getVisible() == null) item.setVisible(true);
         if (item.getOrdenVisualizacion() == null) item.setOrdenVisualizacion(0);
+        if (item.getExentoIva() == null) item.setExentoIva(false);
         RepuestoItem guardado = repuestoItemRepository.save(item);
         almacenService.alinear(tenantId, guardado.getId(), guardado.getStockActual());
         auditoriaService.registrar(tenantId, "COMERCIO", "CREAR", "RepuestoItem", guardado.getId(), "Creó el repuesto SKU " + guardado.getCodigoSku());
@@ -99,6 +100,7 @@ public class RepuestoItemController {
                 if (datos.getAtributoVariante() != null) item.setAtributoVariante(datos.getAtributoVariante());
                 if (datos.getColorVariante() != null) item.setColorVariante(datos.getColorVariante());
                 if (datos.getFechaVencimiento() != null) item.setFechaVencimiento(datos.getFechaVencimiento());
+                if (datos.getExentoIva() != null) item.setExentoIva(datos.getExentoIva());
                 return ResponseEntity.ok(repuestoItemRepository.save(item));
             })
             .orElse(ResponseEntity.notFound().build());

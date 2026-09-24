@@ -346,6 +346,72 @@ public class ModuloTenantController {
         return numero != null ? Map.of("numeroControl", numero) : Map.of();
     }
 
+    // --- Impuestos y cargos (Comercio, V96): IVA, IGTF y delivery por negocio. Todo apagado
+    // por defecto. El cálculo real lo hace el servidor al cobrar (CalculoFiscalVenta).
+
+    public static class ImpuestosResponse {
+        public boolean cobraIva;
+        public java.math.BigDecimal alicuotaIva;
+        public boolean preciosIncluyenIva;
+        public boolean igtfActivo;
+        public java.math.BigDecimal alicuotaIgtf;
+        public boolean catalogoPrecioConIva;
+        public java.math.BigDecimal costoEnvioDelivery;
+    }
+
+    @GetMapping("/mi-negocio/impuestos")
+    public ImpuestosResponse obtenerImpuestos() {
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant l = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        ImpuestosResponse r = new ImpuestosResponse();
+        r.cobraIva = Boolean.TRUE.equals(l.getCobraIva());
+        r.alicuotaIva = l.getAlicuotaIva();
+        r.preciosIncluyenIva = !Boolean.FALSE.equals(l.getPreciosIncluyenIva());
+        r.igtfActivo = Boolean.TRUE.equals(l.getIgtfActivo());
+        r.alicuotaIgtf = l.getAlicuotaIgtf();
+        r.catalogoPrecioConIva = !Boolean.FALSE.equals(l.getCatalogoPrecioConIva());
+        r.costoEnvioDelivery = l.getCostoEnvioDelivery();
+        return r;
+    }
+
+    public static class ActualizarImpuestosRequest {
+        public Boolean cobraIva;
+        public java.math.BigDecimal alicuotaIva;
+        public Boolean preciosIncluyenIva;
+        public Boolean igtfActivo;
+        public java.math.BigDecimal alicuotaIgtf;
+        public Boolean catalogoPrecioConIva;
+        public java.math.BigDecimal costoEnvioDelivery;
+    }
+
+    @PutMapping("/mi-negocio/impuestos")
+    public ImpuestosResponse actualizarImpuestos(@RequestBody ActualizarImpuestosRequest req) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = TenantContext.getCurrentTenant();
+        LicenciaTenant l = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado"));
+        java.math.BigDecimal cien = new java.math.BigDecimal("100");
+        if (req.alicuotaIva != null && (req.alicuotaIva.signum() <= 0 || req.alicuotaIva.compareTo(cien) >= 0)) {
+            throw new RuntimeException("La alícuota de IVA debe estar entre 0 y 100");
+        }
+        if (req.alicuotaIgtf != null && (req.alicuotaIgtf.signum() <= 0 || req.alicuotaIgtf.compareTo(cien) >= 0)) {
+            throw new RuntimeException("La alícuota de IGTF debe estar entre 0 y 100");
+        }
+        if (req.costoEnvioDelivery != null && req.costoEnvioDelivery.signum() < 0) {
+            throw new RuntimeException("El costo de delivery no puede ser negativo");
+        }
+        if (req.cobraIva != null) l.setCobraIva(req.cobraIva);
+        if (req.alicuotaIva != null) l.setAlicuotaIva(req.alicuotaIva);
+        if (req.preciosIncluyenIva != null) l.setPreciosIncluyenIva(req.preciosIncluyenIva);
+        if (req.igtfActivo != null) l.setIgtfActivo(req.igtfActivo);
+        if (req.alicuotaIgtf != null) l.setAlicuotaIgtf(req.alicuotaIgtf);
+        if (req.catalogoPrecioConIva != null) l.setCatalogoPrecioConIva(req.catalogoPrecioConIva);
+        if (req.costoEnvioDelivery != null) l.setCostoEnvioDelivery(req.costoEnvioDelivery);
+        licenciaTenantRepository.save(l);
+        return obtenerImpuestos();
+    }
+
     // --- Zonas de cocina de Horeca: antes venían fijas en el frontend
     // (COCINA/PARRILLA/BAR/COCINA_FRIA) — cada negocio arma las que
     // realmente tiene (ej. un fast-food solo "COCINA", una cevichería suma

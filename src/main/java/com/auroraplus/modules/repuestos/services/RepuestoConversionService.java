@@ -52,6 +52,12 @@ public class RepuestoConversionService {
     @Autowired
     private ClienteRepository clienteRepository;
 
+    @Autowired
+    private com.auroraplus.core.config.repositories.LicenciaTenantRepository licenciaTenantRepository;
+
+    @Autowired
+    private com.auroraplus.modules.comercio.repositories.LibroVentaRepository libroVentaRepository;
+
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RepuestoConversionService.class);
 
     // Repuestos no tiene una entidad "VentaRepuesto" persistida (a diferencia de
@@ -470,7 +476,16 @@ public class RepuestoConversionService {
     /** Un pago del cliente en la moneda en que entregó el dinero (pago mixto: varias). */
     public record PagoTicket(String moneda, BigDecimal monto, String metodo) {}
 
-    public record ResultadoTicket(boolean yaProcesado, BigDecimal total) {}
+    /**
+     * Lo fiscal que decide el cajero en este ticket. aplicaIva=false quita el IVA (queda marcado
+     * en el libro con el usuario que lo hizo); null = lo que diga la configuración del negocio.
+     * delivery: cargo de envío en la moneda base (null o 0 = sin delivery).
+     */
+    public record OpcionesFiscales(Boolean aplicaIva, BigDecimal delivery, String clienteRif, String usuario) {}
+
+    public record ResultadoTicket(boolean yaProcesado, BigDecimal total, CalculoFiscalVenta.Desglose desglose) {
+        public ResultadoTicket(boolean yaProcesado, BigDecimal total) { this(yaProcesado, total, null); }
+    }
 
     /**
      * Cobra el ticket completo del POS en UNA transacción. Antes el POS mandaba cada línea
@@ -489,6 +504,16 @@ public class RepuestoConversionService {
                                         String monedaPago, BigDecimal montoRecibido, java.util.List<PagoTicket> pagos,
                                         BigDecimal vuelto, String monedaVuelto, String metodoPago,
                                         BigDecimal montoPagadoAhora, Integer diasCredito, Long clienteId, String nombreClienteManual) {
+        return venderTicket(tenantId, numeroTicket, lineas, monedaPago, montoRecibido, pagos, vuelto, monedaVuelto, metodoPago,
+            montoPagadoAhora, diasCredito, clienteId, nombreClienteManual, null);
+    }
+
+    @Transactional
+    public ResultadoTicket venderTicket(Long tenantId, String numeroTicket, java.util.List<LineaTicket> lineas,
+                                        String monedaPago, BigDecimal montoRecibido, java.util.List<PagoTicket> pagos,
+                                        BigDecimal vuelto, String monedaVuelto, String metodoPago,
+                                        BigDecimal montoPagadoAhora, Integer diasCredito, Long clienteId, String nombreClienteManual,
+                                        OpcionesFiscales fiscal) {
         if (numeroTicket == null || numeroTicket.isBlank()) throw new RuntimeException("Falta el número del ticket");
         if (lineas == null || lineas.isEmpty()) throw new RuntimeException("El ticket no tiene productos");
         String claveTicket = "pos-ticket:" + numeroTicket.trim();
@@ -496,15 +521,44 @@ public class RepuestoConversionService {
             return new ResultadoTicket(true, null);
         }
 
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal gravado = BigDecimal.ZERO;
+        BigDecimal exento = BigDecimal.ZERO;
         Long primerMovimiento = null;
         for (LineaTicket linea : lineas) {
             MovimientoRepuesto mov = linea.presentacionId() != null
                 ? descontarPresentacion(tenantId, linea.presentacionId(), linea.cantidad(), clienteId, numeroTicket)
                 : descontarUnidadBase(tenantId, linea.repuestoId(), linea.cantidad(), clienteId, numeroTicket);
-            total = total.add(mov.getTotal());
+            if (mov.getRepuesto() != null && Boolean.TRUE.equals(mov.getRepuesto().getExentoIva())) exento = exento.add(mov.getTotal());
+            else gravado = gravado.add(mov.getTotal());
             if (primerMovimiento == null) primerMovimiento = mov.getId();
         }
+
+        // IVA, IGTF y delivery se calculan aquí, nunca en el navegador.
+        com.auroraplus.core.config.entities.LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
+        boolean cobraIva = licencia != null && Boolean.TRUE.equals(licencia.getCobraIva());
+        boolean ivaQuitado = cobraIva && fiscal != null && Boolean.FALSE.equals(fiscal.aplicaIva());
+        boolean incluyeIva = licencia == null || !Boolean.FALSE.equals(licencia.getPreciosIncluyenIva());
+        boolean igtfActivo = licencia != null && Boolean.TRUE.equals(licencia.getIgtfActivo());
+        BigDecimal delivery = fiscal != null && fiscal.delivery() != null && fiscal.delivery().signum() > 0 ? fiscal.delivery() : BigDecimal.ZERO;
+        BigDecimal pagadoEnDivisas = BigDecimal.ZERO;
+        if (igtfActivo) {
+            if (pagos != null && !pagos.isEmpty()) {
+                for (PagoTicket p : pagos) {
+                    if (p.monto() == null || p.monto().signum() <= 0 || !CalculoFiscalVenta.esDivisa(p.moneda())) continue;
+                    pagadoEnDivisas = pagadoEnDivisas.add(motorFinancieroService.convertirAMonedaBase(tenantId, p.monto(), p.moneda()));
+                }
+                if (vuelto != null && vuelto.signum() > 0 && CalculoFiscalVenta.esDivisa(monedaVuelto)) {
+                    pagadoEnDivisas = pagadoEnDivisas.subtract(motorFinancieroService.convertirAMonedaBase(tenantId, vuelto, monedaVuelto)).max(BigDecimal.ZERO);
+                }
+            } else if (CalculoFiscalVenta.esDivisa(monedaPago != null ? monedaPago : motorFinancieroService.obtenerMonedaBase(tenantId))) {
+                // Pago único en divisas: si es a crédito, solo lo que paga ahora.
+                pagadoEnDivisas = montoPagadoAhora != null ? montoPagadoAhora : new BigDecimal("999999999");
+            }
+        }
+        CalculoFiscalVenta.Desglose desglose = CalculoFiscalVenta.calcular(gravado, exento, delivery,
+            cobraIva && !ivaQuitado, cobraIva ? licencia.getAlicuotaIva() : BigDecimal.ZERO, cobraIva && incluyeIva,
+            igtfActivo, igtfActivo ? licencia.getAlicuotaIgtf() : BigDecimal.ZERO, pagadoEnDivisas);
+        BigDecimal total = desglose.total();
         String concepto = "Venta POS ticket " + numeroTicket.trim() + " (" + lineas.size() + " línea" + (lineas.size() == 1 ? "" : "s") + ")";
 
         boolean esMixto = pagos != null && !pagos.isEmpty();
@@ -543,8 +597,51 @@ public class RepuestoConversionService {
                 nombreClienteManual, concepto, primerMovimiento, "POS", false);
         }
 
+        registrarLibroVenta(tenantId, numeroTicket.trim(), desglose, esCredito,
+            ivaQuitado, fiscal, clienteId, nombreClienteManual);
+
         idempotenciaService.registrar(tenantId, claveTicket, "venta_pos_ticket", primerMovimiento);
-        return new ResultadoTicket(false, total);
+        return new ResultadoTicket(false, total, desglose);
+    }
+
+    /** Renglón del libro de ventas, en la misma transacción del cobro. Montos en moneda base + tasa BCV del día. */
+    private void registrarLibroVenta(Long tenantId, String numeroTicket, CalculoFiscalVenta.Desglose d, boolean esCredito,
+                                     boolean ivaQuitado, OpcionesFiscales fiscal, Long clienteId, String nombreClienteManual) {
+        com.auroraplus.modules.comercio.entities.LibroVenta renglon = new com.auroraplus.modules.comercio.entities.LibroVenta();
+        renglon.setTenantId(tenantId);
+        renglon.setNumeroTicket(numeroTicket);
+        String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
+        renglon.setMonedaBase(monedaBase);
+        try {
+            renglon.setTasaBcv("VES".equals(monedaBase) ? BigDecimal.ONE : motorFinancieroService.factorConversion(tenantId, monedaBase, "VES"));
+        } catch (RuntimeException sinTasa) {
+            renglon.setTasaBcv(null); // el libro lo muestra como "sin tasa" en vez de inventarla
+        }
+        String nombre = nombreClienteManual;
+        String rif = fiscal != null ? fiscal.clienteRif() : null;
+        if (clienteId != null) {
+            Optional<Cliente> cliente = clienteRepository.findById(clienteId).filter(c -> tenantId.equals(c.getTenantId()));
+            if (cliente.isPresent()) {
+                if (nombre == null || nombre.isBlank()) nombre = cliente.get().getNombre();
+                if (rif == null || rif.isBlank()) rif = cliente.get().getIdentificacionRif();
+            }
+        }
+        renglon.setClienteNombre(nombre != null && !nombre.isBlank() ? nombre.trim() : "Consumidor final");
+        renglon.setClienteRif(rif != null && !rif.isBlank() ? rif.trim().toUpperCase() : null);
+        renglon.setMontoExento(d.exento());
+        renglon.setBaseImponible(d.baseImponible());
+        renglon.setAlicuotaIva(d.alicuotaIva());
+        renglon.setMontoIva(d.iva());
+        renglon.setMontoIgtf(d.igtf());
+        renglon.setMontoDelivery(d.delivery());
+        renglon.setTotal(d.total());
+        renglon.setEsCredito(esCredito);
+        renglon.setIvaQuitado(ivaQuitado);
+        if (ivaQuitado) {
+            String quien = fiscal != null ? fiscal.usuario() : null;
+            renglon.setIvaQuitadoPor(quien != null && !quien.isBlank() ? quien : "desconocido");
+        }
+        libroVentaRepository.save(renglon);
     }
 
     /** Descuenta una línea en unidad base (con bloqueo y precio por volumen) y deja su kárdex; no toca caja. */

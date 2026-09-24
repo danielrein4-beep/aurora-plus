@@ -69,4 +69,36 @@ public class CompraRepuesto {
     public void setMontoPagado(BigDecimal montoPagado) { this.montoPagado = montoPagado; }
     public List<DetalleCompraRepuesto> getItems() { return items; }
     public void setItems(List<DetalleCompraRepuesto> items) { this.items = items; }
+
+    // Datos fiscales de la factura del proveedor, para el libro de compras (V96).
+    // Opcionales: una compra sin factura fiscal (nota de entrega) los deja vacíos.
+    @Column(name = "numero_control", length = 30)
+    private String numeroControl;
+    @Column(name = "monto_exento", precision = 18, scale = 2)
+    private BigDecimal montoExento;
+    @Column(name = "base_imponible", precision = 18, scale = 2)
+    private BigDecimal baseImponible;
+    @Column(name = "alicuota_iva", precision = 5, scale = 2)
+    private BigDecimal alicuotaIva;
+    @Column(name = "monto_iva", precision = 18, scale = 2)
+    private BigDecimal montoIva;
+    @Column(name = "iva_retenido", precision = 18, scale = 2)
+    private BigDecimal ivaRetenido;
+    @Column(name = "tasa_bcv", precision = 18, scale = 6)
+    private BigDecimal tasaBcv;
+
+    public String getNumeroControl() { return numeroControl; }
+    public void setNumeroControl(String numeroControl) { this.numeroControl = numeroControl; }
+    public BigDecimal getMontoExento() { return montoExento; }
+    public void setMontoExento(BigDecimal montoExento) { this.montoExento = montoExento; }
+    public BigDecimal getBaseImponible() { return baseImponible; }
+    public void setBaseImponible(BigDecimal baseImponible) { this.baseImponible = baseImponible; }
+    public BigDecimal getAlicuotaIva() { return alicuotaIva; }
+    public void setAlicuotaIva(BigDecimal alicuotaIva) { this.alicuotaIva = alicuotaIva; }
+    public BigDecimal getMontoIva() { return montoIva; }
+    public void setMontoIva(BigDecimal montoIva) { this.montoIva = montoIva; }
+    public BigDecimal getIvaRetenido() { return ivaRetenido; }
+    public void setIvaRetenido(BigDecimal ivaRetenido) { this.ivaRetenido = ivaRetenido; }
+    public BigDecimal getTasaBcv() { return tasaBcv; }
+    public void setTasaBcv(BigDecimal tasaBcv) { this.tasaBcv = tasaBcv; }
 }

@@ -35,6 +35,11 @@ public class VentaTicketPosController {
         public Integer diasCredito;
         public Long clienteId;
         public String nombreCliente;
+        /** false = el cajero quitó el IVA en esta venta (queda en el libro con su usuario). Null = según el negocio. */
+        public Boolean aplicaIva;
+        /** Cargo de delivery en la moneda base. */
+        public BigDecimal delivery;
+        public String clienteRif;
     }
 
     @PostMapping("/ticket")
@@ -43,10 +48,13 @@ public class VentaTicketPosController {
         if (tenantId == null) throw new RuntimeException("Sesión sin negocio");
         RepuestoConversionService.ResultadoTicket r = repuestoConversionService.venderTicket(tenantId, req.numeroTicket, req.lineas,
             req.monedaPago, req.montoRecibido, req.pagos, req.vuelto, req.monedaVuelto, req.metodoPago,
-            req.montoPagadoAhora, req.diasCredito, req.clienteId, req.nombreCliente);
+            req.montoPagadoAhora, req.diasCredito, req.clienteId, req.nombreCliente,
+            new RepuestoConversionService.OpcionesFiscales(req.aplicaIva, req.delivery, req.clienteRif,
+                com.auroraplus.core.auth.AuthContext.getUsername()));
         Map<String, Object> salida = new LinkedHashMap<>();
         salida.put("yaProcesado", r.yaProcesado());
         salida.put("total", r.total());
+        salida.put("desglose", r.desglose());
         return salida;
     }
 
