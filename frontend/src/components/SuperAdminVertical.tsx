@@ -17,6 +17,7 @@ import {
 } from "../api";
 import SuperAdminReporteEnfermedad from "./SuperAdminReporteEnfermedad";
 import { VistaSalud, VistaComercio, VistaMercado } from "./SuperAdminInteligencia";
+import { generarPdfInformeVertical } from "../utils/pdfInformeVertical";
 
 /** Verticales con página propia en el menú. "otras" agrupa las de pocos negocios. */
 export const VERTICALES_SUPERADMIN: { id: string; nombre: string; descripcion: string; color: string; icono: string }[] = [
@@ -100,6 +101,32 @@ export default function SuperAdminVertical({ verticalId, onAbrirFicha }: Props) 
   const [recarga, setRecarga] = useState(0);
   /** Diagnóstico/médico con los que se abre el reporte al venir desde "Clínicas". */
   const [destinoReporte, setDestinoReporte] = useState<{ cie10?: string; tenantId?: number; n: number }>({ n: 0 });
+  const [exportando, setExportando] = useState(false);
+
+  const exportarPdf = async () => {
+    if (!datos) return;
+    setExportando(true);
+    setError(null);
+    try {
+      const [restaurantes, ganaderia, odontologia] = await Promise.all([
+        idReal === "restaurantes" ? obtenerOperacionRestaurantes(dias) : Promise.resolve(null),
+        idReal === "ganaderia" ? obtenerProduccionGanaderia(dias) : Promise.resolve(null),
+        idReal === "odontologia" ? obtenerClinicaOdontologia(dias) : Promise.resolve(null),
+      ]);
+      generarPdfInformeVertical({
+        detalle: datos,
+        nombre: verticalId === "otras" ? OTRAS.find((o) => o.id === otraElegida)?.nombre ?? datos.nombre : info.nombre,
+        descripcion: info.descripcion,
+        colorHex: info.color,
+        periodoLabel: `últimos ${PERIODOS.find((p) => p.dias === dias)?.label ?? `${dias} días`}`,
+        restaurantes, ganaderia, odontologia,
+      });
+    } catch (e: any) {
+      setError(e?.message || "No se pudo generar el informe");
+    } finally {
+      setExportando(false);
+    }
+  };
 
   useEffect(() => { setPestana("RESUMEN"); }, [verticalId]);
 
@@ -153,6 +180,14 @@ export default function SuperAdminVertical({ verticalId, onAbrirFicha }: Props) 
           </div>
           <button onClick={() => setRecarga((r) => r + 1)} className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer">
             Actualizar
+          </button>
+          <button
+            onClick={exportarPdf}
+            disabled={!datos || exportando}
+            className="px-4 py-2 rounded-xl text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+            style={{ backgroundColor: info.color }}
+          >
+            {exportando ? "Generando..." : "Informe PDF"}
           </button>
         </div>
       </div>
