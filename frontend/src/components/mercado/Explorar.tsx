@@ -4,7 +4,7 @@ import {
   type PublicacionMercado, type FiltrosMercado, type ResumenMercado, type CategoriaMercado,
 } from "../../api";
 import {
-  CATEGORIAS, RAZAS_COMUNES, ESTADOS_VE, CAJA, INPUT, BOTON, numero, dinero, precioTexto, totalEstimado, edadTexto, sexoTexto,
+  CATEGORIAS, RAZAS_COMUNES, CRUCES_F1, ESTADOS_VE, CAJA, INPUT, BOTON, numero, dinero, precioTexto, totalEstimado, edadTexto, sexoTexto,
   nombreCategoria, mensajeError, SelloVerificado, Estrellas,
 } from "./comun";
 
@@ -29,8 +29,12 @@ export default function Explorar({ onAbrir }: { onAbrir: (id: number) => void })
 
   const cambiar = (cambios: Partial<FiltrosMercado>) => setFiltros((f) => ({ ...f, ...cambios }));
   const conteoCategoria = (id: CategoriaMercado) => resumen?.categorias.find((c) => c.categoria === id)?.total ?? 0;
-  const razas = Array.from(new Set([...(resumen?.razas.map((r) => r.raza) ?? []), ...RAZAS_COMUNES]));
+  const esCruce = (r: string) => /\bF1\b/i.test(r);
+  const razas = Array.from(new Set([...(resumen?.razas.map((r) => r.raza) ?? []), ...RAZAS_COMUNES])).filter((r) => !esCruce(r));
+  // Cruces F1 (doble propósito): los del catálogo más los que ya estén publicados con otro nombre.
+  const cruces = Array.from(new Set([...CRUCES_F1, ...(resumen?.razas.map((r) => r.raza).filter(esCruce) ?? [])]));
   const conteoRaza = (r: string) => resumen?.razas.find((x) => x.raza.toLowerCase() === r.toLowerCase())?.total ?? 0;
+  const conteoF1 = resumen?.razas.filter((x) => esCruce(x.raza)).reduce((s, x) => s + Number(x.total), 0) ?? 0;
   const hayFiltros = !!(filtros.categoria || filtros.raza || filtros.sexo || filtros.estadoRegion || filtros.pesoMin || filtros.pesoMax || filtros.precioMax || filtros.q);
 
   const alternarGuardado = async (p: PublicacionMercado) => {
@@ -66,10 +70,10 @@ export default function Explorar({ onAbrir }: { onAbrir: (id: number) => void })
             <input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Busca Brahman, toro padrote, novilla..."
-              className="flex-1 px-3 py-2 text-stone-900 text-sm bg-transparent focus:outline-none"
+              placeholder="Busca Brahman, F1, toro padrote..."
+              className="flex-1 min-w-0 px-3 py-2 text-stone-900 text-sm bg-transparent focus:outline-none"
             />
-            <button type="submit" className="px-5 py-2 rounded-xl bg-[#57A882] hover:bg-[#4A9673] text-white text-sm font-bold cursor-pointer">Buscar</button>
+            <button type="submit" className="shrink-0 px-4 sm:px-5 py-2 rounded-xl bg-[#57A882] hover:bg-[#4A9673] text-white text-sm font-bold cursor-pointer">Buscar</button>
           </form>
           <div className="flex flex-wrap gap-6 pt-2 text-sm">
             <div><div className="text-2xl font-bold font-['Outfit']">{resumen ? numero.format(resumen.total) : "-"}</div><div className="text-stone-500 text-xs">animales en venta</div></div>
@@ -121,6 +125,23 @@ export default function Explorar({ onAbrir }: { onAbrir: (id: number) => void })
                 }`}
               >
                 {r}{n > 0 && <span className={`ml-1.5 ${activa ? "text-white/80" : "text-stone-400"}`}>{n}</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mr-1">Cruces F1</span>
+          {[["F1", "Todos los F1", conteoF1] as const, ...cruces.map((r) => [r, r.replace(/^F1\s+/i, ""), conteoRaza(r)] as const)].map(([valor, etiqueta, n]) => {
+            const activa = filtros.raza?.toLowerCase() === valor.toLowerCase();
+            return (
+              <button
+                key={valor}
+                onClick={() => cambiar({ raza: activa ? undefined : valor })}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
+                  activa ? "bg-[#66B891] text-white border-[#66B891]" : "bg-[#F4F8F5] dark:bg-white/5 text-stone-700 dark:text-white/70 border-[#DCEBE2] dark:border-white/10 hover:border-[#66B891]"
+                }`}
+              >
+                {etiqueta}{n > 0 && <span className={`ml-1.5 ${activa ? "text-white/80" : "text-stone-400"}`}>{n}</span>}
               </button>
             );
           })}

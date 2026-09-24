@@ -21,6 +21,11 @@ export const RAZAS_COMUNES = [
   "Romosinuano", "Criollo Limonero", "Girolando", "Jersey", "Mestizo",
 ];
 
+/** Cruces F1 de doble propósito (el mismo catálogo que ofrece el alta del animal en Ganadería). */
+export const CRUCES_F1 = [
+  "F1 Brahman x Holstein", "F1 Brahman x Gyr", "F1 Gyr x Holstein", "F1 Pardo Suizo x Cebú", "F1 Angus x Brahman (Brangus)",
+];
+
 export const ESTADOS_VE = [
   "Amazonas", "Anzoátegui", "Apure", "Aragua", "Barinas", "Bolívar", "Carabobo", "Cojedes", "Delta Amacuro", "Distrito Capital",
   "Falcón", "Guárico", "La Guaira", "Lara", "Mérida", "Miranda", "Monagas", "Nueva Esparta", "Portuguesa", "Sucre", "Táchira",
