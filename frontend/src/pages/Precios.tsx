@@ -24,7 +24,6 @@ const VERTICALES = [
   { id: "odontologia", nombre: "Odontología", precioFull: 50, beneficioFull: "Odontograma FDI, periodontograma de 6 puntos y planes de tratamiento por fases", Icon: IconTooth },
   { id: "restaurantes", nombre: "Restaurantes", precioFull: 40, beneficioFull: "Turnos de caja con arqueo real, reservas y zonas de cocina configurables", Icon: IconRestaurant },
   { id: "ganaderia", nombre: "Ganadería", precioFull: 40, beneficioFull: "Mapa satelital de potreros y básculas bluetooth para pesaje en manga", Icon: IconFarm },
-  { id: "veterinaria", nombre: "Veterinaria", precioFull: 40, beneficioFull: "Historias clínicas, agenda y cotizador para mascotas sobre el motor de Mediclinic", Icon: IconVet },
 ] as const;
 
 const BASICO_PRECIO = 25;
@@ -85,7 +84,7 @@ export default function Precios() {
           Dos planes claros,<br />
           <span className="text-[#177E89]">sin letra pequeña</span>
         </h1>
-        <p className="text-slate-500 text-lg font-light uppercase tracking-wide max-w-xl mx-auto leading-relaxed">
+        <p className="text-slate-500 text-lg max-w-xl mx-auto leading-relaxed">
           Desde $25 al mes con lo esencial de tu vertical. Sube a Full desde $40 y desbloquea nuestras herramientas más fuertes. Cancela cuando quieras.
         </p>
       </section>
@@ -103,7 +102,7 @@ export default function Precios() {
               <button
                 key={v.id}
                 onClick={() => setVerticalId(v.id)}
-                className={`relative flex items-center gap-2 py-2.5 px-4 rounded-full text-xs sm:text-sm font-light uppercase tracking-wide transition-all cursor-pointer ${
+                className={`relative flex items-center gap-2 py-2.5 px-4 rounded-full text-xs sm:text-sm transition-all cursor-pointer ${
                   activo
                     ? "bg-[#177E89] text-white"
                     : "bg-white border border-[#E5E5EA] text-slate-500 hover:text-slate-900 hover:border-slate-300"
@@ -121,7 +120,7 @@ export default function Precios() {
             <button
               key={p.id}
               onClick={() => setPeriodoId(p.id)}
-              className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-light uppercase tracking-wide transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2.5 px-3 rounded-lg text-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 periodoId === p.id
                   ? "bg-[#177E89] text-white"
                   : "text-slate-500 hover:text-slate-900"
@@ -156,18 +155,18 @@ export default function Precios() {
                   </div>
                 )}
 
-                <h2 className="relative font-light uppercase tracking-wide text-slate-900 text-2xl mb-1">{plan.nombre}</h2>
-                <p className="relative text-slate-500 text-xs font-light uppercase tracking-wide mb-5">{plan.tagline}</p>
+                <h2 className="relative font-bold tracking-tight text-slate-900 text-2xl mb-1">{plan.nombre}</h2>
+                <p className="relative text-slate-500 text-xs mb-5">{plan.tagline}</p>
 
                 <div className="flex items-end gap-1 mb-1">
                   <span className="font-bold text-6xl text-slate-900 leading-none">
                     ${precioMensualConDescuento.toFixed(2).replace(/\.00$/, "")}
                   </span>
-                  <span className="text-slate-500 text-base font-light uppercase tracking-wide mb-2">/mes</span>
+                  <span className="text-slate-500 text-base mb-2">/mes</span>
                 </div>
 
                 {periodo.descuento > 0 ? (
-                  <p className="text-xs text-[#177E89] font-light uppercase tracking-wide mb-6">
+                  <p className="text-xs text-[#177E89] mb-6">
                     Facturado {periodo.meses === 6 ? "cada 6 meses" : "una vez al año"}: ${totalPeriodo.toFixed(2).replace(/\.00$/, "")} total
                     <span className="text-slate-400"> (antes ${(plan.precioBase * periodo.meses).toFixed(0)})</span>
                   </p>
@@ -179,7 +178,7 @@ export default function Precios() {
                   {plan.features.map((f, idx) => {
                     const esBeneficioClave = plan.destacado && idx === 1;
                     return (
-                      <li key={f} className={`flex items-start gap-3 text-sm font-light uppercase tracking-wide ${esBeneficioClave ? "text-slate-900" : "text-slate-700"}`}>
+                      <li key={f} className={`flex items-start gap-3 text-sm ${esBeneficioClave ? "text-slate-900" : "text-slate-700"}`}>
                         <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
                           esBeneficioClave ? "bg-[#177E89] text-white" : "bg-slate-500/15 text-slate-600"
                         }`}><IconCheck size={9} /></span>
@@ -204,7 +203,7 @@ export default function Precios() {
                   thickness={1}
                   proximity={280}
                   className="relative w-full max-w-xs"
-                  onClick={() => navigate("/auth?registro=1")}
+                  onClick={() => navigate(`/auth?registro=1&plan=${plan.id}`)}
                 >
                   {plan.destacado ? `Quiero Full para ${vertical.nombre}` : "Comenzar con Básico"}
                 </SpecularButton>
@@ -231,7 +230,7 @@ export default function Precios() {
               <h2 className="font-bold text-3xl sm:text-4xl text-slate-900 mb-3">
                 Página Web Profesional
               </h2>
-              <p className="text-slate-500 text-base font-light uppercase tracking-wide leading-relaxed mb-6 max-w-lg">
+              <p className="text-slate-500 text-base leading-relaxed mb-6 max-w-lg">
                 Diseño personalizado con tu identidad de marca, catálogo de productos o servicios, y ventana de pagos integrada. Tu presencia digital, lista para vender.
               </p>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
@@ -243,7 +242,7 @@ export default function Precios() {
                   "Optimizado para celulares",
                   "Panel auto-administrable",
                 ].map((item) => (
-                  <li key={item} className="flex items-center gap-2.5 text-sm font-light uppercase tracking-wide text-slate-700">
+                  <li key={item} className="flex items-center gap-2.5 text-sm text-slate-700">
                     <span className="w-4 h-4 rounded-full bg-[#177E89]/15 text-[#177E89] flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
                     {item}
                   </li>
@@ -271,7 +270,7 @@ export default function Precios() {
               <div className="text-slate-500 text-xs font-light uppercase tracking-wide mb-1">Inversión única</div>
               <div className="font-bold text-3xl text-slate-900 mb-1">Cotizable</div>
               <div className="text-xs text-[#177E89] font-light uppercase tracking-wide mb-4">según requerimientos</div>
-              <div className="text-slate-500 text-xs font-light uppercase tracking-wide leading-relaxed">
+              <div className="text-slate-500 text-xs leading-relaxed">
                 Entrega estimada en 7–14 días hábiles con soporte post-lanzamiento.
               </div>
             </div>
@@ -289,11 +288,11 @@ export default function Precios() {
               <button
                 onClick={() => setOpenFaq(openFaq === i ? null : i)}
                 className="w-full text-left p-5 flex items-center justify-between gap-4 cursor-pointer">
-                <span className="font-light uppercase tracking-wide text-slate-900 text-base">{faq.q}</span>
+                <span className=" font-bold tracking-tight text-slate-900 text-base">{faq.q}</span>
                 <span className={`text-slate-400 text-lg transition-transform ${openFaq === i ? "rotate-45" : ""}`}>+</span>
               </button>
               {openFaq === i && (
-                <div className="px-5 pb-5 text-slate-500 text-sm font-light uppercase tracking-wide leading-relaxed border-t border-slate-200/60 pt-3">
+                <div className="px-5 pb-5 text-slate-500 text-sm leading-relaxed border-t border-slate-200/60 pt-3">
                   {faq.a}
                 </div>
               )}
@@ -304,10 +303,10 @@ export default function Precios() {
 
       {/* Bottom CTA */}
       <section className="px-4 sm:px-6 max-w-3xl mx-auto text-center mt-20">
-        <p className="text-slate-500 text-sm font-light uppercase tracking-wide mb-4">¿Tienes dudas sobre qué plan es el adecuado para ti?</p>
+        <p className="text-slate-500 text-sm mb-4">¿Tienes dudas sobre qué plan es el adecuado para ti?</p>
         <button
           onClick={() => navigate("/nosotros")}
-          className="text-[#177E89] hover:text-[#0D3B3D] transition-colors text-sm font-light uppercase tracking-wide">
+          className="text-[#177E89] hover:text-[#0D3B3D] transition-colors text-sm">
           Hablar con nuestro equipo →
         </button>
       </section>

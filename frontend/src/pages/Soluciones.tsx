@@ -62,7 +62,7 @@ export default function Soluciones() {
           Una plataforma,<br />
           <span className="text-[#177E89]">todas las herramientas</span>
         </h1>
-        <p className="text-slate-500 text-lg font-light uppercase tracking-wide max-w-2xl mx-auto leading-relaxed">
+        <p className="text-slate-500 text-lg max-w-2xl mx-auto leading-relaxed">
           Aurora Plus reúne en un solo sistema todo lo que tu empresa necesita para operar con eficiencia — desde el primer día y sin complicaciones técnicas.
         </p>
       </section>
@@ -87,10 +87,10 @@ export default function Soluciones() {
             <div className="flex-1 p-8 sm:p-10">
               <p className="font-light uppercase tracking-wide text-sm text-[#177E89] mb-2">{sol.tag}</p>
               <h2 className="font-bold text-2xl sm:text-3xl text-slate-900 mb-3">{sol.title}</h2>
-              <p className="text-slate-500 text-base font-light uppercase tracking-wide leading-relaxed mb-6 max-w-xl">{sol.desc}</p>
+              <p className="text-slate-500 text-base leading-relaxed mb-6 max-w-xl">{sol.desc}</p>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {sol.puntos.map((p) => (
-                  <li key={p} className="flex items-center gap-2.5 text-sm font-light uppercase tracking-wide text-slate-700">
+                  <li key={p} className="flex items-center gap-2.5 text-sm text-slate-700">
                     <span className="w-4 h-4 rounded-full bg-[#177E89]/15 text-[#177E89] flex items-center justify-center flex-shrink-0"><IconCheck size={9} /></span>
                     {p}
                   </li>
@@ -107,7 +107,7 @@ export default function Soluciones() {
           ¿Quieres ver todo esto<br />
           <span className="text-[#177E89]">funcionando en tu negocio?</span>
         </h2>
-        <p className="text-slate-500 font-light uppercase tracking-wide mb-8">Crea tu cuenta y úsalo gratis durante 15 días, con tus propios datos.</p>
+        <p className="text-slate-500 mb-8">Crea tu cuenta y úsalo gratis durante 15 días, con tus propios datos.</p>
         <SpecularButton
           size="lg"
           radius={12}

@@ -108,7 +108,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     // o la misma máquina), y se toma la ÚLTIMA IP de la lista: la que agregó ese
     // proxy, no la que inventó el cliente. Antes se tomaba la primera y cualquiera
     // que llegara directo al backend esquivaba el límite cambiando el encabezado.
-    static String ipCliente(String remoteAddr, String forwarded) {
+    public static String ipCliente(String remoteAddr, String forwarded) {
         if (forwarded == null || forwarded.isBlank() || !esProxyInterno(remoteAddr)) {
             return remoteAddr;
         }

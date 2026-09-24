@@ -35,6 +35,9 @@ public class AuthController {
         public String telefonoContacto;
         public String username; // el correo con el que inician sesión
         public String password;
+        public Boolean aceptaTerminos;
+        public String versionTerminos;
+        public String planSolicitado; // "basico" | "full", si llegó desde Precios
     }
 
     // Registro público de autoservicio — crea el tenant, activa su módulo y su
@@ -44,12 +47,16 @@ public class AuthController {
     public static final int DIAS_PRUEBA_GRATIS = 15;
 
     @PostMapping("/registro-negocio")
-    public ResponseEntity<AuthService.ResultadoLogin> registroNegocio(@RequestBody RegistroNegocioRequest request) {
+    public ResponseEntity<AuthService.ResultadoLogin> registroNegocio(@RequestBody RegistroNegocioRequest request,
+                                                                    jakarta.servlet.http.HttpServletRequest http) {
         if (request.username == null || request.username.isBlank()) {
             throw new RuntimeException("El correo es obligatorio");
         }
         if (request.password == null || request.password.length() < 6) {
             throw new RuntimeException("La contraseña debe tener al menos 6 caracteres");
+        }
+        if (!Boolean.TRUE.equals(request.aceptaTerminos)) {
+            throw new RuntimeException("Debes aceptar los términos y la política de privacidad");
         }
         if (authService.existeUsername(request.username)) {
             throw new RuntimeException("Ya existe una cuenta con este correo");
@@ -65,6 +72,10 @@ public class AuthController {
         alta.usuarioInicial = request.username;
         alta.nombreUsuarioInicial = request.nombreCompleto;
         alta.passwordInicial = request.password;
+        alta.terminosVersion = request.versionTerminos != null && !request.versionTerminos.isBlank()
+            ? request.versionTerminos.trim() : "sin-version";
+        alta.terminosIp = com.auroraplus.core.config.RateLimitInterceptor.ipCliente(http.getRemoteAddr(), http.getHeader("X-Forwarded-For"));
+        alta.planSolicitado = "basico".equals(request.planSolicitado) || "full".equals(request.planSolicitado) ? request.planSolicitado : null;
         LicenciaTenant licencia = tenantProvisioningService.crear(alta);
 
         return ResponseEntity.ok(authService.login(licencia.getTenantId(), request.username, request.password));

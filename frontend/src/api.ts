@@ -176,6 +176,11 @@ export interface RegistroNegocio {
   telefonoContacto?: string;
   username: string;
   password: string;
+  /** Obligatorio en el registro público: el servidor guarda fecha, versión e IP. */
+  aceptaTerminos?: boolean;
+  versionTerminos?: string;
+  /** Plan elegido en la web ("basico" | "full"), si llegó desde Precios. */
+  planSolicitado?: string;
 }
 
 export async function registrarNegocio(datos: RegistroNegocio): Promise<SesionAurora> {

@@ -62,19 +62,19 @@ const FEATURES = [
   { title: "Récipe Médico y Vademécum", desc: "En Mediclinic y Odontología: 36+ fármacos con posología, detección de alergias y récipe oficial en PDF." },
   { title: "Módulos Integrados", desc: "Ventas, inventario, caja y auditoría conectados sin planillas paralelas ni datos duplicados." },
   { title: "Cobros a prueba de cortes", desc: "Si se cae la conexión en pleno cobro, reintentar no duplica el pago ni el movimiento de caja. En Ganadería puedes trabajar sin internet y se sincroniza al volver." },
-  { title: "Seguridad y Auditoría", desc: "Roles y permisos granulares por tenant, con trazabilidad completa de cada acción." },
+  { title: "Seguridad y Auditoría", desc: "Cada persona entra con su rol y sus permisos, y queda registrado quién hizo qué y cuándo." },
 ];
 
 const PLANS = [
   {
     name: "Aurora Básico", price: "$25", period: "/mes", desc: "Lo esencial de tu vertical para dejar de operar a mano",
     features: ["Módulos base (POS/agenda, inventario, caja)", "Acceso web + versión móvil", "Sin costo extra por usuario adicional", "Multi-moneda (USD · VES · COP)", "Cobros sin duplicados aunque se caiga la conexión"],
-    cta: "Comenzar con Básico", highlight: false, badge: "",
+    cta: "Comenzar con Básico", highlight: false, badge: "", plan: "basico",
   },
   {
     name: "Aurora Full", price: "Desde $40", period: "/mes", desc: "Todo lo del Básico + nuestras herramientas avanzadas",
     features: ["Comercio: catálogo público + IA por WhatsApp", "Mediclinic/Odontología: vademécum y récipe oficial", "Ganadería: mapa satelital y básculas bluetooth", "Reportes y BI avanzado", "Acompañamiento prioritario"],
-    cta: "Quiero Aurora Full", highlight: true, badge: "Más popular",
+    cta: "Quiero Aurora Full", highlight: true, badge: "Más popular", plan: "full",
   },
 ];
 
@@ -116,12 +116,12 @@ export default function Home() {
           <p className="text-sm font-light uppercase tracking-wide text-[#177E89] mb-4">Software de gestión, hecho a tu medida</p>
 
           {/* H1 Monumental */}
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#1D1D1F] max-w-4xl leading-[1.06] mb-6">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-[#1D1D1F] max-w-4xl leading-[1.06] mb-6">
             Automatiza, simplifica y haz crecer tu negocio.
           </h1>
 
           {/* Subtítulo */}
-          <p className="text-sm sm:text-base text-[#1D1D1F] max-w-2xl font-light uppercase tracking-wide leading-relaxed mb-8">
+          <p className="text-base sm:text-lg text-[#424245] max-w-2xl leading-relaxed mb-8">
             De la libreta y las hojas de Excel a la tranquilidad de un sistema integrado. Controla caja, inventario, agenda clínica y producción en tiempo real.
           </p>
 
@@ -147,7 +147,7 @@ export default function Home() {
             </SpecularButton>
             <button
               onClick={() => navigate("/industrias")}
-              className="text-sm font-light uppercase tracking-wide text-[#1D1D1F] border-b border-[#1D1D1F]/30 hover:border-[#1D1D1F] pb-0.5 transition-colors cursor-pointer"
+              className="text-sm font-medium text-[#1D1D1F] border-b border-[#1D1D1F]/30 hover:border-[#1D1D1F] pb-0.5 transition-colors cursor-pointer"
             >
               Ver los rubros →
             </button>
@@ -163,18 +163,18 @@ export default function Home() {
                     <miSistema.Icon size={24} />
                   </div>
                   <div>
-                    <div className="font-light uppercase tracking-wide text-sm text-[#177E89]">
+                    <div className="text-xs font-medium uppercase tracking-wide text-[#177E89]">
                       Sistema asignado
                     </div>
-                    <div className="font-light uppercase tracking-wide text-base text-[#1D1D1F]">
+                    <div className="font-bold text-base text-[#1D1D1F]">
                       {miSistema.nombre}
                     </div>
-                    <div className="text-xs font-light uppercase tracking-wide text-[#86868B]">{miSistema.desc}</div>
+                    <div className="text-sm text-[#6E6E73]">{miSistema.desc}</div>
                   </div>
                 </div>
                 <button
                   onClick={() => navigate(miSistema.ruta)}
-                  className="btn-deep-black text-xs font-light uppercase tracking-wide px-5 py-2.5 rounded-md cursor-pointer whitespace-nowrap"
+                  className="btn-deep-black text-sm font-semibold px-5 py-2.5 rounded-md cursor-pointer whitespace-nowrap"
                 >
                   Abrir {miSistema.label} →
                 </button>
@@ -183,13 +183,13 @@ export default function Home() {
           })()}
 
           {/* Métricas / Stats — deliberadamente más abajo, para que aparezcan al hacer scroll y no compitan con los botones en la primera vista */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full mt-40 sm:mt-48 pt-10 border-t border-[#E5E5EA] text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full mt-16 sm:mt-24 pt-10 border-t border-[#E5E5EA] text-center">
             {STATS.map((s) => (
               <div key={s.label}>
                 <div className="text-4xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] mb-1">
                   {s.value}
                 </div>
-                <div className="text-xs font-light uppercase text-[#86868B] tracking-wide">
+                <div className="text-xs font-medium uppercase text-[#6E6E73] tracking-wide">
                   {s.label}
                 </div>
               </div>
@@ -204,11 +204,11 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <Kicker>Seis industrias, un mismo motor</Kicker>
+            <Kicker>Cinco rubros, un mismo sistema</Kicker>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-4">
               Diseñado para la realidad de cada sector
             </h2>
-            <p className="text-base sm:text-lg font-light uppercase tracking-wide text-[#86868B]">
+            <p className="text-base sm:text-lg text-[#6E6E73]">
               No adaptamos un sistema genérico: cada módulo responde a los flujos operativos reales de tu empresa.
             </p>
           </div>
@@ -233,10 +233,10 @@ export default function Home() {
                     <h3 className="font-['Fraunces'] text-3xl sm:text-4xl text-[#ffffff] mb-2">
                       {ind.name}
                     </h3>
-                    <p className="text-xs font-light uppercase tracking-wide text-[#ffffff]/80 leading-relaxed mb-4 max-w-[85%]">
+                    <p className="text-sm text-white/85 leading-relaxed mb-4 max-w-[85%]">
                       {ind.desc}
                     </p>
-                    <span className="text-xs font-light uppercase tracking-wide text-[#ffffff] border-b border-[#ffffff]/50 group-hover:border-[#ffffff] pb-0.5 transition-colors">
+                    <span className="text-sm font-medium text-white border-b border-white/50 group-hover:border-[#ffffff] pb-0.5 transition-colors">
                       Ver más
                     </span>
                   </div>
@@ -259,8 +259,8 @@ export default function Home() {
                   <AuroraLogo size={36} animated={false} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-light uppercase tracking-wide text-[#1D1D1F]">Todo tu negocio en un solo lugar</h3>
-                  <p className="text-xs font-light uppercase tracking-wide text-[#86868B] mt-0.5">Lo que registras en un módulo aparece al instante en los demás, sin volver a escribirlo.</p>
+                  <h3 className="text-xl font-bold tracking-tight text-[#1D1D1F]">Todo tu negocio en un solo lugar</h3>
+                  <p className="text-sm text-[#6E6E73] mt-0.5">Lo que registras en un módulo aparece al instante en los demás, sin volver a escribirlo.</p>
                 </div>
               </div>
             </div>
@@ -274,8 +274,8 @@ export default function Home() {
               ].map((item) => (
                 <div key={item.label} className="bg-white border border-[#E5E5EA] rounded-2xl p-5 shadow-sm">
                   <div className="w-8 h-px bg-[#177E89] mb-4" aria-hidden="true" />
-                  <div className="text-[11px] font-light uppercase text-[#86868B] tracking-wide mb-1">{item.label}</div>
-                  <div className="text-sm font-light uppercase tracking-wide text-[#1D1D1F]">{item.val}</div>
+                  <div className="text-[11px] font-semibold uppercase text-[#177E89] tracking-wide mb-1">{item.label}</div>
+                  <div className="text-sm font-medium text-[#1D1D1F]">{item.val}</div>
                 </div>
               ))}
             </div>
@@ -284,27 +284,27 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── CARACTERÍSTICAS DESTACADAS ── */}
-      <section className="py-20 md:py-28 px-6 sm:px-8 bg-white border-b border-[#E5E5EA]">
+      {/* ── CARACTERÍSTICAS DESTACADAS: fondo petróleo de la marca, para no encadenar secciones blancas ── */}
+      <section className="py-20 md:py-28 px-6 sm:px-8 bg-[#0D3B3D]">
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <Kicker>Bajo el capó</Kicker>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-4">
-              Potencia tecnológica sin complicaciones
+            <Kicker className="!text-[#5BC0BE]">Lo que te ahorra trabajo</Kicker>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-4">
+              Herramientas que se notan desde el primer día
             </h2>
-            <p className="text-base sm:text-lg font-light uppercase tracking-wide text-[#86868B]">
-              Herramientas de nivel empresarial preparadas para el trabajo diario.
+            <p className="text-base sm:text-lg text-white/70">
+              Pensadas para el trabajo diario de un negocio en Venezuela, sin complicaciones.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map((feat) => {
               return (
-                <div key={feat.title} className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-7">
-                  <div className="w-8 h-px bg-[#177E89] mb-5" aria-hidden="true" />
-                  <h3 className="text-base font-light uppercase tracking-wide text-[#1D1D1F] mb-2">{feat.title}</h3>
-                  <p className="text-xs font-light uppercase tracking-wide text-[#86868B] leading-relaxed">{feat.desc}</p>
+                <div key={feat.title} className="bg-white/[0.06] border border-white/10 rounded-2xl p-7 hover:bg-white/[0.09] transition-colors">
+                  <div className="w-8 h-0.5 bg-[#5BC0BE] mb-5" aria-hidden="true" />
+                  <h3 className="text-base font-semibold text-white mb-2">{feat.title}</h3>
+                  <p className="text-sm text-white/70 leading-relaxed">{feat.desc}</p>
                 </div>
               );
             })}
@@ -322,7 +322,7 @@ export default function Home() {
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-4">
               Planes claros y transparentes
             </h2>
-            <p className="text-base font-light uppercase tracking-wide text-[#86868B]">
+            <p className="text-base text-[#6E6E73]">
               Sin sorpresas ni cargos ocultos. Elige el plan que mejor se adapte a tu escala.
             </p>
           </div>
@@ -342,17 +342,17 @@ export default function Home() {
                 )}
 
                 <div>
-                  <h3 className="text-xl font-light uppercase tracking-wide text-[#1D1D1F] mb-2">{p.name}</h3>
-                  <p className="text-xs font-light uppercase tracking-wide text-[#86868B] mb-6">{p.desc}</p>
+                  <h3 className="text-xl font-bold tracking-tight text-[#1D1D1F] mb-2">{p.name}</h3>
+                  <p className="text-sm text-[#6E6E73] mb-6">{p.desc}</p>
 
                   <div className="flex items-baseline gap-1 mb-8">
                     <span className="text-4xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F]">{p.price}</span>
-                    <span className="text-sm font-light uppercase tracking-wide text-[#86868B]">{p.period}</span>
+                    <span className="text-sm text-[#6E6E73]">{p.period}</span>
                   </div>
 
                   <ul className="space-y-3 mb-8">
                     {p.features.map((feat) => (
-                      <li key={feat} className="text-xs font-light uppercase tracking-wide text-[#1D1D1F] flex items-center gap-3">
+                      <li key={feat} className="text-sm text-[#1D1D1F] flex items-center gap-3">
                         <span className="w-4 h-4 rounded-full bg-[#177E89]/10 text-[#177E89] flex items-center justify-center flex-shrink-0">
                           <IconCheck size={9} />
                         </span>
@@ -363,8 +363,8 @@ export default function Home() {
                 </div>
 
                 <button
-                  onClick={() => navigate("/auth?registro=1")}
-                  className={`w-full py-3.5 rounded-md text-xs font-light uppercase tracking-wide transition-all cursor-pointer ${
+                  onClick={() => navigate(`/auth?registro=1&plan=${p.plan}`)}
+                  className={`w-full py-3.5 rounded-md text-sm font-semibold transition-all cursor-pointer ${
                     p.highlight
                       ? "btn-deep-black"
                       : "bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] border border-[#E5E5EA]"

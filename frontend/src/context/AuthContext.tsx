@@ -90,7 +90,14 @@ const CUENTAS_REGISTRADAS_KEY = "aurora_registered_accounts";
 function obtenerCuentasLocales(): CuentaRegistrada[] {
   try {
     const raw = localStorage.getItem(CUENTAS_REGISTRADAS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const cuentas: CuentaRegistrada[] = raw ? JSON.parse(raw) : [];
+    // Versiones anteriores guardaban la contraseña en claro: se borra en cuanto se lee.
+    if (cuentas.some((c) => "password" in c)) {
+      const limpias = cuentas.map(({ password: _omitida, ...resto }) => resto);
+      localStorage.setItem(CUENTAS_REGISTRADAS_KEY, JSON.stringify(limpias));
+      return limpias;
+    }
+    return cuentas;
   } catch {
     return [];
   }
@@ -254,12 +261,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // backend (ej. clinica/farmacia/veterinaria comparten moduloPrincipal="salud") y perdería esa
     // distinción si se usara como única fuente.
     const industry = datos.industria || MODULO_A_INDUSTRIA[datos.moduloPrincipal] || datos.moduloPrincipal || "clinica";
-    const nombreUsuario = datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario";
+    const nombreUsuario = datos.nombreCompleto?.trim()
+      || (datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario");
 
     // Guardar cuenta registrada localmente
     guardarCuentaLocal({
       email: datos.emailContacto || datos.username,
-      password: datos.password,
       nombre: nombreUsuario,
       empresa: datos.nombreEmpresa || "Mi Empresa",
       industry,

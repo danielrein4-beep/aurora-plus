@@ -29,6 +29,20 @@ public class LicenciaTenant {
     @Column(name = "fecha_vencimiento_pago", nullable = false)
     private LocalDate fechaVencimientoPago;
 
+    // Constancia de aceptación de Términos y Privacidad en el registro público (V97).
+    @Column(name = "terminos_aceptados_en")
+    private java.time.LocalDateTime terminosAceptadosEn;
+
+    @Column(name = "terminos_version", length = 20)
+    private String terminosVersion;
+
+    @Column(name = "terminos_ip", length = 64)
+    private String terminosIp;
+
+    /** Plan que eligió en la web antes de registrarse ("basico" o "full"); solo informativo. */
+    @Column(name = "plan_solicitado", length = 20)
+    private String planSolicitado;
+
     @Column(name = "nombre_empresa", nullable = false)
     private String nombreEmpresa;
 
@@ -260,6 +274,14 @@ public class LicenciaTenant {
     public boolean isActiva() { return activa; }
     public void setActiva(boolean activa) { this.activa = activa; }
     public LocalDate getFechaVencimientoPago() { return fechaVencimientoPago; }
+    public java.time.LocalDateTime getTerminosAceptadosEn() { return terminosAceptadosEn; }
+    public void setTerminosAceptadosEn(java.time.LocalDateTime v) { this.terminosAceptadosEn = v; }
+    public String getTerminosVersion() { return terminosVersion; }
+    public void setTerminosVersion(String v) { this.terminosVersion = v; }
+    public String getTerminosIp() { return terminosIp; }
+    public void setTerminosIp(String v) { this.terminosIp = v; }
+    public String getPlanSolicitado() { return planSolicitado; }
+    public void setPlanSolicitado(String v) { this.planSolicitado = v; }
     public void setFechaVencimientoPago(LocalDate fechaVencimientoPago) { this.fechaVencimientoPago = fechaVencimientoPago; }
     public String getNombreEmpresa() { return nombreEmpresa; }
     public void setNombreEmpresa(String nombreEmpresa) { this.nombreEmpresa = nombreEmpresa; }

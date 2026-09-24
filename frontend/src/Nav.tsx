@@ -71,7 +71,7 @@ export default function Nav() {
         </button>
 
         {/* Desktop Links */}
-        <div className="hidden md:flex items-center gap-7">
+        <div className="hidden lg:flex items-center gap-7">
           {LINKS.map((l) => {
             const isActive = pathname === l.path;
             return (
@@ -93,7 +93,7 @@ export default function Nav() {
         </div>
 
         {/* CTA */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3">
           {isLoggedIn ? (
             <div className="flex items-center gap-2.5">
               <button
@@ -155,16 +155,16 @@ export default function Nav() {
                 intensity={1}
                 thickness={1}
                 proximity={220}
-                onClick={() => navigate("/onboarding")}
+                onClick={() => navigate("/auth?registro=1")}
               >
-                <span style={{ fontWeight: 300, textTransform: "uppercase", letterSpacing: "0.05em" }}>Solicitar demo</span>
+                <span style={{ fontWeight: 300, textTransform: "uppercase", letterSpacing: "0.05em" }}>Probar gratis</span>
               </SpecularButton>
             </div>
           )}
         </div>
 
         {/* Mobile controls */}
-        <div className="flex md:hidden items-center gap-2">
+        <div className="flex lg:hidden items-center gap-2">
           <button
             className="p-2 text-[#1D1D1F] hover:bg-[#F5F5F7] rounded-lg transition-colors cursor-pointer"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -181,7 +181,7 @@ export default function Nav() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-[#E5E5EA] bg-white px-6 py-5 space-y-1 shadow-lg">
+        <div className="lg:hidden border-t border-[#E5E5EA] bg-white px-6 py-5 space-y-1 shadow-lg">
           {LINKS.map((l) => (
             <button
               key={l.path}
@@ -221,10 +221,10 @@ export default function Nav() {
                   Ingresar
                 </button>
                 <button
-                  onClick={() => { navigate("/precios"); setMobileOpen(false); }}
+                  onClick={() => { navigate("/auth?registro=1"); setMobileOpen(false); }}
                   className="btn-deep-black w-full text-sm font-light uppercase tracking-wide py-3 rounded-xl"
                 >
-                  Solicitar demo gratis
+                  Probar gratis 15 días
                 </button>
               </>
             )}

@@ -48,6 +48,10 @@ public class TenantProvisioningService {
         public Integer mesesVigencia;
         /** Si viene, manda sobre mesesVigencia: la prueba gratuita del registro público se mide en días. */
         public Integer diasVigencia;
+        // Registro público: constancia de Términos y plan elegido en la web.
+        public String terminosVersion;
+        public String terminosIp;
+        public String planSolicitado;
         public String monedaBase;
         public String usuarioInicial;
         public String nombreUsuarioInicial;
@@ -118,6 +122,13 @@ public class TenantProvisioningService {
         // ya serializa las altas de tenant, así la verificación de unicidad no tiene
         // condición de carrera entre altas simultáneas.
         licencia.setSlugCatalogo(generarSlugUnico(request.nombreEmpresa, nuevoTenantId));
+
+        if (request.terminosVersion != null) {
+            licencia.setTerminosAceptadosEn(java.time.LocalDateTime.now());
+            licencia.setTerminosVersion(request.terminosVersion);
+            licencia.setTerminosIp(request.terminosIp);
+        }
+        licencia.setPlanSolicitado(request.planSolicitado);
 
         LicenciaTenant guardada = licenciaTenantRepository.save(licencia);
 
