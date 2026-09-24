@@ -30,6 +30,44 @@ function normalizar(texto: string): string {
     .replace(/[̀-ͯ]/g, ""); // quita tildes para que buscar sin acentos (ej. "hipertension") funcione igual
 }
 
+// El catálogo usa nombres técnicos ("Influenza", "Rinofaringitis aguda"), pero
+// la gente busca como habla ("gripe", "resfriado"). Cada nombre popular lleva a
+// sus códigos, que se muestran primero en la lista.
+const NOMBRES_POPULARES: [string, string[]][] = [
+  ["gripe", ["J11.1", "J11.8", "J10.1", "J09"]],
+  ["resfriado", ["J00"]],
+  ["catarro", ["J00"]],
+  ["fiebre", ["R50.9", "A90", "A01.0"]],
+  ["calentura", ["R50.9"]],
+  ["dengue", ["A90", "A91"]],
+  ["diarrea", ["A09", "K52.9"]],
+  ["gastroenteritis", ["A09"]],
+  ["amigdalitis", ["J03.9"]],
+  ["faringitis", ["J02.9"]],
+  ["bronquitis", ["J20.9"]],
+  ["neumonia", ["J18.9"]],
+  ["asma", ["J45.9"]],
+  ["tos", ["R05"]],
+  ["dolor de cabeza", ["R51"]],
+  ["migrana", ["G43.9"]],
+  ["tension alta", ["I10"]],
+  ["hipertension", ["I10"]],
+  ["diabetes", ["E11.9", "E10.9"]],
+  ["infeccion urinaria", ["N39.0"]],
+  ["conjuntivitis", ["H10.9"]],
+  ["varicela", ["B01.9"]],
+  ["sarampion", ["B05.9"]],
+  ["paludismo", ["B54"]],
+  ["malaria", ["B54"]],
+  ["chikungunya", ["A92.0"]],
+  ["zika", ["A92.8"]],
+  ["covid", ["U07.1"]],
+  ["acne", ["L70.0"]],
+  ["verruga", ["B07"]],
+  ["hongos", ["B35.4", "B35.1", "B36.9"]],
+  ["alergia", ["T78.4"]],
+];
+
 interface Props {
   /** Código CIE-10 ya seleccionado (para mostrarlo si se está editando una consulta existente). */
   valorCodigo?: string;
@@ -84,7 +122,15 @@ export default function Cie10Buscador({ valorCodigo, valorDescripcion, onSelecci
     if (q.length < 2) return [];
     const porCodigo = q.toUpperCase();
     const coincidencias: DiagnosticoCie10[] = [];
+    const codigosPopulares = new Set(
+      NOMBRES_POPULARES.filter(([nombre]) => nombre.startsWith(q) || q.startsWith(nombre)).flatMap(([, codigos]) => codigos),
+    );
+    for (const codigo of codigosPopulares) {
+      const d = catalogo.find((c) => c.codigo === codigo);
+      if (d) coincidencias.push(d);
+    }
     for (const d of catalogo) {
+      if (codigosPopulares.has(d.codigo)) continue;
       if (d.codigo.startsWith(porCodigo) || normalizar(d.descripcion).includes(q)) {
         coincidencias.push(d);
         if (coincidencias.length >= 30) break;

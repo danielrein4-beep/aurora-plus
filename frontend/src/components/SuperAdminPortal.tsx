@@ -2,6 +2,7 @@ import { obtenerCuentasCobro, guardarCuentasCobro, type SaasCuentasCobroConfig }
 import React, { useState, useEffect, useMemo } from "react";
 import AuroraLogo from "../AuroraLogo";
 import SuperAdminActividad from "./SuperAdminActividad";
+import SuperAdminInteligencia from "./SuperAdminInteligencia";
 import SuperAdminFichaTenant from "./SuperAdminFichaTenant";
 import SuperAdminSeguridad from "./SuperAdminSeguridad";
 import SuperAdminEquipo, { ROLES_EQUIPO } from "./SuperAdminEquipo";
@@ -90,12 +91,13 @@ const MODULOS_SISTEMA = [
 ];
 
 /** [migas de pan, título] de cada vista del panel. */
-const TITULOS_VISTA: Record<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO", [string, string]> = {
+const TITULOS_VISTA: Record<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO", [string, string]> = {
   TENANTS: ["Clientes", "Directorio de negocios"],
   PAGOS: ["Ingresos", "Cobros y suscripciones"],
   FINANZAS: ["Ingresos", "Finanzas, gastos fijos y flujo de caja"],
   METRICAS: ["Inteligencia", "Métricas y rendimiento del SaaS"],
   ACTIVIDAD: ["Inteligencia", "Actividad por vertical"],
+  INTELIGENCIA: ["Inteligencia", "Datos de negocios, comercios y salud"],
   SOPORTE: ["Operaciones", "Soporte y asistencia a negocios"],
   AUDITORIA: ["Seguridad", "Bitácora de auditoría"],
   SEGURIDAD: ["Seguridad", "Configuración de la cuenta"],
@@ -109,6 +111,7 @@ const ROLES_POR_VISTA: Record<keyof typeof TITULOS_VISTA, RolEquipoSuperAdmin[]>
   FINANZAS: ["PROPIETARIO", "FINANZAS"],
   METRICAS: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
   ACTIVIDAD: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
+  INTELIGENCIA: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
   SOPORTE: ["PROPIETARIO", "SOPORTE"],
   AUDITORIA: ["PROPIETARIO"],
   SEGURIDAD: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
@@ -281,7 +284,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   // VISTA PRINCIPAL (TENANTS vs FINANZAS)
   // VISTA PRINCIPAL (TENANTS vs PAGOS vs FINANZAS)
-  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO">("TENANTS");
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO">("TENANTS");
 
   // FILTROS Y ESTADOS DEL MODULO DEDICADO DE HISTORIAL DE PAGOS
   const [filtroPagosTenant, setFiltroPagosTenant] = useState<number | "TODOS">("TODOS");
@@ -310,6 +313,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const [ticketSeleccionado, setTicketSeleccionado] = useState<SaasSoporteTicket | null>(null);
   const [mensajesSoporte, setMensajesSoporte] = useState<SaasSoporteMensaje[]>([]);
   const [nuevoMensajeSoporte, setNuevoMensajeSoporte] = useState("");
+  const [pendientesSoporte, setPendientesSoporte] = useState(0);
   const [filtroEstadoSoporte, setFiltroEstadoSoporte] = useState<string>("TODOS");
   const [filtroPrioridadSoporte, setFiltroPrioridadSoporte] = useState<string>("TODOS");
   const [filtroTextoBusquedaSoporte, setFiltroTextoBusquedaSoporte] = useState("");
@@ -556,6 +560,20 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       avisar("Error al cambiar estado: " + (err.message || "Error"));
     }
   };
+
+  // El contador del menú no depende de estar en Soporte ni de sus filtros: se
+  // cuenta aparte al entrar y cada minuto, para enterarse de un ticket nuevo
+  // aunque se esté trabajando en otra sección.
+  useEffect(() => {
+    if (!sesion || !puedeVer("SOPORTE")) return;
+    const contar = () => listarTicketsSuperAdmin()
+      .then((t) => setPendientesSoporte(t.filter((x) => x.estado === "ABIERTO" || x.estado === "EN_ATENCION").length))
+      .catch(() => {});
+    contar();
+    const intervalo = setInterval(contar, 60_000);
+    return () => clearInterval(intervalo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion?.token, perfil?.rol, ticketsSoporte]);
 
   useEffect(() => {
     if (sesion && vistaPrincipal === "SOPORTE") {
@@ -1285,7 +1303,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         {/* NAVEGACION AGRUPADA POR AREA DE TRABAJO */}
         <nav className="p-4 space-y-5 flex-1 overflow-y-auto">
           {(() => {
-            const abiertosSoporte = ticketsSoporte.filter((t) => t.estado === "ABIERTO" || t.estado === "EN_ATENCION").length;
+            const abiertosSoporte = pendientesSoporte;
             const grupos: { titulo: string; items: { vista: typeof vistaPrincipal; label: string; icono: string; badge?: string | number; alerta?: boolean; alAbrir?: () => void }[] }[] = [
               { titulo: "Clientes", items: [
                 { vista: "TENANTS", label: "Directorio de negocios", icono: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4", badge: tenants.length },
@@ -1297,6 +1315,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               { titulo: "Inteligencia", items: [
                 { vista: "METRICAS", label: "Métricas del SaaS", icono: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", alAbrir: () => cargarAnalytics() },
                 { vista: "ACTIVIDAD", label: "Actividad por vertical", icono: "M3 12h4l3-8 4 16 3-8h4" },
+                { vista: "INTELIGENCIA", label: "Inteligencia de datos", icono: "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" },
               ]},
               { titulo: "Operaciones", items: [
                 { vista: "SOPORTE", label: "Soporte y asistencia", icono: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z", badge: abiertosSoporte, alerta: abiertosSoporte > 0, alAbrir: () => cargarTicketsSoporte() },
@@ -2398,6 +2417,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       {vistaPrincipal === "ACTIVIDAD" && (
         <div className="animate-fadeIn">
           <SuperAdminActividad />
+        </div>
+      )}
+
+      {/* VISTA: INTELIGENCIA DE DATOS (MRR/churn/salud de clientes, comercios, salud y canal endémico) */}
+      {vistaPrincipal === "INTELIGENCIA" && (
+        <div className="animate-fadeIn">
+          <SuperAdminInteligencia />
         </div>
       )}
 

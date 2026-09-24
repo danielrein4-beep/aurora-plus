@@ -1,5 +1,4 @@
 import { obtenerCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
-import TenantSoporteWidget from "../components/TenantSoporteWidget";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
@@ -1894,9 +1893,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* ── BOTÓN FLOTANTE DE SOPORTE WHATSAPP ── */}
-      <TenantSoporteWidget />
 
     </div>
   );

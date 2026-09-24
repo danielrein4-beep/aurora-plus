@@ -2637,6 +2637,15 @@ export function obtenerCanalEndemicoRed(cie10: string, anio: number): Promise<Ca
   return requestSuperAdmin(`/api/super-admin/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
 }
 
+/** Canal de UNA clínica visto desde el super-admin (mismo cálculo que ve el médico). */
+export function diagnosticosFrecuentesClinicaRed(tenantId: number, limite = 20): Promise<DiagnosticoFrecuente[]> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/salud/${tenantId}/canal-endemico/diagnosticos-frecuentes?limite=${limite}`);
+}
+
+export function obtenerCanalEndemicoClinicaRed(tenantId: number, cie10: string, anio: number): Promise<CanalEndemico> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/salud/${tenantId}/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+}
+
 export interface CasosPorClinica {
   tenantId: number;
   totalCasos: number;
@@ -5632,4 +5641,104 @@ export function cambiarEstadoCuadrillaConstruccionApi(id: number, estado: string
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ estado })
   });
+}
+
+// --- Inteligencia del super-admin (ver SuperAdminInteligenciaController) ---
+
+export interface TenantInteligenciaBase {
+  tenantId: number;
+  nombreEmpresa: string | null;
+  moduloPrincipal: string | null;
+  plan: string | null;
+  activa: boolean | null;
+  fechaAlta: string | null;
+}
+
+export interface ClinicaInteligencia extends TenantInteligenciaBase {
+  consultasPeriodo: number;
+  consultasTotal: number;
+  pacientes: number;
+  medicos: number;
+  ultimaConsulta: string | null;
+  especialidad: string | null;
+  doctor: string | null;
+  topDiagnosticos: { cie10: string; casos: number }[];
+}
+
+export interface InteligenciaSalud {
+  resumen: { clinicas: number; clinicasConActividad: number; consultasPeriodo: number; pacientes: number };
+  topDiagnosticos: { cie10: string; casos: number; clinicas: number }[];
+  tendencia: { fecha: string; consultas: number }[];
+  clinicas: ClinicaInteligencia[];
+}
+
+export interface ProductoTopInteligencia {
+  nombre: string;
+  cantidad: number;
+  monto: number;
+  comercios: number;
+}
+
+export interface ComercioInteligencia extends TenantInteligenciaBase {
+  ventasPeriodo: number;
+  montoPeriodo: number;
+  utilidadPeriodo: number;
+  ticketPromedio: number;
+  ultimaVenta: string | null;
+  productos: number;
+  categorias: string[];
+  topProducto: string | null;
+}
+
+export interface InteligenciaComercio {
+  resumen: { comercios: number; comerciosConVentas: number; ventasPeriodo: number; montoPeriodo: number; utilidadPeriodo: number; ticketPromedio: number };
+  porRubro: { rubro: string; comercios: number; ventas: number; monto: number }[];
+  topProductos: ProductoTopInteligencia[];
+  tendencia: { fecha: string; ventas: number; monto: number }[];
+  comercios: ComercioInteligencia[];
+}
+
+export interface DetalleComercioInteligencia {
+  topProductos: ProductoTopInteligencia[];
+  tendencia: { fecha: string; ventas: number; monto: number }[];
+  metodosPago: { metodo: string; ventas: number; monto: number }[];
+}
+
+export type Semaforo = "VERDE" | "AMARILLO" | "ROJO";
+
+export interface SaludCliente extends TenantInteligenciaBase {
+  puntaje: number;
+  semaforo: Semaforo;
+  motivos: string[];
+  ultimaActividad: string | null;
+  diasSinActividad: number | null;
+  usoUltimos14: number;
+  usoPrevios14: number;
+  estadoPago: "AL_DIA" | "POR_VENCER" | "VENCIDO" | "SIN_PAGOS";
+  diasParaVencer: number | null;
+  pagandoEsteMes: boolean;
+  ticketsAbiertos: number;
+}
+
+export interface InteligenciaNegocio {
+  resumen: { mrr: number; arr: number; clientesPagando: number; arpu: number; pagosOtraMoneda: number };
+  serie: { mes: string; mrr: number; clientesPagando: number; nuevos: number; perdidos: number; churnPct: number | null }[];
+  semaforo: Record<Semaforo, number>;
+  clientes: SaludCliente[];
+}
+
+export function obtenerInteligenciaSalud(dias: number): Promise<InteligenciaSalud> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/salud?dias=${dias}`);
+}
+
+export function obtenerInteligenciaComercio(dias: number): Promise<InteligenciaComercio> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/comercio?dias=${dias}`);
+}
+
+export function obtenerDetalleComercioInteligencia(tenantId: number, dias: number): Promise<DetalleComercioInteligencia> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/comercio/${tenantId}?dias=${dias}`);
+}
+
+export function obtenerInteligenciaNegocio(): Promise<InteligenciaNegocio> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/negocio`);
 }
