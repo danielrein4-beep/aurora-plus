@@ -119,10 +119,13 @@ export default function SeccionHato({
   // Mismas categorías que la matriz ("Ver fichas" de Becerros incluye los TERNERO); los vendidos aparte.
   const esActivo = (a: AnimalGanaderia) => a.estado === "ACTIVO" || !a.estado;
   const vendidos = animales.filter(a => a.estado === "VENDIDO").length;
+  const esBaja = (a: AnimalGanaderia) => a.estado === "MUERTO" || a.estado === "ROBADO";
+  const bajas = animales.filter(esBaja).length;
   const animalesFiltrados = animales.filter(a => {
     const categoria = categoriasHato.find(c => c.key === filtroCategoria);
     const coincideCat = filtroCategoria === "TODOS" ? esActivo(a)
       : filtroCategoria === "VENDIDOS" ? a.estado === "VENDIDO"
+      : filtroCategoria === "BAJAS" ? esBaja(a)
       : categoria ? esActivo(a) && categoria.filter(a)
       : a.tipoAnimal?.toUpperCase() === filtroCategoria.toUpperCase();
     const coincideBusqueda =
@@ -341,6 +344,7 @@ export default function SeccionHato({
                 { key: "TODOS", label: `Activos (${animalesActivos.length})` },
                 ...matrizConteos.filter(c => c.count > 0).map(c => ({ key: c.key, label: `${c.label} (${c.count})` })),
                 ...(vendidos > 0 ? [{ key: "VENDIDOS", label: `Vendidos (${vendidos})` }] : []),
+                ...(bajas > 0 ? [{ key: "BAJAS", label: `Muertes y pérdidas (${bajas})` }] : []),
               ].map(cat => (
                 <button
                   key={cat.key}
@@ -390,8 +394,10 @@ export default function SeccionHato({
                     </div>
                   </div>
 
-                  <span className="px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 dark:text-white/60 text-[10px] font-bold">
-                    {animal.estado || "ACTIVO"}
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    esBaja(animal) ? "bg-rose-50 text-rose-700" : animal.estado === "VENDIDO" ? "bg-amber-50 text-amber-700" : "bg-slate-500/10 text-slate-500 dark:text-white/60"
+                  }`}>
+                    {({ ACTIVO: "Activo", VENDIDO: "Vendido", MUERTO: "Muerto", ROBADO: "Robado" } as Record<string, string>)[animal.estado || "ACTIVO"] ?? animal.estado}
                   </span>
                 </div>
 

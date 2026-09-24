@@ -136,7 +136,10 @@ public class GanaderiaIndicadoresService {
 
         // Mortalidad de 12 meses
         List<BajaAnimal> bajas = bajaAnimalRepository.findByTenantId(tenantId);
-        r.muertes12Meses = (int) bajas.stream().filter(b -> b.getFecha() != null && !b.getFecha().isBefore(haceUnAnio)).count();
+        // Solo muertes: un robo (abigeato) es una pérdida pero no mortalidad.
+        r.muertes12Meses = (int) bajas.stream()
+            .filter(b -> b.getFecha() != null && !b.getFecha().isBefore(haceUnAnio) && !GanaderiaAnimalService.esRobo(b.getMotivo()))
+            .count();
         r.mortalidad12Meses = porcentaje(r.muertes12Meses, activos.size() + r.muertes12Meses);
 
         // Leche por vaca y día (30 días): litros / pares (vaca, día) con ordeño.

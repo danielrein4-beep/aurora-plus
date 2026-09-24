@@ -20,6 +20,8 @@ interface Props {
   setAnimalFichaId: (id: number | null) => void;
   setSubSanidad: (sub: SubSanidad) => void;
   setVacunaAbierta: (valores: { animalId?: number } | null) => void;
+  /** Abre el registro de muerte o pérdida (robo) de un animal. */
+  setBajaAbierta: (valores: { animalId?: number } | null) => void;
 }
 
 /**
@@ -28,7 +30,7 @@ interface Props {
  */
 export default function SeccionSanidad({
   alertas, alertasSanitarias, animales, animalFichaId, notificar, subSanidad, tenantId, vacunas,
-  abrirEditarAnimal, setAltaAnimal, setAnimalFichaId, setSubSanidad, setVacunaAbierta,
+  abrirEditarAnimal, setAltaAnimal, setAnimalFichaId, setSubSanidad, setVacunaAbierta, setBajaAbierta,
 }: Props) {
   const [fichaVacunas, setFichaVacunas] = useState<AplicacionVacunaGanaderia[]>([]);
   const [fichaMedicamentos, setFichaMedicamentos] = useState<AplicacionMedicamentoGanaderia[]>([]);
@@ -317,6 +319,15 @@ export default function SeccionSanidad({
                       className="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 cursor-pointer transition-colors">
                       <IconEdit size={16} />
                     </button>
+                    {(animalSel.estado === "ACTIVO" || !animalSel.estado) && (
+                      <button
+                        type="button"
+                        onClick={() => setBajaAbierta({ animalId: animalSel.id })}
+                        title="Registrar muerte o pérdida"
+                        className="px-3 py-2 rounded-2xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 text-xs font-semibold cursor-pointer transition-colors">
+                        Muerte o pérdida
+                      </button>
+                    )}
                   </div>
                 </div>
 

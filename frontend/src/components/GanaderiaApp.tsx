@@ -30,6 +30,7 @@ import { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
 import ModalVentaAnimales, { type ModoVenta } from "./ganaderia/ModalVentaAnimales";
 import ModalJornadaOrdeno, { vacasDeOrdeno } from "./ganaderia/ModalJornadaOrdeno";
 import ModalVacunacion, { type VacunacionAplicada } from "./ganaderia/ModalVacunacion";
+import ModalBaja from "./ganaderia/ModalBaja";
 import ModalReproduccion from "./ganaderia/ModalReproduccion";
 import ModalCelo from "./ganaderia/ModalCelo";
 import ModalMastitis from "./ganaderia/ModalMastitis";
@@ -221,6 +222,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [pendientesOffline, setPendientesOffline] = useState(0);
   const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
   const [vacunaAbierta, setVacunaAbierta] = useState<{ animalId?: number } | null>(null);
+  const [bajaAbierta, setBajaAbierta] = useState<{ animalId?: number } | null>(null);
   const [reproAbierta, setReproAbierta] = useState<{ tipo?: string; resultado?: string } | null>(null);
   const [celoAbierto, setCeloAbierto] = useState(false);
   const [mastitisAbierta, setMastitisAbierta] = useState(false);
@@ -711,6 +713,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             setAnimalFichaId={setAnimalFichaId}
             setSubSanidad={setSubSanidad}
             setVacunaAbierta={setVacunaAbierta}
+            setBajaAbierta={setBajaAbierta}
           />
         )}
 
@@ -733,6 +736,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             setSubInventario={setSubInventario}
             setTab={setTab}
             setVacunaAbierta={setVacunaAbierta}
+            setBajaAbierta={setBajaAbierta}
           />
         )}
 
@@ -988,6 +992,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* MODAL: VACUNACIÓN & TRATAMIENTOS SANITARIOS */}
+      {bajaAbierta && (
+        <ModalBaja
+          animalesActivos={animalesActivos}
+          animalIdInicial={bajaAbierta.animalId}
+          notificar={notificar}
+          onRegistrada={(id, estado) => setAnimales(prev => prev.map(a => a.id === id ? { ...a, estado, potrero: undefined } : a))}
+          onCerrar={() => setBajaAbierta(null)}
+        />
+      )}
+
       {vacunaAbierta && (
         <ModalVacunacion
           animales={animales}

@@ -4272,6 +4272,23 @@ export function importarHatoGanaderia(filas: FilaImportacionHato[], confirmar: b
   });
 }
 
+/** Baja de un animal: muerte (queda MUERTO) o robo/abigeato (queda ROBADO). */
+export interface BajaAnimalGanaderia {
+  id: number;
+  animal: AnimalGanaderia;
+  fecha: string;
+  motivo: string;
+  observaciones?: string;
+}
+
+export function registrarBajaGanaderia(datos: { animalId: number; fecha: string; motivo: string; observaciones?: string }): Promise<BajaAnimalGanaderia> {
+  return request("/api/ganaderia/bajas", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarBajasGanaderia(): Promise<BajaAnimalGanaderia[]> {
+  return request("/api/ganaderia/bajas");
+}
+
 /** Indicadores de gestión del hato; null = sin datos suficientes para calcularlo. */
 export interface IndicadoresGanaderia {
   hembrasReproductivas: number;

@@ -1,8 +1,10 @@
 package com.auroraplus.modules.ganaderia.services;
 
 import com.auroraplus.modules.ganaderia.entities.Animal;
+import com.auroraplus.modules.ganaderia.entities.BajaAnimal;
 import com.auroraplus.modules.ganaderia.entities.Potrero;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
+import com.auroraplus.modules.ganaderia.repositories.BajaAnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.PotreroRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,10 @@ public class GanaderiaAnimalService {
     @Autowired private AnimalRepository animalRepository;
     @Autowired private PotreroRepository potreroRepository;
     @Autowired private GanaderiaEngordeService engordeService;
+    @Autowired private BajaAnimalRepository bajaAnimalRepository;
+
+    /** Causa de baja que no es una muerte: el animal sale del hato como ROBADO y no cuenta en la mortalidad. */
+    public static final String CAUSA_ROBO = "Robo / abigeato";
 
     /** Datos del alta de un animal (lo que manda la pantalla). */
     public static class DatosAlta {
@@ -84,6 +90,41 @@ public class GanaderiaAnimalService {
         Animal guardado = animalRepository.save(animal);
         engordeService.registrarPesoDeIngreso(tenantId, guardado, null);
         return guardado;
+    }
+
+    /**
+     * Baja de un animal activo: muerte (queda MUERTO) o robo/abigeato (queda ROBADO). Sale del
+     * potrero, queda la constancia con fecha, causa y observaciones, y deja de contar en el hato activo.
+     */
+    @Transactional
+    public BajaAnimal registrarBaja(Long tenantId, Long animalId, LocalDate fecha, String motivo, String observaciones) {
+        Animal animal = animalRepository.findForUpdateByIdAndTenantId(animalId, tenantId)
+            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
+        if (!"ACTIVO".equals(animal.getEstado())) {
+            throw new RuntimeException("El animal ya no está activo (estado actual: " + animal.getEstado() + ")");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new RuntimeException("El motivo de la baja es obligatorio");
+        }
+        LocalDate dia = fecha != null ? fecha : LocalDate.now();
+        if (dia.isAfter(LocalDate.now())) {
+            throw new RuntimeException("La fecha de la baja no puede ser futura");
+        }
+        animal.setEstado(esRobo(motivo) ? "ROBADO" : "MUERTO");
+        animal.setPotrero(null);
+        animalRepository.save(animal);
+
+        BajaAnimal baja = new BajaAnimal();
+        baja.setTenantId(tenantId);
+        baja.setAnimal(animal);
+        baja.setFecha(dia);
+        baja.setMotivo(motivo.trim());
+        baja.setObservaciones(observaciones);
+        return bajaAnimalRepository.save(baja);
+    }
+
+    public static boolean esRobo(String motivo) {
+        return motivo != null && motivo.trim().toLowerCase().startsWith("robo");
     }
 
     /** Edición de la ficha: solo cambia lo que viene informado. */

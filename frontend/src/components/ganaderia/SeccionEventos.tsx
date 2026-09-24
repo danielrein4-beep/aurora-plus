@@ -22,6 +22,8 @@ interface Props {
   setSubInventario: (sub: SubInventario) => void;
   setTab: (tab: TabGanaderia) => void;
   setVacunaAbierta: (valores: { animalId?: number } | null) => void;
+  /** Abre el registro de muerte o pérdida (robo) de un animal. */
+  setBajaAbierta: (valores: { animalId?: number } | null) => void;
 }
 
 /** Centro de eventos del hato: accesos rápidos a registrar partos, servicios, sanidad, pesajes, ventas y rotaciones. */
@@ -29,7 +31,7 @@ export default function SeccionEventos({
   animales, notificar, potreros, abrirNuevoPotrero, abrirVaqueraRapida, abrirVentaAnimales,
   setAltaAnimal, setCeloAbierto, setMastitisAbierta, setModalPesaje, setModalRotar,
   setModalVentaLeche, setOrdenoAbierto, setReproAbierta, setSubInventario, setTab,
-  setVacunaAbierta,
+  setVacunaAbierta, setBajaAbierta,
 }: Props) {
   return (
     <div className="space-y-6 text-left">
@@ -240,6 +242,12 @@ export default function SeccionEventos({
               className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
               <span>• Venta / Beneficio (Salida Real)</span>
               <span className="text-[10px] text-rose-400 font-bold">Despachar →</span>
+            </button>
+            <button
+              onClick={() => setBajaAbierta({})}
+              className="w-full text-left p-2 rounded-xl hover:bg-white/5 text-slate-700 dark:text-white/80 hover:text-emerald-400 cursor-pointer flex items-center justify-between">
+              <span>• Muertes y pérdidas (robo / abigeato)</span>
+              <span className="text-[10px] text-rose-400 font-bold">Registrar →</span>
             </button>
           </div>
         </div>
