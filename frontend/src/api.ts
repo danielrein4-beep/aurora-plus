@@ -3826,6 +3826,8 @@ export interface TicketPosRequest {
   nombreCliente?: string;
   /** false = el cajero quitó el IVA en esta venta (queda en el libro con su usuario). */
   aplicaIva?: boolean;
+  /** true/false = el cajero activó o quitó el IGTF en esta venta. */
+  aplicaIgtf?: boolean;
   /** Cargo de delivery en la moneda base. */
   delivery?: number;
   clienteRif?: string;

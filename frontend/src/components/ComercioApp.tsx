@@ -2072,7 +2072,10 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // ─── Impuestos y cargos (Configuración > Impuestos y cargos) ─────────
   // El cálculo que vale lo hace el servidor al cobrar; aquí se repite solo para mostrarlo.
   const [impuestos, setImpuestos] = useState<ImpuestosNegocio | null>(null);
-  const [aplicaIvaVenta, setAplicaIvaVenta] = useState(true);
+  // Como en Restaurante: el cajero decide en cada venta si lleva IVA, IGTF o delivery. Arrancan
+  // según Configuración > Impuestos y cargos, y se pueden activar aunque ahí estén apagados.
+  const [aplicaIvaVenta, setAplicaIvaVenta] = useState(false);
+  const [aplicaIgtfVenta, setAplicaIgtfVenta] = useState(false);
   const [conDelivery, setConDelivery] = useState(false);
   const [montoDelivery, setMontoDelivery] = useState("");
   const [pagoMixtoMetodo, setPagoMixtoMetodo] = useState("EFECTIVO_USD");
@@ -2499,7 +2502,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // En modo euro no aplican (ni IVA venezolano ni IGTF).
   useEffect(() => {
     if (!user?.tenantId || modoEuro() || tab !== "pos") return;
-    obtenerImpuestosNegocio().then(setImpuestos).catch(() => setImpuestos(null));
+    obtenerImpuestosNegocio()
+      .then((cfg) => { setImpuestos(cfg); setAplicaIvaVenta(!!cfg.cobraIva); setAplicaIgtfVenta(!!cfg.igtfActivo); })
+      .catch(() => setImpuestos(null));
   }, [user?.tenantId, tab]);
 
   // Cálculos de Totales del Carrito — misma cuenta que CalculoFiscalVenta en el servidor.
@@ -2513,15 +2518,16 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       if (exentos.has(l.productoId)) exento += monto;
       else gravado += monto;
     }
-    const cobraIva = !!impuestos?.cobraIva;
-    const alicuota = cobraIva ? impuestos!.alicuotaIva : 0;
+    const porDefecto = !!impuestos?.cobraIva;
+    const cobraIva = !modoEuro() && (aplicaIvaVenta || porDefecto);
+    const alicuota = cobraIva ? (impuestos?.alicuotaIva && impuestos.alicuotaIva > 0 ? impuestos.alicuotaIva : 16) : 0;
     const factor = 1 + alicuota / 100;
     const aplica = cobraIva && aplicaIvaVenta;
-    const delivery = impuestos && conDelivery ? Math.max(0, parseFloat(montoDelivery) || 0) : 0;
+    const delivery = conDelivery ? Math.max(0, parseFloat(montoDelivery) || 0) : 0;
     const g = gravado + delivery;
     let base: number;
     let iva: number;
-    if (cobraIva && impuestos!.preciosIncluyenIva) {
+    if (cobraIva && impuestos?.preciosIncluyenIva !== false) {
       base = r2(g / factor);
       iva = aplica ? r2(r2(g) - base) : 0;
     } else {
@@ -2530,9 +2536,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     }
     const ex = r2(exento);
     const subtotal = r2(ex + base + iva);
-    const alicuotaIgtf = impuestos?.igtfActivo ? impuestos.alicuotaIgtf : 0;
-    return { cobraIva, alicuota, exento: ex, base, iva, delivery: r2(delivery), subtotal, alicuotaIgtf, ivaQuitado: cobraIva && !aplicaIvaVenta };
-  }, [carrito, productos, impuestos, aplicaIvaVenta, conDelivery, montoDelivery]);
+    const alicuotaIgtf = !modoEuro() && aplicaIgtfVenta ? (impuestos?.alicuotaIgtf && impuestos.alicuotaIgtf > 0 ? impuestos.alicuotaIgtf : 3) : 0;
+    return { cobraIva, alicuota, exento: ex, base, iva, delivery: r2(delivery), subtotal, alicuotaIgtf, ivaQuitado: porDefecto && !aplicaIvaVenta };
+  }, [carrito, productos, impuestos, aplicaIvaVenta, aplicaIgtfVenta, conDelivery, montoDelivery]);
 
   /** IGTF sobre lo pagado en divisas, nunca más que el subtotal. */
   const igtfSobre = (pagadoEnDivisas: number) =>
@@ -2687,7 +2693,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       lineas: carrito.map((l) => [l.backendId, l.presentacionId ?? null, l.cantidad]),
       esCredito, modoCobro, monedaRecibida, montoRecibido,
       pagos: pagosMixtos.map((p) => [p.moneda, p.montoOriginal]),
-      fiscal: [aplicaIvaVenta, conDelivery, montoDelivery],
+      fiscal: [aplicaIvaVenta, aplicaIgtfVenta, conDelivery, montoDelivery],
     });
     if (!ticketEnCursoRef.current || ticketEnCursoRef.current.firma !== firmaCobro) {
       ticketEnCursoRef.current = { numero: `TKT-${Math.floor(100000 + Math.random() * 900000)}`, firma: firmaCobro };
@@ -2812,7 +2818,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             montoPagadoAhora: esCredito ? 0 : undefined,
             diasCredito: esCredito ? 15 : undefined,
             nombreCliente: esCredito ? clienteParaVenta.nombre : undefined,
-            aplicaIva: desgloseFiscal.cobraIva ? aplicaIvaVenta : undefined,
+            aplicaIva: modoEuro() ? undefined : aplicaIvaVenta,
+            aplicaIgtf: modoEuro() ? undefined : aplicaIgtfVenta,
             delivery: desgloseFiscal.delivery > 0 ? desgloseFiscal.delivery : undefined,
             clienteRif: clienteParaVenta.documento && clienteParaVenta.documento !== "V-00000000" && !clienteParaVenta.documento.startsWith("CLI-") && !clienteParaVenta.documento.startsWith("CR-")
               ? clienteParaVenta.documento : undefined,
@@ -2929,43 +2936,70 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     setPagoMixtoRef("");
     setEmailClienteModal("");
     setEnviarEmailAlConfirmar(false);
-    setAplicaIvaVenta(true);
+    setAplicaIvaVenta(!!impuestos?.cobraIva);
+    setAplicaIgtfVenta(!!impuestos?.igtfActivo);
     setConDelivery(false);
     setMontoDelivery("");
     limpiarClienteAMostrador();
   };
 
   // Generar Cotización PDF / Proforma
-  const generarCotizacion = () => {
-    if (carrito.length === 0) return;
-    const num = `COT-${Math.floor(1000 + Math.random() * 9000)}`;
-    const proforma = `
-      ═══════════════════════════════════════════════════════════════════
-      PRESUPUESTO / COTIZACIÓN FORMAL: ${num}
-      Empresa: ${user?.empresa || "Aurora Comercial"}
-      Fecha: ${new Date().toLocaleDateString()} · Validez: 5 días continuos
-      Cliente: ${clienteSel.nombre} (${clienteSel.documento})
-      ═══════════════════════════════════════════════════════════════════
-      ${carrito.map((l) => `${l.cantidad}x ${l.nombre} | Unit: ${SIM()}${l.precio.toFixed(2)} | Subtotal: ${SIM()}${(l.precio * l.cantidad).toFixed(2)}`).join("\n      ")}
-      ═══════════════════════════════════════════════════════════════════
-      TOTAL${modoEuro() ? "" : " REF. USD"}:  ${SIM()}${totalUSD.toFixed(2)}${modoEuro() ? "" : `
-      TOTAL BOLÍVARES: Bs. ${totalBs.toFixed(2)} (Tasa: ${tasaActivaBs.toFixed(2)})
-      TOTAL COP:       COP ${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
-      ═══════════════════════════════════════════════════════════════════
-      * Precios sujetos a cambio tras vencimiento de la cotización.
-    `;
-    const blob = new Blob([proforma], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Cotizacion_${num}_${clienteSel.nombre.replace(/\s+/g, "_")}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const nombreLocal = user?.empresa || (
     "Mi negocio"
   );
+
+  // Cotización en PDF, como en Restaurante (antes bajaba un .txt): el mismo carrito con su IVA,
+  // delivery e IGTF, sin tocar inventario ni caja. Vale 7 días porque los precios cambian con la tasa.
+  const generarCotizacion = () => {
+    if (carrito.length === 0) return;
+    const doc = new jsPDF();
+    const hoyFmt = new Date().toLocaleDateString("es-VE");
+    const vence = new Date(); vence.setDate(vence.getDate() + 7);
+    const num = `COT-${Date.now().toString().slice(-6)}`;
+    const m = (n: number) => `${SIM()}${n.toFixed(2)}`;
+
+    doc.setFontSize(16); doc.setFont("helvetica", "bold");
+    doc.text(nombreLocal, 14, 18);
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    doc.text(`Cotización ${num}`, 14, 26);
+    doc.setFontSize(9); doc.setTextColor(100);
+    doc.text(`Fecha: ${hoyFmt}    Válida hasta: ${vence.toLocaleDateString("es-VE")}`, 14, 32);
+    const tieneCliente = clienteSel && clienteSel.id !== "c-1";
+    if (tieneCliente) doc.text(`Cliente: ${clienteSel.nombre}${clienteSel.documento ? " · " + clienteSel.documento : ""}`, 14, 37);
+    doc.setTextColor(0);
+
+    let y = tieneCliente ? 46 : 42;
+    doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    doc.text("Cant.", 14, y); doc.text("Descripción", 32, y); doc.text("P. Unit.", 150, y, { align: "right" }); doc.text("Subtotal", 196, y, { align: "right" });
+    y += 2; doc.setDrawColor(200); doc.line(14, y, 196, y); y += 6;
+    doc.setFont("helvetica", "normal");
+    carrito.forEach((l) => {
+      if (y > 260) { doc.addPage(); y = 20; }
+      doc.text(String(l.cantidad), 14, y);
+      doc.text(l.nombre, 32, y, { maxWidth: 110 });
+      doc.text(m(l.precio), 150, y, { align: "right" });
+      doc.text(m(l.precio * l.cantidad), 196, y, { align: "right" });
+      y += 7;
+    });
+
+    y += 2; doc.line(120, y, 196, y); y += 6;
+    const renglon = (etiqueta: string, valor: string) => { doc.text(etiqueta, 150, y, { align: "right" }); doc.text(valor, 196, y, { align: "right" }); y += 5.5; };
+    const f = desgloseFiscal;
+    if (f.exento > 0) renglon("Exento de IVA:", m(f.exento));
+    renglon(f.cobraIva ? "Base imponible:" : "Subtotal:", m(f.base - (f.cobraIva ? 0 : f.delivery)));
+    if (f.cobraIva) renglon(f.ivaQuitado ? "IVA (no aplica):" : `IVA ${f.alicuota}%:`, m(f.iva));
+    if (f.delivery > 0) renglon(f.cobraIva ? "Delivery (en la base):" : "Delivery:", m(f.delivery));
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    renglon("Total:", m(f.subtotal));
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    if (f.alicuotaIgtf > 0) renglon(`Pagando en divisas (+IGTF ${f.alicuotaIgtf}%):`, m(f.subtotal + igtfSobre(f.subtotal)));
+    if (!modoEuro() && tasaActivaBs > 0) renglon(`≈ En bolívares (tasa ${tasaActivaBs.toFixed(2)}):`, `Bs. ${(f.subtotal * tasaActivaBs).toFixed(2)}`);
+
+    doc.setFontSize(8); doc.setTextColor(120);
+    doc.text("Esta cotización no es una venta ni afecta inventario o caja. Los precios pueden variar según el tipo de cambio vigente al momento de la compra.", 14, 285, { maxWidth: 182 });
+    doc.save(`Cotizacion_${num}_${(tieneCliente ? clienteSel.nombre : nombreLocal).replace(/\s+/g, "_")}.pdf`);
+  };
+
 
   const saludo = (() => {
     const h = new Date().getHours();
@@ -3538,36 +3572,36 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
 
               {/* Totalizador & Acciones Comerciales */}
               <div className="flex-shrink-0 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
-                {impuestos && (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[11.5px] font-semibold text-slate-700 dark:text-slate-300">
-                    {impuestos.cobraIva && (
-                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input type="checkbox" checked={aplicaIvaVenta} onChange={(e) => setAplicaIvaVenta(e.target.checked)} className="w-4 h-4 accent-teal-600 cursor-pointer" />
-                        IVA {impuestos.alicuotaIva}%
-                      </label>
-                    )}
-                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                      <input
-                        type="checkbox" checked={conDelivery} className="w-4 h-4 accent-teal-600 cursor-pointer"
-                        onChange={(e) => {
-                          setConDelivery(e.target.checked);
-                          if (e.target.checked && !montoDelivery && impuestos.costoEnvioDelivery > 0) setMontoDelivery(String(impuestos.costoEnvioDelivery));
-                        }}
-                      />
-                      Delivery
-                    </label>
+                {/* Cargos e impuestos en un clic, como en Restaurante: el cajero decide si esta venta los lleva */}
+                {carrito.length > 0 && !modoEuro() && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {([
+                      ["iva", `IVA ${impuestos?.alicuotaIva && impuestos.alicuotaIva > 0 ? impuestos.alicuotaIva : 16}%`, aplicaIvaVenta, () => setAplicaIvaVenta((v) => !v)],
+                      ["igtf", `IGTF ${impuestos?.alicuotaIgtf && impuestos.alicuotaIgtf > 0 ? impuestos.alicuotaIgtf : 3}%`, aplicaIgtfVenta, () => setAplicaIgtfVenta((v) => !v)],
+                      ["delivery", "Delivery", conDelivery, () => {
+                        const nuevo = !conDelivery;
+                        setConDelivery(nuevo);
+                        if (nuevo && !montoDelivery && (impuestos?.costoEnvioDelivery ?? 0) > 0) setMontoDelivery(String(impuestos!.costoEnvioDelivery));
+                      }],
+                    ] as const).map(([clave, etiqueta, activo, alternar]) => (
+                      <button key={clave} type="button" onClick={alternar}
+                        className={`text-[11px] font-bold px-3 py-1 rounded-full border cursor-pointer transition-colors ${
+                          activo
+                            ? clave === "delivery" ? "bg-teal-600 border-teal-600 text-white" : "bg-amber-600 border-amber-600 text-white"
+                            : "border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400"
+                        }`}>
+                        {activo ? "✓ " : "+ "}{etiqueta}
+                      </button>
+                    ))}
                     {conDelivery && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 text-xs">
                         <span className="text-slate-500">{SIM()}</span>
                         <input
-                          type="number" min={0} step={0.5} value={montoDelivery} placeholder="0.00"
+                          type="number" min={0} step={0.5} value={montoDelivery} placeholder="0.00" autoFocus={!montoDelivery}
                           onChange={(e) => setMontoDelivery(e.target.value)}
                           className="w-20 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
                         />
                       </span>
-                    )}
-                    {impuestos.igtfActivo && (
-                      <span className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">IGTF {impuestos.alicuotaIgtf}% solo si paga en divisas</span>
                     )}
                   </div>
                 )}
@@ -3577,14 +3611,20 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   </div>
                 )}
                 <div className="space-y-1 bg-slate-100/60 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-300/60 dark:border-slate-700/40">
-                  {(desgloseFiscal.cobraIva || desgloseFiscal.delivery > 0) && carrito.length > 0 && (
+                  {(desgloseFiscal.cobraIva || desgloseFiscal.delivery > 0 || desgloseFiscal.alicuotaIgtf > 0) && carrito.length > 0 && (
                     <div className="space-y-0.5 pb-1.5 mb-1 border-b border-slate-300/60 dark:border-slate-700/50 text-[11px] font-mono text-slate-500 dark:text-slate-400">
                       {desgloseFiscal.exento > 0 && (
-                        <div className="flex justify-between"><span>Exento</span><span>{SIM()}{desgloseFiscal.exento.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>Exento de IVA</span><span>{SIM()}{desgloseFiscal.exento.toFixed(2)}</span></div>
                       )}
-                      <div className="flex justify-between"><span>{desgloseFiscal.cobraIva ? "Base imponible" : "Productos"}{desgloseFiscal.delivery > 0 ? " (incl. delivery)" : ""}</span><span>{SIM()}{desgloseFiscal.base.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span>{desgloseFiscal.cobraIva ? "Base imponible" : "Subtotal"}</span><span>{SIM()}{(desgloseFiscal.base - (desgloseFiscal.cobraIva ? 0 : desgloseFiscal.delivery)).toFixed(2)}</span></div>
                       {desgloseFiscal.cobraIva && (
                         <div className="flex justify-between"><span>IVA {desgloseFiscal.ivaQuitado ? "(quitado)" : `${desgloseFiscal.alicuota}%`}</span><span>{SIM()}{desgloseFiscal.iva.toFixed(2)}</span></div>
+                      )}
+                      {desgloseFiscal.delivery > 0 && (
+                        <div className="flex justify-between"><span>Delivery{desgloseFiscal.cobraIva ? " (en la base)" : ""}</span><span>{SIM()}{desgloseFiscal.delivery.toFixed(2)}</span></div>
+                      )}
+                      {desgloseFiscal.alicuotaIgtf > 0 && (
+                        <div className="flex justify-between"><span>IGTF {desgloseFiscal.alicuotaIgtf}% (si paga en divisas)</span><span>{SIM()}{igtfSobre(desgloseFiscal.subtotal).toFixed(2)}</span></div>
                       )}
                     </div>
                   )}
@@ -3617,7 +3657,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     title="Descargar presupuesto formal para cliente"
                   >
                     <IconFileText size={14} />
-                    <span> Cotización</span>
+                    <span>Cotización PDF</span>
                   </button>
 
                                     <button

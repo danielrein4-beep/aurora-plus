@@ -487,10 +487,18 @@ public class RepuestoConversionService {
      * dice si se pagó en divisas (lleva IGTF); null = se deduce de la moneda del pago.
      * canalVenta: "POS" (por defecto) o "WEB", para el concepto y el origen del asiento de caja.
      */
+    /**
+     * aplicaIva / aplicaIgtf: lo que decidió el cajero en esta venta (como en Restaurante). true obliga
+     * aunque el negocio no lo tenga activo por defecto, false lo quita, null = según Configuración.
+     */
     public record OpcionesFiscales(Boolean aplicaIva, BigDecimal delivery, String clienteRif, String usuario,
-                                   Boolean pagoEnDivisas, String canalVenta) {
+                                   Boolean pagoEnDivisas, String canalVenta, Boolean aplicaIgtf) {
         public OpcionesFiscales(Boolean aplicaIva, BigDecimal delivery, String clienteRif, String usuario) {
-            this(aplicaIva, delivery, clienteRif, usuario, null, null);
+            this(aplicaIva, delivery, clienteRif, usuario, null, null, null);
+        }
+        public OpcionesFiscales(Boolean aplicaIva, BigDecimal delivery, String clienteRif, String usuario,
+                                Boolean pagoEnDivisas, String canalVenta) {
+            this(aplicaIva, delivery, clienteRif, usuario, pagoEnDivisas, canalVenta, null);
         }
     }
 
@@ -548,10 +556,19 @@ public class RepuestoConversionService {
         com.auroraplus.core.config.entities.LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
         // En modo euro no aplican el IVA venezolano ni el IGTF (el POS tampoco los muestra).
         boolean modoEuro = licencia != null && "EUR".equals(licencia.getMonedaBase());
-        boolean cobraIva = !modoEuro && licencia != null && Boolean.TRUE.equals(licencia.getCobraIva());
-        boolean ivaQuitado = cobraIva && fiscal != null && Boolean.FALSE.equals(fiscal.aplicaIva());
+        boolean ivaPorDefecto = licencia != null && Boolean.TRUE.equals(licencia.getCobraIva());
+        Boolean ivaElegido = fiscal != null ? fiscal.aplicaIva() : null;
+        boolean cobraIva = !modoEuro && licencia != null && (Boolean.TRUE.equals(ivaElegido) || (ivaElegido == null && ivaPorDefecto) || (ivaPorDefecto && Boolean.FALSE.equals(ivaElegido)));
+        // "Quitado" = el negocio cobra IVA por defecto y el cajero lo quitó en esta venta (queda en el libro).
+        boolean ivaQuitado = !modoEuro && ivaPorDefecto && Boolean.FALSE.equals(ivaElegido);
+        BigDecimal alicuotaIva = licencia != null && licencia.getAlicuotaIva() != null && licencia.getAlicuotaIva().signum() > 0
+            ? licencia.getAlicuotaIva() : new BigDecimal("16"); // alícuota general venezolana
         boolean incluyeIva = licencia == null || !Boolean.FALSE.equals(licencia.getPreciosIncluyenIva());
-        boolean igtfActivo = !modoEuro && licencia != null && Boolean.TRUE.equals(licencia.getIgtfActivo());
+        Boolean igtfElegido = fiscal != null ? fiscal.aplicaIgtf() : null;
+        boolean igtfActivo = !modoEuro && licencia != null
+            && (igtfElegido != null ? igtfElegido : Boolean.TRUE.equals(licencia.getIgtfActivo()));
+        BigDecimal alicuotaIgtf = licencia != null && licencia.getAlicuotaIgtf() != null && licencia.getAlicuotaIgtf().signum() > 0
+            ? licencia.getAlicuotaIgtf() : new BigDecimal("3"); // IGTF vigente sobre pagos en divisas
         BigDecimal delivery = fiscal != null && fiscal.delivery() != null && fiscal.delivery().signum() > 0 ? fiscal.delivery() : BigDecimal.ZERO;
         BigDecimal pagadoEnDivisas = BigDecimal.ZERO;
         if (igtfActivo) {
@@ -568,8 +585,8 @@ public class RepuestoConversionService {
             }
         }
         CalculoFiscalVenta.Desglose desglose = CalculoFiscalVenta.calcular(gravado, exento, delivery,
-            cobraIva && !ivaQuitado, cobraIva ? licencia.getAlicuotaIva() : BigDecimal.ZERO, cobraIva && incluyeIva,
-            igtfActivo, igtfActivo ? licencia.getAlicuotaIgtf() : BigDecimal.ZERO, pagadoEnDivisas);
+            cobraIva && !ivaQuitado, cobraIva ? alicuotaIva : BigDecimal.ZERO, cobraIva && incluyeIva,
+            igtfActivo, igtfActivo ? alicuotaIgtf : BigDecimal.ZERO, pagadoEnDivisas);
         BigDecimal total = desglose.total();
         String canal = fiscal != null && fiscal.canalVenta() != null ? fiscal.canalVenta() : "POS";
         String concepto = ("WEB".equals(canal) ? "Venta web pedido " : "Venta POS ticket ") + numeroTicket.trim() + " (" + lineas.size() + " línea" + (lineas.size() == 1 ? "" : "s") + ")";
