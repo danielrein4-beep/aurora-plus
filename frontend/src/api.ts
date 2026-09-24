@@ -5321,6 +5321,39 @@ export interface DetalleActividadVertical {
   tenants: TenantActividad[];
 }
 
+/** Reporte de una enfermedad en toda la red: casos por médico y por mes (año vs anterior). */
+export interface MedicoReporteEnfermedad {
+  tenantId: number;
+  medico: string;
+  especialidad: string | null;
+  clinica: string | null;
+  casosAnio: number;
+  casosAnioAnterior: number;
+  casosHistorico: number;
+  pacientesDistintos: number;
+  ultimoCaso: string | null;
+  porMes: number[];
+  participacionPct: number;
+}
+
+export interface ReporteEnfermedad {
+  cie10: string;
+  descripcion: string | null;
+  anio: number;
+  totalAnio: number;
+  totalAnioAnterior: number;
+  totalHistorico: number;
+  pacientesDistintos: number;
+  medicosConCasos: number;
+  porMes: number[];
+  porMesAnterior: number[];
+  medicos: MedicoReporteEnfermedad[];
+}
+
+export function obtenerReporteEnfermedadSuperAdmin(cie10: string, anio: number): Promise<ReporteEnfermedad> {
+  return requestSuperAdmin(`/api/super-admin/actividad/enfermedad?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+}
+
 export function obtenerResumenActividadSuperAdmin(dias: number): Promise<ResumenActividadVertical[]> {
   return requestSuperAdmin(`/api/super-admin/actividad/resumen?dias=${dias}`);
 }

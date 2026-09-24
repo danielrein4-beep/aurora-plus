@@ -7,7 +7,7 @@ import {
   type DetalleActividadVertical,
   type TenantActividad,
 } from "../api";
-import CanalEndemico from "./CanalEndemico";
+import SuperAdminReporteEnfermedad from "./SuperAdminReporteEnfermedad";
 
 /** Mismas verticales que el directorio de tenants, con los textos ya acentuados. */
 const VERTICALES = [
@@ -143,16 +143,14 @@ export default function SuperAdminActividad() {
               onClick={() => setSubVistaSalud("CANAL")}
               className={`px-4 py-1.5 rounded-xl text-xs font-bold cursor-pointer ${subVistaSalud === "CANAL" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600"}`}
             >
-              Canal Endémico de la red
+              Reporte por enfermedad
             </button>
           </div>
         )}
       </div>
 
       {vertical === "salud" && subVistaSalud === "CANAL" ? (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6">
-          <CanalEndemico modo="red" />
-        </div>
+        <SuperAdminReporteEnfermedad />
       ) : (
         <>
           {error && (
