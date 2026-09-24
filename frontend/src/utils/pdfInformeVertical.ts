@@ -3,7 +3,7 @@ import type {
   DetalleVertical, MetricaVertical, OperacionRestaurantes, ProduccionGanaderia, ClinicaOdontologia,
 } from "../api";
 import {
-  type RGB, CIELO, ESMERALDA, VIOLETA, AMBAR, ROJO, GRIS, MARGEN,
+  type RGB, CIELO, ESMERALDA, VIOLETA, AMBAR, ROJO, GRIS, TINTA, MARGEN, PALETA_GRAFICAS,
   hexARgb, encabezado, pie, numerarPaginas, tarjetas, tituloSeccion, barrasMensuales, barrasHorizontales, tabla, vinetas,
 } from "./pdfComun";
 
@@ -86,7 +86,7 @@ function portada(doc: jsPDF, datos: DatosPdfInformeVertical, color: RGB, fecha: 
     `Período: ${datos.periodoLabel}  ·  ${k.negocios} negocio(s)  ·  Generado: ${fecha}`, color);
 
   tarjetas(doc, y0, [
-    { label: "NEGOCIOS", val: numero.format(k.negocios), color, nota: `${k.activos} activos · ${k.suspendidos} suspendidos` },
+    { label: "NEGOCIOS", val: numero.format(k.negocios), color: TINTA, nota: `${k.activos} activos · ${k.suspendidos} suspendidos` },
     { label: "USÁNDOLO DE VERDAD", val: numero.format(k.conActividad), color: ESMERALDA, nota: `de ${k.activos} activos` },
     { label: "EN RIESGO DE ABANDONO", val: numero.format(k.enRiesgo), color: k.enRiesgo > 0 ? ROJO : GRIS, nota: "sin uso en 14+ días" },
     { label: "POR VENCER", val: numero.format(k.porVencer), color: k.porVencer > 0 ? AMBAR : GRIS, nota: "próximos 7 días" },
@@ -100,7 +100,7 @@ function portada(doc: jsPDF, datos: DatosPdfInformeVertical, color: RGB, fecha: 
     const usarSuma = !!m.serieSuma;
     const valores = (usarSuma ? m.serieSuma! : m.serie).map(Number);
     tituloSeccion(doc, `${m.etiqueta} por mes${usarSuma ? ` (${m.unidadSuma === "USD" ? "monto en dólares" : m.unidadSuma})` : ""} — últimos 12 meses`, MARGEN, chartY - 5);
-    barrasMensuales(doc, valores, null, chartX, chartY, chartW, chartH, color, d.meses.map(etiquetaMes),
+    barrasMensuales(doc, valores, null, chartX, chartY, chartW, chartH, PALETA_GRAFICAS[0], d.meses.map(etiquetaMes),
       (v) => (usarSuma && m.unidadSuma === "USD" ? `$${numero.format(v)}` : numero.format(v)));
   } else {
     tituloSeccion(doc, "Esta vertical todavía no tiene métricas con fecha.", MARGEN, chartY - 5);
@@ -116,7 +116,6 @@ function hallazgos(datos: DatosPdfInformeVertical): { texto: string; color: RGB 
   const d = datos.detalle;
   const k = d.kpis;
   const salida: { texto: string; color: RGB }[] = [];
-  const color = hexARgb(datos.colorHex);
   if (k.negocios === 0) return [{ texto: "Todavía no hay negocios en esta vertical.", color: GRIS }];
 
   const adopcion = k.activos > 0 ? Math.round((k.conActividad / k.activos) * 100) : 0;
@@ -134,7 +133,7 @@ function hallazgos(datos: DatosPdfInformeVertical): { texto: string; color: RGB 
     const max = Math.max(...valores);
     if (max > 0) {
       const i = valores.indexOf(max);
-      salida.push({ texto: `Mes con más ${m.etiqueta.toLowerCase()}: ${nombreMes(d.meses[i])} (${m.serieSuma ? suma(max, m.unidadSuma) : numero.format(max)}).`, color });
+      salida.push({ texto: `Mes con más ${m.etiqueta.toLowerCase()}: ${nombreMes(d.meses[i])} (${m.serieSuma ? suma(max, m.unidadSuma) : numero.format(max)}).`, color: PALETA_GRAFICAS[0] });
     }
     // El mes en curso va a medias: se compara el último mes completo contra el anterior.
     const ultimo = valores[10], previo = valores[9];
@@ -199,14 +198,14 @@ function metricasYEvolucion(doc: jsPDF, datos: DatosPdfInformeVertical, color: R
     const cy = y + 14;
     tituloSeccion(doc, "Ingresos de suscripciones por mes (USD)", MARGEN, cy - 5);
     if (d.serieIngresos.some((v) => Number(v) > 0)) {
-      barrasMensuales(doc, d.serieIngresos.map(Number), null, MARGEN + 10, cy, w, alto, CIELO, d.meses.map(etiquetaMes), (v) => `$${numero.format(v)}`);
+      barrasMensuales(doc, d.serieIngresos.map(Number), null, MARGEN + 10, cy, w, alto, PALETA_GRAFICAS[1], d.meses.map(etiquetaMes), (v) => `$${numero.format(v)}`);
     } else {
       notaVacia(doc, "No se registraron pagos de suscripción de esta vertical en los últimos 12 meses.", MARGEN, cy + 4);
     }
     const x2 = MARGEN + w + 30;
     tituloSeccion(doc, "Negocios nuevos por mes", x2 - 10, cy - 5);
     if (d.serieAltas.some((v) => Number(v) > 0)) {
-      barrasMensuales(doc, d.serieAltas.map(Number), null, x2, cy, w, alto, VIOLETA, d.meses.map(etiquetaMes));
+      barrasMensuales(doc, d.serieAltas.map(Number), null, x2, cy, w, alto, PALETA_GRAFICAS[3], d.meses.map(etiquetaMes));
     } else {
       notaVacia(doc, "No hubo negocios nuevos en los últimos 12 meses.", x2 - 10, cy + 4);
     }
@@ -221,27 +220,27 @@ function operacionRestaurantes(doc: jsPDF, datos: DatosPdfInformeVertical, op: O
   const y0 = encabezado(doc, "RESTAURANTES — OPERACIÓN", "Horas pico, días, canales, métodos de pago y platos", `Período: ${datos.periodoLabel}  ·  Generado: ${fecha}`, color);
   const pico = op.porHora.indexOf(Math.max(...op.porHora));
   tarjetas(doc, y0, [
-    { label: "COMANDAS", val: numero.format(op.comandas), color, nota: "sin anuladas" },
+    { label: "COMANDAS", val: numero.format(op.comandas), color: PALETA_GRAFICAS[0], nota: "sin anuladas" },
     { label: "VENTAS DE LOS RESTAURANTES", val: usd(Number(op.ventas)), color: ESMERALDA, nota: "consumo registrado" },
     { label: "TICKET PROMEDIO", val: usd(Number(op.ticketPromedio)), color: VIOLETA, nota: "por comanda" },
-    { label: "HORA PICO", val: op.comandas ? `${String(pico).padStart(2, "0")}:00` : "—", color, nota: op.comandas ? `${op.porHora[pico]} comandas` : "sin comandas" },
+    { label: "HORA PICO", val: op.comandas ? `${String(pico).padStart(2, "0")}:00` : "—", color: PALETA_GRAFICAS[2], nota: op.comandas ? `${op.porHora[pico]} comandas` : "sin comandas" },
   ]);
   const cy = y0 + 34, ch = 44;
   const w1 = (W - 2 * MARGEN) * 0.62;
   tituloSeccion(doc, "Comandas por hora del día", MARGEN, cy - 5);
-  barrasMensuales(doc, op.porHora.map(Number), null, MARGEN + 8, cy, w1 - 8, ch, color, op.porHora.map((_, h) => String(h)));
+  barrasMensuales(doc, op.porHora.map(Number), null, MARGEN + 8, cy, w1 - 8, ch, PALETA_GRAFICAS[0], op.porHora.map((_, h) => String(h)));
   const x2 = MARGEN + w1 + 14;
   tituloSeccion(doc, "Por día de la semana", x2 - 6, cy - 5);
-  barrasMensuales(doc, op.porDiaSemana.map(Number), null, x2, cy, W - x2 - MARGEN, ch, color, DIAS_SEMANA);
+  barrasMensuales(doc, op.porDiaSemana.map(Number), null, x2, cy, W - x2 - MARGEN, ch, PALETA_GRAFICAS[1], DIAS_SEMANA);
 
   const ry = cy + ch + 14;
   const cw = (W - 2 * MARGEN - 2 * 10) / 3;
   tituloSeccion(doc, "Canales de venta", MARGEN, ry);
-  barrasHorizontales(doc, op.canales.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), MARGEN, ry + 3, cw, color, 5);
+  barrasHorizontales(doc, op.canales.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), MARGEN, ry + 3, cw, PALETA_GRAFICAS, 5);
   tituloSeccion(doc, "Métodos de pago", MARGEN + cw + 10, ry);
-  barrasHorizontales(doc, op.metodosPago.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), MARGEN + cw + 10, ry + 3, cw, color, 5);
+  barrasHorizontales(doc, op.metodosPago.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), MARGEN + cw + 10, ry + 3, cw, PALETA_GRAFICAS, 5);
   tituloSeccion(doc, "Platos más vendidos", MARGEN + 2 * (cw + 10), ry);
-  barrasHorizontales(doc, op.topPlatos.map((p) => ({ etiqueta: p.nombre, valor: Number(p.cantidad), texto: `${numero.format(Number(p.cantidad))} · ${usd(Number(p.ventas))}` })), MARGEN + 2 * (cw + 10), ry + 3, cw, color, 5);
+  barrasHorizontales(doc, op.topPlatos.map((p) => ({ etiqueta: p.nombre, valor: Number(p.cantidad), texto: `${numero.format(Number(p.cantidad))} · ${usd(Number(p.ventas))}` })), MARGEN + 2 * (cw + 10), ry + 3, cw, PALETA_GRAFICAS, 5);
   pie(doc, PIE);
 }
 
@@ -251,7 +250,7 @@ function produccionGanaderia(doc: jsPDF, datos: DatosPdfInformeVertical, op: Pro
   const y0 = encabezado(doc, "GANADERÍA — PRODUCCIÓN Y HATO", "Leche, calidad, hato y fincas", `Período: ${datos.periodoLabel}  ·  Generado: ${fecha}`, color);
   const hato = op.hatoPorEstado.reduce((s, x) => s + Number(x.n), 0);
   tarjetas(doc, y0, [
-    { label: "LECHE ORDEÑADA", val: `${numero.format(Number(op.litros))} L`, color, nota: "en el período" },
+    { label: "LECHE ORDEÑADA", val: `${numero.format(Number(op.litros))} L`, color: PALETA_GRAFICAS[1], nota: "en el período" },
     { label: "ORDEÑOS", val: numero.format(op.ordenos), color: CIELO, nota: `${op.vacasOrdenadas} vaca(s)` },
     { label: "PROMEDIO POR ORDEÑO", val: `${numero.format(Number(op.promedioPorOrdeno))} L`, color: VIOLETA },
     { label: "GRASA / PROTEÍNA", val: `${numero.format(Number(op.grasaPromedio))}% / ${numero.format(Number(op.proteinaPromedio))}%`, color: AMBAR, nota: "promedio" },
@@ -261,19 +260,19 @@ function produccionGanaderia(doc: jsPDF, datos: DatosPdfInformeVertical, op: Pro
   const cy = y0 + 34, ch = 50;
   if (leche?.serieSuma) {
     tituloSeccion(doc, "Litros de leche por mes — últimos 12 meses", MARGEN, cy - 5);
-    barrasMensuales(doc, leche.serieSuma.map(Number), null, MARGEN + 10, cy, W - 2 * MARGEN - 10, ch, color, datos.detalle.meses.map(etiquetaMes), (v) => numero.format(v));
+    barrasMensuales(doc, leche.serieSuma.map(Number), null, MARGEN + 10, cy, W - 2 * MARGEN - 10, ch, PALETA_GRAFICAS[1], datos.detalle.meses.map(etiquetaMes), (v) => numero.format(v));
   }
   const ry = cy + ch + 14;
   const cw = (W - 2 * MARGEN - 3 * 10) / 4;
   const col = (i: number) => MARGEN + i * (cw + 10);
   tituloSeccion(doc, "Hato por estado", col(0), ry);
-  barrasHorizontales(doc, op.hatoPorEstado.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), col(0), ry + 3, cw, color, 5);
+  barrasHorizontales(doc, op.hatoPorEstado.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), col(0), ry + 3, cw, PALETA_GRAFICAS, 5);
   tituloSeccion(doc, "Hato por tipo", col(1), ry);
-  barrasHorizontales(doc, op.hatoPorTipo.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), col(1), ry + 3, cw, color, 5);
+  barrasHorizontales(doc, op.hatoPorTipo.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), col(1), ry + 3, cw, PALETA_GRAFICAS, 5);
   tituloSeccion(doc, "Hato por sexo", col(2), ry);
-  barrasHorizontales(doc, op.hatoPorSexo.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), col(2), ry + 3, cw, color, 5);
+  barrasHorizontales(doc, op.hatoPorSexo.map((c) => ({ etiqueta: c.etiqueta, valor: Number(c.n) })), col(2), ry + 3, cw, PALETA_GRAFICAS, 5);
   tituloSeccion(doc, "Fincas con más producción", col(3), ry);
-  barrasHorizontales(doc, op.topFincas.map((f) => ({ etiqueta: f.nombre, valor: Number(f.litros), texto: `${numero.format(Number(f.litros))} L` })), col(3), ry + 3, cw, color, Math.floor((H - ry - 20) / 9));
+  barrasHorizontales(doc, op.topFincas.map((f) => ({ etiqueta: f.nombre, valor: Number(f.litros), texto: `${numero.format(Number(f.litros))} L` })), col(3), ry + 3, cw, PALETA_GRAFICAS, Math.floor((H - ry - 20) / 9));
   pie(doc, PIE);
 }
 
@@ -282,7 +281,7 @@ function clinicaOdontologia(doc: jsPDF, datos: DatosPdfInformeVertical, op: Clin
   const y0 = encabezado(doc, "ODONTOLOGÍA — TRATAMIENTOS Y CARTERA", "Planes de tratamiento, cobros y procedimientos", `Período: ${datos.periodoLabel}  ·  Generado: ${fecha}`, color);
   const pendiente = Math.max(0, Number(op.carteraTotal) - Number(op.carteraPagada));
   tarjetas(doc, y0, [
-    { label: "PLANES DE TRATAMIENTO", val: numero.format(op.planesPorEstado.reduce((s, p) => s + Number(p.n), 0)), color },
+    { label: "PLANES DE TRATAMIENTO", val: numero.format(op.planesPorEstado.reduce((s, p) => s + Number(p.n), 0)), color: PALETA_GRAFICAS[3] },
     { label: "CARTERA TOTAL", val: usd(Number(op.carteraTotal)), color: CIELO },
     { label: "COBRADO", val: usd(Number(op.carteraPagada)), color: ESMERALDA },
     { label: "POR COBRAR", val: usd(pendiente), color: pendiente > 0 ? AMBAR : GRIS },
@@ -290,9 +289,9 @@ function clinicaOdontologia(doc: jsPDF, datos: DatosPdfInformeVertical, op: Clin
   const ry = y0 + 34;
   const cw = (W - 2 * MARGEN - 12) / 2;
   tituloSeccion(doc, "Planes por estado", MARGEN, ry);
-  barrasHorizontales(doc, op.planesPorEstado.map((p) => ({ etiqueta: p.etiqueta, valor: Number(p.n), texto: `${p.n} · ${usd(Number(p.monto))}` })), MARGEN, ry + 3, cw, color, 10);
+  barrasHorizontales(doc, op.planesPorEstado.map((p) => ({ etiqueta: p.etiqueta, valor: Number(p.n), texto: `${p.n} · ${usd(Number(p.monto))}` })), MARGEN, ry + 3, cw, PALETA_GRAFICAS, 10);
   tituloSeccion(doc, "Procedimientos más realizados (período)", MARGEN + cw + 12, ry);
-  barrasHorizontales(doc, op.topProcedimientos.map((p) => ({ etiqueta: p.etiqueta, valor: Number(p.n) })), MARGEN + cw + 12, ry + 3, cw, color, 10);
+  barrasHorizontales(doc, op.topProcedimientos.map((p) => ({ etiqueta: p.etiqueta, valor: Number(p.n) })), MARGEN + cw + 12, ry + 3, cw, PALETA_GRAFICAS, 10);
   pie(doc, PIE);
 }
 

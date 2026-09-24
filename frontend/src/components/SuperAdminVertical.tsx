@@ -25,7 +25,7 @@ export const VERTICALES_SUPERADMIN: { id: string; nombre: string; descripcion: s
     icono: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" },
   { id: "odontologia", nombre: "Odontología", descripcion: "Consultorios dentales", color: "#14b8a6",
     icono: "M12 3c-2.5 0-3-1-5-1S3 3.5 3 7c0 3 1.5 5 2 8 .4 2.4 1 6 2.5 6s1.5-3 2.5-5.5c.5-1.3 1.5-1.3 2 0C13 18 13 21 14.5 21S16.6 17.4 17 15c.5-3 2-5 2-8 0-3.5-2-5-4-5s-2.5 1-3 1z" },
-  { id: "restaurantes", nombre: "Restaurantes", descripcion: "Restaurantes, cafeterías y delivery", color: "#2E9AA0",
+  { id: "restaurantes", nombre: "Restaurantes", descripcion: "Restaurantes, cafeterías y delivery", color: "#237F87",
     icono: "M3 3v7a3 3 0 003 3v8m0-18v7m3-7v7a3 3 0 01-3 3m12-10c-1.7 0-3 2-3 5s1.3 4 3 4v9" },
   { id: "comercio", nombre: "Comercio", descripcion: "Tiendas, ferreterías, repuestos y farmacias", color: "#6366f1",
     icono: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.3 2.3c-.6.6-.2 1.7.7 1.7H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" },
@@ -49,6 +49,12 @@ const PERIODOS = [
   { dias: 90, label: "90 días" },
   { dias: 365, label: "12 meses" },
 ];
+
+/**
+ * Colores de las gráficas: variados y sobrios, a propósito distintos del color de la
+ * vertical (que queda solo para su identidad: cabecera, ícono, pestañas y botones).
+ */
+const PALETA = ["#6C7FD8", "#5FB49C", "#D9A94E", "#A78BDA", "#5AA9C9", "#8FA3B8"];
 
 const MESES_CORTOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -209,7 +215,7 @@ export default function SuperAdminVertical({ verticalId, onAbrirFicha }: Props) 
       {error && <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-sm">{error}</div>}
       {cargando && !datos && <div className="text-sm text-slate-400">Cargando {info.nombre}...</div>}
 
-      {datos && pestana === "RESUMEN" && <Resumen datos={datos} color={info.color} onAbrirFicha={onAbrirFicha} />}
+      {datos && pestana === "RESUMEN" && <Resumen datos={datos} onAbrirFicha={onAbrirFicha} />}
       {datos && pestana === "NEGOCIOS" && <Negocios datos={datos} onAbrirFicha={onAbrirFicha} />}
 
       {pestana === "CLINICAS" && (
@@ -226,16 +232,16 @@ export default function SuperAdminVertical({ verticalId, onAbrirFicha }: Props) 
       )}
       {pestana === "COMERCIOS" && <VistaComercio dias={dias} />}
       {pestana === "MERCADO" && <VistaMercado dias={dias} />}
-      {pestana === "OPERACION" && <OperacionRestaurantesVista dias={dias} color={info.color} onAbrirFicha={onAbrirFicha} />}
-      {pestana === "PRODUCCION" && <ProduccionGanaderiaVista dias={dias} color={info.color} datos={datos} onAbrirFicha={onAbrirFicha} />}
-      {pestana === "CLINICA_ODONTO" && <ClinicaOdontologiaVista dias={dias} color={info.color} />}
+      {pestana === "OPERACION" && <OperacionRestaurantesVista dias={dias} onAbrirFicha={onAbrirFicha} />}
+      {pestana === "PRODUCCION" && <ProduccionGanaderiaVista dias={dias} datos={datos} onAbrirFicha={onAbrirFicha} />}
+      {pestana === "CLINICA_ODONTO" && <ClinicaOdontologiaVista dias={dias} />}
     </div>
   );
 }
 
 // ───────────────────────────── RESUMEN ─────────────────────────────
 
-function Resumen({ datos, color, onAbrirFicha }: { datos: DetalleVertical; color: string; onAbrirFicha: (id: number) => void }) {
+function Resumen({ datos, onAbrirFicha }: { datos: DetalleVertical; onAbrirFicha: (id: number) => void }) {
   const { kpis } = datos;
   const conSerie = datos.metricas.filter((m) => m.serie);
   const [metricaGrafico, setMetricaGrafico] = useState(conSerie[0]?.clave ?? "");
@@ -269,7 +275,7 @@ function Resumen({ datos, color, onAbrirFicha }: { datos: DetalleVertical; color
 
       {/* MÉTRICAS OPERATIVAS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {datos.metricas.map((m) => <TarjetaMetrica key={m.clave} m={m} color={color} meses={datos.meses} />)}
+        {datos.metricas.map((m, i) => <TarjetaMetrica key={m.clave} m={m} color={PALETA[i % PALETA.length]} meses={datos.meses} />)}
         {datos.metricas.length === 0 && <div className="text-sm text-slate-400">Esta vertical todavía no tiene métricas operativas.</div>}
       </div>
 
@@ -286,7 +292,7 @@ function Resumen({ datos, color, onAbrirFicha }: { datos: DetalleVertical; color
                 <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#64748b" }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#64748b" }} />
                 <Tooltip formatter={(v, k) => k === "suma" ? [formatoSuma(Number(v), elegida?.unidadSuma ?? null), elegida?.unidadSuma === "USD" ? "Monto" : "Total"] : [numero.format(Number(v)), elegida?.etiqueta ?? ""]} />
-                <Bar dataKey={verSuma ? "suma" : "cantidad"} fill={color} radius={[4, 4, 0, 0]} />
+                <Bar dataKey={verSuma ? "suma" : "cantidad"} fill={PALETA[0]} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -301,13 +307,13 @@ function Resumen({ datos, color, onAbrirFicha }: { datos: DetalleVertical; color
                 <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#64748b" }} />
                 <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
                 <Tooltip formatter={(v, k) => k === "ingresos" ? [`$${dinero.format(Number(v))}`, "Ingresos"] : [numero.format(Number(v)), "Negocios nuevos"]} />
-                <Area type="monotone" dataKey="ingresos" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.15} strokeWidth={2} />
+                <Area type="monotone" dataKey="ingresos" stroke={PALETA[1]} fill={PALETA[1]} fillOpacity={0.15} strokeWidth={2} />
                 <Area type="monotone" dataKey="altas" stroke="#a855f7" fill="#a855f7" fillOpacity={0.08} strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="flex gap-4 text-[11px] text-slate-500 mt-2">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-sky-500" /> Ingresos</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PALETA[1] }} /> Ingresos</span>
             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-violet-500" /> Negocios nuevos</span>
           </div>
         </Panel>
@@ -493,7 +499,7 @@ function useCarga<T>(cargar: () => Promise<T>, deps: unknown[]) {
   return { datos, error };
 }
 
-function OperacionRestaurantesVista({ dias, color, onAbrirFicha }: { dias: number; color: string; onAbrirFicha: (id: number) => void }) {
+function OperacionRestaurantesVista({ dias, onAbrirFicha }: { dias: number; onAbrirFicha: (id: number) => void }) {
   const { datos, error } = useCarga<OperacionRestaurantes>(() => obtenerOperacionRestaurantes(dias), [dias]);
   if (!datos) return <EstadoCarga error={error} />;
   const horas = datos.porHora.map((n, h) => ({ hora: `${String(h).padStart(2, "0")}h`, comandas: n, ventas: datos.ventasPorHora[h] }));
@@ -505,7 +511,7 @@ function OperacionRestaurantesVista({ dias, color, onAbrirFicha }: { dias: numbe
         <Kpi titulo="Comandas" valor={numero.format(datos.comandas)} nota="Sin anuladas, en el período" />
         <Kpi titulo="Ventas de los restaurantes" valor={`$${dinero.format(datos.ventas)}`} nota="Consumo registrado" color="text-emerald-600" />
         <Kpi titulo="Ticket promedio" valor={`$${dinero.format(datos.ticketPromedio)}`} nota="Por comanda" />
-        <Kpi titulo="Hora pico" valor={datos.comandas ? `${String(horaPico).padStart(2, "0")}:00` : "-"} nota={datos.comandas ? `${datos.porHora[horaPico]} comandas` : "Sin comandas"} color="text-teal-700" />
+        <Kpi titulo="Hora pico" valor={datos.comandas ? `${String(horaPico).padStart(2, "0")}:00` : "-"} nota={datos.comandas ? `${datos.porHora[horaPico]} comandas` : "Sin comandas"} />
       </div>
       <div className="grid lg:grid-cols-3 gap-6">
         <Panel titulo="Comandas por hora del día" className="lg:col-span-2">
@@ -516,7 +522,7 @@ function OperacionRestaurantesVista({ dias, color, onAbrirFicha }: { dias: numbe
                 <XAxis dataKey="hora" tick={{ fontSize: 10, fill: "#64748b" }} interval={1} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#64748b" }} />
                 <Tooltip formatter={(v, k) => k === "ventas" ? [`$${dinero.format(Number(v))}`, "Ventas"] : [v, "Comandas"]} />
-                <Bar dataKey="comandas" fill={color} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="comandas" fill={PALETA[0]} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -529,30 +535,29 @@ function OperacionRestaurantesVista({ dias, color, onAbrirFicha }: { dias: numbe
                 <XAxis dataKey="dia" tick={{ fontSize: 10, fill: "#64748b" }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#64748b" }} />
                 <Tooltip />
-                <Bar dataKey="comandas" name="Comandas" fill={color} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="comandas" name="Comandas" fill={PALETA[1]} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Panel>
       </div>
       <div className="grid lg:grid-cols-3 gap-6">
-        <Panel titulo="Canales de venta"><Barras filas={datos.canales} color={color} /></Panel>
-        <Panel titulo="Métodos de pago"><Barras filas={datos.metodosPago} color={color} /></Panel>
+        <Panel titulo="Canales de venta"><Barras filas={datos.canales} /></Panel>
+        <Panel titulo="Métodos de pago"><Barras filas={datos.metodosPago} /></Panel>
         <Panel titulo="Platos más vendidos">
-          <Barras filas={datos.topPlatos.map((p) => ({ etiqueta: p.nombre, n: Number(p.cantidad), detalle: `$${dinero.format(Number(p.ventas))}` }))} color={color} />
+          <Barras filas={datos.topPlatos.map((p) => ({ etiqueta: p.nombre, n: Number(p.cantidad), detalle: `$${dinero.format(Number(p.ventas))}` }))} />
         </Panel>
       </div>
       <Panel titulo="Restaurantes que más venden">
         <Barras
           filas={datos.topRestaurantes.map((r) => ({ etiqueta: r.nombre, n: Number(r.ventas), detalle: `${r.comandas} comandas`, formato: (v: number) => `$${dinero.format(v)}`, alTocar: () => onAbrirFicha(r.tenantId) }))}
-          color={color}
         />
       </Panel>
     </div>
   );
 }
 
-function ProduccionGanaderiaVista({ dias, color, datos: detalle, onAbrirFicha }: { dias: number; color: string; datos: DetalleVertical | null; onAbrirFicha: (id: number) => void }) {
+function ProduccionGanaderiaVista({ dias, datos: detalle, onAbrirFicha }: { dias: number; datos: DetalleVertical | null; onAbrirFicha: (id: number) => void }) {
   const { datos, error } = useCarga<ProduccionGanaderia>(() => obtenerProduccionGanaderia(dias), [dias]);
   if (!datos) return <EstadoCarga error={error} />;
   const leche = detalle?.metricas.find((m) => m.clave === "leche");
@@ -575,27 +580,26 @@ function ProduccionGanaderiaVista({ dias, color, datos: detalle, onAbrirFicha }:
               <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#64748b" }} />
               <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
               <Tooltip formatter={(v) => [`${numero.format(Number(v))} L`, "Leche"]} />
-              <Bar dataKey="litros" fill={color} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="litros" fill={PALETA[1]} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </Panel>
       <div className="grid lg:grid-cols-3 gap-6">
-        <Panel titulo="Hato por estado"><Barras filas={datos.hatoPorEstado} color={color} /></Panel>
-        <Panel titulo="Hato por tipo"><Barras filas={datos.hatoPorTipo} color={color} /></Panel>
-        <Panel titulo="Hato por sexo"><Barras filas={datos.hatoPorSexo} color={color} /></Panel>
+        <Panel titulo="Hato por estado"><Barras filas={datos.hatoPorEstado} /></Panel>
+        <Panel titulo="Hato por tipo"><Barras filas={datos.hatoPorTipo} /></Panel>
+        <Panel titulo="Hato por sexo"><Barras filas={datos.hatoPorSexo} /></Panel>
       </div>
       <Panel titulo="Fincas con más producción" nota="Litros en el período">
         <Barras
           filas={datos.topFincas.map((f) => ({ etiqueta: f.nombre, n: Number(f.litros), detalle: `${f.ordenos} ordeños`, formato: (v: number) => `${numero.format(v)} L`, alTocar: () => onAbrirFicha(f.tenantId) }))}
-          color={color}
         />
       </Panel>
     </div>
   );
 }
 
-function ClinicaOdontologiaVista({ dias, color }: { dias: number; color: string }) {
+function ClinicaOdontologiaVista({ dias }: { dias: number }) {
   const { datos, error } = useCarga<ClinicaOdontologia>(() => obtenerClinicaOdontologia(dias), [dias]);
   if (!datos) return <EstadoCarga error={error} />;
   const pendiente = Math.max(0, Number(datos.carteraTotal) - Number(datos.carteraPagada));
@@ -609,10 +613,10 @@ function ClinicaOdontologiaVista({ dias, color }: { dias: number; color: string 
       </div>
       <div className="grid lg:grid-cols-2 gap-6">
         <Panel titulo="Planes por estado">
-          <Barras filas={datos.planesPorEstado.map((p) => ({ etiqueta: p.etiqueta, n: Number(p.n), detalle: `$${dinero.format(Number(p.monto))} · cobrado $${dinero.format(Number(p.pagado))}` }))} color={color} />
+          <Barras filas={datos.planesPorEstado.map((p) => ({ etiqueta: p.etiqueta, n: Number(p.n), detalle: `$${dinero.format(Number(p.monto))} · cobrado $${dinero.format(Number(p.pagado))}` }))} />
         </Panel>
         <Panel titulo="Procedimientos más realizados" nota="En el período">
-          <Barras filas={datos.topProcedimientos} color={color} />
+          <Barras filas={datos.topProcedimientos} />
         </Panel>
       </div>
     </div>
@@ -646,7 +650,7 @@ function Panel({ titulo, nota, accion, className = "", children }: { titulo: str
   );
 }
 
-function Barras({ filas, color }: { filas: (ConteoEtiqueta & { detalle?: string; formato?: (v: number) => string; alTocar?: () => void })[]; color: string }) {
+function Barras({ filas }: { filas: (ConteoEtiqueta & { detalle?: string; formato?: (v: number) => string; alTocar?: () => void })[] }) {
   if (filas.length === 0) return <p className="text-xs text-slate-400">Sin datos en el período.</p>;
   const max = Math.max(1, ...filas.map((f) => Number(f.n)));
   return (
@@ -658,7 +662,7 @@ function Barras({ filas, color }: { filas: (ConteoEtiqueta & { detalle?: string;
             <span className="font-mono font-bold text-slate-900 shrink-0">{f.formato ? f.formato(Number(f.n)) : numero.format(Number(f.n))}</span>
           </div>
           <div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-1">
-            <div className="h-full rounded-full" style={{ width: `${(Number(f.n) / max) * 100}%`, backgroundColor: color }} />
+            <div className="h-full rounded-full" style={{ width: `${(Number(f.n) / max) * 100}%`, backgroundColor: PALETA[i % PALETA.length] }} />
           </div>
           {f.detalle && <div className="text-[10px] text-slate-500 mt-0.5">{f.detalle}</div>}
         </button>

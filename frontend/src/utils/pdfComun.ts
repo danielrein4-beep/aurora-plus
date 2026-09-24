@@ -20,6 +20,14 @@ export const ROJO: RGB = [239, 68, 68];
 
 export const MARGEN = 14;
 
+/**
+ * Colores de las gráficas: variados y sobrios (índigo suave, verde salvia, dorado,
+ * lavanda, azul claro, gris azulado). El color de cada vertical queda para su cabecera.
+ */
+export const PALETA_GRAFICAS: RGB[] = [
+  [108, 127, 216], [95, 180, 156], [217, 169, 78], [167, 139, 218], [90, 169, 201], [143, 163, 184],
+];
+
 export function hexARgb(hex: string): RGB {
   const h = hex.replace("#", "");
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
@@ -164,7 +172,8 @@ function escalaBonita(max: number): number {
 
 /** Ranking con barras horizontales. Devuelve la Y final. */
 export function barrasHorizontales(
-  doc: jsPDF, filas: { etiqueta: string; valor: number; texto?: string }[], x: number, y: number, w: number, color: RGB, maxFilas = 8,
+  doc: jsPDF, filas: { etiqueta: string; valor: number; texto?: string }[], x: number, y: number, w: number,
+  color: RGB | RGB[] = PALETA_GRAFICAS, maxFilas = 8,
 ): number {
   if (filas.length === 0) {
     doc.setFont("helvetica", "normal");
@@ -174,7 +183,8 @@ export function barrasHorizontales(
     return y + 6;
   }
   const max = Math.max(1, ...filas.map((f) => f.valor));
-  for (const f of filas.slice(0, maxFilas)) {
+  const colorFila = (i: number): RGB => (Array.isArray(color[0]) ? (color as RGB[])[i % (color as RGB[]).length] : (color as RGB));
+  for (const [i, f] of filas.slice(0, maxFilas).entries()) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.2);
     doc.setTextColor(30, 41, 59);
@@ -184,7 +194,7 @@ export function barrasHorizontales(
     doc.setFillColor(241, 245, 249);
     doc.roundedRect(x, y + 4.4, w, 2, 1, 1, "F");
     if (f.valor > 0) {
-      doc.setFillColor(...color);
+      doc.setFillColor(...colorFila(i));
       doc.roundedRect(x, y + 4.4, Math.max(1.2, (w * f.valor) / max), 2, 1, 1, "F");
     }
     y += 9;
