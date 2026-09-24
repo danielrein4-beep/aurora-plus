@@ -224,7 +224,7 @@ function operacionRestaurantes(doc: jsPDF, datos: DatosPdfInformeVertical, op: O
     { label: "COMANDAS", val: numero.format(op.comandas), color, nota: "sin anuladas" },
     { label: "VENTAS DE LOS RESTAURANTES", val: usd(Number(op.ventas)), color: ESMERALDA, nota: "consumo registrado" },
     { label: "TICKET PROMEDIO", val: usd(Number(op.ticketPromedio)), color: VIOLETA, nota: "por comanda" },
-    { label: "HORA PICO", val: op.comandas ? `${String(pico).padStart(2, "0")}:00` : "—", color: AMBAR, nota: op.comandas ? `${op.porHora[pico]} comandas` : "sin comandas" },
+    { label: "HORA PICO", val: op.comandas ? `${String(pico).padStart(2, "0")}:00` : "—", color, nota: op.comandas ? `${op.porHora[pico]} comandas` : "sin comandas" },
   ]);
   const cy = y0 + 34, ch = 44;
   const w1 = (W - 2 * MARGEN) * 0.62;

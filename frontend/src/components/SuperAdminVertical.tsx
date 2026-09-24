@@ -25,7 +25,7 @@ export const VERTICALES_SUPERADMIN: { id: string; nombre: string; descripcion: s
     icono: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" },
   { id: "odontologia", nombre: "Odontología", descripcion: "Consultorios dentales", color: "#14b8a6",
     icono: "M12 3c-2.5 0-3-1-5-1S3 3.5 3 7c0 3 1.5 5 2 8 .4 2.4 1 6 2.5 6s1.5-3 2.5-5.5c.5-1.3 1.5-1.3 2 0C13 18 13 21 14.5 21S16.6 17.4 17 15c.5-3 2-5 2-8 0-3.5-2-5-4-5s-2.5 1-3 1z" },
-  { id: "restaurantes", nombre: "Restaurantes", descripcion: "Restaurantes, cafeterías y delivery", color: "#f97316",
+  { id: "restaurantes", nombre: "Restaurantes", descripcion: "Restaurantes, cafeterías y delivery", color: "#2E9AA0",
     icono: "M3 3v7a3 3 0 003 3v8m0-18v7m3-7v7a3 3 0 01-3 3m12-10c-1.7 0-3 2-3 5s1.3 4 3 4v9" },
   { id: "comercio", nombre: "Comercio", descripcion: "Tiendas, ferreterías, repuestos y farmacias", color: "#6366f1",
     icono: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.3 2.3c-.6.6-.2 1.7.7 1.7H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" },
@@ -505,7 +505,7 @@ function OperacionRestaurantesVista({ dias, color, onAbrirFicha }: { dias: numbe
         <Kpi titulo="Comandas" valor={numero.format(datos.comandas)} nota="Sin anuladas, en el período" />
         <Kpi titulo="Ventas de los restaurantes" valor={`$${dinero.format(datos.ventas)}`} nota="Consumo registrado" color="text-emerald-600" />
         <Kpi titulo="Ticket promedio" valor={`$${dinero.format(datos.ticketPromedio)}`} nota="Por comanda" />
-        <Kpi titulo="Hora pico" valor={datos.comandas ? `${String(horaPico).padStart(2, "0")}:00` : "-"} nota={datos.comandas ? `${datos.porHora[horaPico]} comandas` : "Sin comandas"} color="text-orange-600" />
+        <Kpi titulo="Hora pico" valor={datos.comandas ? `${String(horaPico).padStart(2, "0")}:00` : "-"} nota={datos.comandas ? `${datos.porHora[horaPico]} comandas` : "Sin comandas"} color="text-teal-700" />
       </div>
       <div className="grid lg:grid-cols-3 gap-6">
         <Panel titulo="Comandas por hora del día" className="lg:col-span-2">
