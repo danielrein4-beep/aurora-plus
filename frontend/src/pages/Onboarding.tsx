@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
-  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconSparkles, IconHardware, IconRestaurant, IconFarm,
+  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconRestaurant, IconFarm,
   IconEducation, IconConstruction, IconWarning, IconClose, IconCheck, IconLock,
   IconCard, IconBank, IconPrescription,
 } from "../Icons";
@@ -77,15 +77,6 @@ const INDUSTRIES: IndustryItem[] = [
     badge: "100% DISPONIBLE (Listo)",
     isReady: true,
     tagline: "Vertical: Mediclinic Odonto",
-  },
-  {
-    id: "estetica",
-    label: "Estética & Cosmiatría",
-    Icon: IconSparkles,
-    desc: "Fichas de piel, sesiones con fotos antes/después, paquetes de sesiones y consentimientos",
-    badge: "100% DISPONIBLE (Listo)",
-    isReady: true,
-    tagline: "Vertical: Aurora Estética",
   },
   {
     id: "finca",

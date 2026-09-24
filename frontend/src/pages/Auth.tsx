@@ -4,7 +4,7 @@ import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconLock,
   IconRestaurant, IconHardware, IconClinic,
-  IconTooth, IconFarm, IconSparkles,
+  IconTooth, IconFarm,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { solicitarRecuperacionClave } from "../api";
@@ -34,7 +34,6 @@ const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "comercio", label: "Comercio", sub: "Tienda, ferretería, repuestos o farmacia", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Negocio" },
   { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
   { id: "odontologia", label: "Odontología", sub: "Historia clínica y odontograma FDI", Icon: IconTooth, modulo: "odontologia", ruta: "/mediclinic", nombreDefault: "Mi Consultorio Dental" },
-  { id: "estetica", label: "Estética & Cosmiatría", sub: "Fichas de piel, paquetes y fotos antes/después", Icon: IconSparkles, modulo: "estetica", ruta: "/estetica", nombreDefault: "Mi Centro de Estética" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
 ];
 

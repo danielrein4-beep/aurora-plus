@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { listarPacientes, listarProcedimientos, listarProfesionalesEstetica, type Paciente, type ProcedimientoMedico, type ProfesionalEstetica } from "../api";
+import { listarPacientes, listarProcedimientos, listarProfesionalesEstetica, obtenerMiNegocio, type Paciente, type ProcedimientoMedico, type ProfesionalEstetica } from "../api";
 import {
   IconBox, IconCalendarSolido, IconDashboardGrid, IconDoorExit, IconSparkles, IconTag, IconUser, IconUsers, IconWallet, IconWarning,
 } from "../Icons";
@@ -40,6 +40,18 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
   const [version, setVersion] = useState(0);
   const [profesionales, setProfesionales] = useState<ProfesionalEstetica[]>([]);
   const [errorEquipo, setErrorEquipo] = useState<string | null>(null);
+  // Estética aún no se ofrece al público: solo la abren las cuentas de verificación del superadmin
+  // (las que pueden cambiar de vertical en el Hub). null = verificando.
+  const [habilitada, setHabilitada] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    let activo = true;
+    obtenerMiNegocio()
+      .then((n) => activo && setHabilitada(!!n.permiteCambioVertical))
+      .catch(() => activo && setHabilitada(false));
+    return () => { activo = false; };
+  }, [tenantId]);
 
   const recargarClientas = useCallback(async () => {
     try {
@@ -74,11 +86,11 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || !habilitada) return;
     recargarClientas();
     recargarServicios();
     recargarProfesionales();
-  }, [tenantId, recargarClientas, recargarServicios, recargarProfesionales]);
+  }, [tenantId, habilitada, recargarClientas, recargarServicios, recargarProfesionales]);
 
   const ir = (p: PaginaEstetica) => {
     setPagina(p);
@@ -95,6 +107,24 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
           <p className="text-sm text-slate-500 mb-5">Inicia sesión con la cuenta de tu centro de estética para continuar.</p>
           <button onClick={logout} className="px-4 py-2 rounded-xl bg-[#9E4A63] text-white text-sm font-semibold cursor-pointer">Cerrar sesión</button>
         </div>
+      </div>
+    );
+  }
+
+  if (habilitada !== true) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] p-6">
+        {habilitada === null ? (
+          <span className="w-6 h-6 rounded-full border-2 border-[#9E4A63]/30 border-t-[#9E4A63] animate-spin" aria-label="Verificando acceso" />
+        ) : (
+          <div className="bg-white p-8 rounded-3xl border border-slate-200 max-w-md text-center shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900 mb-1">Estética aún no está disponible</h2>
+            <p className="text-sm text-slate-500 mb-5">Este módulo está en preparación y todavía no se ofrece a los negocios.</p>
+            {onSalir && (
+              <button onClick={onSalir} className="px-4 py-2 rounded-xl bg-[#9E4A63] text-white text-sm font-semibold cursor-pointer">Volver al Hub</button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
