@@ -55,6 +55,9 @@ public class GanaderiaImportacionService {
     private EventoReproductivoRepository eventoReproductivoRepository;
 
     @Autowired
+    private GanaderiaEngordeService engordeService;
+
+    @Autowired
     private RegistroAuditoriaService auditoriaService;
 
     /** Una fila del Excel tal como la escribió el ganadero: todo texto, se valida aquí. */
@@ -251,7 +254,10 @@ public class GanaderiaImportacionService {
             a.setEstado("ACTIVO");
             if (v.estadoReproductivo != null) a.setEstadoReproductivo(v.estadoReproductivo);
             if (v.estadoProductivo != null) a.setEstadoProductivo(v.estadoProductivo);
-            creados.put(clave(v.arete), animalRepository.save(a));
+            Animal guardado = animalRepository.save(a);
+            // El peso de la planilla cuenta como primer pesaje (desde la entrada a la sociedad si aplica).
+            engordeService.registrarPesoDeIngreso(tenantId, guardado, a.getFechaEntradaSociedad());
+            creados.put(clave(v.arete), guardado);
         }
 
         LocalDate hoy = LocalDate.now();

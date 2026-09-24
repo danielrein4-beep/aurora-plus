@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { IconCheckCircle, IconDownload, IconSyringe, IconWarning, IconEdit, IconCow, IconTag, IconShield, IconDna, IconScale } from "../../Icons";
 import { obtenerGdpGanaderia, obtenerVacunasPorAnimal, obtenerMedicamentosPorAnimal, descargarAlertasSanitariasExcel, obtenerEventosReproductivosPorHembra, obtenerCurvaPesoGanaderia, type AnimalGanaderia, type TableroAlertasGanaderia, type VacunaGanaderia, type AlertaSanitariaGanaderia, type AplicacionVacunaGanaderia, type AplicacionMedicamentoGanaderia, type EventoReproductivoGanaderia, type RegistroPesoGanaderia, type GdpGanaderiaResponse } from "../../api";
+import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { Notificar, SubSanidad } from "./tipos";
 
@@ -382,7 +383,7 @@ export default function SeccionSanidad({
                       ) : (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                           {fichaVacunas.map((v) => {
-                            const hoyStr = new Date().toISOString().slice(0, 10);
+                            const hoyStr = fechaLocalISO();
                             const refuerzoVencido = v.fechaProximaDosis && v.fechaProximaDosis < hoyStr;
                             return (
                             <div key={v.id} className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs space-y-1">
@@ -418,7 +419,7 @@ export default function SeccionSanidad({
                       ) : (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                           {fichaMedicamentos.map((m) => {
-                            const hoy = new Date().toISOString().slice(0, 10);
+                            const hoy = fechaLocalISO();
                             const retiroLecheActivo = m.fechaFinRetiroLeche && m.fechaFinRetiroLeche >= hoy;
                             const retiroCarneActivo = m.fechaFinRetiroCarne && m.fechaFinRetiroCarne >= hoy;
                             return (

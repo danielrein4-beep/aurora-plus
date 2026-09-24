@@ -24,7 +24,7 @@ interface Props {
 export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBCV, tasaCOP, monedasConfig, tenantId, notificar, onDespachado, onCerrar }: Props) {
   const [formVentaLeche, setFormVentaLeche] = useState({
     fecha: fechaLocalISO(),
-    litrosVendidos: 200,
+    litrosVendidos: 0,
     precioLitroUSD: precioLecheUSD,
     compradorOPlanta: "",
     monedaPago: "USD",
@@ -101,7 +101,7 @@ export default function ModalDespachoLeche({ tanqueLeche, precioLecheUSD, tasaBC
       notificar(`Despacho registrado: ${litros} L entregados a ${formVentaLeche.compradorOPlanta} por $${(litros * precio).toFixed(2)} USD.`);
       setFormVentaLeche({
         fecha: fechaLocalISO(),
-        litrosVendidos: Math.min(200, res.tanque.stockActualLitros),
+        litrosVendidos: 0,
         precioLitroUSD: precioLecheUSD,
         compradorOPlanta: "",
         monedaPago: "USD",

@@ -46,6 +46,8 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
   const [filtroPotrero, setFiltroPotrero] = useState("");
   const [filtroLote, setFiltroLote] = useState("");
   const [orden, setOrden] = useState<"arete" | "gdp_asc" | "gdp_desc">("arete");
+  // Con un hato recién importado casi nadie tiene dos pesajes: esos animales no llenan la tabla de guiones.
+  const [verSinPesajes, setVerSinPesajes] = useState(false);
   const [expandido, setExpandido] = useState<number | null>(null);
   const [historial, setHistorial] = useState<RegistroPesoGanaderia[]>([]);
   const [edicion, setEdicion] = useState<Record<number, { pesoKg: string; fecha: string }>>({});
@@ -155,6 +157,8 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
   const gdpPromedio = conGdp.length ? conGdp.reduce((s, f) => s + Number(f.gdpKgDia), 0) / conGdp.length : null;
   const estancados = visibles.filter(f => f.gdpUltimoPeriodoKgDia != null && f.gdpUltimoPeriodoKgDia < GDP_BAJA).length;
   const sinDatos = visibles.filter(f => f.gdpKgDia == null).length;
+  const ocultarSinPesajes = !verSinPesajes && conGdp.length > 0 && sinDatos > 0;
+  const enTabla = ocultarSinPesajes ? conGdp : visibles;
 
   const campo = "px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs focus:border-teal-600 focus:outline-none";
 
@@ -231,7 +235,7 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
             {!cargando && visibles.length === 0 && (
               <tr><td colSpan={9} className="p-6 text-center text-slate-500">Ningún animal coincide con el filtro.</td></tr>
             )}
-            {visibles.map(f => (
+            {enTabla.map(f => (
               <Fragment key={f.animalId}>
                 <tr
                   onClick={() => abrirHistorial(f.animalId)}
@@ -243,7 +247,7 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
                     <span className="ml-2 text-slate-700">{f.nombre || f.tipoAnimal || ""}</span>
                     {f.raza && <span className="ml-1 text-slate-400">· {f.raza}</span>}
                   </td>
-                  <td className="p-3 text-slate-600">{f.potrero || "—"}{f.lote ? <span className="text-slate-400"> · {f.lote}</span> : null}</td>
+                  <td className="p-3 text-slate-600">{f.potrero || (f.lote ? null : "—")}{f.lote ? <span className="text-slate-400">{f.potrero ? " · " : ""}{f.lote}</span> : null}</td>
                   <td className="p-3 text-right font-mono text-slate-700">
                     {f.pesoInicial != null ? `${fmt(f.pesoInicial)} kg` : "—"}
                     {f.fechaInicial && <div className="text-[10px] text-slate-400">{fechaCorta(f.fechaInicial)}</div>}
@@ -322,6 +326,18 @@ export default function EngordeGanadero({ tenantId, puedeCorregir, notificar, on
                 )}
               </Fragment>
             ))}
+            {!cargando && (ocultarSinPesajes || (verSinPesajes && conGdp.length > 0 && sinDatos > 0)) && (
+              <tr>
+                <td colSpan={9} className="p-3 text-center text-xs text-slate-500">
+                  {ocultarSinPesajes
+                    ? `${sinDatos} animal${sinDatos === 1 ? "" : "es"} todavía sin dos pesajes para calcular la GDP. `
+                    : ""}
+                  <button type="button" onClick={() => setVerSinPesajes(v => !v)} className="font-semibold text-teal-700 hover:text-teal-900 underline cursor-pointer">
+                    {ocultarSinPesajes ? "Mostrarlos" : "Ocultar los que no tienen pesajes"}
+                  </button>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

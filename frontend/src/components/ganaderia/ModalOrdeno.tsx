@@ -27,10 +27,10 @@ export default function ModalOrdeno({
   const [formOrdeno, setFormOrdeno] = useState({
     animalId: animalesActivos[0]?.id ?? 0,
     turno: "MANANA",
-    cantidadLitros: 12.5,
+    cantidadLitros: 0,
     precioVentaLitro: precioLecheUSD,
-    porcentajeGrasa: 3.8,
-    porcentajeProteina: 3.2,
+    // Sin análisis de laboratorio no se inventa la grasa: vacío = no medido.
+    porcentajeGrasa: 0,
     destino: "TANQUE" as "TANQUE" | "VENTA_DIRECTA",
   });
 
@@ -46,8 +46,7 @@ export default function ModalOrdeno({
         turno: formOrdeno.turno,
         cantidadLitros: Number(formOrdeno.cantidadLitros),
         precioVentaLitro: Number(formOrdeno.precioVentaLitro),
-        porcentajeGrasa: Number(formOrdeno.porcentajeGrasa),
-        porcentajeProteina: Number(formOrdeno.porcentajeProteina),
+        porcentajeGrasa: formOrdeno.porcentajeGrasa > 0 ? Number(formOrdeno.porcentajeGrasa) : undefined,
         destino: formOrdeno.destino,
       });
       onRegistrado(nuevoReg, formOrdeno.destino === "TANQUE" ? Number(formOrdeno.cantidadLitros) : 0);
@@ -99,7 +98,9 @@ export default function ModalOrdeno({
                 onFocus={e => e.target.select()}
                 step="0.1"
                 required
-                value={formOrdeno.cantidadLitros}
+                min="0.1"
+                placeholder="Ej. 12,5"
+                value={formOrdeno.cantidadLitros || ""}
                 onChange={e => setFormOrdeno({ ...formOrdeno, cantidadLitros: Number(e.target.value) })}
                 className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-sky-400 font-mono font-bold"
               />
@@ -113,7 +114,8 @@ export default function ModalOrdeno({
                 type="number"
                 onFocus={e => e.target.select()}
                 step="0.1"
-                value={formOrdeno.porcentajeGrasa}
+                placeholder="Opcional"
+                value={formOrdeno.porcentajeGrasa || ""}
                 onChange={e => setFormOrdeno({ ...formOrdeno, porcentajeGrasa: Number(e.target.value) })}
                 className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
               />

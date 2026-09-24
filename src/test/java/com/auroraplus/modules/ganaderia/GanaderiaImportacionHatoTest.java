@@ -30,6 +30,7 @@ class GanaderiaImportacionHatoTest {
     @Autowired private GanaderiaImportacionService importacionService;
     @Autowired private AnimalRepository animalRepository;
     @Autowired private PotreroRepository potreroRepository;
+    @Autowired private com.auroraplus.modules.ganaderia.repositories.RegistroPesoRepository registroPesoRepository;
 
     private static FilaImportacion fila(String arete, String sexo, String tipo, String raza) {
         FilaImportacion f = new FilaImportacion();
@@ -147,5 +148,21 @@ class GanaderiaImportacionHatoTest {
 
         assertTrue(b.errores.isEmpty(), () -> "errores inesperados: " + b.errores.stream().map(e -> e.mensaje).toList());
         assertTrue(b.confirmado, "otra finca no debe chocar con el arete 001 de la primera");
+    }
+
+    @Test
+    void elPesoDeLaPlanillaQuedaComoPrimerPesaje() {
+        Long tenant = TENANT.incrementAndGet();
+        FilaImportacion conPeso = fila("P-1", "MACHO", "TORO", "Brahman");
+        conPeso.pesoActual = "512,5";
+        FilaImportacion sinPeso = fila("P-2", "HEMBRA", "VACA", "Gyr");
+
+        assertTrue(importacionService.importar(tenant, List.of(conPeso, sinPeso), true).confirmado);
+
+        var pesajes = registroPesoRepository.findByTenantIdOrdenado(tenant);
+        assertEquals(1, pesajes.size(), "solo el animal con peso en la planilla arranca su curva");
+        assertEquals("P-1", pesajes.get(0).getAnimal().getArete());
+        assertEquals(0, new java.math.BigDecimal("512.5").compareTo(pesajes.get(0).getPesoKg()));
+        assertEquals(java.time.LocalDate.now(), pesajes.get(0).getFecha());
     }
 }

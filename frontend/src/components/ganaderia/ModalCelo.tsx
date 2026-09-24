@@ -21,8 +21,8 @@ export default function ModalCelo({ animales, animalesActivos, tenantId, notific
     hembraId: animalesActivos.find(a => a.sexo === "HEMBRA")?.id ?? 0,
     fecha: fechaLocalISO(),
     tipoCelo: "NATURAL",
-    sintomasCelo: "Acepta monta, moco cristalino abundante, hiperactividad",
-    horaOptimaIA: "AM/PM: Inseminar 12 horas después de observado el celo",
+    sintomasCelo: "",
+    horaOptimaIA: "",
   });
 
   // Manejador: Registrar Celo (Evento Reproductivo dedicado)

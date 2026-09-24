@@ -60,6 +60,9 @@ public class AnimalController {
     @Autowired
     private GanaderiaImportacionService importacionService;
 
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.GanaderiaEngordeService engordeService;
+
     // ── P0: tenant NUNCA viene por query/body/header — siempre de TenantContext/JWT ──
 
     @GetMapping
@@ -147,6 +150,7 @@ public class AnimalController {
         }
 
         Animal guardado = animalRepository.save(animal);
+        engordeService.registrarPesoDeIngreso(tenantId, guardado, null);
         auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "Animal", guardado.getId(),
             "Dio de alta el animal " + guardado.getArete() + (guardado.getPotrero() == null ? " sin potrero asignado" : " en el potrero " + guardado.getPotrero().getNombre()));
         return ResponseEntity.ok(guardado);

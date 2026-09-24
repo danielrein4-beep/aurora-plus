@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { IconFileText, IconCalendar, IconChart, IconMilk, IconCow, IconTag, IconScale, IconCoins } from "../../Icons";
 import type { PotreroGanaderia, RegistroOrdenoGanaderia, VacunaGanaderia, VentaLecheTanque, GastoGanaderia, VentaGanaderiaResumen } from "../../api";
-import ReportesCampoGanaderia from "../ReportesCampoGanaderia";
+import ReportesCampoGanaderia, { fechaLocalISO } from "../ReportesCampoGanaderia";
 import { CATEGORIAS_GASTO_GANADERIA } from "./catalogos";
 import type { MonedasConfig, Notificar, TabGanaderia, SubPotreros } from "./tipos";
 
@@ -55,7 +55,7 @@ export default function SeccionFinanzas({
     return { weekKey, year, weekNo, rangoTexto, mondayTime: monday.getTime() };
   };
 
-  const hoyInfo = getISOWeekInfo(new Date().toISOString().slice(0, 10));
+  const hoyInfo = getISOWeekInfo(fechaLocalISO());
   const semanaActualKey = hoyInfo?.weekKey ?? "2026-W37";
 
   const listaGastos = gastos;

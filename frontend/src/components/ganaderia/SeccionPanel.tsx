@@ -1,6 +1,7 @@
 import { IconSettings } from "../../Icons";
 import type { AnimalGanaderia, PotreroGanaderia, RegistroOrdenoGanaderia, VacunaGanaderia, AlertaSanitariaGanaderia, TanqueLeche, VentaLecheTanque } from "../../api";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
+import { KG_POR_UG, num } from "./formato";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { MonedasConfig, TabGanaderia, SubPotreros } from "./tipos";
 
@@ -38,7 +39,11 @@ export default function SeccionPanel({
 }: Props) {
   const vacasOrdeno = animalesActivos.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA").length;
   const totalHectareas = potreros.reduce((sum, p) => sum + (Number(p.areaHectareas) || 0), 0);
-  const cargaAnimalHa = totalHectareas > 0 ? (totalAnimales / totalHectareas).toFixed(2) : "0.00";
+  // Carga animal en UG/ha: una unidad ganadera = 450 kg de peso vivo. Los animales sin peso
+  // cargado no suman (se avisa cuántos son) en vez de suponerles un peso.
+  const pesoVivoTotal = animalesActivos.reduce((s, a) => s + (Number(a.pesoActual) || 0), 0);
+  const sinPeso = animalesActivos.filter(a => !(Number(a.pesoActual) > 0)).length;
+  const cargaUgHa = totalHectareas > 0 ? pesoVivoTotal / KG_POR_UG / totalHectareas : null;
   const litrosHoy = ordenos
     .filter(o => o.fecha === fechaLocalISO())
     .reduce((sum, o) => sum + (Number(o.cantidadLitros) || 0), 0);
@@ -157,7 +162,7 @@ export default function SeccionPanel({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-400">Paso 3</span>
                     {tieneAnimales ? (
-                      <span className="text-[11px] font-bold text-teal-700">Completado ({animales.length})</span>
+                      <span className="text-[11px] font-bold text-teal-700">Completado ({totalAnimales})</span>
                     ) : (
                       <span className="text-[11px] font-bold text-amber-600">Pendiente</span>
                     )}
@@ -167,7 +172,7 @@ export default function SeccionPanel({
                   </h4>
                   <p className="text-[11px] text-slate-500">
                     {tieneAnimales
-                      ? `${animales.length} cabezas en el hato.`
+                      ? `${totalAnimales} cabezas activas en el hato.`
                       : "Registra tu primer animal por nacimiento o compra con su arete."}
                   </p>
                 </div>
@@ -191,10 +196,6 @@ export default function SeccionPanel({
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1 text-left">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-[10px] font-bold text-teal-700 uppercase tracking-wider">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-              Sincronización Agronómica Activa
-            </div>
             <h2 className="font-['Outfit'] font-black text-2xl text-slate-900">
               Control Integral de Finca & Hato
             </h2>
@@ -228,8 +229,11 @@ export default function SeccionPanel({
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-3 flex-wrap text-xs text-slate-500">
-              <span>{totalHectareas.toFixed(1)} hectáreas totales</span>
-              <span className="font-semibold text-teal-700">{cargaAnimalHa} UG/ha de carga animal</span>
+              <span>{totalHectareas > 0 ? `${num(totalHectareas, 1)} ha en potreros` : "Sin hectáreas cargadas en los potreros"}</span>
+              <span className="font-semibold text-teal-700" title="Unidad ganadera (UG) = 450 kg de peso vivo">
+                {cargaUgHa != null ? `${num(cargaUgHa, 2)} UG/ha de carga animal` : "Carga animal: falta el área"}
+                {cargaUgHa != null && sinPeso > 0 && <span className="font-normal text-slate-500"> ({sinPeso} sin peso)</span>}
+              </span>
             </div>
           </div>
 
@@ -255,7 +259,6 @@ export default function SeccionPanel({
                 ${ingresosLecheHoy.toFixed(2)} USD
                 {monedasConfig.VES && ` · Bs. ${(ingresosLecheHoy * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </span>
-              <span className="text-emerald-700 font-semibold">Sincronizado</span>
             </div>
           </div>
         </div>
@@ -271,7 +274,7 @@ export default function SeccionPanel({
                   Tanque de Leche Frío
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-50 text-sky-700 border border-sky-200">
-                  <span>{tanqueLeche?.temperaturaCelsius ?? 4.0}°C Óptima</span>
+                  <span>{tanqueLeche?.temperaturaCelsius != null ? `${num(tanqueLeche.temperaturaCelsius, 1)} °C` : "Sin temperatura"}</span>
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -402,18 +405,24 @@ export default function SeccionPanel({
                 <div>
                   <div className="font-bold text-sm text-slate-900 dark:text-white">{pot.nombre}</div>
                   <div className="text-xs text-slate-500 dark:text-white/40">
-                    {pot.areaHectareas} ha • {pot.tipoPasto || "Pasto Natural"} • Capacidad: {pot.capacidadAnimales || 20} cabezas
+                    {[
+                      pot.areaHectareas ? `${num(pot.areaHectareas, 1)} ha` : null,
+                      pot.tipoPasto || null,
+                      pot.capacidadAnimales ? `capacidad ${pot.capacidadAnimales} cabezas` : null,
+                    ].filter(Boolean).join(" · ") || "Faltan área, pasto y capacidad"}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                    pot.estado === "ACTIVO"
-                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                    pot.estado === "EN_DESCANSO"
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                      : pot.estado === "EN_MANTENIMIENTO"
+                        ? "bg-slate-100 text-slate-600 border border-slate-200"
+                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                   }`}>
-                    {pot.estado === "ACTIVO" ? "EN USO" : "DESCANSO"}
+                    {pot.estado === "EN_DESCANSO" ? "En descanso" : pot.estado === "EN_MANTENIMIENTO" ? "Mantenimiento" : "En uso"}
                   </span>
-                  {pot.estado === "ACTIVO" && (
+                  {pot.estado !== "EN_DESCANSO" && pot.estado !== "EN_MANTENIMIENTO" && (
                     <button
                       onClick={() => { setModalRotar(pot); }}
                       className="px-2.5 py-1 rounded-xl bg-emerald-500 text-white text-[11px] font-bold cursor-pointer hover:scale-105 transition-all">

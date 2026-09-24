@@ -21,7 +21,7 @@ export default function ModalReproduccion({ animalesActivos, valoresIniciales, t
     fecha: fechaLocalISO(),
     resultado: "PREÑADA_CONFIRMADA",
     fechaProbableParto: fechaLocalISO(new Date(Date.now() + 180 * 86400000)),
-    sementalReferenciaExterna: "Pajuela Toro Don Juan (IA)",
+    sementalReferenciaExterna: "",
     ...valoresIniciales,
   });
 
@@ -80,6 +80,7 @@ export default function ModalReproduccion({ animalesActivos, valoresIniciales, t
             <label className="text-slate-400 block mb-1">Semental / Pajuela de IA</label>
             <input
               type="text"
+              placeholder="Ej. Toro Tamarindo o pajuela Gyr lechero"
               value={formRepro.sementalReferenciaExterna}
               onChange={e => setFormRepro({ ...formRepro, sementalReferenciaExterna: e.target.value })}
               className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"

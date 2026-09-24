@@ -51,6 +51,22 @@ public class GanaderiaEngordeService {
         public BigDecimal gdpUltimoPeriodoKgDia;
     }
 
+    /**
+     * El peso con que el animal entra al hato (alta o importación) es su primer pesaje:
+     * sin él la ganancia diaria (GDP) no tiene desde dónde contar hasta el segundo pesaje.
+     */
+    @Transactional
+    public void registrarPesoDeIngreso(Long tenantId, Animal animal, LocalDate fecha) {
+        BigDecimal peso = animal.getPesoActual();
+        if (peso == null || peso.signum() <= 0) return;
+        RegistroPeso r = new RegistroPeso();
+        r.setTenantId(tenantId);
+        r.setAnimal(animal);
+        r.setFecha(fecha != null ? fecha : LocalDate.now());
+        r.setPesoKg(peso);
+        registroPesoRepository.save(r);
+    }
+
     @Transactional(readOnly = true)
     public List<FilaEngorde> resumen(Long tenantId) {
         Map<Long, List<RegistroPeso>> porAnimal = new HashMap<>();

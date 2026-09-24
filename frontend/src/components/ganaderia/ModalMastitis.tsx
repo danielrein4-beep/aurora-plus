@@ -20,11 +20,11 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
     fecha: fechaLocalISO(),
     cuartoAfectado: "PD",
     gradoCmt: "GRADO_2",
-    farmacoAplicado: "Cefalexina + Gentamicina Intramamaria",
-    diasRetiroLeche: 4,
-    veterinario: "Dr. Médico Veterinario",
-    costo: 12.0,
-    notas: "Cuarto posterior derecho caliente y reactivo al reactivo California Mastitis Test (CMT).",
+    farmacoAplicado: "",
+    diasRetiroLeche: 0,
+    veterinario: "",
+    costo: 0,
+    notas: "",
   });
 
   // Manejador: Registrar Mastitis (Sanidad dedicada con retiro de leche)
@@ -130,10 +130,11 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
               <input
                 type="number"
                 onFocus={e => e.target.select()}
-                min="0"
+                min="1"
                 max="30"
                 required
-                value={formMastitis.diasRetiroLeche}
+                placeholder="Ej. 4"
+                value={formMastitis.diasRetiroLeche || ""}
                 onChange={e => setFormMastitis({ ...formMastitis, diasRetiroLeche: Number(e.target.value) })}
                 className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 font-mono font-bold"
               />
@@ -158,7 +159,8 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
                 onFocus={e => e.target.select()}
                 step="0.5"
                 min="0"
-                value={formMastitis.costo}
+                placeholder="0,00"
+                value={formMastitis.costo || ""}
                 onChange={e => setFormMastitis({ ...formMastitis, costo: Number(e.target.value) })}
                 className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
               />

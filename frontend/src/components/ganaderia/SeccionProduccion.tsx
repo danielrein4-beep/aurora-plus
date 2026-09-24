@@ -30,10 +30,10 @@ export default function SeccionProduccion({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
-            Producción Lechera & Curvas de Crecimiento (GDP)
+            Producción de Leche
           </h3>
           <p className="text-xs text-slate-500 dark:text-white/40">
-            Pesaje por turno en sala de ordeño y seguimiento de ganancia diaria de peso.
+            Ordeños por vaca y turno, tanque de frío y despachos a planta o cisterna.
           </p>
         </div>
 
@@ -41,7 +41,7 @@ export default function SeccionProduccion({
           <button
             onClick={abrirVaqueraRapida}
             className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md hover:scale-105 transition-all flex items-center gap-2 cursor-pointer">
-            <span>Modo Vaquera Rápida (Bulk Entry)</span>
+            <span>Jornada de ordeño (todo el rebaño)</span>
           </button>
           <button
             onClick={() => setOrdenoAbierto(true)}
@@ -62,12 +62,12 @@ export default function SeccionProduccion({
         </div>
 
         <div className="apple-glass rounded-2xl p-5 border border-white/10 text-left space-y-1">
-          <div className="text-xs text-slate-400 font-medium">Ingresos Estimados (USD)</div>
+          <div className="text-xs text-slate-400 font-medium">Valor de la leche ordeñada (USD)</div>
           <div className="font-['Outfit'] font-black text-3xl text-emerald-500 dark:text-emerald-400">
             ${ordenos.reduce((sum, o) => sum + (Number(o.montoVenta) || 0), 0).toFixed(2)}
           </div>
           <div className="text-[11px] text-slate-500 dark:text-white/40 flex items-center justify-between">
-            <span>A razón de ${precioLecheUSD.toFixed(2)} / Litro</span>
+            <span>{precioLecheUSD > 0 ? `Precio actual: $${precioLecheUSD.toFixed(2)} por litro` : "Precio del litro sin fijar"}</span>
             <button
               type="button"
               onClick={() => setModalEditarPrecioLeche(true)}

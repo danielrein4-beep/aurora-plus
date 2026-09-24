@@ -77,8 +77,6 @@ export default function ModalJornadaOrdeno({
           turno: vaqueraTurno === "DOBLE" ? "MANANA" : vaqueraTurno,
           cantidadLitros: litrosTotales,
           precioVentaLitro: vaqueraPrecioUSD,
-          porcentajeGrasa: 3.8,
-          porcentajeProteina: 3.2,
           destino: vaqueraDestino,
         });
         nuevosOrdenos.push(reg);

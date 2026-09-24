@@ -77,9 +77,9 @@ export default function ModalVacunacion({
   const [formVacuna, setFormVacuna] = useState({
     animalId: animalIdInicial ?? animalesActivos[0]?.id ?? 0,
     vacunaId: vacunas[0]?.id ?? 0,
-    lote: recordados.lote ?? "L-2026-98",
-    veterinario: recordados.veterinario ?? "Dr. Médico Veterinario",
-    costo: recordados.costo ?? 3.5,
+    lote: recordados.lote ?? "",
+    veterinario: recordados.veterinario ?? "",
+    costo: recordados.costo ?? 0,
   });
   const [vacunacionModo, setVacunacionModo] = useState<"INDIVIDUAL" | "MULTIPLE">("INDIVIDUAL");
   const [animalesVacunaSeleccionados, setAnimalesVacunaSeleccionados] = useState<number[]>([]);
@@ -576,7 +576,8 @@ export default function ModalVacunacion({
                   onFocus={e => e.target.select()}
                   step="0.1"
                   min="0"
-                  value={formVacuna.costo}
+                  placeholder="0,00"
+                  value={formVacuna.costo || ""}
                   onChange={e => setFormVacuna({ ...formVacuna, costo: Number(e.target.value) })}
                   className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
                 />
