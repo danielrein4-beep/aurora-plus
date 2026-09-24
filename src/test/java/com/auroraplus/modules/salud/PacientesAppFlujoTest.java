@@ -125,7 +125,7 @@ class PacientesAppFlujoTest extends SaludIntegrationTestBase {
             "archivos", java.util.List.of(Map.of("nombre", "hemo.png", "tipo", "image/png", "datosBase64", pngMinimo)));
         ResponseEntity<JsonNode> subido = rest.exchange(url("/api/pacientes/v1/examenes"), HttpMethod.POST, new HttpEntity<>(examen, hp), JsonNode.class);
         assertEquals(HttpStatus.OK, subido.getStatusCode(), "Subir examen: " + subido.getBody());
-        assertFalse(subido.getBody().get("revisado").asBoolean());
+        assertFalse(subido.getBody().has("revisado"), "Al paciente no se le dice si el médico ya lo revisó");
         long examenId = subido.getBody().get("id").asLong();
 
         Map<String, Object> falso = Map.of("medicoId", clinica.tenantId(),
@@ -140,7 +140,8 @@ class PacientesAppFlujoTest extends SaludIntegrationTestBase {
         assertEquals(1, inbox.getBody().size(), "El examen debe aparecer en la ficha del paciente en Mediclinic");
         assertEquals(HttpStatus.OK, post(clinica, "/api/salud/laboratorio/inbox/" + examenId + "/marcar-leido", Map.of()).getStatusCode());
         ResponseEntity<JsonNode> misExamenes = rest.exchange(url("/api/pacientes/v1/examenes"), HttpMethod.GET, new HttpEntity<>(hp), JsonNode.class);
-        assertTrue(misExamenes.getBody().get(0).get("revisado").asBoolean(), "El paciente ve que el médico ya lo revisó");
+        assertEquals(1, misExamenes.getBody().size());
+        assertFalse(misExamenes.getBody().get(0).has("revisado"), "Aunque el médico lo lea, la app solo muestra que se envió");
 
         // 9. El médico comparte el plan de la consulta; las notas privadas nunca salen.
         Map<String, Object> consulta = new LinkedHashMap<>();

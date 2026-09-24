@@ -26,7 +26,7 @@ import java.util.Map;
  * Lo que el paciente ve y aporta de su propia historia, sin tocar la historia clínica:
  * - Exámenes: la foto o PDF que sube el paciente cae en la bandeja de exámenes recibidos
  *   que Mediclinic ya tiene (la misma del portal de laboratorio), ligada a su ficha.
- *   "Revisado" es cuando alguien del consultorio lo marcó como leído.
+ *   Al paciente solo se le confirma que se envió; si el médico ya lo revisó no se le muestra.
  * - Planes: solo lo que el médico compartió explícitamente (copia, ver PlanCompartido).
  * Todo exige un vínculo con el consultorio (nace cuando la clínica acepta una cita).
  */
@@ -45,7 +45,7 @@ public class ExpedientePacienteService {
     @Autowired private ConsultaMedicaRepository consultas;
 
     public record ArchivoSubido(String nombre, String tipo, String datosBase64) {}
-    public record ExamenDto(Long id, Long medicoId, String fecha, int archivos, boolean revisado, String revisadoEn) {}
+    public record ExamenDto(Long id, Long medicoId, String fecha, int archivos) {}
     public record PlanDto(Long id, Long medicoId, String fechaConsulta, String compartidoEn, String diagnostico,
                           String planTratamiento, String indicaciones, String recipe, String examenesIndicados) {}
     public record EstadoCompartido(boolean pacienteUsaLaApp, boolean compartido, String compartidoEn) {}
@@ -181,8 +181,7 @@ public class ExpedientePacienteService {
     }
 
     private ExamenDto aDto(ExamenRecibidoPaciente e) {
-        return new ExamenDto(e.getId(), e.getTenantId(), e.getFechaHoraRecepcion().toString(), e.getArchivos().size(),
-            e.isLeido(), e.getFechaHoraLeido() == null ? null : e.getFechaHoraLeido().toString());
+        return new ExamenDto(e.getId(), e.getTenantId(), e.getFechaHoraRecepcion().toString(), e.getArchivos().size());
     }
 
     private PlanDto aDto(PlanCompartido p) {
