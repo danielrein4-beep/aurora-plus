@@ -283,6 +283,78 @@ export interface FacturacionFiscalConfig {
   numerosRestantes?: number | null;
 }
 
+/** Impuestos y cargos del negocio (Comercio). Todo apagado por defecto. */
+export interface ImpuestosNegocio {
+  cobraIva: boolean;
+  alicuotaIva: number;
+  preciosIncluyenIva: boolean;
+  igtfActivo: boolean;
+  alicuotaIgtf: number;
+  catalogoPrecioConIva: boolean;
+  costoEnvioDelivery: number;
+}
+
+export function obtenerImpuestosNegocio(): Promise<ImpuestosNegocio> {
+  return request(`/api/config/mi-negocio/impuestos`);
+}
+
+export function actualizarImpuestosNegocio(datos: Partial<ImpuestosNegocio>): Promise<ImpuestosNegocio> {
+  return request(`/api/config/mi-negocio/impuestos`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface RenglonLibroVentas {
+  fecha: string;
+  numeroTicket: string;
+  numeroControl: string | null;
+  clienteNombre: string | null;
+  clienteRif: string | null;
+  tasaBcv: number | null;
+  tasaEstimada: boolean;
+  exento: number;
+  baseImponible: number;
+  alicuotaIva: number;
+  iva: number;
+  igtf: number;
+  delivery: number;
+  total: number;
+  ivaQuitado: boolean;
+  ivaQuitadoPor: string | null;
+  esCredito: boolean;
+}
+
+export interface RenglonLibroCompras {
+  fecha: string;
+  proveedor: string;
+  proveedorRif: string | null;
+  numeroFactura: string | null;
+  numeroControl: string | null;
+  tasaBcv: number | null;
+  tasaEstimada: boolean;
+  sinFacturaFiscal: boolean;
+  exento: number;
+  baseImponible: number;
+  alicuotaIva: number;
+  iva: number;
+  ivaRetenido: number;
+  total: number;
+}
+
+export interface LibroFiscal<T> {
+  monedaBase: string;
+  desde: string;
+  hasta: string;
+  renglones: T[];
+}
+
+/** Libros para el contador; desde/hasta en "YYYY-MM-DD". */
+export function obtenerLibroVentas(desde: string, hasta: string): Promise<LibroFiscal<RenglonLibroVentas>> {
+  return request(`/api/comercio/libros/ventas?desde=${desde}&hasta=${hasta}`);
+}
+
+export function obtenerLibroCompras(desde: string, hasta: string): Promise<LibroFiscal<RenglonLibroCompras>> {
+  return request(`/api/comercio/libros/compras?desde=${desde}&hasta=${hasta}`);
+}
+
 export function obtenerFacturacionFiscal(): Promise<FacturacionFiscalConfig> {
   return request("/api/config/mi-negocio/facturacion-fiscal");
 }
@@ -3512,6 +3584,7 @@ export interface RepuestoItem {
   atributoVariante?: string | null; // etiqueta de este SKU dentro del grupo (ej. "Talla 38")
   colorVariante?: string | null; // segunda faceta de variante (ej. "Rojo") — selector de color, luego talla
   fechaVencimiento?: string | null; // "YYYY-MM-DD" — caducidad del artículo (ej. pinturas, químicos), no por lote
+  exentoIva?: boolean | null; // producto exento de IVA (cesta básica, medicinas...)
 }
 
 export interface PresentacionRepuesto {
@@ -3614,6 +3687,13 @@ export interface CompraRepuesto {
   total: number;
   montoPagado?: number | null;
   items?: DetalleCompraRepuesto[];
+  numeroControl?: string | null;
+  montoExento?: number | null;
+  baseImponible?: number | null;
+  alicuotaIva?: number | null;
+  montoIva?: number | null;
+  ivaRetenido?: number | null;
+  tasaBcv?: number | null;
 }
 
 export interface ItemCompraRepuestoRequest {
@@ -3630,6 +3710,13 @@ export interface CompraRepuestoRequest {
   montoPagadoAhora?: number;
   monedaPago?: string;
   diasCredito?: number;
+  /** Datos de la factura fiscal del proveedor, para el libro de compras (opcionales). */
+  numeroControl?: string;
+  montoExento?: number;
+  baseImponible?: number;
+  alicuotaIva?: number;
+  montoIva?: number;
+  ivaRetenido?: number;
 }
 
 export interface ResultadoVentaRepuestoVolumen {
@@ -3749,13 +3836,30 @@ export interface TicketPosRequest {
   diasCredito?: number;
   clienteId?: number;
   nombreCliente?: string;
+  /** false = el cajero quitó el IVA en esta venta (queda en el libro con su usuario). */
+  aplicaIva?: boolean;
+  /** Cargo de delivery en la moneda base. */
+  delivery?: number;
+  clienteRif?: string;
+}
+
+/** Desglose fiscal que calculó el servidor al cobrar (en la moneda base). */
+export interface DesgloseFiscalTicket {
+  exento: number;
+  baseImponible: number;
+  alicuotaIva: number;
+  iva: number;
+  delivery: number;
+  subtotal: number;
+  igtf: number;
+  total: number;
 }
 
 /**
  * Cobra el ticket completo del POS en una sola transacción: si una línea falla no queda nada
  * a medias, y si el ticket ya se cobró (reintento tras un corte de red) devuelve yaProcesado.
  */
-export function cobrarTicketPos(datos: TicketPosRequest): Promise<{ yaProcesado: boolean; total: number | null }> {
+export function cobrarTicketPos(datos: TicketPosRequest): Promise<{ yaProcesado: boolean; total: number | null; desglose?: DesgloseFiscalTicket | null }> {
   return request(`/api/repuestos/ventas/ticket`, { method: "POST", body: JSON.stringify(datos) });
 }
 

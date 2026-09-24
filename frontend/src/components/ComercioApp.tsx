@@ -83,6 +83,8 @@ import {
   type FacturacionFiscalConfig, type ModoFacturacionFiscal, type DatosFiscalesNegocio,
 } from "../api";
 import ArqueoCajaMultimoneda from "./ArqueoCajaMultimoneda";
+import ImpuestosCargosComercio from "./ImpuestosCargosComercio";
+import LibrosFiscalesComercio from "./LibrosFiscalesComercio";
 
 // ── Moneda base del negocio ────────────────────────────────────────────────
 // CONVENCIÓN INTERNA: en todo este archivo, la moneda "USD" significa "la moneda base del
@@ -2029,7 +2031,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // Submódulos dentro de "Administración" — antes CXC/CXP e Ingresos&Gastos eran dos
   // entradas separadas en el sidebar; se agrupan porque ambas son la misma función de
   // negocio (control administrativo del dinero), no dos cosas distintas.
-  const [subTabAdmin, setSubTabAdmin] = useState<"cxc_cxp" | "ingresos_gastos" | "cuentas_bancarias" | "personal">("ingresos_gastos");
+  const [subTabAdmin, setSubTabAdmin] = useState<"cxc_cxp" | "ingresos_gastos" | "cuentas_bancarias" | "personal" | "libros">("ingresos_gastos");
 
   // Las cuentas por cobrar/pagar viven en el backend real (ver cargarCuentas más abajo,
   // definida después junto a cargarIngresosCaja/cargarGastosCaja) — arranca vacío y se
@@ -3120,6 +3122,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         { subTab: "cxc_cxp" as const, etiqueta: "Cuentas por Cobrar & Pagar" },
                         { subTab: "cuentas_bancarias" as const, etiqueta: "Cuentas Bancarias" },
                         { subTab: "personal" as const, etiqueta: "Personal & Nómina" },
+                        // Libros en bolívares para el contador venezolano: no aplica en modo euro.
+                        ...(!modoEuro() && user?.rol === "DUENO_ADMIN" ? [{ subTab: "libros" as const, etiqueta: "Libros de Compras y Ventas" }] : []),
                       ]).map((sub) => (
                         <button
                           key={sub.subTab}
@@ -4293,7 +4297,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "administracion" && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-            {subTabAdmin === "personal" ? (
+            {subTabAdmin === "libros" ? (
+              <LibrosFiscalesComercio nombreNegocio={user?.empresa || "Mi Comercio"} mostrarToast={mostrarToast} />
+            ) : subTabAdmin === "personal" ? (
               <PersonalRoute embebido>
                 <PersonalPage embedded />
               </PersonalRoute>
@@ -6627,7 +6633,7 @@ const TIPO_CUENTA_LABELS: Record<TipoCuentaBancaria, string> = {
 
 /** "Dónde está guardado el dinero" (Caja Efectivo, Cuenta Dólares, cada banco) —
  * independiente del ledger de ventas/gastos por moneda que ya lleva MovimientoCaja. */
-type SeccionConfiguracion = "tienda" | "qr" | "pagos" | "fiscal" | "moneda";
+type SeccionConfiguracion = "tienda" | "qr" | "pagos" | "fiscal" | "impuestos" | "moneda";
 
 const SECCIONES_CONFIGURACION: { id: SeccionConfiguracion; etiqueta: string; ayuda: string }[] = [
   { id: "tienda", etiqueta: "Mi Tienda", ayuda: "Nombre, logo, colores y banner de tu catálogo online." },
@@ -6635,6 +6641,7 @@ const SECCIONES_CONFIGURACION: { id: SeccionConfiguracion; etiqueta: string; ayu
   { id: "pagos", etiqueta: "Métodos de Pago", ayuda: "Pago Móvil, Zelle, Binance y Bancolombia: solo aparecen a tus clientes los que tengan datos reales cargados." },
   { id: "moneda", etiqueta: "Moneda", ayuda: "En qué moneda trabaja tu negocio. Con euro se trabaja solo en euros: sin bolívares, sin pesos y sin tasas de cambio." },
   { id: "fiscal", etiqueta: "Facturación Fiscal", ayuda: "RIF, razón social y el rango de números de control que te asignó tu imprenta." },
+  { id: "impuestos", etiqueta: "Impuestos y cargos", ayuda: "IVA, IGTF y delivery: si se cobran, cómo se muestran los precios y cuánto cuesta el envío." },
 ];
 
 /** Todo lo que se configura una vez y se deja (no es de uso diario), en un solo lugar y con nombres
@@ -6666,7 +6673,7 @@ function ConfiguracionComercio({ tenantId, nombreNegocio, esDuenoAdmin, onIrAEqu
 
         <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
           <nav className="w-full md:w-56 flex md:flex-col gap-1 overflow-x-auto md:overflow-visible flex-shrink-0">
-            {SECCIONES_CONFIGURACION.filter((s) => !(modoEuro() && (s.id === "pagos" || s.id === "fiscal"))).map((s) => (
+            {SECCIONES_CONFIGURACION.filter((s) => !(modoEuro() && (s.id === "pagos" || s.id === "fiscal" || s.id === "impuestos"))).map((s) => (
               <button key={s.id} type="button" onClick={() => onSeccion(s.id)} className={claseBoton(seccion === s.id)}>
                 {s.etiqueta}
               </button>
@@ -6683,6 +6690,8 @@ function ConfiguracionComercio({ tenantId, nombreNegocio, esDuenoAdmin, onIrAEqu
             <p className="text-xs text-slate-500 dark:text-slate-400">{seccionActual.ayuda}</p>
             {seccion === "fiscal" ? (
               <FacturacionFiscalComercio mostrarToast={mostrarToast} />
+            ) : seccion === "impuestos" ? (
+              <ImpuestosCargosComercio esDuenoAdmin={esDuenoAdmin} mostrarToast={mostrarToast} />
             ) : seccion === "moneda" ? (
               <MonedaNegocioComercio esDuenoAdmin={esDuenoAdmin} mostrarToast={mostrarToast} />
             ) : (
