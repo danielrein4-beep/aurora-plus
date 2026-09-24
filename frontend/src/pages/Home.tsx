@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import AuroraLogo from "../AuroraLogo";
 import SpecularButton from "../components/SpecularButton";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -54,15 +53,6 @@ const SISTEMA_POR_INDUSTRIA: Record<string, { ruta: string; label: string; nombr
   ganaderia: { ruta: "/ganaderia", label: "Aurora Ganadería", nombre: "Aurora Ganadería", desc: "Gestión integral de ganadería, rotación de potreros, registro sanitario y trazabilidad animal.", Icon: IconFarm },
 };
 const SISTEMA_POR_DEFECTO = { ruta: "/mediclinic", label: "Mediclinic Pro", nombre: "Mediclinic Pro — Espacio Clínico", desc: "Historias clínicas digitales, agenda médica, sala de espera reactiva, cotizador y caja diaria.", Icon: IconClinic };
-
-const FEATURES = [
-  { title: "Asistente de IA por WhatsApp", desc: "En Comercio: responde precios, stock y tasa BCV al instante y sin costo. Con límites de costo por negocio." },
-  { title: "Control Sanitario Estricto", desc: "En Ganadería: si un animal sigue en período de retiro por vacuna o tratamiento, el sistema bloquea su venta." },
-  { title: "Récipe Médico y Vademécum", desc: "En Mediclinic y Odontología: 36+ fármacos con posología, detección de alergias y récipe oficial en PDF." },
-  { title: "Módulos Integrados", desc: "Ventas, inventario, caja y auditoría conectados sin planillas paralelas ni datos duplicados." },
-  { title: "Nube + Local Resiliente", desc: "Trabaja con o sin internet. Sincronización automática al recuperar la conectividad." },
-  { title: "Seguridad y Auditoría", desc: "Roles y permisos granulares por tenant, con trazabilidad completa de cada acción." },
-];
 
 const PLANS = [
   {
@@ -240,75 +230,6 @@ export default function Home() {
                       {ind.desc}
                     </p>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── AURORA ENGINE CORE (ARQUITECTURA) ── */}
-      <section className="py-20 md:py-28 px-6 sm:px-8 bg-white border-b border-[#E5E5EA]">
-        <div className="max-w-5xl mx-auto">
-          
-          <div className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-3xl p-8 sm:p-12">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-8 border-b border-[#E5E5EA]">
-              <div className="flex items-center gap-4">
-                <div className="p-2.5 rounded-2xl bg-white border border-[#E5E5EA] shadow-sm">
-                  <AuroraLogo size={36} animated={false} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-xl font-bold text-[#1D1D1F] tracking-tight">Aurora Engine Core</h3>
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      ONLINE v2.4
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#86868B] mt-0.5">Arquitectura Multi-Tenant · PostgreSQL · Sincronización Local</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-8 text-left">
-              {[
-                { label: "Caja Central", val: "Sincronizada" },
-                { label: "Kardex e Insumos", val: "Auto-Descuento" },
-                { label: "Modo Offline", val: "Persistencia Total" },
-                { label: "Auditoría RBAC", val: "Trazabilidad 100%" },
-              ].map((item) => (
-                <div key={item.label} className="bg-white border border-[#E5E5EA] rounded-2xl p-5 shadow-sm">
-                  <div className="w-8 h-px bg-[#177E89] mb-4" aria-hidden="true" />
-                  <div className="text-[11px] font-semibold text-[#86868B] uppercase tracking-wider mb-1">{item.label}</div>
-                  <div className="text-sm font-bold text-[#1D1D1F]">{item.val}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── CARACTERÍSTICAS DESTACADAS ── */}
-      <section className="py-20 md:py-28 px-6 sm:px-8 bg-white border-b border-[#E5E5EA]">
-        <div className="max-w-6xl mx-auto">
-          
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-4">
-              Potencia tecnológica sin complicaciones
-            </h2>
-            <p className="text-base sm:text-lg text-[#86868B]">
-              Herramientas de nivel empresarial preparadas para el trabajo diario.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map((feat) => {
-              return (
-                <div key={feat.title} className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-7">
-                  <div className="w-8 h-px bg-[#177E89] mb-5" aria-hidden="true" />
-                  <h3 className="text-base font-bold text-[#1D1D1F] mb-2">{feat.title}</h3>
-                  <p className="text-xs text-[#86868B] leading-relaxed">{feat.desc}</p>
                 </div>
               );
             })}
