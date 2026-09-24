@@ -33,7 +33,7 @@ const BASICO_FEATURES = [
   "Sin costo extra por usuario adicional",
   "Multi-moneda (USD · VES · COP)",
   "Reportes esenciales",
-  "Offline con sincronización automática",
+  "Cobros sin duplicados aunque se caiga la conexión",
 ];
 const FULL_FEATURES_COMUNES = [
   "Todo lo incluido en Aurora Básico",
@@ -215,7 +215,7 @@ export default function Precios() {
                   thickness={1}
                   proximity={280}
                   className="relative w-full max-w-xs shadow-sm"
-                  onClick={() => navigate("/onboarding")}
+                  onClick={() => navigate("/auth?registro=1")}
                 >
                   {plan.destacado ? `Quiero Full para ${vertical.nombre}` : "Comenzar con Básico"}
                 </SpecularButton>

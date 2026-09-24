@@ -47,6 +47,7 @@ public class TenantProvisioningService {
         public Integer mesesVigencia;
         public String monedaBase;
         public String usuarioInicial;
+        public String nombreUsuarioInicial;
         public String passwordInicial;
         public Boolean accesoTotal;
         public Integer limiteUsuarios;
@@ -154,8 +155,10 @@ public class TenantProvisioningService {
             // como el médico del consultorio y le auto-asigne citas/consultas —
             // DUENO_ADMIN no cuenta para ese resuelto, aunque igual tenga acceso.
             Usuario.Rol rolInicial = "salud".equals(moduloBackend) ? Usuario.Rol.MEDICO : Usuario.Rol.DUENO_ADMIN;
+            String nombreUsuario = request.nombreUsuarioInicial != null && !request.nombreUsuarioInicial.isBlank()
+                ? request.nombreUsuarioInicial.trim() : request.nombreEmpresa;
             authService.crearUsuario(nuevoTenantId, request.usuarioInicial, request.passwordInicial,
-                rolInicial, request.nombreEmpresa);
+                rolInicial, nombreUsuario);
         }
 
         return guardada;

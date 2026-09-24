@@ -60,14 +60,14 @@ const FEATURES = [
   { title: "Control Sanitario Estricto", desc: "En Ganadería: si un animal sigue en período de retiro por vacuna o tratamiento, el sistema bloquea su venta." },
   { title: "Récipe Médico y Vademécum", desc: "En Mediclinic y Odontología: 36+ fármacos con posología, detección de alergias y récipe oficial en PDF." },
   { title: "Módulos Integrados", desc: "Ventas, inventario, caja y auditoría conectados sin planillas paralelas ni datos duplicados." },
-  { title: "Nube + Local Resiliente", desc: "Trabaja con o sin internet. Sincronización automática al recuperar la conectividad." },
+  { title: "Cobros a prueba de cortes", desc: "Si se cae la conexión en pleno cobro, reintentar no duplica el pago ni el movimiento de caja. En Ganadería puedes trabajar sin internet y se sincroniza al volver." },
   { title: "Seguridad y Auditoría", desc: "Roles y permisos granulares por tenant, con trazabilidad completa de cada acción." },
 ];
 
 const PLANS = [
   {
     name: "Aurora Básico", price: "$25", period: "/mes", desc: "Lo esencial de tu vertical para dejar de operar a mano",
-    features: ["Módulos base (POS/agenda, inventario, caja)", "Acceso web + versión móvil", "Sin costo extra por usuario adicional", "Multi-moneda (USD · VES · COP)", "Offline con sincronización automática"],
+    features: ["Módulos base (POS/agenda, inventario, caja)", "Acceso web + versión móvil", "Sin costo extra por usuario adicional", "Multi-moneda (USD · VES · COP)", "Cobros sin duplicados aunque se caiga la conexión"],
     cta: "Comenzar con Básico", highlight: false, badge: "",
   },
   {
@@ -78,10 +78,10 @@ const PLANS = [
 ];
 
 const STATS = [
-  { value: "6",       label: "Verticales nativas" },
-  { value: "100%",    label: "Resiliente sin internet" },
+  { value: "5",       label: "Rubros especializados" },
+  { value: "1 mes",   label: "De prueba gratis" },
   { value: "3",       label: "Monedas: USD · VES · COP" },
-  { value: "< 2 sem", label: "Tiempo de implementación" },
+  { value: "$0",      label: "Por usuario adicional" },
 ];
 
 export default function Home() {
@@ -137,9 +137,9 @@ export default function Home() {
               thickness={1}
               proximity={280}
               className="w-full sm:w-auto"
-              onClick={() => navigate("/onboarding")}
+              onClick={() => navigate("/auth?registro=1")}
             >
-              Solicitar demo gratis
+              Probar gratis 1 mes
             </SpecularButton>
             <SpecularButton
               size="lg"
@@ -156,7 +156,7 @@ export default function Home() {
               className="w-full sm:w-auto shadow-sm"
               onClick={() => navigate("/industrias")}
             >
-              Ver los 6 rubros
+              Ver los rubros
             </SpecularButton>
           </div>
 
@@ -259,23 +259,18 @@ export default function Home() {
                   <AuroraLogo size={36} animated={false} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-xl font-bold text-[#1D1D1F] tracking-tight">Aurora Engine Core</h3>
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      ONLINE v2.4
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#86868B] mt-0.5">Arquitectura Multi-Tenant · PostgreSQL · Sincronización Local</p>
+                  <h3 className="text-xl font-bold text-[#1D1D1F] tracking-tight">Todo tu negocio en un solo lugar</h3>
+                  <p className="text-xs text-[#86868B] mt-0.5">Lo que registras en un módulo aparece al instante en los demás, sin volver a escribirlo.</p>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-8 text-left">
               {[
-                { label: "Caja Central", val: "Sincronizada" },
-                { label: "Kardex e Insumos", val: "Auto-Descuento" },
-                { label: "Modo Offline", val: "Persistencia Total" },
-                { label: "Auditoría RBAC", val: "Trazabilidad 100%" },
+                { label: "Caja", val: "Cada cobro entra solo a caja" },
+                { label: "Inventario", val: "Se descuenta al vender o atender" },
+                { label: "Tasa del día", val: "Bolívares y dólares al cambio vigente" },
+                { label: "Historial", val: "Quién hizo qué y cuándo" },
               ].map((item) => (
                 <div key={item.label} className="bg-white border border-[#E5E5EA] rounded-2xl p-5 shadow-sm">
                   <div className="w-8 h-px bg-[#177E89] mb-4" aria-hidden="true" />
@@ -366,7 +361,7 @@ export default function Home() {
                 </div>
 
                 <button
-                  onClick={() => navigate("/onboarding")}
+                  onClick={() => navigate("/auth?registro=1")}
                   className={`w-full py-3.5 rounded-full text-xs font-semibold tracking-wide transition-all cursor-pointer ${
                     p.highlight
                       ? "btn-deep-black"

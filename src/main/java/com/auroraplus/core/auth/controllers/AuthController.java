@@ -29,6 +29,7 @@ public class AuthController {
 
     public static class RegistroNegocioRequest {
         public String nombreEmpresa;
+        public String nombreCompleto; // de quien se registra; antes se guardaba el del negocio como nombre del usuario
         public String moduloPrincipal; // salud, horeca, ganaderia, etc.
         public String emailContacto;
         public String telefonoContacto;
@@ -59,6 +60,7 @@ public class AuthController {
         alta.emailContacto = request.emailContacto;
         alta.telefonoContacto = request.telefonoContacto;
         alta.usuarioInicial = request.username;
+        alta.nombreUsuarioInicial = request.nombreCompleto;
         alta.passwordInicial = request.password;
         LicenciaTenant licencia = tenantProvisioningService.crear(alta);
 

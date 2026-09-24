@@ -36,6 +36,8 @@ const INDUSTRIES = [
   },
   {
     name: "Veterinaria",
+    // Aun en construccion: se anuncia, pero no se ofrece crear cuenta todavia.
+    proximamente: true,
     tagline: "El mismo motor de Mediclinic, para mascotas",
     desc: "Agenda, historias clínicas, sala de espera y cotizador para clínicas veterinarias — construido sobre el mismo motor probado de Mediclinic Pro.",
     modulos: ["Historia clínica por mascota y propietario", "Agenda de citas y cirugías", "Sala de espera en vivo", "Cotizador de procedimientos", "Cobros y caja diaria", "Cierres de caja"],
@@ -93,7 +95,12 @@ export default function Industrias() {
                 {/* Header */}
                 <div className="mb-6">
                   <div className="text-teal-600 dark:text-white/35 text-xs font-semibold tracking-widest uppercase mb-2">{ind.tagline}</div>
-                  <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white">{ind.name}</h2>
+                  <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white flex items-center gap-3">
+                    {ind.name}
+                    {"proximamente" in ind && ind.proximamente && (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Próximamente</span>
+                    )}
+                  </h2>
                 </div>
 
                 <p className="text-slate-600 dark:text-white/55 text-base leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
@@ -128,9 +135,9 @@ export default function Industrias() {
                 intensity={1}
                 thickness={1}
                 proximity={280}
-                onClick={() => navigate("/onboarding")}
+                onClick={() => navigate("proximamente" in ind && ind.proximamente ? "/nosotros" : "/auth?registro=1")}
               >
-                Quiero una demo para {ind.name}
+                {"proximamente" in ind && ind.proximamente ? "Avísame cuando esté listo" : `Probar gratis ${ind.name}`}
               </SpecularButton>
               <SpecularButton
                 size="md"

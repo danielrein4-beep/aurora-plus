@@ -117,7 +117,7 @@ export default function Soluciones() {
           ¿Quieres ver todo esto<br />
           <span className="text-aurora">funcionando en tu negocio?</span>
         </h2>
-        <p className="text-slate-500 dark:text-white/40 mb-8">Agenda una demo personalizada — te mostramos exactamente lo que necesitas, sin perder tu tiempo.</p>
+        <p className="text-slate-500 dark:text-white/40 mb-8">Crea tu cuenta y úsalo gratis durante un mes, con tus propios datos.</p>
         <SpecularButton
           size="lg"
           radius={12}
@@ -131,9 +131,9 @@ export default function Soluciones() {
           intensity={1}
           thickness={1}
           proximity={280}
-          onClick={() => navigate("/onboarding")}
+          onClick={() => navigate("/auth?registro=1")}
         >
-          Solicitar demo gratuita
+          Probar gratis 1 mes
         </SpecularButton>
       </section>
     </main>
