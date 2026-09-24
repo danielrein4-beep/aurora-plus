@@ -2,15 +2,17 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   listarSesionesEstetica, registrarSesionEstetica, eliminarSesionEstetica, fotosSesionEstetica,
   listarPaquetesEstetica, obtenerFichaEstetica,
-  type SesionEstetica, type PaqueteEstetica, type ProcedimientoMedico,
+  type SesionEstetica, type PaqueteEstetica, type ProcedimientoMedico, type ProfesionalEstetica,
 } from "../../api";
 import { IconCamera, IconTrash } from "../../Icons";
 import {
-  Aviso, Boton, Campo, Cargando, Insignia, Modal, Vacio, claseInput, comprimirImagen, formatearFecha, hoyISO, mensajeError,
+  Aviso, Boton, Campo, Cargando, Insignia, Modal, Vacio, claseInput, comprimirImagen, formatearFecha, formatearMonto, hoyISO, mensajeError,
 } from "./comun";
 import { alertasDeFicha } from "./FichaPiel";
 
-export default function SesionesClienta({ pacienteId, servicios }: { pacienteId: number; servicios: ProcedimientoMedico[] }) {
+export default function SesionesClienta({ pacienteId, servicios, profesionales }: {
+  pacienteId: number; servicios: ProcedimientoMedico[]; profesionales: ProfesionalEstetica[];
+}) {
   const [sesiones, setSesiones] = useState<SesionEstetica[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export default function SesionesClienta({ pacienteId, servicios }: { pacienteId:
                   <div>
                     <div className="font-semibold text-sm text-slate-900 dark:text-white">{s.servicio}</div>
                     <div className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
-                      {formatearFecha(s.fecha_sesion)}{s.zona ? ` · ${s.zona}` : ""}{s.profesional ? ` · ${s.profesional}` : ""}
+                      {formatearFecha(s.fecha_sesion)}{s.zona ? ` · ${s.zona}` : ""}{s.profesional ? ` · ${s.profesional}` : ""}{s.valor != null ? ` · ${formatearMonto(s.valor, s.moneda)}` : ""}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -100,6 +102,7 @@ export default function SesionesClienta({ pacienteId, servicios }: { pacienteId:
         <NuevaSesion
           pacienteId={pacienteId}
           servicios={servicios}
+          profesionales={profesionales.filter((p) => p.activo)}
           onCerrar={() => setNueva(false)}
           onGuardada={() => { setNueva(false); cargar(); }}
         />
@@ -118,14 +121,15 @@ function Dato({ t, v }: { t: string; v: string }) {
   );
 }
 
-function NuevaSesion({ pacienteId, servicios, onCerrar, onGuardada }: {
-  pacienteId: number; servicios: ProcedimientoMedico[]; onCerrar: () => void; onGuardada: () => void;
+function NuevaSesion({ pacienteId, servicios, profesionales, onCerrar, onGuardada }: {
+  pacienteId: number; servicios: ProcedimientoMedico[]; profesionales: ProfesionalEstetica[]; onCerrar: () => void; onGuardada: () => void;
 }) {
   const [paquetes, setPaquetes] = useState<PaqueteEstetica[]>([]);
   const [alertas, setAlertas] = useState<string[]>([]);
   const [f, setF] = useState({
     servicio: "", paqueteId: "", fechaSesion: hoyISO(), zona: "", parametros: "", productos: "",
     reaccion: "", indicaciones: "", proximaSesion: "",
+    profesionalId: profesionales.length === 1 ? String(profesionales[0].id) : "", valor: "",
   });
   const [fotoAntes, setFotoAntes] = useState<string | null>(null);
   const [fotoDespues, setFotoDespues] = useState<string | null>(null);
@@ -143,7 +147,13 @@ function NuevaSesion({ pacienteId, servicios, onCerrar, onGuardada }: {
 
   const elegirPaquete = (id: string) => {
     const p = paquetes.find((x) => String(x.id) === id);
-    setF((prev) => ({ ...prev, paqueteId: id, servicio: p && !prev.servicio ? p.nombre : prev.servicio }));
+    // Con paquete el valor lo calcula el servidor (precio del paquete entre sus sesiones).
+    setF((prev) => ({ ...prev, paqueteId: id, valor: id ? "" : prev.valor, servicio: p && !prev.servicio ? p.nombre : prev.servicio }));
+  };
+
+  const elegirServicio = (nombre: string) => {
+    const s = servicios.find((x) => x.nombre === nombre);
+    setF((prev) => ({ ...prev, servicio: nombre, valor: s && !prev.paqueteId ? String(s.costo) : prev.valor }));
   };
 
   const cargarFoto = async (archivo: File | undefined, cual: "antes" | "despues") => {
@@ -174,6 +184,8 @@ function NuevaSesion({ pacienteId, servicios, onCerrar, onGuardada }: {
         proximaSesion: f.proximaSesion || undefined,
         fotoAntes: fotoAntes ?? undefined,
         fotoDespues: fotoDespues ?? undefined,
+        profesionalId: f.profesionalId ? Number(f.profesionalId) : undefined,
+        valor: !f.paqueteId && f.valor !== "" ? Number(f.valor) : undefined,
       });
       onGuardada();
     } catch (e) {
@@ -208,12 +220,25 @@ function NuevaSesion({ pacienteId, servicios, onCerrar, onGuardada }: {
             </Campo>
           )}
           <Campo label="Servicio realizado">
-            <input className={claseInput} list="servicios-estetica" value={f.servicio} onChange={(e) => set("servicio", e.target.value)} placeholder="Limpieza facial profunda" />
+            <input className={claseInput} list="servicios-estetica" value={f.servicio} onChange={(e) => elegirServicio(e.target.value)} placeholder="Limpieza facial profunda" />
             <datalist id="servicios-estetica">{servicios.map((s) => <option key={s.id} value={s.nombre} />)}</datalist>
           </Campo>
           <Campo label="Fecha">
             <input type="date" className={claseInput} value={f.fechaSesion} max={hoyISO()} onChange={(e) => set("fechaSesion", e.target.value)} />
           </Campo>
+          {profesionales.length > 0 && (
+            <Campo label="La atendió">
+              <select className={claseInput} value={f.profesionalId} onChange={(e) => set("profesionalId", e.target.value)}>
+                <option value="">Sin asignar</option>
+                {profesionales.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+            </Campo>
+          )}
+          {!f.paqueteId && (
+            <Campo label="Valor del servicio (USD)" ayuda="Para calcular la comisión.">
+              <input type="number" min={0} step="0.01" className={claseInput} value={f.valor} onChange={(e) => set("valor", e.target.value)} />
+            </Campo>
+          )}
           <Campo label="Zona tratada">
             <input className={claseInput} value={f.zona} onChange={(e) => set("zona", e.target.value)} placeholder="Rostro completo" />
           </Campo>

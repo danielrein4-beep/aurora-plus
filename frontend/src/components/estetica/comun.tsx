@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { IconClose } from "../../Icons";
 
-export type PaginaEstetica = "general" | "clientas" | "agenda" | "servicios" | "paquetes" | "caja";
+export type PaginaEstetica = "general" | "clientas" | "agenda" | "servicios" | "paquetes" | "productos" | "equipo" | "caja";
 
 // Paleta de la vertical: misma estructura que MediClinic, con tono propio (ciruela y rosa).
 export const COLOR = {

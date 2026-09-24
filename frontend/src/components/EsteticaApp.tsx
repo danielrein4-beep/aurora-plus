@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { listarPacientes, listarProcedimientos, type Paciente, type ProcedimientoMedico } from "../api";
+import { listarPacientes, listarProcedimientos, listarProfesionalesEstetica, type Paciente, type ProcedimientoMedico, type ProfesionalEstetica } from "../api";
 import {
-  IconCalendarSolido, IconDashboardGrid, IconDoorExit, IconSparkles, IconTag, IconUsers, IconWallet, IconWarning,
+  IconBox, IconCalendarSolido, IconDashboardGrid, IconDoorExit, IconSparkles, IconTag, IconUser, IconUsers, IconWallet, IconWarning,
 } from "../Icons";
 import { COLOR, mensajeError, type PaginaEstetica } from "./estetica/comun";
 import VistaGeneral from "./estetica/VistaGeneral";
@@ -11,6 +11,8 @@ import Agenda from "./estetica/Agenda";
 import Servicios from "./estetica/Servicios";
 import PaginaPaquetes from "./estetica/Paquetes";
 import Caja from "./estetica/Caja";
+import Productos from "./estetica/Productos";
+import Equipo from "./estetica/Equipo";
 
 const NAV: { id: PaginaEstetica; label: string; Icon: (p: { size?: number }) => React.ReactNode }[] = [
   { id: "general", label: "Vista General", Icon: IconDashboardGrid },
@@ -18,7 +20,9 @@ const NAV: { id: PaginaEstetica; label: string; Icon: (p: { size?: number }) => 
   { id: "agenda", label: "Agenda", Icon: IconCalendarSolido },
   { id: "paquetes", label: "Paquetes", Icon: IconSparkles },
   { id: "servicios", label: "Servicios", Icon: IconTag },
+  { id: "productos", label: "Productos", Icon: IconBox },
   { id: "caja", label: "Caja", Icon: IconWallet },
+  { id: "equipo", label: "Equipo y comisiones", Icon: IconUser },
 ];
 
 export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
@@ -34,6 +38,8 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
   const [servicios, setServicios] = useState<ProcedimientoMedico[]>([]);
   const [errorServicios, setErrorServicios] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [profesionales, setProfesionales] = useState<ProfesionalEstetica[]>([]);
+  const [errorEquipo, setErrorEquipo] = useState<string | null>(null);
 
   const recargarClientas = useCallback(async () => {
     try {
@@ -58,11 +64,21 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
     }
   }, [tenantId]);
 
+  const recargarProfesionales = useCallback(async () => {
+    try {
+      setProfesionales(await listarProfesionalesEstetica());
+      setErrorEquipo(null);
+    } catch (e) {
+      setErrorEquipo(mensajeError(e, "No se pudo cargar el equipo."));
+    }
+  }, []);
+
   useEffect(() => {
     if (!tenantId) return;
     recargarClientas();
     recargarServicios();
-  }, [tenantId, recargarClientas, recargarServicios]);
+    recargarProfesionales();
+  }, [tenantId, recargarClientas, recargarServicios, recargarProfesionales]);
 
   const ir = (p: PaginaEstetica) => {
     setPagina(p);
@@ -152,6 +168,7 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
             <Clientas
               clientas={clientas}
               servicios={servicios}
+              profesionales={profesionales}
               negocio={negocio}
               seleccionada={seleccionada}
               onSeleccionar={setSeleccionada}
@@ -164,6 +181,8 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
           {pagina === "paquetes" && <PaginaPaquetes clientas={clientas} servicios={servicios} />}
           {pagina === "servicios" && <Servicios tenantId={tenantId} servicios={servicios} onRecargar={recargarServicios} error={errorServicios} />}
           {pagina === "caja" && <Caja clientas={clientas} servicios={servicios} />}
+          {pagina === "productos" && <Productos clientas={clientas} profesionales={profesionales} />}
+          {pagina === "equipo" && <Equipo profesionales={profesionales} onRecargar={recargarProfesionales} error={errorEquipo} />}
         </div>
       </main>
     </div>

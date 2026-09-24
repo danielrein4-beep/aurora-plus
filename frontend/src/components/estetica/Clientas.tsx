@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { crearPaciente, actualizarPaciente, type Paciente, type NuevoPaciente, type ProcedimientoMedico } from "../../api";
+import { crearPaciente, actualizarPaciente, type Paciente, type NuevoPaciente, type ProcedimientoMedico, type ProfesionalEstetica } from "../../api";
 import { IconChevronLeft, IconEdit, IconSearch, IconWhatsApp } from "../../Icons";
 import { Aviso, Boton, Campo, EncabezadoPagina, Modal, Tarjeta, Vacio, claseInput, enlaceWhatsApp, formatearFecha, mensajeError } from "./comun";
 import FichaPiel from "./FichaPiel";
@@ -31,10 +31,11 @@ function edad(fecha?: string | null): number | null {
 }
 
 export default function Clientas({
-  clientas, servicios, negocio, seleccionada, onSeleccionar, onRecargar, cargando, error,
+  clientas, servicios, profesionales, negocio, seleccionada, onSeleccionar, onRecargar, cargando, error,
 }: {
   clientas: Paciente[];
   servicios: ProcedimientoMedico[];
+  profesionales: ProfesionalEstetica[];
   negocio: string;
   seleccionada: Paciente | null;
   onSeleccionar: (c: Paciente | null) => void;
@@ -114,6 +115,7 @@ export default function Clientas({
           <DetalleClienta
             clienta={seleccionada}
             servicios={servicios}
+            profesionales={profesionales}
             negocio={negocio}
             pestana={pestana}
             onPestana={setPestana}
@@ -134,8 +136,8 @@ export default function Clientas({
   );
 }
 
-function DetalleClienta({ clienta, servicios, negocio, pestana, onPestana, onVolver, onEditar }: {
-  clienta: Paciente; servicios: ProcedimientoMedico[]; negocio: string; pestana: Pestana;
+function DetalleClienta({ clienta, servicios, profesionales, negocio, pestana, onPestana, onVolver, onEditar }: {
+  clienta: Paciente; servicios: ProcedimientoMedico[]; profesionales: ProfesionalEstetica[]; negocio: string; pestana: Pestana;
   onPestana: (p: Pestana) => void; onVolver: () => void; onEditar: () => void;
 }) {
   const wa = enlaceWhatsApp(clienta.telefono, `Hola ${clienta.nombres || clienta.nombreCompleto.split(" ")[0]}, `);
@@ -184,7 +186,7 @@ function DetalleClienta({ clienta, servicios, negocio, pestana, onPestana, onVol
         </nav>
       </div>
       <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-white/10">
-        {pestana === "sesiones" && <SesionesClienta pacienteId={clienta.id} servicios={servicios} />}
+        {pestana === "sesiones" && <SesionesClienta pacienteId={clienta.id} servicios={servicios} profesionales={profesionales} />}
         {pestana === "ficha" && <FichaPiel pacienteId={clienta.id} />}
         {pestana === "paquetes" && <PaquetesClienta clienta={clienta} servicios={servicios} />}
         {pestana === "consentimientos" && <Consentimientos clienta={clienta} negocio={negocio} />}

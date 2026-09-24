@@ -6603,6 +6603,9 @@ export interface SesionEstetica {
   indicaciones: string | null;
   proxima_sesion: string | null;
   profesional: string | null;
+  profesional_id: number | null;
+  valor: number | null;
+  moneda: string;
   tiene_foto_antes: boolean;
   tiene_foto_despues: boolean;
 }
@@ -6618,6 +6621,7 @@ export function fotosSesionEstetica(sesionId: number): Promise<{ antes: string |
 export function registrarSesionEstetica(datos: {
   pacienteId: number; paqueteId?: number; fechaSesion?: string; servicio: string; zona?: string; parametros?: string;
   productos?: string; reaccion?: string; indicaciones?: string; proximaSesion?: string; fotoAntes?: string; fotoDespues?: string;
+  profesionalId?: number; valor?: number;
 }): Promise<{ id: number }> {
   return request(`/api/salud/estetica/sesiones`, { method: "POST", body: JSON.stringify(datos) });
 }
@@ -6702,4 +6706,89 @@ export interface LineaEstadisticaComercio {
 }
 export function obtenerEstadisticasComercio(desde: string, hasta: string): Promise<LineaEstadisticaComercio[]> {
   return request(`/api/repuestos/reportes/estadisticas?desde=${desde}&hasta=${hasta}`);
+}
+
+// --- Estética: profesionales, comisiones y productos (V100) ---
+export interface ProfesionalEstetica {
+  id: number;
+  nombre: string;
+  telefono: string | null;
+  comision_servicios: number;
+  comision_productos: number;
+  activo: boolean;
+}
+
+export function listarProfesionalesEstetica(): Promise<ProfesionalEstetica[]> {
+  return request(`/api/salud/estetica/profesionales`);
+}
+
+export interface DatosProfesionalEstetica {
+  nombre: string; telefono?: string; comisionServicios: number; comisionProductos: number; activo?: boolean;
+}
+
+export function crearProfesionalEstetica(datos: DatosProfesionalEstetica): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/profesionales`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function actualizarProfesionalEstetica(id: number, datos: DatosProfesionalEstetica): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/profesionales/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface ComisionProfesional {
+  id: number;
+  nombre: string;
+  activo: boolean;
+  comision_servicios: number;
+  comision_productos: number;
+  sesiones: number;
+  sesiones_sin_valor: number;
+  total_servicios: number;
+  comision_servicios_monto: number;
+  ventas_productos: number;
+  total_productos: number;
+  comision_productos_monto: number;
+}
+
+export function comisionesEstetica(desde: string, hasta: string): Promise<{ profesionales: ComisionProfesional[]; sesionesSinProfesional: number }> {
+  return request(`/api/salud/estetica/comisiones?desde=${desde}&hasta=${hasta}`);
+}
+
+export interface ProductoEstetica {
+  id: number;
+  sku: string;
+  nombre: string;
+  categoria: string;
+  stock_actual: number;
+  stock_minimo: number | null;
+  costo_unitario: number;
+  precio_venta: number;
+}
+
+export function listarProductosEstetica(): Promise<{ productos: ProductoEstetica[]; moneda: string }> {
+  return request(`/api/salud/estetica/productos`);
+}
+
+export interface DatosProductoEstetica {
+  nombre: string; sku?: string; categoria: string; precioVenta: number; costoUnitario: number;
+  stockMinimo?: number | null; stockInicial?: number;
+}
+
+export function crearProductoEstetica(datos: DatosProductoEstetica): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/productos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function actualizarProductoEstetica(id: number, datos: DatosProductoEstetica): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/productos/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function entradaProductoEstetica(id: number, cantidad: number, costoUnitario?: number): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/productos/${id}/entrada`, { method: "POST", body: JSON.stringify({ cantidad, costoUnitario }) });
+}
+
+export function venderProductosEstetica(datos: {
+  claveIdempotencia: string; pacienteId?: number; profesionalId?: number;
+  items: { articuloId: number; cantidad: number }[];
+  monedaPago: string; montoRecibido?: number; metodoPago: NuevoCobro["metodoPago"]; referenciaPago?: string;
+}): Promise<{ id: number; cobro_id: number; total: number; moneda: string }> {
+  return request(`/api/salud/estetica/ventas-productos`, { method: "POST", body: JSON.stringify(datos) });
 }
