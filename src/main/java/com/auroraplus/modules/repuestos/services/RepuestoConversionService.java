@@ -29,6 +29,9 @@ import java.util.Optional;
 public class RepuestoConversionService {
 
     @Autowired
+    private AlmacenService almacenService;
+
+    @Autowired
     private RepuestoItemRepository repuestoItemRepository;
 
     @Autowired
@@ -238,6 +241,7 @@ public class RepuestoConversionService {
         BigDecimal stockNuevo = stockAnterior.subtract(cantidadEnUnidadBase);
         repuesto.setStockActual(stockNuevo);
         repuestoItemRepository.save(repuesto);
+        almacenService.alinear(repuesto.getTenantId(), repuesto.getId(), repuesto.getStockActual());
 
         BigDecimal precioUnitarioPresentacion = aplicarDescuentoClienteMayorista(presentacion.getPrecioVenta(), clienteId, tenantId);
         BigDecimal totalVenta = cantidadVendida.multiply(precioUnitarioPresentacion).setScale(2, RoundingMode.HALF_UP);
@@ -376,6 +380,7 @@ public class RepuestoConversionService {
         BigDecimal stockNuevo = stockAnterior.subtract(cantidad);
         repuesto.setStockActual(stockNuevo);
         repuestoItemRepository.save(repuesto);
+        almacenService.alinear(repuesto.getTenantId(), repuesto.getId(), repuesto.getStockActual());
 
         MovimientoRepuesto movimiento = registrarMovimientoVenta(repuesto, cantidad, stockAnterior, stockNuevo,
             "Venta directa" + (esMayorista ? " (tarifa Mayorista)" : " (tarifa Detal)"), clienteId, total);
@@ -420,6 +425,8 @@ public class RepuestoConversionService {
 
         repuesto.setStockActual(stockReal);
         repuestoItemRepository.save(repuesto);
+
+        almacenService.alinear(repuesto.getTenantId(), repuesto.getId(), repuesto.getStockActual());
 
         MovimientoRepuesto movimiento = new MovimientoRepuesto();
         movimiento.setTenantId(tenantId);
@@ -556,6 +563,7 @@ public class RepuestoConversionService {
         BigDecimal stockNuevo = stockAnterior.subtract(cantidad);
         repuesto.setStockActual(stockNuevo);
         repuestoItemRepository.save(repuesto);
+        almacenService.alinear(repuesto.getTenantId(), repuesto.getId(), repuesto.getStockActual());
         MovimientoRepuesto mov = registrarMovimientoVenta(repuesto, cantidad, stockAnterior, stockNuevo,
             "Venta " + ticket + (esMayorista ? " (tarifa Mayorista)" : " (tarifa Detal)"), clienteId, total);
         intentarGenerarBorrador(repuesto);
@@ -581,6 +589,7 @@ public class RepuestoConversionService {
         BigDecimal stockNuevo = stockAnterior.subtract(enUnidadBase);
         repuesto.setStockActual(stockNuevo);
         repuestoItemRepository.save(repuesto);
+        almacenService.alinear(repuesto.getTenantId(), repuesto.getId(), repuesto.getStockActual());
         MovimientoRepuesto mov = registrarMovimientoVenta(repuesto, enUnidadBase, stockAnterior, stockNuevo,
             "Venta " + ticket + ": " + cantidad + " " + presentacion.getNombrePresentacion(), clienteId, total);
         intentarGenerarBorrador(repuesto);

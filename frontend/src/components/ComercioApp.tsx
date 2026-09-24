@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import ModalCatalogoQR from "./ModalCatalogoQR";
 import PedidosWebPanel from "./PedidosWebPanel";
 import BitacoraAuditoria from "./BitacoraAuditoria";
+import DevolucionesComercio from "./DevolucionesComercio";
 import { useState, useMemo, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
@@ -1963,7 +1964,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // Dentro de "Cierres & Reportes": arqueo de caja (todos) vs. utilidad real por
   // producto (solo Dueño/Administrador — mismo criterio que el backend, ver
   // ReporteRepuestoController.exigirRol).
-  const [subCierre, setSubCierre] = useState<"caja" | "utilidad">("caja");
+  const [subCierre, setSubCierre] = useState<"caja" | "utilidad" | "devoluciones">("caja");
+  const [ticketADevolver, setTicketADevolver] = useState("");
+  const puedeDevolver = user?.rol === "DUENO_ADMIN" || user?.rol === "ENCARGADO_INVENTARIO";
   // "Administración" se expande en el propio sidebar y muestra sus submódulos
   // ahí mismo (Ingresos & Gastos / CXC-CXP / Cuentas Bancarias) — mismo patrón
   // que el "Cuentas" de Fina, en vez de pestañas horizontales dentro del panel.
@@ -4268,10 +4271,25 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   Utilidad Real
                 </button>
               )}
+              {puedeDevolver && (
+                <button
+                  onClick={() => setSubCierre("devoluciones")}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    subCierre === "devoluciones" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400"
+                  }`}
+                >
+                  Devoluciones
+                </button>
+              )}
             </div>
 
             {subCierre === "caja" ? (
               <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
+            ) : subCierre === "devoluciones" && puedeDevolver ? (
+              <DevolucionesComercio
+                ticketInicial={ticketADevolver}
+                onDevuelto={(mensaje) => { mostrarToast(mensaje, "success"); cargarRepuestosBackend(); cargarIngresosCaja(); }}
+              />
             ) : (
               <UtilidadComercio />
             )}
@@ -4855,6 +4873,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                             <span className="font-mono font-black text-sm text-teal-600 dark:text-teal-400">{SIM()}{v.total.toFixed(2)}</span>
                             <span className={`text-[10px] text-slate-400 font-mono block ${modoEuro() ? "hidden" : ""}`}>Bs. {v.totalBs.toFixed(2)}</span>
                           </div>
+                          {puedeDevolver && v.numero.startsWith("TKT-") && (
+                            <button
+                              onClick={() => { setTicketADevolver(v.numero); setClienteHistorialModal(null); setTab("cierre"); setSubCierre("devoluciones"); }}
+                              className="px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/30 dark:hover:bg-rose-800/50 text-[10px] font-bold text-rose-700 dark:text-rose-300 cursor-pointer transition-colors"
+                              title="Devolver productos de esta venta"
+                            >
+                              Devolver
+                            </button>
+                          )}
                           <button
                             onClick={() => imprimirTicketComercio(v, nombreLocal, tasaActivaBs, tasaCop)}
                             className="px-2.5 py-1 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-[10px] font-bold text-slate-800 dark:text-white flex items-center gap-1 cursor-pointer transition-colors"

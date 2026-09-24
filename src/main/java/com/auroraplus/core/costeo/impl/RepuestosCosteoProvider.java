@@ -42,6 +42,11 @@ public class RepuestosCosteoProvider implements CosteoProvider {
         var ventas = movimientoRepuestoRepository
             .findByTenantIdAndTipoAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(
                 tenantId, MovimientoRepuesto.TipoMovimiento.VENTA, desdeInicio, hastaFin);
+        // Las devoluciones restan ventas y costo.
+        ventas = new java.util.ArrayList<>(ventas);
+        ventas.addAll(movimientoRepuestoRepository
+            .findByTenantIdAndTipoAndFechaRegistroGreaterThanEqualAndFechaRegistroLessThan(
+                tenantId, MovimientoRepuesto.TipoMovimiento.DEVOLUCION, desdeInicio, hastaFin));
 
         BigDecimal ventasBrutas = BigDecimal.ZERO;
         BigDecimal costoVentas = BigDecimal.ZERO;
@@ -50,10 +55,12 @@ public class RepuestosCosteoProvider implements CosteoProvider {
         for (MovimientoRepuesto m : ventas) {
             BigDecimal total = m.getTotal();
             if (total == null) continue;
+            BigDecimal signo = m.getTipo() == MovimientoRepuesto.TipoMovimiento.DEVOLUCION ? BigDecimal.ONE.negate() : BigDecimal.ONE;
+            total = total.multiply(signo);
             ventasBrutas = ventasBrutas.add(total);
 
             if (m.getCostoUnitario() != null && m.getCantidad() != null) {
-                costoVentas = costoVentas.add(m.getCostoUnitario().multiply(m.getCantidad()));
+                costoVentas = costoVentas.add(m.getCostoUnitario().multiply(m.getCantidad()).multiply(signo));
                 ventasConCostoConocido = ventasConCostoConocido.add(total);
             }
         }

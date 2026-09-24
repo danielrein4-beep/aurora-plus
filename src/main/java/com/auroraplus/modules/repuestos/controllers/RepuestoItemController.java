@@ -29,6 +29,9 @@ import java.util.Optional;
 public class RepuestoItemController {
 
     @Autowired
+    private com.auroraplus.modules.repuestos.services.AlmacenService almacenService;
+
+    @Autowired
     private RepuestoItemRepository repuestoItemRepository;
 
     @Autowired
@@ -67,6 +70,7 @@ public class RepuestoItemController {
         if (item.getVisible() == null) item.setVisible(true);
         if (item.getOrdenVisualizacion() == null) item.setOrdenVisualizacion(0);
         RepuestoItem guardado = repuestoItemRepository.save(item);
+        almacenService.alinear(tenantId, guardado.getId(), guardado.getStockActual());
         auditoriaService.registrar(tenantId, "COMERCIO", "CREAR", "RepuestoItem", guardado.getId(), "Creó el repuesto SKU " + guardado.getCodigoSku());
         return ResponseEntity.status(HttpStatus.CREATED).body(guardado);
     }
@@ -227,6 +231,7 @@ public class RepuestoItemController {
                     BigDecimal stockNuevo = stockAnterior.add(item.stockInicial);
                     repuesto.setStockActual(stockNuevo);
                     repuesto = repuestoItemRepository.save(repuesto);
+                    almacenService.alinear(tenantId, repuesto.getId(), repuesto.getStockActual());
 
                     MovimientoRepuesto movimiento = new MovimientoRepuesto();
                     movimiento.setTenantId(tenantId);

@@ -24,6 +24,9 @@ import java.util.List;
 public class RepuestoCompraService {
 
     @Autowired
+    private AlmacenService almacenService;
+
+    @Autowired
     private CompraRepuestoRepository compraRepuestoRepository;
 
     @Autowired
@@ -104,6 +107,7 @@ public class RepuestoCompraService {
                 repuesto.setPrecioVenta(itemCompra.precioVenta);
             }
             repuestoItemRepository.save(repuesto);
+            almacenService.alinear(tenantId, repuesto.getId(), repuesto.getStockActual());
 
             BigDecimal subtotal = itemCompra.cantidad.multiply(itemCompra.costoUnitario);
             totalCompra = totalCompra.add(subtotal);

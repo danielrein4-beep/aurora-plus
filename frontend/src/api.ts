@@ -2094,10 +2094,13 @@ export function obtenerItemsComanda(tenantId: number, comandaId: number): Promis
 export interface ResumenPeriodoAbierto {
   desde: string;
   hasta: string;
-  totalIngresos: number;
-  totalEgresos: number;
-  montoEsperadoEnCaja: number;
+  /** Solo el dueño recibe las cifras: para el cajero el arqueo es ciego y vienen vacías. */
+  totalIngresos?: number;
+  totalEgresos?: number;
+  /** Efectivo que debería haber en la gaveta (lo mismo que calcula el cierre). */
+  montoEsperadoEnCaja?: number;
   cantidadMovimientos: number;
+  arqueoCiego?: boolean;
 }
 
 export function resumenPeriodoAbierto(tenantId: number, moneda: string): Promise<ResumenPeriodoAbierto> {
@@ -3752,6 +3755,40 @@ export interface TicketPosRequest {
  */
 export function cobrarTicketPos(datos: TicketPosRequest): Promise<{ yaProcesado: boolean; total: number | null }> {
   return request(`/api/repuestos/ventas/ticket`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface LineaVendidaTicket {
+  movimientoId: number;
+  repuestoId: number;
+  codigoSku: string;
+  descripcion: string;
+  cantidad: number;
+  total: number | null;
+  devuelto: number;
+}
+
+export function lineasDeTicketPos(numero: string): Promise<LineaVendidaTicket[]> {
+  return request(`/api/repuestos/ventas/ticket/${encodeURIComponent(numero)}/lineas`);
+}
+
+export interface ResultadoDevolucion {
+  yaProcesada: boolean;
+  montoDevuelto: number | null;
+  rebajadoDeCredito: number | null;
+  reembolsadoEnCaja: number | null;
+  monedaReembolso: string | null;
+}
+
+/** Devolución total o parcial de un ticket: el stock vuelve y el dinero sale de caja (o rebaja el crédito). */
+export function devolverTicketPos(datos: {
+  numeroTicket: string;
+  lineas: { movimientoId: number; cantidad: number }[];
+  motivo: string;
+  monedaReembolso?: string;
+  metodoReembolso?: string;
+  clave: string;
+}): Promise<ResultadoDevolucion> {
+  return request(`/api/repuestos/ventas/devolucion`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export function despacharPorPresentacion(

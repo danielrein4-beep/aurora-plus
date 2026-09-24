@@ -39,26 +39,36 @@ public class TesoreriaController {
     @Autowired
     private TesoreriaPdfService tesoreriaPdfService;
 
-    /** Vista previa del período abierto (sin cerrarlo), para que el cajero sepa qué esperar antes de declarar. */
+    /**
+     * Vista previa del período abierto (sin cerrarlo). El arqueo es ciego: solo el dueño ve lo que
+     * debería haber; el cajero cuenta y declara sin saber la cifra, si no podría "cuadrar" a la medida.
+     * El esperado es solo el efectivo, igual que calcula el cierre.
+     */
     @GetMapping("/resumen-periodo-abierto")
     public ResponseEntity<Map<String, Object>> resumenPeriodoAbierto(@RequestParam Long tenantId, @RequestParam String moneda) {
         Optional<ArqueoCaja> ultimoArqueo = arqueoCajaRepository.findTopByTenantIdAndMonedaOrderByFechaArqueoDesc(tenantId, moneda);
         LocalDateTime desde = ultimoArqueo.map(ArqueoCaja::getFechaArqueo).orElse(LocalDateTime.of(2000, 1, 1, 0, 0));
         LocalDateTime ahora = LocalDateTime.now();
+        List<MovimientoCaja> movimientos = movimientoCajaRepository.findByTenantIdAndMonedaAndFechaRegistroBetweenOrderByFechaRegistroAsc(tenantId, moneda, desde, ahora);
+
+        Map<String, Object> respuesta = new java.util.HashMap<>();
+        respuesta.put("desde", desde);
+        respuesta.put("hasta", ahora);
+        respuesta.put("cantidadMovimientos", movimientos.size());
+        String rol = com.auroraplus.core.auth.AuthContext.getRol();
+        boolean ciego = !"DUENO_ADMIN".equals(rol) && !"ADMINISTRADOR_FINCA".equals(rol);
+        respuesta.put("arqueoCiego", ciego);
+        if (ciego) return ResponseEntity.ok(respuesta);
 
         BigDecimal ingresos = movimientoCajaRepository.sumarMontoPorTipoYMonedaEntreFechas(tenantId, moneda, MovimientoCaja.TipoMovimiento.INGRESO, desde, ahora);
         BigDecimal egresos = movimientoCajaRepository.sumarMontoPorTipoYMonedaEntreFechas(tenantId, moneda, MovimientoCaja.TipoMovimiento.EGRESO, desde, ahora);
-        List<MovimientoCaja> movimientos = movimientoCajaRepository.findByTenantIdAndMonedaAndFechaRegistroBetweenOrderByFechaRegistroAsc(tenantId, moneda, desde, ahora);
-
-        return ResponseEntity.ok(Map.of(
-            "desde", desde,
-            "hasta", ahora,
-            "totalIngresos", ingresos,
-            "totalEgresos", egresos,
-            "montoEsperadoEnCaja", ingresos.subtract(egresos),
-            "cantidadMovimientos", movimientos.size(),
-            "movimientos", movimientos
-        ));
+        BigDecimal ingresosEfectivo = movimientoCajaRepository.sumarEfectivoPorTipoYMonedaEntreFechas(tenantId, moneda, MovimientoCaja.TipoMovimiento.INGRESO, desde, ahora);
+        BigDecimal egresosEfectivo = movimientoCajaRepository.sumarEfectivoPorTipoYMonedaEntreFechas(tenantId, moneda, MovimientoCaja.TipoMovimiento.EGRESO, desde, ahora);
+        respuesta.put("totalIngresos", ingresos);
+        respuesta.put("totalEgresos", egresos);
+        respuesta.put("montoEsperadoEnCaja", ingresosEfectivo.subtract(egresosEfectivo));
+        respuesta.put("movimientos", movimientos);
+        return ResponseEntity.ok(respuesta);
     }
 
     /** Cierre de caja: el cajero declara lo que tiene físicamente, el sistema calcula el descuadre. */

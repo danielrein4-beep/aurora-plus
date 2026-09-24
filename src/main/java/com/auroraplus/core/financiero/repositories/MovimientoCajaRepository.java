@@ -49,6 +49,10 @@ public interface MovimientoCajaRepository extends JpaRepository<MovimientoCaja, 
 
     List<MovimientoCaja> findByTenantIdAndTipoOrderByFechaRegistroDesc(Long tenantId, MovimientoCaja.TipoMovimiento tipo);
 
+    /** Movimientos nacidos de una operación concreta (p. ej. la cuenta por cobrar de una venta). */
+    List<MovimientoCaja> findByTenantIdAndTipoAndReferenciaTipoAndReferenciaId(Long tenantId, MovimientoCaja.TipoMovimiento tipo,
+                                                                                String referenciaTipo, Long referenciaId);
+
     /** CXC/CXP pendientes (con saldo real) cuya fecha de vencimiento ya llegó o llega dentro de `hasta` — para el recordatorio automático diario. */
     @Query("SELECT m FROM MovimientoCaja m WHERE m.tipo = :tipo AND m.estado <> 'PAGADO' "
         + "AND m.saldoPendiente IS NOT NULL AND m.saldoPendiente > 0 "
