@@ -1,6 +1,7 @@
 import { avisar } from "../avisos";
 import AsistenteIaModal from "./AsistenteIaModal";
 import jsPDF from "jspdf";
+import EstadisticasComercio from "./EstadisticasComercio";
 import ModalCatalogoQR from "./ModalCatalogoQR";
 import PedidosWebPanel from "./PedidosWebPanel";
 import BitacoraAuditoria from "./BitacoraAuditoria";
@@ -281,6 +282,8 @@ export interface VentaComercio {
   cliente: ClienteComercio;
   lineas: LineaCarritoComercio[];
   fecha: string;
+  /** Fecha y hora real (del servidor o del momento del cobro), para las estadísticas por hora y día. */
+  fechaISO?: string;
   total: number;
   totalBs: number;
   totalCop: number;
@@ -1923,7 +1926,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   const tasaCop = !esEuro && tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "cierre" | "auditoria" | "configuracion">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "estadisticas" | "cierre" | "auditoria" | "configuracion">("general");
   // Configuración es una pantalla con secciones (antes era un modal llamado "Catálogo Online & QR"
   // donde además vivían pagos y perfil de tienda, imposible de adivinar por su nombre).
   const [seccionConfig, setSeccionConfig] = useState<SeccionConfiguracion>("tienda");
@@ -2204,7 +2207,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
         clientesSincronizados.current = new Map(listaClientes.filter((c) => c.id !== "c-1").map((c) => [c.id, firmaCliente(c)]));
         const listaVentas: VentaComercio[] = [];
         for (const v of ventasFinal) {
-          try { listaVentas.push(JSON.parse(v.detalleJson) as VentaComercio); } catch { /* detalle ilegible: se omite esa venta */ }
+          try { listaVentas.push({ ...(JSON.parse(v.detalleJson) as VentaComercio), fechaISO: v.fechaRegistro }); } catch { /* detalle ilegible: se omite esa venta */ }
         }
         setClientes(listaClientes);
         setVentas(listaVentas);
@@ -2770,6 +2773,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       cliente: clienteParaVenta,
       lineas: [...carrito],
       fecha: new Date().toLocaleString(),
+      fechaISO: new Date().toISOString(),
       total: totalUSD,
       totalBs,
       totalCop: totalCopCalculado,
@@ -3086,6 +3090,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 ...(esComercio ? [{ id: "proveedores" as const, Icon: IconTruck, etiqueta: "Proveedores" }] : []),
                 { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
                 { id: "administracion" as const, Icon: IconWallet, etiqueta: "Administración" },
+                { id: "estadisticas" as const, Icon: IconChart, etiqueta: "Estadísticas" },
                 { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
                 ...(user?.rol === "DUENO_ADMIN" ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría" }] : []),
               ],
@@ -4397,6 +4402,17 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             TAB 4: CIERRE & REPORTES — TURNOS DE CAJA CON ARQUEO REAL
             (mismo motor /api/financiero/turnos que usa Aurora Horeca)
             ══════════════════════════════════════════════════════════════════ */}
+        {tab === "estadisticas" && (
+          <EstadisticasComercio
+            ventas={ventas}
+            productos={productosDelRubro}
+            gastos={gastosCaja}
+            simbolo={SIM()}
+            tasaBs={tasaActivaBs}
+            tasaCop={tasaCop}
+          />
+        )}
+
         {tab === "cierre" && user?.tenantId && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60 w-fit">

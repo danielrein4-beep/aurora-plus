@@ -6677,3 +6677,19 @@ export function reporteCobrosSalud(inicioIso: string, finIso: string): Promise<C
 export function actualizarProcedimiento(tenantId: number, id: number, datos: Omit<ProcedimientoMedico, "id">): Promise<ProcedimientoMedico> {
   return request(`/api/salud/procedimientos/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
 }
+
+// --- Estadísticas de Comercio: todas las ventas del Kárdex (incluye las anteriores al historial del POS) ---
+export interface LineaEstadisticaComercio {
+  fecha: string;
+  repuestoId: number;
+  descripcion: string;
+  categoria: string | null;
+  cantidad: number;
+  total: number | null;
+  costoUnitario: number | null;
+  ticket: string;
+  devolucion: boolean;
+}
+export function obtenerEstadisticasComercio(desde: string, hasta: string): Promise<LineaEstadisticaComercio[]> {
+  return request(`/api/repuestos/reportes/estadisticas?desde=${desde}&hasta=${hasta}`);
+}
