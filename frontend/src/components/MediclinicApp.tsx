@@ -721,6 +721,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   
   // Estado del perfil activo: siempre null al montar para mostrar la pantalla de selección estilo Netflix
   const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(null);
+  // En teléfono el menú lateral fijo tapaba media pantalla: ahora es un cajón (igual que en Comercio).
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
 
   const [rolActivo, setRolActivo] = useState<RolVista>("MEDICO");
   const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
@@ -743,8 +745,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     matriculaMPPS: "",
     colegioMedicos: "",
     clinicaNombre: user?.empresa || (esOdontologia ? "Mi Consultorio Odontológico" : "Mi Consultorio Médico"),
-    tasaBCV: 56.40,
-    tasaCOP: 4200,
+    tasaBCV: 0, // sin tasa real no se inventa una (antes 56,40)
+    tasaCOP: 0,
     claveDoctor: "1234",
     // false hasta que el médico elige su propio PIN por primera vez (ver
     // ModalConfigurarClavePrimeraVez) — mientras esté en false, en vez de pedir
@@ -1130,7 +1132,10 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
       
-      <aside className="w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1.5 bg-[#0D3B3D]">
+      {menuMovilAbierto && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMenuMovilAbierto(false)} aria-hidden="true" />
+      )}
+      <aside className={`w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1.5 bg-[#0D3B3D] fixed inset-y-0 left-0 z-50 overflow-y-auto transform transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${menuMovilAbierto ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="px-2 pb-3 mb-2 border-b border-white/10">
           <div className="flex items-center justify-between">
             {esOdontologia ? (
@@ -1166,7 +1171,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             return (
               <button
                 key={n.id}
-                onClick={() => intentarNavegar(n.id)}
+                onClick={() => { intentarNavegar(n.id); setMenuMovilAbierto(false); }}
                 className={`sidebar-glare w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                   activo
                     ? "sidebar-glare--active bg-white/10 text-white"
@@ -1229,9 +1234,16 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="py-3 px-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-white/70 backdrop-blur-md">
+      <main className="flex-1 min-w-0 flex flex-col overflow-y-auto">
+        <header className="py-3 px-3 sm:px-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-white/70 backdrop-blur-md">
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMenuMovilAbierto(true)}
+              className="lg:hidden p-2 -ml-1 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer flex-shrink-0"
+              aria-label="Abrir menú"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+            </button>
             <button
               onClick={cerrarSesionPerfil}
               className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors cursor-pointer flex-shrink-0"
@@ -4964,8 +4976,8 @@ function Procedimientos({
 
   // Modal para ajuste rápido de tasas
   const [modalTasas, setModalTasas] = useState(false);
-  const [tempTasaBCV, setTempTasaBCV] = useState(config?.tasaBCV || 950);
-  const [tempTasaCOP, setTempTasaCOP] = useState(config?.tasaCOP || 4000);
+  const [tempTasaBCV, setTempTasaBCV] = useState(config?.tasaBCV || 0);
+  const [tempTasaCOP, setTempTasaCOP] = useState(config?.tasaCOP || 0);
   const [guardandoTasasModal, setGuardandoTasasModal] = useState(false);
 
   // Filtros del Historial
@@ -4984,8 +4996,8 @@ function Procedimientos({
   }, [pacienteInicialId, pacientes]);
 
   // Cálculo en tiempo real
-  const tasaBCV = Number(config?.tasaBCV) || 950;
-  const tasaCOP = Number(config?.tasaCOP) || 4000;
+  const tasaBCV = Number(config?.tasaBCV) || 0;
+  const tasaCOP = Number(config?.tasaCOP) || 0;
   const usdNum = parseFloat(String(precioUSD)) || 0;
   const vesNum = usdNum * tasaBCV;
   const copNum = usdNum * tasaCOP;
@@ -5993,7 +6005,7 @@ function SalaEspera({
   const [enviandoComprobante, setEnviandoComprobante] = useState(false);
   const [comprobanteMsg, setComprobanteMsg] = useState<string | null>(null);
 
-  const tasaBCV = Number(config?.tasaBCV) || 950;
+  const tasaBCV = Number(config?.tasaBCV) || 0;
 
   const dispararToast = (msg: string) => {
     setToastExito(msg);
@@ -6383,7 +6395,7 @@ function SalaEspera({
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       tasaBCV: config?.tasaBCV || tasaBCV,
-      tasaCOP: config?.tasaCOP || 4200,
+      tasaCOP: config?.tasaCOP || 0,
       cobros: cobrosLocales,
       totalUSD: totalCajaUSD,
       totalVES: totalCajaVES,
@@ -8430,8 +8442,8 @@ function ResumenesFinancieros({
                   responsableNombre: config?.secretariaNombre || config?.doctorNombre || "Recepción y Caja",
                   fecha: hoy(),
                   horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                  tasaBCV: config?.tasaBCV || 56.4,
-                  tasaCOP: config?.tasaCOP || 4200,
+                  tasaBCV: config?.tasaBCV || 0,
+                  tasaCOP: config?.tasaCOP || 0,
                   cobros: cobrosLocales,
                   totalUSD,
                   totalVES,

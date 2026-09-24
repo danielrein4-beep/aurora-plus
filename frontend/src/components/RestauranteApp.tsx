@@ -213,6 +213,9 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
+  // En teléfono el menú lateral fijo de 256 px se comía la pantalla del mesonero: ahora es un
+  // cajón que se abre con el botón de menú (igual que en Comercio); en escritorio sigue fijo.
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   // Venta Rápida ya no es una pantalla aparte con su propio overlay — vive
   // fusionada directo en la Vista General (ver VistaGeneral). Este candado
   // solo se dispara desde ahí cuando falta registrar la tasa BCV del día.
@@ -448,8 +451,11 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           <defs> compartido que declara ese gradiente. */}
       <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
-      {/* SIDEBAR */}
-      <aside className="w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1 bg-[#0D3B3D]">
+      {/* SIDEBAR (cajón en teléfono, fijo en escritorio) */}
+      {menuMovilAbierto && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMenuMovilAbierto(false)} aria-hidden="true" />
+      )}
+      <aside className={`w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1 bg-[#0D3B3D] fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${menuMovilAbierto ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="px-2 pb-4 mb-2 border-b border-white/10">
           <div className="flex items-center justify-between">
             <div className="font-['Outfit'] font-black text-lg text-white">Aurora Horeca</div>
@@ -472,7 +478,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                 return (
                   <button
                     key={n.id}
-                    onClick={() => irA(n.id)}
+                    onClick={() => { irA(n.id); setMenuMovilAbierto(false); }}
                     className={`sidebar-glare w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                       n.premium
                         ? "text-white/30"
@@ -525,11 +531,18 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             apilamiento — sin un z-index explícito acá, el popover de la tasa (aunque
             tenga su propio z-index alto) queda atrapado dentro de ese contexto y las
             tarjetas de la Vista General (que vienen después en el DOM) lo tapan. */}
-        <header className="relative z-30 h-16 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-6 bg-white/30 dark:bg-black/10 backdrop-blur-md">
+        <header className="relative z-30 h-16 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-3 sm:px-6 bg-white/30 dark:bg-black/10 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setMenuMovilAbierto(true)}
+              className="lg:hidden p-2 -ml-1 rounded-xl text-slate-600 dark:text-white/70 hover:bg-slate-200/70 dark:hover:bg-white/10 cursor-pointer flex-shrink-0"
+              aria-label="Abrir menú"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+            </button>
+            <button
               onClick={onSalir}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300/60 dark:border-white/10"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all hidden sm:flex items-center gap-1.5 cursor-pointer border border-slate-300/60 dark:border-white/10"
             >
               <span>← Aurora Hub</span>
             </button>
