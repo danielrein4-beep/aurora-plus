@@ -477,6 +477,14 @@ body {
   color: rgba(255, 255, 255, 0.6) !important;
 }
 
+/* En teléfono el mercado tiene una barra de navegación fija abajo: el botón de
+   soporte sube para no taparla. */
+@media (max-width: 767px) {
+  body.con-barra-inferior .soporte-flotante {
+    bottom: 5.5rem;
+  }
+}
+
 .aurora-public-nav {
   background-color: rgba(255, 255, 255, 0.96) !important;
   border-bottom: 1px solid #E5E5EA !important;

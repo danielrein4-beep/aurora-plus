@@ -30,6 +30,9 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
   const [animales, setAnimales] = useState<AnimalGanaderia[] | null>(null);
   const [publicados, setPublicados] = useState<Set<string>>(new Set());
   const [animalId, setAnimalId] = useState<number | "">("");
+  const [modoLote, setModoLote] = useState(false);
+  const [loteIds, setLoteIds] = useState<number[]>([]);
+  const [filtroLote, setFiltroLote] = useState("");
   const [categoria, setCategoria] = useState<CategoriaMercado | "">("");
   const [titulo, setTitulo] = useState("");
   const [precio, setPrecio] = useState("");
@@ -50,7 +53,7 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
       .catch(() => {});
   }, []);
 
-  const animal = animales?.find((a) => a.id === animalId);
+  const animal = animales?.find((a) => a.id === (modoLote ? loteIds[0] : animalId));
 
   const elegirAnimal = (id: number | "") => {
     setAnimalId(id);
@@ -75,8 +78,15 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
 
   const moverAPortada = (i: number) => setFotos([fotos[i], ...fotos.filter((_, j) => j !== i)]);
 
+  const alternarEnLote = (id: number) => {
+    const nuevos = loteIds.includes(id) ? loteIds.filter((x) => x !== id) : [...loteIds, id];
+    setLoteIds(nuevos);
+    const primero = animales?.find((x) => x.id === nuevos[0]);
+    if (primero && !categoria) setCategoria(sugerirCategoria(primero));
+  };
+
   const publicar = () => {
-    if (!animalId) { setError("Elige el animal"); return; }
+    if (modoLote ? loteIds.length < 2 : !animalId) { setError(modoLote ? "Elige al menos 2 animales para el lote" : "Elige el animal"); return; }
     if (!categoria) { setError("Elige la categoría"); return; }
     if (!(Number(precio) > 0)) { setError("Escribe el precio"); return; }
     if (!estadoRegion) { setError("Elige el estado donde está el animal"); return; }
@@ -87,7 +97,7 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
       try {
         const miniatura = await comprimirImagen(fotos[0], 520, 0.72);
         const creada = await publicarEnMercado({
-          animalId: Number(animalId), categoria, titulo: titulo || undefined, precio: Number(precio), tipoPrecio,
+          ...(modoLote ? { animalIds: loteIds } : { animalId: Number(animalId) }), categoria, titulo: titulo || undefined, precio: Number(precio), tipoPrecio,
           estadoRegion, municipio: municipio || undefined, descripcion: descripcion || undefined, negociable, fotos, miniatura,
         });
         onListo(creada.id, !!creada.datosOcultos);
@@ -100,6 +110,10 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
   };
 
   const disponibles = (animales ?? []).filter((a) => !publicados.has(a.arete));
+  const texto = filtroLote.trim().toLowerCase();
+  const filtrados = disponibles.filter((a) => !texto || [a.arete, a.nombre, a.raza, a.tipoAnimal, a.lote].some((v) => v?.toLowerCase().includes(texto)));
+  const seleccionados = disponibles.filter((a) => loteIds.includes(a.id));
+  const pesoLote = seleccionados.reduce((s, a) => s + Number(a.pesoActual ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -109,17 +123,64 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <div className="space-y-6">
-          <section className={`${CAJA} p-6 space-y-4`}>
-            <Paso numero={1} titulo="El animal" />
-            <select className={INPUT} value={animalId} onChange={(e) => elegirAnimal(e.target.value ? Number(e.target.value) : "")}>
-              <option value="">{animales === null ? "Cargando tu hato..." : disponibles.length === 0 ? "No tienes animales activos sin publicar" : "Elige un animal activo de tu hato"}</option>
-              {disponibles.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.arete}{a.nombre ? ` · ${a.nombre}` : ""} · {a.raza ?? "sin raza"} · {sexoTexto(a.sexo)}{a.pesoActual ? ` · ${a.pesoActual} kg` : ""}
-                </option>
+        <div className="space-y-6 min-w-0">
+          <section className={`${CAJA} p-5 sm:p-6 space-y-4 min-w-0`}>
+            <Paso numero={1} titulo={modoLote ? "Los animales del lote" : "El animal"} />
+            <div className="flex gap-1 p-1 rounded-xl bg-stone-100 dark:bg-white/5 w-fit">
+              {([[false, "Un animal"], [true, "Un lote"]] as [boolean, string][]).map(([lote, etiqueta]) => (
+                <button
+                  key={etiqueta}
+                  type="button"
+                  onClick={() => setModoLote(lote)}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${modoLote === lote ? "bg-white dark:bg-white/10 text-stone-900 dark:text-white shadow-sm" : "text-stone-500"}`}
+                >
+                  {etiqueta}
+                </button>
               ))}
-            </select>
+            </div>
+            {!modoLote ? (
+              <select className={INPUT} value={animalId} onChange={(e) => elegirAnimal(e.target.value ? Number(e.target.value) : "")}>
+                <option value="">{animales === null ? "Cargando tu hato..." : disponibles.length === 0 ? "No tienes animales activos sin publicar" : "Elige un animal activo de tu hato"}</option>
+                {disponibles.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.arete}{a.nombre ? ` · ${a.nombre}` : ""} · {a.raza ?? "sin raza"} · {sexoTexto(a.sexo)}{a.pesoActual ? ` · ${a.pesoActual} kg` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input className={`${INPUT} min-w-0`} placeholder="Filtrar por arete, raza, lote..." value={filtroLote} onChange={(e) => setFiltroLote(e.target.value)} />
+                  <button
+                    type="button"
+                    className={`${BOTON_SUAVE} whitespace-nowrap`}
+                    onClick={() => {
+                      const todos = filtrados.every((a) => loteIds.includes(a.id));
+                      const nuevos = todos ? loteIds.filter((id) => !filtrados.some((a) => a.id === id)) : Array.from(new Set([...loteIds, ...filtrados.map((a) => a.id)]));
+                      setLoteIds(nuevos);
+                      const primero = animales?.find((x) => x.id === nuevos[0]);
+                      if (primero && !categoria) setCategoria(sugerirCategoria(primero));
+                    }}
+                  >
+                    {filtrados.length > 0 && filtrados.every((a) => loteIds.includes(a.id)) ? "Quitar todos" : "Elegir todos"}
+                  </button>
+                </div>
+                <div className="max-h-64 overflow-y-auto rounded-xl border border-stone-200 dark:border-white/10 divide-y divide-stone-100 dark:divide-white/5">
+                  {filtrados.length === 0 && <p className="p-3 text-xs text-stone-500">No hay animales activos sin publicar con ese filtro.</p>}
+                  {filtrados.map((a) => (
+                    <label key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-stone-50 dark:hover:bg-white/5">
+                      <input type="checkbox" checked={loteIds.includes(a.id)} onChange={() => alternarEnLote(a.id)} />
+                      <span className="font-mono text-xs w-20 shrink-0">{a.arete}</span>
+                      <span className="flex-1 min-w-0 truncate text-stone-700 dark:text-white/70">{a.raza ?? "sin raza"} · {sexoTexto(a.sexo)}{a.tipoAnimal ? ` · ${a.tipoAnimal.toLowerCase()}` : ""}</span>
+                      <span className="text-xs font-mono text-stone-500 shrink-0">{a.pesoActual ? `${a.pesoActual} kg` : ""}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-stone-600 dark:text-white/60">
+                  {seleccionados.length} animal(es) en el lote{pesoLote > 0 ? ` · ${pesoLote.toLocaleString("es-VE")} kg en total · promedio ${(pesoLote / seleccionados.length).toLocaleString("es-VE", { maximumFractionDigits: 0 })} kg` : ""}
+                </p>
+              </div>
+            )}
             <div>
               <label className="text-[11px] text-stone-500">Categoría</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1">
@@ -129,7 +190,7 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
                     type="button"
                     onClick={() => setCategoria(c.id)}
                     className={`px-3 py-2.5 rounded-xl text-xs font-bold border text-left cursor-pointer ${
-                      categoria === c.id ? "bg-emerald-800 text-white border-emerald-800" : "bg-white dark:bg-white/5 text-stone-700 dark:text-white/70 border-stone-200 dark:border-white/10"
+                      categoria === c.id ? "bg-[#66B891] text-white border-[#66B891]" : "bg-white dark:bg-white/5 text-stone-700 dark:text-white/70 border-stone-200 dark:border-white/10"
                     }`}
                   >
                     {c.nombre}
@@ -137,12 +198,18 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
                 ))}
               </div>
             </div>
-            <input className={INPUT} placeholder={animal ? `Título (ej. Toro ${animal.raza ?? ""} padrote de 3 años)` : "Título de la publicación"} value={titulo} onChange={(e) => setTitulo(e.target.value)} maxLength={120} />
+            <input
+              className={INPUT}
+              placeholder={modoLote ? `Título (ej. Lote de ${Math.max(seleccionados.length, 2)} novillos ${animal?.raza ?? ""} para ceba)` : animal ? `Título (ej. Toro ${animal.raza ?? ""} padrote de 3 años)` : "Título de la publicación"}
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              maxLength={120}
+            />
             <textarea className={INPUT} rows={4} placeholder="Genética, carácter, alimentación, por qué lo vendes..." value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={2000} />
             <p className="text-[11px] text-stone-500">No escribas teléfonos, redes ni correos: se ocultan solos. Tus datos se comparten al cerrar el trato.</p>
           </section>
 
-          <section className={`${CAJA} p-6 space-y-4`}>
+          <section className={`${CAJA} p-5 sm:p-6 space-y-4 min-w-0`}>
             <Paso numero={2} titulo="Precio y ubicación" />
             <div className="grid grid-cols-2 gap-3">
               <div className="relative">
@@ -154,6 +221,13 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
                 <option value="POR_KG">Por kilo</option>
               </select>
             </div>
+            {modoLote && Number(precio) > 0 && seleccionados.length > 1 && (
+              <p className="text-xs text-stone-600 dark:text-white/60">
+                Precio del lote completo: aprox. <strong>
+                  {(tipoPrecio === "POR_KG" ? Number(precio) * pesoLote : Number(precio) * seleccionados.length).toLocaleString("es-VE", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+                </strong>. Las ofertas son por el lote completo.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <select className={INPUT} value={estadoRegion} onChange={(e) => setEstadoRegion(e.target.value)}>
                 <option value="">Estado</option>
@@ -167,14 +241,14 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
           </section>
         </div>
 
-        <section className={`${CAJA} p-6 space-y-4 h-fit`}>
+        <section className={`${CAJA} p-6 space-y-4 h-fit min-w-0`}>
           <Paso numero={3} titulo={`Fotos (${fotos.length}/6)`} />
           <div className="grid grid-cols-3 gap-2">
             {fotos.map((f, i) => (
               <div key={i} className="relative aspect-square rounded-2xl overflow-hidden bg-stone-100 group">
                 <img src={f} alt="" className="w-full h-full object-cover" />
                 {i === 0 ? (
-                  <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full bg-amber-500 text-stone-950 text-[10px] font-bold">Portada</span>
+                  <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full bg-[#66B891] text-white text-[10px] font-bold">Portada</span>
                 ) : (
                   <button type="button" onClick={() => moverAPortada(i)} className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full bg-white/90 text-stone-900 text-[10px] font-bold cursor-pointer opacity-0 group-hover:opacity-100">
                     Usar de portada
@@ -184,7 +258,7 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
               </div>
             ))}
             {fotos.length < 6 && (
-              <label className="aspect-square rounded-2xl border-2 border-dashed border-stone-300 dark:border-white/20 flex flex-col items-center justify-center gap-1 text-xs text-stone-500 cursor-pointer text-center p-2 hover:border-emerald-600">
+              <label className="aspect-square rounded-2xl border-2 border-dashed border-stone-300 dark:border-white/20 flex flex-col items-center justify-center gap-1 text-xs text-stone-500 cursor-pointer text-center p-2 hover:border-[#66B891]">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h2l1.5-2h7L17 5h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
                   <circle cx="12" cy="12" r="3.5" />
@@ -210,7 +284,7 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
 function Paso({ numero, titulo }: { numero: number; titulo: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="w-7 h-7 rounded-full bg-emerald-800 text-white text-xs font-bold flex items-center justify-center">{numero}</span>
+      <span className="w-7 h-7 rounded-full bg-[#66B891] text-white text-xs font-bold flex items-center justify-center">{numero}</span>
       <span className="font-bold text-stone-900 dark:text-white">{titulo}</span>
     </div>
   );

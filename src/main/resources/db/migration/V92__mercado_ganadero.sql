@@ -110,3 +110,28 @@ CREATE TABLE IF NOT EXISTS mercado_ganado_condiciones (
     version INTEGER NOT NULL,
     fecha TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- Fincas suspendidas del mercado por incumplir sus condiciones (p. ej. cerrar
+-- por fuera un trato que nació aquí). No afecta el resto de Aurora.
+CREATE TABLE IF NOT EXISTS mercado_ganado_suspensiones (
+    tenant_id BIGINT PRIMARY KEY,
+    motivo VARCHAR(500) NOT NULL,
+    suspendido_por VARCHAR(120),
+    fecha TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Venta por lotes: una publicación puede llevar varios animales (animal_id
+-- queda como el animal de portada). El precio por cabeza o por kilo se
+-- multiplica por el lote; la oferta es por el lote completo.
+ALTER TABLE publicaciones_venta
+    ADD COLUMN IF NOT EXISTS cantidad INTEGER NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS peso_total NUMERIC(12, 2);
+
+CREATE TABLE IF NOT EXISTS mercado_ganado_lote_animales (
+    publicacion_id BIGINT NOT NULL REFERENCES publicaciones_venta (id) ON DELETE CASCADE,
+    animal_id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL,
+    PRIMARY KEY (publicacion_id, animal_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mercado_lote_animal ON mercado_ganado_lote_animales (animal_id);

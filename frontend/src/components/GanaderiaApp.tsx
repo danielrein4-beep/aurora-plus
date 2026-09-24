@@ -1759,7 +1759,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           <button
             onClick={() => navigate("/mercado")}
             title="Abrir el Mercado Ganadero: compra y venta entre fincas de Aurora"
-            className="px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-emerald-950 shadow-md shadow-amber-500/20">
+            className="px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 bg-[#66B891] hover:bg-[#57A882] text-emerald-50 shadow-md shadow-[#66B891]/20">
             <span>Mercado ganadero</span>
             {sinLeerMercado > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] leading-none">{sinLeerMercado}</span>

@@ -5,12 +5,12 @@ import {
 } from "../../api";
 
 export const CATEGORIAS: { id: CategoriaMercado; nombre: string; descripcion: string; fondo: string }[] = [
-  { id: "PADROTE", nombre: "Padrotes", descripcion: "Toros reproductores listos para servicio", fondo: "from-amber-900 via-amber-800 to-orange-700" },
-  { id: "VACA_PARIDA", nombre: "Vacas paridas", descripcion: "Con su cría al pie", fondo: "from-emerald-900 via-emerald-800 to-teal-700" },
-  { id: "VACA_ORDENO", nombre: "Vacas de ordeño", descripcion: "En producción de leche", fondo: "from-sky-900 via-sky-800 to-cyan-700" },
-  { id: "NOVILLA", nombre: "Novillas", descripcion: "Hembras jóvenes de reemplazo", fondo: "from-rose-900 via-rose-800 to-pink-700" },
-  { id: "MAUTE", nombre: "Mautes y becerros", descripcion: "Destetados para levante", fondo: "from-lime-900 via-lime-800 to-green-700" },
-  { id: "CEBA", nombre: "Ganado de ceba", descripcion: "Para engorde y matadero", fondo: "from-stone-800 via-stone-700 to-amber-800" },
+  { id: "PADROTE", nombre: "Padrotes", descripcion: "Toros reproductores listos para servicio", fondo: "bg-[#EEF6F1] border-[#CFE6D9] hover:border-[#9CD1B5]" },
+  { id: "VACA_PARIDA", nombre: "Vacas paridas", descripcion: "Con su cría al pie", fondo: "bg-[#EDF5F4] border-[#CFE3E0] hover:border-[#9CCFC7]" },
+  { id: "VACA_ORDENO", nombre: "Vacas de ordeño", descripcion: "En producción de leche", fondo: "bg-[#EEF3F7] border-[#D3E0EA] hover:border-[#A9C3D8]" },
+  { id: "NOVILLA", nombre: "Novillas", descripcion: "Hembras jóvenes de reemplazo", fondo: "bg-[#F2F6EC] border-[#DCE7CD] hover:border-[#BCD3A0]" },
+  { id: "MAUTE", nombre: "Mautes y becerros", descripcion: "Destetados para levante", fondo: "bg-[#EDF5F6] border-[#CDE3E6] hover:border-[#9FCAD0]" },
+  { id: "CEBA", nombre: "Ganado de ceba", descripcion: "Para engorde y matadero", fondo: "bg-[#F4F3EF] border-[#E3E0D6] hover:border-[#CFCABB]" },
 ];
 
 export const nombreCategoria = (id: string | null | undefined) => CATEGORIAS.find((c) => c.id === id)?.nombre ?? "Sin categoría";
@@ -30,8 +30,19 @@ export const ESTADOS_VE = [
 export const dinero = new Intl.NumberFormat("es-VE", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 export const numero = new Intl.NumberFormat("es-VE", { maximumFractionDigits: 1 });
 
-export function precioTexto(p: { precio: number; tipoPrecio: string }) {
-  return `${dinero.format(p.precio)}${p.tipoPrecio === "POR_KG" ? " / kg" : ""}`;
+export function precioTexto(p: { precio: number; tipoPrecio: string; cantidad?: number }) {
+  if (p.tipoPrecio === "POR_KG") return `${dinero.format(p.precio)} / kg`;
+  return `${dinero.format(p.precio)}${(p.cantidad ?? 1) > 1 ? " / cabeza" : ""}`;
+}
+
+/** Lo que costaría el animal o el lote completo, si se puede calcular. */
+export function totalEstimado(p: { precio: number; tipoPrecio: string; cantidad?: number; peso: number | null; pesoTotal?: number | null }) {
+  const cantidad = p.cantidad ?? 1;
+  if (p.tipoPrecio === "POR_KG") {
+    const kilos = cantidad > 1 ? p.pesoTotal : p.peso;
+    return kilos != null ? p.precio * Number(kilos) : null;
+  }
+  return cantidad > 1 ? p.precio * cantidad : null;
 }
 
 export function edadTexto(meses: number | null) {
@@ -92,15 +103,15 @@ export function comprimirImagen(fuente: File | string, ladoMax: number, calidad:
 // ─────────────────────────── piezas visuales ───────────────────────────
 
 export const CAJA = "rounded-3xl bg-white dark:bg-[#0c1f17] border border-stone-200/80 dark:border-white/10 shadow-sm";
-export const INPUT = "w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-[#0a1a13] text-stone-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/30";
-export const BOTON = "px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold cursor-pointer disabled:opacity-50 transition-colors";
-export const BOTON_ORO = "px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-stone-950 text-sm font-bold cursor-pointer disabled:opacity-50 transition-colors";
+export const INPUT = "w-full px-3.5 py-2.5 rounded-xl border border-stone-200 dark:border-white/10 bg-white dark:bg-[#0a1a13] text-stone-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#66B891]/30";
+export const BOTON = "px-5 py-2.5 rounded-xl bg-[#57A882] hover:bg-[#4A9673] text-white text-sm font-bold cursor-pointer disabled:opacity-50 transition-colors";
+export const BOTON_ORO = "px-5 py-2.5 rounded-xl bg-[#66B891] hover:bg-[#57A882] text-white text-sm font-bold shadow-sm shadow-[#66B891]/20 cursor-pointer disabled:opacity-50 transition-colors";
 export const BOTON_SUAVE = "px-4 py-2.5 rounded-xl border border-stone-200 dark:border-white/10 text-stone-700 dark:text-white/80 text-sm font-bold cursor-pointer hover:bg-stone-50 dark:hover:bg-white/5 disabled:opacity-50";
 
 export function SelloVerificado({ pequeno }: { pequeno?: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-bold ${pequeno ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-[11px]"}`}
+      className={`inline-flex items-center gap-1 rounded-full bg-[#EEF6F1] dark:bg-emerald-500/10 text-[#2F6B4F] dark:text-emerald-300 font-bold ${pequeno ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-[11px]"}`}
       title="Cliente con pagos confirmados en Aurora Plus"
     >
       <svg className={pequeno ? "w-3 h-3" : "w-3.5 h-3.5"} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -117,7 +128,7 @@ export function Estrellas({ valor, total }: { valor: number | null; total?: numb
     <span className="inline-flex items-center gap-1 text-[11px] text-stone-600 dark:text-white/60">
       <span className="flex">
         {[1, 2, 3, 4, 5].map((i) => (
-          <svg key={i} className={`w-3.5 h-3.5 ${i <= Math.round(valor) ? "text-amber-500" : "text-stone-300 dark:text-white/20"}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <svg key={i} className={`w-3.5 h-3.5 ${i <= Math.round(valor) ? "text-amber-400" : "text-stone-300 dark:text-white/20"}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.5 7.7l5.9-.9L10 1.5z" />
           </svg>
         ))}

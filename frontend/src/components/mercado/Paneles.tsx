@@ -71,7 +71,7 @@ export function MiPuesto({ onAbrir, onPublicar }: { onAbrir: (id: number) => voi
                       <td className="px-3 py-3 text-right">
                         {p.mejorOferta ? (
                           <>
-                            <div className="font-mono font-bold text-emerald-800 dark:text-emerald-300">{dinero.format(Number(p.mejorOferta))}</div>
+                            <div className="font-mono font-bold text-[#2F6B4F] dark:text-emerald-300">{dinero.format(Number(p.mejorOferta))}</div>
                             <div className="text-[10px] text-stone-500">{pctOferta}% de lo que pides</div>
                           </>
                         ) : <span className="text-stone-300">-</span>}
@@ -80,7 +80,7 @@ export function MiPuesto({ onAbrir, onPublicar }: { onAbrir: (id: number) => voi
                         {p.referencia ? (
                           <>
                             <div className="font-mono">{dinero.format(p.referencia.promedio)}</div>
-                            <div className={`text-[10px] ${pctMercado! > 10 ? "text-rose-600" : pctMercado! < -10 ? "text-emerald-700" : "text-stone-500"}`}>
+                            <div className={`text-[10px] ${pctMercado! > 10 ? "text-rose-600" : pctMercado! < -10 ? "text-[#3E8A66]" : "text-stone-500"}`}>
                               {pctMercado === 0 ? "en el promedio" : `pides ${Math.abs(pctMercado!)}% ${pctMercado! > 0 ? "más" : "menos"}`}
                             </div>
                           </>
@@ -88,11 +88,11 @@ export function MiPuesto({ onAbrir, onPublicar }: { onAbrir: (id: number) => voi
                       </td>
                       <td className="px-3 py-3 text-center">
                         {p.ofertasPendientes > 0
-                          ? <span className="px-2 py-1 rounded-full bg-amber-500 text-stone-950 text-[11px] font-bold">{p.ofertasPendientes}</span>
+                          ? <span className="px-2 py-1 rounded-full bg-[#66B891] text-white text-[11px] font-bold">{p.ofertasPendientes}</span>
                           : <span className="text-stone-300">0</span>}
                       </td>
                       <td className="px-5 py-3 text-xs">
-                        {p.estado === "ACTIVA" ? <span className="text-emerald-700 font-bold">En venta</span>
+                        {p.estado === "ACTIVA" ? <span className="text-[#3E8A66] font-bold">En venta</span>
                           : p.estado === "VENDIDA" ? <span className="font-bold">Vendido por {dinero.format(Number(p.precioFinal))}</span>
                           : <span className="text-stone-400">Retirado</span>}
                       </td>
@@ -110,7 +110,7 @@ export function MiPuesto({ onAbrir, onPublicar }: { onAbrir: (id: number) => voi
 
 function Indicador({ titulo, valor, resaltado }: { titulo: string; valor: string; resaltado?: boolean }) {
   return (
-    <div className={`${CAJA} p-5 ${resaltado ? "ring-2 ring-amber-400" : ""}`}>
+    <div className={`${CAJA} p-5 ${resaltado ? "ring-2 ring-[#9CD1B5]" : ""}`}>
       <div className="text-[11px] font-bold text-stone-500 uppercase tracking-wide">{titulo}</div>
       <div className="text-3xl font-bold text-stone-900 dark:text-white font-['Outfit'] mt-1">{valor}</div>
     </div>
@@ -120,8 +120,8 @@ function Indicador({ titulo, valor, resaltado }: { titulo: string; valor: string
 // ─────────────────────────── comprador ───────────────────────────
 
 const ESTADO_OFERTA: Record<string, { texto: string; clase: string }> = {
-  PENDIENTE: { texto: "Esperando respuesta", clase: "bg-amber-50 text-amber-800" },
-  ACEPTADA: { texto: "Aceptada", clase: "bg-emerald-50 text-emerald-800" },
+  PENDIENTE: { texto: "Esperando respuesta", clase: "bg-sky-50 text-sky-800" },
+  ACEPTADA: { texto: "Aceptada", clase: "bg-[#EEF6F1] text-[#2F6B4F]" },
   RECHAZADA: { texto: "Rechazada", clase: "bg-rose-50 text-rose-700" },
   RETIRADA: { texto: "Reemplazada", clase: "bg-stone-100 text-stone-600" },
 };
@@ -188,7 +188,7 @@ export function MisCompras({ onAbrir }: { onAbrir: (id: number) => void }) {
 // ─────────────────────────── mensajes ───────────────────────────
 
 export function BandejaMensajes({ conversaciones, onAbrir }: {
-  conversaciones: ConversacionMercado[]; onAbrir: (id: number, comprador?: number) => void;
+  conversaciones: ConversacionMercado[]; onAbrir: (id: number, comprador?: string) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -202,8 +202,8 @@ export function BandejaMensajes({ conversaciones, onAbrir }: {
         <div className={`${CAJA} divide-y divide-stone-100 dark:divide-white/5 overflow-hidden`}>
           {conversaciones.map((c) => (
             <button
-              key={`${c.publicacionId}-${c.compradorTenantId}`}
-              onClick={() => onAbrir(c.publicacionId, c.soyVendedor ? c.compradorTenantId : undefined)}
+              key={`${c.publicacionId}-${c.compradorRef}`}
+              onClick={() => onAbrir(c.publicacionId, c.soyVendedor ? c.compradorRef : undefined)}
               className="w-full flex items-center gap-4 p-4 text-left cursor-pointer hover:bg-stone-50 dark:hover:bg-white/5"
             >
               <div className="w-14 h-14 rounded-2xl overflow-hidden bg-stone-100 shrink-0">
@@ -215,14 +215,14 @@ export function BandejaMensajes({ conversaciones, onAbrir }: {
                   <span className="text-[10px] text-stone-400 whitespace-nowrap">{fechaCorta(c.ultimaFecha)}</span>
                 </div>
                 <div className="text-xs text-stone-500 truncate">
-                  <span className={`mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${c.soyVendedor ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-900"}`}>
+                  <span className={`mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${c.soyVendedor ? "bg-[#DDEFE4] text-[#2F6B4F]" : "bg-sky-100 text-sky-900"}`}>
                     {c.soyVendedor ? "Te quiere comprar" : "Le compras"}
                   </span>
                   {c.ultimoMensaje}
                 </div>
               </div>
               {Number(c.sinLeer) > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-bold">{c.sinLeer}</span>
+                <span className="px-2 py-0.5 rounded-full bg-[#66B891] text-white text-[10px] font-bold">{c.sinLeer}</span>
               )}
             </button>
           ))}

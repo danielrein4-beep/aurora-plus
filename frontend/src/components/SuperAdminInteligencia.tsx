@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import {
   obtenerInteligenciaNegocio, obtenerInteligenciaComercio, obtenerInteligenciaSalud, obtenerDetalleComercioInteligencia,
-  obtenerMercadoGanaderoSuperAdmin,
+  obtenerMercadoGanaderoSuperAdmin, suspenderFincaMercado, reactivarFincaMercado,
   type InteligenciaNegocio, type InteligenciaComercio, type InteligenciaSalud, type DetalleComercioInteligencia,
   type PanelMercadoSuperAdmin,
   type Semaforo,
@@ -661,9 +661,32 @@ const TIPO_SOSPECHA: Record<string, string> = {
 };
 
 function VistaMercado({ dias }: { dias: number }) {
-  const { datos, error, cargando } = useCarga<PanelMercadoSuperAdmin>(() => obtenerMercadoGanaderoSuperAdmin(dias), [dias]);
+  const [version, setVersion] = useState(0);
+  const { datos, error, cargando } = useCarga<PanelMercadoSuperAdmin>(() => obtenerMercadoGanaderoSuperAdmin(dias), [dias, version]);
   if (!datos) return <Estado cargando={cargando} error={error} />;
-  const { resumen, alertas, sospechas } = datos;
+  const { resumen, alertas, sospechas, suspendidas } = datos;
+  const suspendidasIds = new Set(suspendidas.map((s) => s.tenantId));
+
+  const suspender = async (tenantId: number, nombre: string | null) => {
+    const motivo = prompt(`Motivo para suspender a ${nombre ?? "esta finca"} del Mercado Ganadero (lo verá la finca):`);
+    if (!motivo || !motivo.trim()) return;
+    try { await suspenderFincaMercado(tenantId, motivo.trim()); setVersion((v) => v + 1); }
+    catch (e) { alert(e instanceof Error ? e.message : "No se pudo suspender"); }
+  };
+  const reactivar = async (tenantId: number, nombre: string | null) => {
+    if (!confirm(`¿Devolverle el acceso al mercado a ${nombre ?? "esta finca"}?`)) return;
+    try { await reactivarFincaMercado(tenantId); setVersion((v) => v + 1); }
+    catch (e) { alert(e instanceof Error ? e.message : "No se pudo reactivar"); }
+  };
+  const BotonSuspender = ({ tenantId, nombre, etiqueta }: { tenantId: number | null; nombre: string | null; etiqueta: string }) => {
+    if (tenantId == null) return null;
+    if (suspendidasIds.has(tenantId)) return <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold whitespace-nowrap">{nombre} suspendida</span>;
+    return (
+      <button onClick={() => suspender(tenantId, nombre)} className="px-2.5 py-1 rounded-lg border border-rose-200 text-rose-700 text-[11px] font-bold hover:bg-rose-50 cursor-pointer whitespace-nowrap">
+        {etiqueta}
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -682,7 +705,7 @@ function VistaMercado({ dias }: { dias: number }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] font-bold text-slate-500 uppercase border-b border-slate-100">
-                  <th className="py-2 pr-4">Señal</th><th className="py-2 pr-4">Publicación</th><th className="py-2 pr-4">Vendedor</th><th className="py-2">Detalle</th>
+                  <th className="py-2 pr-4">Señal</th><th className="py-2 pr-4">Publicación</th><th className="py-2 pr-4">Vendedor</th><th className="py-2 pr-4">Detalle</th><th className="py-2">Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -691,7 +714,13 @@ function VistaMercado({ dias }: { dias: number }) {
                     <td className="py-2.5 pr-4"><span className="px-2 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold whitespace-nowrap">{TIPO_SOSPECHA[s.tipo] ?? s.tipo}</span></td>
                     <td className="py-2.5 pr-4 font-bold text-slate-900">{s.titulo}</td>
                     <td className="py-2.5 pr-4 text-slate-700">{s.vendedor}</td>
-                    <td className="py-2.5 text-xs text-slate-600">{s.detalle}</td>
+                    <td className="py-2.5 pr-4 text-xs text-slate-600">{s.detalle}</td>
+                    <td className="py-2.5">
+                      <div className="flex flex-col gap-1 items-start">
+                        <BotonSuspender tenantId={s.vendedorTenantId} nombre={s.vendedor} etiqueta="Suspender vendedor" />
+                        <BotonSuspender tenantId={s.compradorTenantId} nombre={s.comprador} etiqueta="Suspender comprador" />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -699,6 +728,23 @@ function VistaMercado({ dias }: { dias: number }) {
           </div>
         )}
       </Tarjeta>
+
+      {suspendidas.length > 0 && (
+        <Tarjeta titulo="Fincas suspendidas del mercado" nota="No pueden entrar y sus publicaciones no se ven; el resto de Aurora les funciona normal">
+          <div className="space-y-2">
+            {suspendidas.map((s) => (
+              <div key={s.tenantId} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 p-3">
+                <div>
+                  <div className="font-bold text-slate-900">{s.finca ?? `Finca #${s.tenantId}`}</div>
+                  <div className="text-xs text-slate-600">{s.motivo}</div>
+                  <div className="text-[11px] text-slate-400">{new Date(s.fecha).toLocaleString("es-VE")}{s.suspendidoPor ? ` · por ${s.suspendidoPor}` : ""}</div>
+                </div>
+                <button onClick={() => reactivar(s.tenantId, s.finca)} className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-bold cursor-pointer">Reactivar</button>
+              </div>
+            ))}
+          </div>
+        </Tarjeta>
+      )}
 
       <Tarjeta titulo="Datos de contacto ocultados" nota="Lo que escribieron antes de que el filtro lo tapara">
         {alertas.length === 0 ? (
@@ -715,6 +761,7 @@ function VistaMercado({ dias }: { dias: number }) {
                   <span className="text-slate-400">{new Date(a.fecha).toLocaleString("es-VE")}</span>
                 </div>
                 <p className="text-sm text-slate-700 mt-1 font-mono break-words">{a.contenido}</p>
+                <div className="mt-2"><BotonSuspender tenantId={a.fincaTenantId} nombre={a.finca} etiqueta={`Suspender a ${a.finca ?? "la finca"} del mercado`} /></div>
               </div>
             ))}
           </div>

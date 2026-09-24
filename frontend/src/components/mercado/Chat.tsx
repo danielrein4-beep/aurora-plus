@@ -5,7 +5,7 @@ import { CAJA, INPUT, BOTON, fechaCorta, mensajeError } from "./comun";
 /** Chat entre la finca vendedora y una compradora. El vendedor indica con qué comprador habla. */
 export default function Chat({ publicacionId, comprador, titulo, puedeEscribir, conCondiciones, cabecera }: {
   publicacionId: number;
-  comprador?: number;
+  comprador?: string;
   titulo: string;
   puedeEscribir: boolean;
   conCondiciones: (accion: () => void) => void;
@@ -59,11 +59,11 @@ export default function Chat({ publicacionId, comprador, titulo, puedeEscribir, 
         )}
         {mensajes.map((m) => m.esSistema ? (
           <div key={m.id} className="text-center">
-            <span className="inline-block px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-[11px] text-amber-900 dark:text-amber-200">{m.contenido}</span>
+            <span className="inline-block px-3 py-1 rounded-full bg-[#EEF6F1] dark:bg-emerald-500/10 text-[11px] text-[#2F6B4F] dark:text-emerald-200">{m.contenido}</span>
           </div>
         ) : (
           <div key={m.id} className={`flex ${m.esMio ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[80%] px-3.5 py-2 rounded-2xl text-sm ${m.esMio ? "bg-emerald-700 text-white rounded-br-md" : "bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-white rounded-bl-md"}`}>
+            <div className={`max-w-[80%] px-3.5 py-2 rounded-2xl text-sm ${m.esMio ? "bg-[#66B891] text-white rounded-br-md" : "bg-stone-100 dark:bg-white/10 text-stone-800 dark:text-white rounded-bl-md"}`}>
               {!m.esMio && m.emisorNombre && <div className="text-[10px] font-bold opacity-70">{m.emisorNombre}</div>}
               <div className="whitespace-pre-line break-words">{m.contenido}</div>
               <div className={`text-[10px] mt-0.5 ${m.esMio ? "text-white/70" : "text-stone-400"}`}>{fechaCorta(m.fecha)}</div>
@@ -73,7 +73,7 @@ export default function Chat({ publicacionId, comprador, titulo, puedeEscribir, 
         <div ref={finRef} />
       </div>
       {aviso && (
-        <p className="text-[11px] mt-2 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-900 dark:text-amber-200">
+        <p className="text-[11px] mt-2 px-3 py-2 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-900 dark:text-sky-200">
           Ocultamos un dato de contacto de tu mensaje. Los datos de cada finca se muestran solos cuando se cierra el trato.
         </p>
       )}
