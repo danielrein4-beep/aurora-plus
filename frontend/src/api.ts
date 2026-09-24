@@ -3346,6 +3346,24 @@ export interface RegistrarPagoSuperAdminRequest {
   meses?: number;
   dias?: number;
   notas?: string;
+  /** Comisiones pendientes (mercado ganadero) que se cobran en esta factura. */
+  comisionIds?: number[];
+}
+
+export interface ComisionPlataforma {
+  id: number;
+  tenantId: number;
+  origen: string;
+  descripcion: string | null;
+  montoBase: number;
+  porcentaje: number;
+  montoComision: number;
+  pagada: boolean;
+  fecha: string;
+}
+
+export function listarComisionesPendientesSuperAdmin(tenantId: number): Promise<ComisionPlataforma[]> {
+  return requestSuperAdmin(`/api/super-admin/comisiones?pagada=false&tenantId=${tenantId}`);
 }
 
 export interface RegalarTiempoSuperAdminRequest {
@@ -5741,4 +5759,163 @@ export function obtenerDetalleComercioInteligencia(tenantId: number, dias: numbe
 
 export function obtenerInteligenciaNegocio(): Promise<InteligenciaNegocio> {
   return requestSuperAdmin(`/api/super-admin/inteligencia/negocio`);
+}
+
+// --- Mercado ganadero entre fincas de Aurora (ver MercadoGanaderoController) ---
+
+export interface PublicacionMercado {
+  id: number;
+  titulo: string;
+  precio: number;
+  tipoPrecio: "POR_CABEZA" | "POR_KG";
+  ubicacion: string | null;
+  negociable: boolean;
+  estado: "ACTIVA" | "VENDIDA" | "RETIRADA";
+  fechaPublicacion: string;
+  miniatura: string | null;
+  peso: number | null;
+  raza: string | null;
+  sexo: "MACHO" | "HEMBRA" | string;
+  tipoAnimal: string | null;
+  arete: string;
+  edadMeses: number | null;
+  finca: string;
+  esMia: boolean;
+  ofertasPendientes: number;
+  totalFotos: number;
+  precioFinal: number | null;
+  fechaCierre: string | null;
+}
+
+export interface OfertaMercado {
+  id: number;
+  monto: number;
+  estado: "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "RETIRADA";
+  fecha: string;
+  mensaje: string | null;
+  compradorTenantId?: number;
+  compradorNombre?: string;
+  traspasado?: boolean;
+}
+
+export interface DetallePublicacionMercado extends PublicacionMercado {
+  descripcion: string | null;
+  fotos: { id: number; imagen: string }[];
+  pesos: { fecha: string; pesoKg: number }[];
+  vacunas: { nombre: string; enfermedadPrevenida: string | null; fechaAplicacion: string }[];
+  ofertas?: OfertaMercado[];
+  misOfertas?: OfertaMercado[];
+  animalRecibidoId?: number;
+}
+
+export interface FiltrosMercado {
+  raza?: string;
+  sexo?: string;
+  pesoMin?: number;
+  pesoMax?: number;
+  precioMax?: number;
+  ubicacion?: string;
+  q?: string;
+  orden?: "recientes" | "precio_asc" | "precio_desc" | "peso_desc";
+}
+
+export interface PublicarMercadoRequest {
+  animalId?: number;
+  titulo?: string;
+  precio: number;
+  tipoPrecio: "POR_CABEZA" | "POR_KG";
+  ubicacion?: string;
+  descripcion?: string;
+  negociable: boolean;
+  fotos?: string[];
+  miniatura?: string;
+}
+
+export interface ConversacionMercado {
+  publicacionId: number;
+  compradorTenantId: number;
+  titulo: string;
+  estado: string;
+  miniatura: string | null;
+  soyVendedor: boolean;
+  otraFinca: string | null;
+  ultimaFecha: string;
+  ultimoMensaje: string;
+  sinLeer: number;
+}
+
+export interface MensajeMercado {
+  id: number;
+  esMio: boolean;
+  emisorNombre: string | null;
+  contenido: string;
+  esSistema: boolean;
+  fecha: string;
+}
+
+export function listarMercadoGanadero(filtros: FiltrosMercado = {}): Promise<PublicacionMercado[]> {
+  const params = new URLSearchParams();
+  Object.entries(filtros).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") params.append(k, String(v)); });
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return request(`/api/ganaderia/mercado/publicaciones${query}`);
+}
+
+export function listarMisPublicacionesMercado(): Promise<PublicacionMercado[]> {
+  return request(`/api/ganaderia/mercado/mis-publicaciones`);
+}
+
+export function obtenerPublicacionMercado(id: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}`);
+}
+
+export function publicarEnMercado(datos: PublicarMercadoRequest): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function editarPublicacionMercado(id: number, datos: PublicarMercadoRequest): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function retirarPublicacionMercado(id: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}/retirar`, { method: "POST" });
+}
+
+export function ofertarEnMercado(id: number, monto: number, mensaje?: string): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}/ofertas`, { method: "POST", body: JSON.stringify({ monto, mensaje }) });
+}
+
+export function aceptarOfertaMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/aceptar`, { method: "POST" });
+}
+
+export function rechazarOfertaMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/rechazar`, { method: "POST" });
+}
+
+export function recibirAnimalMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/recibir`, { method: "POST" });
+}
+
+export function listarConversacionesMercado(): Promise<ConversacionMercado[]> {
+  return request(`/api/ganaderia/mercado/conversaciones`);
+}
+
+export function contarSinLeerMercado(): Promise<{ sinLeer: number }> {
+  return request(`/api/ganaderia/mercado/sin-leer`);
+}
+
+export function listarMensajesMercado(publicacionId: number, comprador?: number): Promise<MensajeMercado[]> {
+  const query = comprador ? `?comprador=${comprador}` : "";
+  return request(`/api/ganaderia/mercado/publicaciones/${publicacionId}/mensajes${query}`);
+}
+
+export function enviarMensajeMercado(publicacionId: number, contenido: string, comprador?: number): Promise<MensajeMercado[]> {
+  return request(`/api/ganaderia/mercado/publicaciones/${publicacionId}/mensajes`, {
+    method: "POST",
+    body: JSON.stringify({ contenido, comprador }),
+  });
+}
+
+export function obtenerComisionesMercado(): Promise<{ pendiente: number; comisiones: { id: number; descripcion: string | null; montoComision: number; pagada: boolean; fecha: string }[] }> {
+  return request(`/api/ganaderia/mercado/comisiones`);
 }

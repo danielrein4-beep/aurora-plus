@@ -25,6 +25,8 @@ import {
   ejecutarBarridoSuspensionSuperAdmin,
   listarPagosSuperAdmin,
   registrarPagoSuperAdmin,
+  listarComisionesPendientesSuperAdmin,
+  type ComisionPlataforma,
   regalarTiempoSuperAdmin,
   impersonarTenantSuperAdmin,
   listarAuditoriaGlobalSuperAdmin,
@@ -232,6 +234,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     notas: "",
   });
   const [registrandoPago, setRegistrandoPago] = useState(false);
+  // Comisiones del mercado ganadero que se suman a esta factura
+  const [comisionesPendientes, setComisionesPendientes] = useState<ComisionPlataforma[]>([]);
+  const [comisionesElegidas, setComisionesElegidas] = useState<number[]>([]);
 
   // Formulario regalar tiempo
   const [regaloForm, setRegaloForm] = useState<RegalarTiempoSuperAdminRequest>({
@@ -820,6 +825,11 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   const abrirModalPago = (tenant: LicenciaTenant) => {
     setTenantParaPago(tenant);
+    setComisionesPendientes([]);
+    setComisionesElegidas([]);
+    listarComisionesPendientesSuperAdmin(tenant.tenantId)
+      .then((lista) => { setComisionesPendientes(lista); setComisionesElegidas(lista.map((c) => c.id)); })
+      .catch(() => setComisionesPendientes([]));
     setPagoForm({
       tenantId: tenant.tenantId,
       monto: 35.0,
@@ -837,7 +847,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     e.preventDefault();
     setRegistrandoPago(true);
     try {
-      await registrarPagoSuperAdmin(pagoForm);
+      const comisiones = comisionesPendientes.filter((c) => comisionesElegidas.includes(c.id));
+      const totalComisiones = comisiones.reduce((s, c) => s + Number(c.montoComision), 0);
+      await registrarPagoSuperAdmin({
+        ...pagoForm,
+        monto: Math.round((Number(pagoForm.monto) + totalComisiones) * 100) / 100,
+        comisionIds: comisiones.map((c) => c.id),
+      });
       avisar(`Pago registrado. Licencia extendida y reactivada.`);
       setShowPagoModal(false);
       cargarTodo();
@@ -3760,7 +3776,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-600 uppercase text-[10px]">Monto Cobrado (USD)</label>
+                  <label className="font-bold text-slate-600 uppercase text-[10px]">
+                    {comisionesPendientes.length > 0 ? "Suscripcion (USD)" : "Monto Cobrado (USD)"}
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -3786,6 +3804,35 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                   </select>
                 </div>
               </div>
+
+              {comisionesPendientes.length > 0 && (() => {
+                const totalComisiones = comisionesPendientes
+                  .filter((c) => comisionesElegidas.includes(c.id))
+                  .reduce((s, c) => s + Number(c.montoComision), 0);
+                return (
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
+                    <label className="font-bold text-amber-800 uppercase text-[10px]">Comisiones pendientes del mercado ganadero</label>
+                    {comisionesPendientes.map((c) => (
+                      <label key={c.id} className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={comisionesElegidas.includes(c.id)}
+                          onChange={(e) => setComisionesElegidas(e.target.checked
+                            ? [...comisionesElegidas, c.id]
+                            : comisionesElegidas.filter((id) => id !== c.id))}
+                        />
+                        <span className="flex-1 text-slate-700">{c.descripcion || c.origen}</span>
+                        <span className="font-mono font-bold text-slate-900">${Number(c.montoComision).toFixed(2)}</span>
+                      </label>
+                    ))}
+                    <div className="flex justify-between pt-2 border-t border-amber-200 font-bold text-slate-900">
+                      <span>Total a cobrar (suscripcion + comisiones)</span>
+                      <span className="font-mono">${(Number(pagoForm.monto) + totalComisiones).toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="space-y-1">
                 <label className="font-bold text-slate-600 uppercase text-[10px]">Referencia de Transaccion / Comprobante</label>

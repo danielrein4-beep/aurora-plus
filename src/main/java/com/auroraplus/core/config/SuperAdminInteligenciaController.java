@@ -337,7 +337,8 @@ public class SuperAdminInteligenciaController {
      * meses que cubre (un pago de 3 meses por $60 aporta $20 a cada mes). Un
      * cliente "pagando" en un mes es el que recibe aporte ese mes; churn es el
      * que pagaba el mes anterior y este ya no. El tiempo regalado (pagos de $0)
-     * no cuenta como cliente pagando.
+     * no cuenta como cliente pagando, ni las comisiones del mercado ganadero
+     * que se cobraron dentro de una factura (no son ingreso recurrente).
      */
     @GetMapping("/negocio")
     public Map<String, Object> negocio() {
@@ -345,10 +346,12 @@ public class SuperAdminInteligenciaController {
         Map<YearMonth, Map<Long, BigDecimal>> aportes = new TreeMap<>();
         long pagosOtraMoneda = 0;
         for (Map<String, Object> p : consultarFilas(
-                "SELECT tenant_id, monto, moneda, meses_pagados, dias_acreditados, fecha_pago FROM pagos_suscripcion_tenant "
-                    + "WHERE (estado IS NULL OR estado = 'CONFIRMADO') AND monto > 0")) {
+                "SELECT p.tenant_id, p.monto - COALESCE((SELECT SUM(c.monto_comision) FROM comisiones_plataforma c WHERE c.pago_id = p.id), 0) AS monto, "
+                    + "p.moneda, p.meses_pagados, p.dias_acreditados, p.fecha_pago FROM pagos_suscripcion_tenant p "
+                    + "WHERE (p.estado IS NULL OR p.estado = 'CONFIRMADO') AND p.monto > 0")) {
             if (p.get("fecha_pago") == null || p.get("tenant_id") == null) continue;
             if (!"USD".equalsIgnoreCase(String.valueOf(p.get("moneda")))) { pagosOtraMoneda++; continue; }
+            if (dec(p.get("monto")).signum() <= 0) continue; // pago que solo cubrió comisiones
             int meses = p.get("meses_pagados") != null ? ((Number) p.get("meses_pagados")).intValue() : 0;
             if (meses <= 0 && p.get("dias_acreditados") != null) meses = (int) Math.round(((Number) p.get("dias_acreditados")).intValue() / 30.0);
             meses = Math.max(1, meses);

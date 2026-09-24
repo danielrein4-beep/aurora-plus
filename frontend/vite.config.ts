@@ -39,7 +39,8 @@ export default defineConfig(({ mode }) => {
       // de un solo dominio.
       proxy: {
         '/api': {
-          target: 'http://localhost:8080',
+          // AURORA_API_TARGET permite apuntar a un backend de prueba en otro puerto.
+          target: process.env.AURORA_API_TARGET || 'http://localhost:8080',
           changeOrigin: true,
         },
       },

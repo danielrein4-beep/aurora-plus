@@ -1,3 +1,5 @@
+import MercadoGanadero from "./MercadoGanadero";
+import { contarSinLeerMercado } from "../api";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
 import {
@@ -243,7 +245,15 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
 
   // Pestaña principal activa
-  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
+  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "mercado" | "auditoria">("resumen");
+  const [sinLeerMercado, setSinLeerMercado] = useState(0);
+  // Mensajes del mercado sin leer, para avisar en la pestaña aunque se esté en otra sección.
+  useEffect(() => {
+    const contar = () => contarSinLeerMercado().then((r) => setSinLeerMercado(Number(r.sinLeer))).catch(() => {});
+    contar();
+    const intervalo = setInterval(contar, 60_000);
+    return () => clearInterval(intervalo);
+  }, []);
 
   // Sub-vistas Sanidad & Trazabilidad
   const [subSanidad, setSubSanidad] = useState<"individual" | "lotes">("individual");
@@ -1743,6 +1753,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
                 : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
             }`}>
             <span>Centro de Reportes</span>
+          </button>
+
+          <button
+            onClick={() => setTab("mercado")}
+            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              tab === "mercado"
+                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
+            }`}>
+            <span>Mercado ganadero</span>
+            {sinLeerMercado > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] leading-none">{sinLeerMercado}</span>
+            )}
           </button>
 
           {user?.rol === "DUENO_ADMIN" && (
@@ -4184,6 +4207,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             </div>
           );
         })()}
+
+        {tab === "mercado" && (
+          <MercadoGanadero
+            puedeNegociar={user?.rol === "DUENO_ADMIN" || user?.rol === "ADMINISTRADOR_FINCA"}
+            onSinLeer={setSinLeerMercado}
+          />
+        )}
 
         {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (
           <BitacoraAuditoria moduloSugerido="GANADERIA" />

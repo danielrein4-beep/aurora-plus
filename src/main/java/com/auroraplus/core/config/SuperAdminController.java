@@ -39,6 +39,9 @@ public class SuperAdminController {
     private LicenciaTenantRepository licenciaTenantRepository;
 
     @Autowired
+    private com.auroraplus.core.config.repositories.ComisionPlataformaRepository comisionPlataformaRepository;
+
+    @Autowired
     private ModuloTenantRepository moduloTenantRepository;
 
     @Autowired
@@ -171,6 +174,8 @@ public class SuperAdminController {
         public Integer meses; // 1, 3, 6, 12...
         public Integer dias; // libre
         public String notas;
+        /** Comisiones pendientes (p. ej. del mercado ganadero) que se cobran en este pago. */
+        public List<Long> comisionIds;
     }
 
     /**
@@ -219,8 +224,18 @@ public class SuperAdminController {
         pago.setEstado("CONFIRMADO");
         pago.setNotas(req.notas);
         pago.setRegistradoPor("superadmin");
+        PagoSuscripcionTenant guardado = pagoSuscripcionRepository.save(pago);
 
-        return ResponseEntity.ok(pagoSuscripcionRepository.save(pago));
+        if (req.comisionIds != null && !req.comisionIds.isEmpty()) {
+            for (com.auroraplus.core.config.entities.ComisionPlataforma c : comisionPlataformaRepository.findAllById(req.comisionIds)) {
+                if (!c.getTenantId().equals(licencia.getTenantId()) || Boolean.TRUE.equals(c.getPagada())) continue;
+                c.setPagada(true);
+                c.setPagoId(guardado.getId());
+                comisionPlataformaRepository.save(c);
+            }
+        }
+
+        return ResponseEntity.ok(guardado);
     }
 
     public static class RegalarTiempoRequest {
