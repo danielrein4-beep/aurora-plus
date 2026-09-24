@@ -37,6 +37,10 @@ import {
   type RepuestoItem,
   type MapaMesaEntrada,
   obtenerCapacidadesPersonal,
+  obtenerEstadoSuscripcion,
+  reportarPagoSuscripcion,
+  tasaVigente,
+  type EstadoSuscripcion,
 } from "../api";
 import MediclinicApp from "../components/MediclinicApp";
 
@@ -369,10 +373,21 @@ export default function Dashboard() {
     } catch {}
   };
 
-  const tasaBcv = 45.0;
+  // Tasa guardada por el propio negocio; si no tiene ninguna no se inventa: se pide pagar a la tasa BCV del día.
+  const [tasaBcv, setTasaBcv] = useState<number | null>(null);
+  const [suscripcion, setSuscripcion] = useState<EstadoSuscripcion | null>(null);
+  const [enviandoPago, setEnviandoPago] = useState(false);
+  const [errorPago, setErrorPago] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    obtenerEstadoSuscripcion().then(setSuscripcion).catch(() => setSuscripcion(null));
+    tasaVigente(user.tenantId, "USD", "VES")
+      .then((t) => setTasaBcv(t && Number(t.tasa) > 0 ? Number(t.tasa) : null))
+      .catch(() => setTasaBcv(null));
+  }, [user?.tenantId]);
   const [paymentForm, setPaymentForm] = useState({
     metodo: "Pago Móvil (Bolívares - Tasa BCV)",
-    monto: "$35.00",
+    monto: "$25.00",
     referencia: "",
     banco: "Banesco",
   });
@@ -381,8 +396,9 @@ export default function Dashboard() {
   const userIndustry = user?.industry || "clinica";
   const vertical = VERTICAL_METADATA[userIndustry] || VERTICAL_METADATA["clinica"];
   const VerticalIcon = VERTICAL_ICON[userIndustry] || VERTICAL_ICON["clinica"];
-  const isTrial = user?.planStatus !== "active";
-  const daysLeft = isTrial ? trialDaysLeft : 30;
+  // El servidor manda: prueba = nunca ha pagado; días = hasta la fecha real de vencimiento.
+  const isTrial = suscripcion ? suscripcion.enPrueba : user?.planStatus !== "active";
+  const daysLeft = suscripcion ? suscripcion.diasRestantes : trialDaysLeft;
 
   // Estados de datos reales conectados al backend multi-tenant
   const [metricasEnVivo, setMetricasEnVivo] = useState<{ label: string; val: string; change: string; color: string }[] | null>(null);
@@ -731,21 +747,32 @@ export default function Dashboard() {
     }
   }, [user?.tenantId, userIndustry]);
 
-  const handleReportPaymentSubmit = (e: React.FormEvent) => {
+  // Antes marcaba el plan como "activado" solo en este navegador, sin avisar a nadie. Ahora el
+  // reporte llega al equipo de Aurora (ticket de soporte) y queda en verificación.
+  const handleReportPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentForm.referencia.trim()) return;
-
-    reportPayment({
-      monto: paymentForm.monto,
-      metodo: paymentForm.metodo,
-      referencia: paymentForm.referencia,
-    });
-
-    setPaymentSuccessMsg("¡Pago registrado con éxito! Tu plan ha sido activado inmediatamente.");
-    setTimeout(() => {
-      setShowPaymentModal(false);
-      setPaymentSuccessMsg("");
-    }, 2000);
+    const monto = parseFloat(paymentForm.monto.replace(/[^0-9.,]/g, "").replace(",", "."));
+    if (!(monto > 0)) { setErrorPago("Indica el monto que pagaste."); return; }
+    const enBolivares = paymentForm.metodo.startsWith("Pago Móvil") || paymentForm.metodo.startsWith("Transferencia");
+    setEnviandoPago(true);
+    setErrorPago(null);
+    try {
+      await reportarPagoSuscripcion({
+        monto,
+        moneda: enBolivares && /bs/i.test(paymentForm.monto) ? "VES" : "USD",
+        metodo: paymentForm.metodo,
+        referencia: paymentForm.referencia.trim(),
+        plan: suscripcion?.planSolicitado || undefined,
+      });
+      reportPayment({ monto: paymentForm.monto, metodo: paymentForm.metodo, referencia: paymentForm.referencia });
+      setPaymentSuccessMsg("Recibimos tu reporte de pago. Lo verificamos y activamos tu plan; te avisamos por WhatsApp o correo.");
+      setPaymentForm((f) => ({ ...f, referencia: "" }));
+    } catch (err) {
+      setErrorPago(err instanceof Error ? err.message : "No se pudo enviar el reporte. Intenta de nuevo.");
+    } finally {
+      setEnviandoPago(false);
+    }
   };
 
   return (
@@ -763,7 +790,7 @@ export default function Dashboard() {
         {/* Izquierda: Logo + Nombre del Hub + Empresa */}
         <div className="flex items-center gap-3.5">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => setActiveTab("vertical")}
             className="flex items-center gap-3 cursor-pointer group text-left"
           >
             <div className="p-1.5 rounded-xl bg-white/5 border border-white/10 group-hover:scale-105 transition-transform">
@@ -775,7 +802,7 @@ export default function Dashboard() {
               </div>
               <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                <span>{user?.empresa || "Clínica & Consultorios Médicos"}</span>
+                <span>{user?.empresa || "Mi negocio"}</span>
               </div>
             </div>
           </button>
@@ -818,13 +845,6 @@ export default function Dashboard() {
             </button>
           )}
 
-          <button
-            onClick={() => navigate("/onboarding")}
-            title="Cambiar o explorar otras verticales de Aurora"
-            className="px-3.5 py-2 rounded-full font-medium transition-all duration-300 text-slate-500 dark:text-white/40 hover:text-teal-500 dark:hover:text-teal-300 hover:bg-white/40 dark:hover:bg-white/8 flex items-center gap-1.5 text-xs">
-            <IconCustomize size={14} />
-            <span>Cambiar Rubro</span>
-          </button>
         </nav>
 
         {/* Derecha: Botón Directo a la vertical + Estado + Salir */}
@@ -848,7 +868,7 @@ export default function Dashboard() {
               : "bg-teal-500/10 border-teal-500/30 text-teal-700 dark:text-teal-300"
           }`}>
             <span className={`w-2 h-2 rounded-full ${isTrial ? "bg-amber-400 animate-ping" : "bg-teal-400"}`} />
-            <span>{isTrial ? `Prueba gratis · ${daysLeft} ${daysLeft === 1 ? "día" : "días"}` : "Plan Activo"}</span>
+            <span>{suscripcion?.vencida ? "Plan vencido" : isTrial ? `Prueba gratis · ${daysLeft} ${daysLeft === 1 ? "día" : "días"}` : "Plan activo"}</span>
           </div>
 
           <button
@@ -884,7 +904,7 @@ export default function Dashboard() {
               <button
                 onClick={() => setShowPaymentModal(true)}
                 className="btn-electric-blue text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md cursor-pointer hover:scale-105 transition-all">
-                Activar Plan Pro ($35/mes) →
+                Activar mi plan →
               </button>
             </div>
           </div>
@@ -911,10 +931,7 @@ export default function Dashboard() {
                   </h2>
 
                   <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
-                    {vertical.desc}{" "}
-                    {userIndustry === "restaurante"
-                      ? "Gestiona mesas, comandas y cocina en tiempo real desde un solo lugar."
-                      : "Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real."}
+                    {vertical.desc}
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -922,31 +939,16 @@ export default function Dashboard() {
                       onClick={() => navigate(rutaVertical)}
                       className="btn-cyber-neon text-white text-xs sm:text-sm font-extrabold px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
                       <IconRocket size={17} />
-                      <span>Entrar a {vertical.name} (Cloud Web)</span>
+                      <span>Entrar a {vertical.name}</span>
                       <span className="text-base">→</span>
                     </button>
 
-                    <a
-                      href="https://github.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="apple-glass-btn text-xs sm:text-sm font-semibold px-5 py-3.5 rounded-2xl flex items-center gap-2 text-white/90 hover:text-white border border-white/15 cursor-pointer hover:border-teal-400/40 transition-all">
-                      <IconDownload size={15} />
-                      <span>Descargar para Windows (.exe)</span>
-                    </a>
-
-                    <button
-                      onClick={() => alert("Tu API Token de Licencia: AURORA-MED-PRO-9842-SECURE")}
-                      className="apple-glass-btn text-xs font-mono px-4 py-3.5 rounded-2xl text-white/60 hover:text-white border border-white/10 cursor-pointer flex items-center gap-2 transition-all">
-                      <IconKey size={14} />
-                      <span>Clave de Licencia</span>
-                    </button>
                   </div>
                 </div>
 
                 {/* Lado Derecho: Métricas Reales en Grid 2x2 Estilo Glassmorphism */}
                 <div className="lg:col-span-5 grid grid-cols-2 gap-3.5">
-                  {(metricasEnVivo || vertical.stats).map((s) => (
+                  {(metricasEnVivo || vertical.stats.map((s) => ({ ...s, val: "—", change: "Sin datos por ahora", color: "text-white/40" }))).map((s) => (
                     <div key={s.label} className="apple-glass rounded-2xl p-4 sm:p-5 text-left border border-white/10 shadow-md hover:border-teal-400/40 transition-all duration-300">
                       <div className="text-white/50 text-[11px] font-medium leading-tight">{s.label}</div>
                       <div className={`font-['Outfit'] font-black text-2xl sm:text-3xl mt-1.5 ${s.color}`}>{s.val}</div>
@@ -1036,7 +1038,8 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* 3. Gestión de Personal & Nómina */}
+                {/* 3. Gestión de Personal & Nómina — solo si el negocio la tiene activa */}
+                {accesoPersonal && (
                 <div 
                   onClick={() => navigate("/personal")}
                   className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-purple-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
@@ -1056,7 +1059,7 @@ export default function Dashboard() {
                         Gestión de Personal
                       </h4>
                       <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
-                        Control de turnos, asistencias biométricas, comisiones por venta y liquidación periódica.
+                        Directorio del equipo, turnos, asistencia, metas y comisiones por venta.
                       </p>
                     </div>
                   </div>
@@ -1066,6 +1069,7 @@ export default function Dashboard() {
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
                 </div>
+                )}
 
                 {/* 4. Auditoría — solo el Dueño/Administrador la ve */}
                 {user?.rol === "DUENO_ADMIN" && (
@@ -1341,7 +1345,7 @@ export default function Dashboard() {
                                   </td>
                                   <td className="p-3.5 text-right">
                                     <button
-                                      onClick={() => alert(`Abriendo historia clínica de ${c.paciente?.nombreCompleto}`)}
+                                      onClick={() => navigate("/mediclinic")}
                                       className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
                                       Abrir Historia →
                                     </button>
@@ -1457,27 +1461,29 @@ export default function Dashboard() {
                 <div className="apple-glass rounded-2xl p-5 border border-teal-500/30 space-y-2">
                   <div className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Plan Actual</div>
                   <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
-                    {user?.plan || "Estándar"} ($35/mes)
+                    {suscripcion?.vencida ? "Plan vencido" : isTrial ? "Prueba gratis" : "Plan activo"}
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
-                    Módulos ilimitados para tu clínica + versión móvil.
+                    {suscripcion?.planSolicitado === "full" ? "Elegiste Aurora Full (desde $40/mes)." : suscripcion?.planSolicitado === "basico" ? "Elegiste Aurora Básico ($25/mes)." : "Aurora Básico $25/mes · Aurora Full desde $40/mes."}
                   </p>
                 </div>
 
                 <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">Próxima Fecha de Corte</div>
+                  <div className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">{isTrial ? "Tu prueba termina" : "Próxima fecha de corte"}</div>
                   <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
-                    25 Septiembre 2026
+                    {suscripcion?.fechaVencimiento
+                      ? new Date(suscripcion.fechaVencimiento + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" })
+                      : "—"}
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
-                    Recordatorio automático por WhatsApp 5 días antes.
+                    Te avisamos por correo 5 días antes.
                   </p>
                 </div>
 
                 <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
                   <div className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Métodos Disponibles</div>
                   <div className="text-sm font-semibold text-slate-800 dark:text-white/90">
-                    Pago Móvil · Binance · Zelle · Tarjeta
+                    Pago Móvil · Binance · Zelle
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
                     Tasa oficial BCV para pagos en bolívares.
@@ -1500,35 +1506,27 @@ export default function Dashboard() {
                         <th className="p-3.5">Monto</th>
                         <th className="p-3.5">Método / Referencia</th>
                         <th className="p-3.5">Estado</th>
-                        <th className="p-3.5 text-right">Comprobante</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                      {(user?.payments && user.payments.length > 0) ? (
-                        user.payments.map((p) => (
+                      {(suscripcion?.pagos && suscripcion.pagos.length > 0) ? (
+                        suscripcion.pagos.map((p) => (
                           <tr key={p.id}>
-                            <td className="p-3.5 font-mono font-bold text-slate-900 dark:text-white">{p.id}</td>
-                            <td className="p-3.5 text-slate-600 dark:text-white/60">{p.fecha}</td>
-                            <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{p.monto}</td>
-                            <td className="p-3.5 text-slate-600 dark:text-white/70">{p.metodo} · Ref: {p.referencia}</td>
+                            <td className="p-3.5 font-mono font-bold text-slate-900 dark:text-white">#{p.id}</td>
+                            <td className="p-3.5 text-slate-600 dark:text-white/60">{new Date(p.fecha).toLocaleDateString("es-VE")}</td>
+                            <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{Number(p.monto).toFixed(2)} {p.moneda}</td>
+                            <td className="p-3.5 text-slate-600 dark:text-white/70">{p.metodoPago}{p.referencia ? ` · Ref: ${p.referencia}` : ""}</td>
                             <td className="p-3.5">
                               <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
-                                {p.estado.toUpperCase()}
+                                CONFIRMADO
                               </span>
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() => alert(`Descargando factura en PDF del pago ${p.id}`)}
-                                className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-1">
-                                <IconFileText size={12} /> Descargar PDF
-                              </button>
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="p-6 text-center text-slate-400 dark:text-white/40">
-                            Sin pagos ni recibos registrados aún en esta cuenta. Usa &ldquo;Reportar Nuevo Pago&rdquo; para registrar tu comprobante.
+                          <td colSpan={5} className="p-6 text-center text-slate-400 dark:text-white/40">
+                            Aún no hay pagos confirmados. Cuando reportes uno, aparece aquí en cuanto el equipo de Aurora lo verifique.
                           </td>
                         </tr>
                       )}
@@ -1712,7 +1710,7 @@ export default function Dashboard() {
                     Pagar Suscripción Aurora Plus
                   </h3>
                   <p className="text-slate-500 dark:text-white/40 text-xs">
-                    Activación automática para {vertical.name}
+                    Reporta tu pago y lo activamos al verificarlo
                   </p>
                 </div>
               </div>
@@ -1738,7 +1736,7 @@ export default function Dashboard() {
                       <IconBank size={14} /> Cuentas Oficiales para Transferir:
                     </div>
                     <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                      Tasa BCV Oficial: {tasaBcv.toFixed(2)} Bs/$
+                      {tasaBcv ? `Tasa de referencia: ${tasaBcv.toFixed(2)} Bs/$` : "Paga a la tasa BCV del día"}
                     </span>
                   </div>
 
@@ -1786,13 +1784,15 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    {/* Total equivalente en Bs */}
+                    {/* Total equivalente en Bs: solo si hay una tasa real cargada */}
+                    {tasaBcv && (
                     <div className="pt-1.5 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px] font-sans">
                       <span className="text-slate-500 dark:text-slate-400">Monto exacto a transferir:</span>
                       <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs">
-                        Bs. {((parseFloat(paymentForm.monto.replace(/[^0-9.]/g, "")) || 35.0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        Bs. {((parseFloat(paymentForm.monto.replace(/[^0-9.]/g, "")) || 25.0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
+                    )}
                   </div>
 
                   {/* Binance USDT si existe */}
@@ -1842,7 +1842,6 @@ export default function Dashboard() {
                     <option value="Transferencia Bancaria Nacional (Banesco/Mercantil)">Transferencia Bancaria Nacional</option>
                     <option value="Binance Pay / USDT">Binance Pay / USDT</option>
                     <option value="Zelle">Zelle</option>
-                    <option value="Tarjeta de Crédito / Débito Internacional">Tarjeta Internacional</option>
                   </select>
                 </div>
 
@@ -1856,7 +1855,7 @@ export default function Dashboard() {
                       value={paymentForm.monto}
                       onChange={(e) => setPaymentForm({ ...paymentForm, monto: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white font-mono"
-                      placeholder="$35.00 USD"
+                      placeholder="$25.00"
                     />
                   </div>
                   <div>
@@ -1874,6 +1873,8 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {errorPago && <p className="text-xs text-rose-600 dark:text-rose-400">{errorPago}</p>}
+
                 <div className="pt-2 flex items-center justify-end gap-3">
                   <button
                     type="button"
@@ -1883,8 +1884,9 @@ export default function Dashboard() {
                   </button>
                   <button
                     type="submit"
-                    className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-md">
-                    Confirmar y Activar Plan →
+                    disabled={enviandoPago}
+                    className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-md disabled:opacity-60">
+                    {enviandoPago ? "Enviando…" : "Enviar reporte de pago →"}
                   </button>
                 </div>
               </form>

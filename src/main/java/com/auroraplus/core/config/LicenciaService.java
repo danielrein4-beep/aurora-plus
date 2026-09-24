@@ -39,6 +39,9 @@ public class LicenciaService {
 
     static {
         NIVEL_REQUERIDO_POR_MODULO.put("super-admin", null); // sin restricción de licencia (lo gestiona el propio super-admin)
+        // Un negocio vencido tiene que poder ver su suscripción, reportar su pago y hablar con soporte.
+        NIVEL_REQUERIDO_POR_MODULO.put("suscripcion", null);
+        NIVEL_REQUERIDO_POR_MODULO.put("tenant", null);
         NIVEL_REQUERIDO_POR_MODULO.put("horeca", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("repuestos", LicenciaTenant.TipoLicencia.COMERCIAL);
         // Farmacia, Ferretería y Comercio comparten el mismo motor que Repuestos

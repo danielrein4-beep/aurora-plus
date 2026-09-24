@@ -331,12 +331,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const newPayment: PaymentRecord = {
         id: `PAY-${Date.now().toString().slice(-6)}`,
         fecha: new Date().toLocaleDateString("es-ES"),
-        estado: "aprobado",
+        estado: "pendiente",
         ...payment,
       };
+      // El plan solo se activa cuando el equipo de Aurora registra el pago en el servidor.
       return {
         ...prev,
-        planStatus: "active",
         payments: [newPayment, ...(prev.payments || [])],
       };
     });

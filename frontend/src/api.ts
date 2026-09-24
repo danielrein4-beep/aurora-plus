@@ -6471,3 +6471,36 @@ export function reactivarFincaMercado(tenantId: number): Promise<{ suspendida: b
 export function obtenerMercadoGanaderoSuperAdmin(dias: number): Promise<PanelMercadoSuperAdmin> {
   return requestSuperAdmin(`/api/super-admin/inteligencia/mercado-ganadero?dias=${dias}`);
 }
+
+// --- Suscripción del propio negocio (Hub > Facturación & Pagos) ---
+// Funciona aunque la licencia esté vencida: el negocio tiene que poder ver y reportar su pago.
+
+export interface PagoSuscripcionVista {
+  id: number;
+  fecha: string;
+  monto: number;
+  moneda: string;
+  metodoPago: string;
+  referencia: string | null;
+  mesesPagados: number | null;
+}
+
+export interface EstadoSuscripcion {
+  nombreEmpresa: string;
+  tipoLicencia: string;
+  planSolicitado: string | null;
+  fechaVencimiento: string | null;
+  diasRestantes: number;
+  vencida: boolean;
+  enPrueba: boolean;
+  pagos: PagoSuscripcionVista[];
+}
+
+export function obtenerEstadoSuscripcion(): Promise<EstadoSuscripcion> {
+  return request("/api/suscripcion/estado");
+}
+
+/** Avisa al equipo de Aurora que se pagó (abre un ticket de soporte de prioridad alta). No acredita nada por sí solo. */
+export function reportarPagoSuscripcion(datos: { monto: number; moneda: string; metodo: string; referencia: string; plan?: string }): Promise<unknown> {
+  return request("/api/suscripcion/reportar-pago", { method: "POST", body: JSON.stringify(datos) });
+}
