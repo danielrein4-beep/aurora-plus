@@ -716,7 +716,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
             {proyectos.length === 0 ? (
               <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
-                No hay proyectos registrados en este tenant.
+                Todavía no tienes proyectos registrados.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1116,7 +1116,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
             {insumos.length === 0 ? (
               <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
-                No hay insumos registrados en este tenant.
+                Todavía no tienes insumos registrados.
               </div>
             ) : (
               <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden">

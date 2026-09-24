@@ -54,10 +54,11 @@ const NAV_GRUPOS: NavGrupo[] = [
   {
     titulo: "Operación",
     items: [
-      { id: "general", label: "Vista General", Icon: IconCustomize },
-      { id: "resumen", label: "Resumen General", Icon: IconChart },
+      // "Vista General" era la caja y convivía con "Resumen General": dos nombres para cosas distintas.
+      { id: "general", label: "Punto de Venta", Icon: IconCustomize },
+      { id: "resumen", label: "Vista General", Icon: IconChart },
       { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant },
-      { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass },
+      { id: "cocina", label: "Pantalla de Cocina", Icon: IconHourglass },
       { id: "reservas", label: "Reservas", Icon: IconCalendar },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
     ],
@@ -624,7 +625,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                 escandallos={escandallos} articulos={articulos} onVenta={registrarVenta} onCambio={recargarTodo} zonasCocina={zonasCocina} zonasMesa={zonasMesa} onZonasMesaGuardadas={recargarZonasMesa} nombreLocal={config.nombreLocal}
                 onAccionEncolada={actualizarContadorPendientes} />
           )}
-          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} zonasCocina={zonasCocina} onZonasCocinaGuardadas={recargarZonasCocina} nombreLocal={config.nombreLocal} />)}
+          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Pantalla de Cocina" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} zonasCocina={zonasCocina} onZonasCocinaGuardadas={recargarZonasCocina} nombreLocal={config.nombreLocal} />)}
           {pagina === "reservas" && <Reservas mapa={mapa} />}
           {pagina === "recetas" && (recetasActivas
             ? <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} tasaCop={tasaCop} tasaBcv={tasaBcv} onCambio={recargarTodo} zonasCocina={zonasCocina} />
@@ -7017,7 +7018,7 @@ function ZonasCocinaConfig({ onGuardado }: { onGuardado: () => void }) {
       <div>
         <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Zonas de cocina</h3>
         <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">
-          Las estaciones que ves en Cocina (KDS) y al asignar un plato en Recetas — arma las que realmente tiene tu negocio, no todos tienen las mismas 4.
+          Las estaciones que ves en la Pantalla de Cocina y al asignar un plato en Recetas — arma las que realmente tiene tu negocio, no todos tienen las mismas 4.
         </p>
       </div>
       {zonas === null ? (
