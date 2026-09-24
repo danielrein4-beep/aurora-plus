@@ -107,7 +107,7 @@ export default function Soluciones() {
           ¿Quieres ver todo esto<br />
           <span className="text-[#177E89]">funcionando en tu negocio?</span>
         </h2>
-        <p className="text-slate-500 font-light uppercase tracking-wide mb-8">Crea tu cuenta y úsalo gratis durante un mes, con tus propios datos.</p>
+        <p className="text-slate-500 font-light uppercase tracking-wide mb-8">Crea tu cuenta y úsalo gratis durante 15 días, con tus propios datos.</p>
         <SpecularButton
           size="lg"
           radius={12}
@@ -123,7 +123,7 @@ export default function Soluciones() {
           proximity={280}
           onClick={() => navigate("/auth?registro=1")}
         >
-          Probar gratis 1 mes
+          Probar gratis 15 días
         </SpecularButton>
       </section>
     </main>

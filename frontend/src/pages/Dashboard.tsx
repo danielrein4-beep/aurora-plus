@@ -848,7 +848,7 @@ export default function Dashboard() {
               : "bg-teal-500/10 border-teal-500/30 text-teal-700 dark:text-teal-300"
           }`}>
             <span className={`w-2 h-2 rounded-full ${isTrial ? "bg-amber-400 animate-ping" : "bg-teal-400"}`} />
-            <span>{isTrial ? `Trial (${daysLeft}d)` : "Plan Activo"}</span>
+            <span>{isTrial ? `Prueba gratis · ${daysLeft} ${daysLeft === 1 ? "día" : "días"}` : "Plan Activo"}</span>
           </div>
 
           <button
@@ -876,7 +876,7 @@ export default function Dashboard() {
                   Estás disfrutando de tu prueba gratuita de {vertical.name}
                 </h4>
                 <p className="text-slate-500 dark:text-white/50 text-xs mt-0.5">
-                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Tus datos e historias clínicas se guardan permanentemente.
+                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Todo lo que registres se queda guardado cuando actives tu plan.
                 </p>
               </div>
             </div>

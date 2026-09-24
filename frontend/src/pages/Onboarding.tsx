@@ -678,7 +678,7 @@ export default function Onboarding() {
                   ¿Cómo prefieres pagar cuando termine tu prueba?
                 </h2>
                 <p className="text-slate-500 text-sm mt-1">
-                  Tu prueba de <strong className="text-slate-700">30 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
+                  Tu prueba de <strong className="text-slate-700">15 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
                 </p>
               </div>
 
@@ -776,7 +776,7 @@ export default function Onboarding() {
                 <div className="h-px bg-white/10" />
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Prueba Gratuita:</span>
-                  <span className="text-emerald-400 font-bold">30 días de acceso completo</span>
+                  <span className="text-emerald-400 font-bold">15 días de acceso completo</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Método de Pago:</span>

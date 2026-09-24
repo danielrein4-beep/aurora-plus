@@ -219,6 +219,8 @@ export interface MiNegocio {
   moduloPrincipal: string;
   logoBase64: string | null;
   hierroBase64: string | null;
+  /** Fin de la prueba o del período pagado (AAAA-MM-DD). */
+  fechaVencimientoPago?: string | null;
 }
 
 export function obtenerMiNegocio(): Promise<MiNegocio> {

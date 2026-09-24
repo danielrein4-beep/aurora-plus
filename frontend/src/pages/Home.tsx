@@ -80,7 +80,7 @@ const PLANS = [
 
 const STATS = [
   { value: "5",       label: "Rubros especializados" },
-  { value: "1 mes",   label: "De prueba gratis" },
+  { value: "15 días", label: "De prueba gratis" },
   { value: "3",       label: "Monedas: USD · VES · COP" },
   { value: "$0",      label: "Por usuario adicional" },
 ];
@@ -143,7 +143,7 @@ export default function Home() {
               className="w-full sm:w-auto"
               onClick={() => navigate("/auth?registro=1")}
             >
-              Probar gratis 1 mes
+              Probar gratis 15 días
             </SpecularButton>
             <button
               onClick={() => navigate("/industrias")}

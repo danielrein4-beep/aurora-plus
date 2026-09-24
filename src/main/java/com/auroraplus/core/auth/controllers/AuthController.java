@@ -39,8 +39,10 @@ public class AuthController {
 
     // Registro público de autoservicio — crea el tenant, activa su módulo y su
     // usuario DUENO_ADMIN, y entrega el token de una vez para no pedir un
-    // segundo login. Prueba gratuita de 1 mes por defecto (ver
-    // TenantProvisioningService — mesesVigencia null = 1 mes).
+    // segundo login. Prueba gratuita de 15 días (DIAS_PRUEBA_GRATIS).
+    /** Duración de la prueba gratuita del registro público. Los textos de la web dicen lo mismo. */
+    public static final int DIAS_PRUEBA_GRATIS = 15;
+
     @PostMapping("/registro-negocio")
     public ResponseEntity<AuthService.ResultadoLogin> registroNegocio(@RequestBody RegistroNegocioRequest request) {
         if (request.username == null || request.username.isBlank()) {
@@ -57,6 +59,7 @@ public class AuthController {
         alta.nombreEmpresa = request.nombreEmpresa;
         alta.moduloPrincipal = request.moduloPrincipal;
         alta.tipoLicencia = LicenciaTenant.TipoLicencia.COMERCIAL;
+        alta.diasVigencia = DIAS_PRUEBA_GRATIS;
         alta.emailContacto = request.emailContacto;
         alta.telefonoContacto = request.telefonoContacto;
         alta.usuarioInicial = request.username;

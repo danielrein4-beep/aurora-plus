@@ -46,6 +46,8 @@ public class TenantProvisioningService {
         public String emailContacto;
         public String telefonoContacto;
         public Integer mesesVigencia;
+        /** Si viene, manda sobre mesesVigencia: la prueba gratuita del registro público se mide en días. */
+        public Integer diasVigencia;
         public String monedaBase;
         public String usuarioInicial;
         public String nombreUsuarioInicial;
@@ -95,7 +97,9 @@ public class TenantProvisioningService {
         licencia.setModuloPrincipal(request.moduloPrincipal);
         licencia.setTipoLicencia(request.tipoLicencia);
         licencia.setActiva(true);
-        licencia.setFechaVencimientoPago(LocalDate.now().plusMonths(meses));
+        licencia.setFechaVencimientoPago(request.diasVigencia != null
+            ? LocalDate.now().plusDays(request.diasVigencia)
+            : LocalDate.now().plusMonths(meses));
         licencia.setEmailContacto(request.emailContacto);
         licencia.setTelefonoContacto(request.telefonoContacto);
         licencia.setFechaAlta(LocalDate.now());

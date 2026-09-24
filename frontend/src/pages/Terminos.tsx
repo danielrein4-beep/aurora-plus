@@ -31,7 +31,7 @@ export default function Terminos() {
 
         <section>
           <h2 className="font-['Outfit'] font-bold text-xl text-slate-900 dark:text-white mb-3">4. Pagos y período de prueba</h2>
-          <p>Durante la fase de piloto, el acceso se otorga bajo un período de prueba y los pagos, cuando aplican, se coordinan directamente con el equipo de Aurora Plus — todavía no existe cobro automático dentro de la plataforma.</p>
+          <p>Al crear tu cuenta tienes 15 días de prueba gratuita con acceso completo, sin cargo y sin pedirte medios de pago. Al terminar, el acceso se pausa hasta que actives un plan; tus datos no se borran. Durante la fase de piloto, los pagos, cuando aplican, se coordinan directamente con el equipo de Aurora Plus — todavía no existe cobro automático dentro de la plataforma.</p>
         </section>
 
         <section>
