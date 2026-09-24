@@ -616,6 +616,8 @@ export interface CierreCajaRegistro {
   totalCOP?: number;
   totalPacientes: number;
   observaciones?: string;
+  /** Detalle de cobros del cierre en JSON (V104), para reimprimirlo desde cualquier equipo. */
+  cobrosJson?: string;
 }
 
 export function listarCierresCaja(): Promise<CierreCajaRegistro[]> {
@@ -7039,21 +7041,6 @@ export function venderProductosEstetica(datos: {
   monedaPago: string; montoRecibido?: number; metodoPago: NuevoCobro["metodoPago"]; referenciaPago?: string;
 }): Promise<{ id: number; cobro_id: number; total: number; moneda: string }> {
   return request(`/api/salud/estetica/ventas-productos`, { method: "POST", body: JSON.stringify(datos) });
-}
-
-// --- Mediclinic: historial de cierres de caja en el servidor (V103) ---
-export interface CierreCajaGuardado<T = unknown> { id: number; fecha: string; datos: T; creadoPor: string | null }
-export function listarCierresCajaSalud<T = unknown>(): Promise<CierreCajaGuardado<T>[]> {
-  return request("/api/salud/cierres-caja");
-}
-export function guardarCierreCajaSalud<T = unknown>(datos: T): Promise<CierreCajaGuardado<T>> {
-  return request("/api/salud/cierres-caja", { method: "POST", body: JSON.stringify(datos) });
-}
-export function eliminarCierreCajaSalud(id: number): Promise<unknown> {
-  return request(`/api/salud/cierres-caja/${id}`, { method: "DELETE" });
-}
-export function vaciarCierresCajaSalud(): Promise<unknown> {
-  return request("/api/salud/cierres-caja", { method: "DELETE" });
 }
 
 /** Cobro de consulta tal como lo guarda el servidor (con paciente, método y hora). */

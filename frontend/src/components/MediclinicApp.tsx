@@ -35,7 +35,7 @@ import {
   contadorInboxExamenesRecibidos, listarExamenesRecibidosPorPaciente, type ExamenRecibidoPaciente,
   listarPacientes, crearPaciente, actualizarPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
-  listarCierresCajaSalud, guardarCierreCajaSalud, eliminarCierreCajaSalud, vaciarCierresCajaSalud, type CobroConsultaDetalle,
+  eliminarCierreCaja, type CobroConsultaDetalle,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, llamarAConsultorioSalaEspera, procesarCobro,
   listarCierresCaja, registrarCierreCaja,
   estadoPinDoctor, verificarPinDoctor, configurarPinDoctor,
@@ -935,7 +935,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     } catch { return []; }
   });
 
-  // Historial de cierres: en el servidor (V103). Cada cierre lleva su id del servidor para borrarlo.
+  // Historial de cierres: en el servidor (salud_cierres_caja, con el detalle de cobros desde V104).
   const [historialCierres, setHistorialCierres] = useState<(CierreCajaData & { serverId?: number })[]>([]);
 
   const [modalTasasRapidas, setModalTasasRapidas] = useState(false);
@@ -1020,8 +1020,28 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   useEffect(() => {
     if (!user?.tenantId) return;
-    listarCierresCajaSalud<CierreCajaData>()
-      .then((lista) => setHistorialCierres(lista.map((c) => ({ ...c.datos, serverId: c.id }))))
+    listarCierresCaja()
+      .then((lista) => setHistorialCierres(lista.map((c: CierreCajaRegistro) => {
+        let cobros: CobroItem[] = [];
+        try { cobros = c.cobrosJson ? JSON.parse(c.cobrosJson) : []; } catch { /* detalle ilegible: solo totales */ }
+        return {
+          clinicaNombre: configPerfil?.clinicaNombre || "Consultorio Médico",
+          doctorNombre: configPerfil?.doctorNombre || "",
+          responsableNombre: c.responsableNombre,
+          logoBase64: configPerfil?.logoBase64,
+          fecha: c.fecha,
+          horaCierre: c.horaCierre,
+          tasaBCV: Number(c.tasaBCV) || 0,
+          tasaCOP: Number(c.tasaCOP) || 0,
+          cobros,
+          totalUSD: Number(c.totalUSD) || 0,
+          totalVES: Number(c.totalVES) || 0,
+          totalCOP: Number(c.totalCOP) || 0,
+          totalPacientes: c.totalPacientes,
+          observaciones: c.observaciones,
+          serverId: c.id,
+        };
+      })))
       .catch(() => avisar("No se pudo cargar el historial de cierres de caja. Revisa la conexión.", "error"));
   }, [user?.tenantId]);
 
@@ -1043,7 +1063,19 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   };
 
   const agregarCierreAuditado = (cierre: CierreCajaData) => {
-    guardarCierreCajaSalud(cierre)
+    registrarCierreCaja({
+      fecha: cierre.fecha,
+      horaCierre: cierre.horaCierre,
+      responsableNombre: cierre.responsableNombre,
+      tasaBCV: cierre.tasaBCV,
+      tasaCOP: cierre.tasaCOP,
+      totalUSD: cierre.totalUSD,
+      totalVES: cierre.totalVES,
+      totalCOP: cierre.totalCOP,
+      totalPacientes: cierre.totalPacientes,
+      observaciones: cierre.observaciones,
+      cobrosJson: JSON.stringify(cierre.cobros || []),
+    })
       .then((g) => setHistorialCierres((prev) => [{ ...cierre, serverId: g.id }, ...prev]))
       .catch((err) => avisar(`El cierre se generó, pero no se guardó en el historial: ${err instanceof Error ? err.message : "error del servidor"}`, "error"));
   };
@@ -1051,7 +1083,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const eliminarCierreAuditado = async (index: number) => {
     const cierre = historialCierres[index];
     try {
-      if (cierre?.serverId) await eliminarCierreCajaSalud(cierre.serverId);
+      if (cierre?.serverId) await eliminarCierreCaja(cierre.serverId);
       setHistorialCierres((prev) => prev.filter((_, i) => i !== index));
       setToastTasa("✓ Cierre auditado eliminado del historial.");
       setTimeout(() => setToastTasa(null), 3000);
@@ -1062,7 +1094,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const limpiarHistorialCierres = async () => {
     try {
-      await vaciarCierresCajaSalud();
+      for (const c of historialCierres) if (c.serverId) await eliminarCierreCaja(c.serverId);
     } catch (err) {
       avisar(`No se pudo vaciar el historial: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
       return;
@@ -6502,24 +6534,9 @@ function SalaEspera({
       totalCOP: totalCajaCOP,
       totalPacientes: cobrosLocales.length,
     };
+    // onAgregarCierre lo guarda en el servidor (totales + detalle de cobros) y avisa si falla.
     onAgregarCierre(dataCierre);
     setMostrarModalCierre(false);
-    try {
-      await registrarCierreCaja({
-        fecha: dataCierre.fecha,
-        horaCierre: dataCierre.horaCierre,
-        responsableNombre: dataCierre.responsableNombre,
-        tasaBCV: dataCierre.tasaBCV,
-        tasaCOP: dataCierre.tasaCOP,
-        totalUSD: dataCierre.totalUSD,
-        totalVES: dataCierre.totalVES,
-        totalCOP: dataCierre.totalCOP,
-        totalPacientes: dataCierre.totalPacientes,
-      });
-      dispararToast("Cierre de caja generado y guardado en el servidor.");
-    } catch (err) {
-      dispararToast(`⚠️ Cierre generado localmente, pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-    }
     if (onVerDocumento) {
       onVerDocumento({ tipo: "CIERRE_CAJA", data: dataCierre });
     } else {
