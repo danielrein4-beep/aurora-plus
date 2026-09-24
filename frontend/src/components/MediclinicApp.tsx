@@ -12,6 +12,7 @@ import {
   IconCalendarSolido, IconChartTrend, IconWallet, IconGearSolido,
 } from "../Icons";
 import ModuloOdontologia from "./ModuloOdontologia";
+import AtenderPacienteOdonto from "./AtenderPacienteOdonto";
 import ThemeToggle from "./ThemeToggle";
 import SpecularButton from "./SpecularButton";
 import CanalEndemico from "./CanalEndemico";
@@ -59,7 +60,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 
-type Pagina = "general" | "pacientes" | "historias" | "odontograma" | "laboratorio" | "procedimientos" | "sala-espera" | "agenda" | "canal-endemico" | "financiero" | "configuracion";
+type Pagina = "general" | "atender" | "pacientes" | "historias" | "odontograma" | "laboratorio" | "procedimientos" | "sala-espera" | "agenda" | "canal-endemico" | "financiero" | "configuracion";
 type RolVista = "MEDICO" | "SECRETARIA";
 
 const NAV: { id: Pagina; label: string; Icon: (p: { size?: number }) => React.ReactNode; roles?: RolVista[] }[] = [
@@ -679,6 +680,9 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     const items = [];
     for (const n of NAV) {
       if (n.id === "canal-endemico") continue;
+      if (n.id === "pacientes") {
+        items.push({ id: "atender" as Pagina, label: "Atender paciente", Icon: IconTooth });
+      }
       if (n.id === "agenda") {
         items.push({ ...n, label: "Agenda Dental & Calendario" });
         continue;
@@ -1375,7 +1379,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onNavegar={setPagina}
                 onSeleccionarPacienteParaConsulta={(id) => {
                   setPacienteSeleccionadoId(id);
-                  setPagina("historias");
+                  if (esOdontologia) {
+                    setOdontoEnConsulta(true);
+                    setPagina("odontograma");
+                  } else {
+                    setPagina("historias");
+                  }
                 }}
                 onSeleccionarPacienteParaCotizacion={(id) => {
                   setPacienteSeleccionadoId(id);
@@ -1393,6 +1402,16 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onVerDocumento={setVisorDocumento}
                 onIrAOdontologia={(id) => {
                   if (id) setPacienteSeleccionadoId(id);
+                  setOdontoEnConsulta(true);
+                  setPagina("odontograma");
+                }}
+              />
+            )}
+            {pagina === "atender" && (
+              <AtenderPacienteOdonto
+                pacientes={pacientes}
+                onAtender={(id) => {
+                  setPacienteSeleccionadoId(id);
                   setOdontoEnConsulta(true);
                   setPagina("odontograma");
                 }}
@@ -1441,7 +1460,12 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
                 onNavegar={setPagina}
                 onSeleccionarPacienteParaConsulta={(id) => {
                   setPacienteSeleccionadoId(id);
-                  setPagina("historias");
+                  if (esOdontologia) {
+                    setOdontoEnConsulta(true);
+                    setPagina("odontograma");
+                  } else {
+                    setPagina("historias");
+                  }
                 }}
                 onVerDocumento={setVisorDocumento}
               />
