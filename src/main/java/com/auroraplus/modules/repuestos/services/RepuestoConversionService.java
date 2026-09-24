@@ -538,10 +538,12 @@ public class RepuestoConversionService {
 
         // IVA, IGTF y delivery se calculan aquí, nunca en el navegador.
         com.auroraplus.core.config.entities.LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId).orElse(null);
-        boolean cobraIva = licencia != null && Boolean.TRUE.equals(licencia.getCobraIva());
+        // En modo euro no aplican el IVA venezolano ni el IGTF (el POS tampoco los muestra).
+        boolean modoEuro = licencia != null && "EUR".equals(licencia.getMonedaBase());
+        boolean cobraIva = !modoEuro && licencia != null && Boolean.TRUE.equals(licencia.getCobraIva());
         boolean ivaQuitado = cobraIva && fiscal != null && Boolean.FALSE.equals(fiscal.aplicaIva());
         boolean incluyeIva = licencia == null || !Boolean.FALSE.equals(licencia.getPreciosIncluyenIva());
-        boolean igtfActivo = licencia != null && Boolean.TRUE.equals(licencia.getIgtfActivo());
+        boolean igtfActivo = !modoEuro && licencia != null && Boolean.TRUE.equals(licencia.getIgtfActivo());
         BigDecimal delivery = fiscal != null && fiscal.delivery() != null && fiscal.delivery().signum() > 0 ? fiscal.delivery() : BigDecimal.ZERO;
         BigDecimal pagadoEnDivisas = BigDecimal.ZERO;
         if (igtfActivo) {
@@ -550,9 +552,7 @@ public class RepuestoConversionService {
                     if (p.monto() == null || p.monto().signum() <= 0 || !CalculoFiscalVenta.esDivisa(p.moneda())) continue;
                     pagadoEnDivisas = pagadoEnDivisas.add(motorFinancieroService.convertirAMonedaBase(tenantId, p.monto(), p.moneda()));
                 }
-                if (vuelto != null && vuelto.signum() > 0 && CalculoFiscalVenta.esDivisa(monedaVuelto)) {
-                    pagadoEnDivisas = pagadoEnDivisas.subtract(motorFinancieroService.convertirAMonedaBase(tenantId, vuelto, monedaVuelto)).max(BigDecimal.ZERO);
-                }
+                // Lo pagado de más en divisas vuelve como vuelto: CalculoFiscalVenta ya topa el IGTF en el subtotal.
             } else if (CalculoFiscalVenta.esDivisa(monedaPago != null ? monedaPago : motorFinancieroService.obtenerMonedaBase(tenantId))) {
                 // Pago único en divisas: si es a crédito, solo lo que paga ahora.
                 pagadoEnDivisas = montoPagadoAhora != null ? montoPagadoAhora : new BigDecimal("999999999");

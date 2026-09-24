@@ -81,6 +81,7 @@ import {
   obtenerFacturacionFiscal, actualizarFacturacionFiscal, siguienteNumeroControlFiscal,
   obtenerDatosFiscalesNegocio, actualizarDatosFiscalesNegocio,
   type FacturacionFiscalConfig, type ModoFacturacionFiscal, type DatosFiscalesNegocio,
+  obtenerImpuestosNegocio, type ImpuestosNegocio, type DesgloseFiscalTicket,
 } from "../api";
 import ArqueoCajaMultimoneda from "./ArqueoCajaMultimoneda";
 import ImpuestosCargosComercio from "./ImpuestosCargosComercio";
@@ -207,6 +208,7 @@ export interface ProductoComercio {
   grupoVariante?: string; // junta este SKU con otros (mismo zapato, otra talla) en una sola tarjeta pública
   atributoVariante?: string; // etiqueta de este SKU dentro del grupo (ej. "Talla 38")
   colorVariante?: string; // segunda faceta de variante (ej. "Rojo") — selector de color, luego talla
+  exentoIva?: boolean; // no lleva IVA (cesta básica, medicinas...)
 }
 
 export interface LineaCarritoComercio {
@@ -292,6 +294,8 @@ export interface VentaComercio {
   desglosePagos?: Array<{ moneda: string; monto: number; label?: string }>;
   pagosMixtos?: PagoMixtoItem[];
   emailCliente?: string;
+  /** Desglose fiscal que calculó el servidor al cobrar (IVA, IGTF, delivery). */
+  fiscal?: DesgloseFiscalTicket & { ivaQuitado?: boolean };
 }
 
 export interface CotizacionComercio {
@@ -638,16 +642,28 @@ function generarNotaEntregaPDF(
   y += 6;
 
   // ─── Bloque de Totales ─────────────────────────────────────────────
-  const totalBs = venta.total * tasaActivaBs;
+  // En bolívares no se cobra IGTF: el total en Bs sale del subtotal sin IGTF.
+  const totalBs = (venta.fiscal ? venta.fiscal.subtotal : venta.total) * tasaActivaBs;
   const totalCop = venta.total * tasaCop;
   const totX = colRight - 60;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(80, 80, 80);
-  doc.text(`Subtotal ${CODIGO()}:`, totX, y);
-  doc.text(`${SIM()}${venta.total.toFixed(2)}`, colRight - 2, y, { align: "right" });
-  y += 5;
+  const f = venta.fiscal;
+  const lineaTotal = (etiqueta: string, monto: number) => {
+    doc.text(etiqueta, totX, y);
+    doc.text(`${SIM()}${monto.toFixed(2)}`, colRight - 2, y, { align: "right" });
+    y += 5;
+  };
+  if (f && (f.alicuotaIva > 0 || f.iva > 0 || f.igtf > 0 || f.delivery > 0 || f.ivaQuitado)) {
+    if (f.exento > 0) lineaTotal("Exento:", f.exento);
+    lineaTotal(f.alicuotaIva > 0 || f.ivaQuitado ? "Base imponible:" : `Subtotal ${CODIGO()}:`, f.baseImponible);
+    if (f.alicuotaIva > 0) lineaTotal(`IVA ${f.alicuotaIva}%:`, f.iva);
+    if (f.igtf > 0) lineaTotal("IGTF (pago en divisas):", f.igtf);
+  } else {
+    lineaTotal(`Subtotal ${CODIGO()}:`, venta.total);
+  }
   if (!modoEuro()) {
   doc.text(`Tasa BCV aplicada:`, totX, y);
   doc.text(`Bs.${tasaActivaBs.toFixed(2)}/USD`, colRight - 2, y, { align: "right" });
@@ -2188,6 +2204,12 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // ─── Pago Mixto ───────────────────────────────────────────────────────
   const [modoCobro, setModoCobro] = useState<"unico" | "mixto">("unico");
   const [pagosMixtos, setPagosMixtos] = useState<PagoMixtoItem[]>([]);
+  // ─── Impuestos y cargos (Configuración > Impuestos y cargos) ─────────
+  // El cálculo que vale lo hace el servidor al cobrar; aquí se repite solo para mostrarlo.
+  const [impuestos, setImpuestos] = useState<ImpuestosNegocio | null>(null);
+  const [aplicaIvaVenta, setAplicaIvaVenta] = useState(true);
+  const [conDelivery, setConDelivery] = useState(false);
+  const [montoDelivery, setMontoDelivery] = useState("");
   const [pagoMixtoMetodo, setPagoMixtoMetodo] = useState("EFECTIVO_USD");
   const [pagoMixtoMoneda, setPagoMixtoMoneda] = useState<"USD" | "VES" | "COP">("USD");
   const [pagoMixtoMonto, setPagoMixtoMonto] = useState("");
@@ -2418,6 +2440,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             atributoVariante: r.atributoVariante || undefined,
             colorVariante: r.colorVariante || undefined,
             fechaVencimiento: r.fechaVencimiento || undefined,
+            exentoIva: r.exentoIva === true,
           }));
           setProductos((prev) => {
             const otros = prev.filter((p) => p.rubro !== perfilActivo);
@@ -2606,13 +2629,65 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     return ["Todos", ...Array.from(cats)];
   }, [productos, perfilActivo]);
 
-  // Cálculos de Totales del Carrito
-  const totalUSD = useMemo(() => {
-    return carrito.reduce((acc, l) => acc + l.precio * l.cantidad, 0);
-  }, [carrito]);
+  // Impuestos del negocio: se releen al entrar al POS por si el dueño los cambió en Configuración.
+  // En modo euro no aplican (ni IVA venezolano ni IGTF).
+  useEffect(() => {
+    if (!user?.tenantId || modoEuro() || tab !== "pos") return;
+    obtenerImpuestosNegocio().then(setImpuestos).catch(() => setImpuestos(null));
+  }, [user?.tenantId, tab]);
 
-  const totalBs = useMemo(() => totalUSD * tasaActivaBs, [totalUSD, tasaActivaBs]);
-  const totalCopCalculado = useMemo(() => totalUSD * tasaCop, [totalUSD, tasaCop]);
+  // Cálculos de Totales del Carrito — misma cuenta que CalculoFiscalVenta en el servidor.
+  const desgloseFiscal = useMemo(() => {
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const exentos = new Set(productos.filter((p) => p.exentoIva).map((p) => p.id));
+    let gravado = 0;
+    let exento = 0;
+    for (const l of carrito) {
+      const monto = r2(l.precio * l.cantidad);
+      if (exentos.has(l.productoId)) exento += monto;
+      else gravado += monto;
+    }
+    const cobraIva = !!impuestos?.cobraIva;
+    const alicuota = cobraIva ? impuestos!.alicuotaIva : 0;
+    const factor = 1 + alicuota / 100;
+    const aplica = cobraIva && aplicaIvaVenta;
+    const delivery = impuestos && conDelivery ? Math.max(0, parseFloat(montoDelivery) || 0) : 0;
+    const g = gravado + delivery;
+    let base: number;
+    let iva: number;
+    if (cobraIva && impuestos!.preciosIncluyenIva) {
+      base = r2(g / factor);
+      iva = aplica ? r2(r2(g) - base) : 0;
+    } else {
+      base = r2(g);
+      iva = aplica ? r2(base * (factor - 1)) : 0;
+    }
+    const ex = r2(exento);
+    const subtotal = r2(ex + base + iva);
+    const alicuotaIgtf = impuestos?.igtfActivo ? impuestos.alicuotaIgtf : 0;
+    return { cobraIva, alicuota, exento: ex, base, iva, delivery: r2(delivery), subtotal, alicuotaIgtf, ivaQuitado: cobraIva && !aplicaIvaVenta };
+  }, [carrito, productos, impuestos, aplicaIvaVenta, conDelivery, montoDelivery]);
+
+  /** IGTF sobre lo pagado en divisas, nunca más que el subtotal. */
+  const igtfSobre = (pagadoEnDivisas: number) =>
+    desgloseFiscal.alicuotaIgtf > 0
+      ? Math.round(Math.min(Math.max(0, pagadoEnDivisas), desgloseFiscal.subtotal) * desgloseFiscal.alicuotaIgtf) / 100
+      : 0;
+
+  // IGTF según cómo paga: todo en divisas, nada en bolívares, o la parte en divisas del pago mixto.
+  const igtfCobro = useMemo(() => {
+    if (!desgloseFiscal.alicuotaIgtf) return 0;
+    if (modoCobro === "mixto") return igtfSobre(pagosMixtos.filter((p) => p.moneda !== "VES").reduce((a, p) => a + p.montoUSD, 0));
+    return monedaRecibida !== "VES" ? igtfSobre(desgloseFiscal.subtotal) : 0;
+  }, [desgloseFiscal, modoCobro, pagosMixtos, monedaRecibida]);
+
+  // totalUSD = lo que se cobra con la forma de pago elegida (incluye IGTF si es en divisas).
+  const totalUSD = useMemo(() => Math.round((desgloseFiscal.subtotal + igtfCobro) * 100) / 100, [desgloseFiscal, igtfCobro]);
+  // En bolívares nunca hay IGTF; en pesos (divisa) sí.
+  // Alias para ejecutarCobro, que redefine totalUSD localmente (a crédito no hay IGTF).
+  const totalUSDCobro = totalUSD;
+  const totalBs = useMemo(() => desgloseFiscal.subtotal * tasaActivaBs, [desgloseFiscal, tasaActivaBs]);
+  const totalCopCalculado = useMemo(() => (desgloseFiscal.subtotal + igtfSobre(desgloseFiscal.subtotal)) * tasaCop, [desgloseFiscal, tasaCop]);
 
   // Agregar al carrito con soporte de presentaciones y precio mayorista dinámico
   const agregarAlCarrito = (p: ProductoComercio, presentacion?: PresentacionRepuesto) => {
@@ -2739,11 +2814,14 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // Finalizar Cobro
   const ejecutarCobro = async (esCredito = false) => {
     if (carrito.length === 0) return;
+    // A crédito no se paga nada ahora, así que no hay IGTF (el servidor hace lo mismo).
+    const totalUSD = esCredito ? desgloseFiscal.subtotal : totalUSDCobro;
 
     const firmaCobro = JSON.stringify({
       lineas: carrito.map((l) => [l.backendId, l.presentacionId ?? null, l.cantidad]),
       esCredito, modoCobro, monedaRecibida, montoRecibido,
       pagos: pagosMixtos.map((p) => [p.moneda, p.montoOriginal]),
+      fiscal: [aplicaIvaVenta, conDelivery, montoDelivery],
     });
     if (!ticketEnCursoRef.current || ticketEnCursoRef.current.firma !== firmaCobro) {
       ticketEnCursoRef.current = { numero: `TKT-${Math.floor(100000 + Math.random() * 900000)}`, firma: firmaCobro };
@@ -2811,7 +2889,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
 
     // Cálculo exacto de costos y utilidad de la venta
     const costoTotal = carrito.reduce((acc, l) => acc + (l.costo || 0) * l.cantidad, 0);
-    const utilidad = totalUSD - costoTotal;
+    // Sin impuestos ni delivery: el IVA y el IGTF no son ganancia del negocio.
+    const utilidad = desgloseFiscal.exento + desgloseFiscal.base - desgloseFiscal.delivery - costoTotal;
 
     const nuevaVenta: VentaComercio = {
       id: String(Date.now()),
@@ -2867,8 +2946,21 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             montoPagadoAhora: esCredito ? 0 : undefined,
             diasCredito: esCredito ? 15 : undefined,
             nombreCliente: esCredito ? clienteParaVenta.nombre : undefined,
+            aplicaIva: desgloseFiscal.cobraIva ? aplicaIvaVenta : undefined,
+            delivery: desgloseFiscal.delivery > 0 ? desgloseFiscal.delivery : undefined,
+            clienteRif: clienteParaVenta.documento && clienteParaVenta.documento !== "V-00000000" && !clienteParaVenta.documento.startsWith("CLI-") && !clienteParaVenta.documento.startsWith("CR-")
+              ? clienteParaVenta.documento : undefined,
           });
           yaEstabaCobrada = resultado.yaProcesado;
+          if (resultado.desglose) {
+            // El total que vale es el del servidor (calcula IVA e IGTF con su propia configuración).
+            nuevaVenta.fiscal = { ...resultado.desglose, ivaQuitado: desgloseFiscal.ivaQuitado };
+            if (Math.abs(resultado.desglose.total - nuevaVenta.total) > 0.009) {
+              mostrarToast(`El total final quedó en ${SIM()}${resultado.desglose.total.toFixed(2)} (impuestos recalculados por el servidor).`, "info");
+              nuevaVenta.total = resultado.desglose.total;
+              nuevaVenta.totalBs = resultado.desglose.subtotal * tasaActivaBs;
+            }
+          }
         }
         ticketEnCursoRef.current = null;
         cargarRepuestosBackend();
@@ -2971,6 +3063,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     setPagoMixtoRef("");
     setEmailClienteModal("");
     setEnviarEmailAlConfirmar(false);
+    setAplicaIvaVenta(true);
+    setConDelivery(false);
+    setMontoDelivery("");
     limpiarClienteAMostrador();
   };
 
@@ -3577,11 +3672,66 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
 
               {/* Totalizador & Acciones Comerciales */}
               <div className="flex-shrink-0 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                {impuestos && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[11.5px] font-semibold text-slate-700 dark:text-slate-300">
+                    {impuestos.cobraIva && (
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="checkbox" checked={aplicaIvaVenta} onChange={(e) => setAplicaIvaVenta(e.target.checked)} className="w-4 h-4 accent-teal-600 cursor-pointer" />
+                        IVA {impuestos.alicuotaIva}%
+                      </label>
+                    )}
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox" checked={conDelivery} className="w-4 h-4 accent-teal-600 cursor-pointer"
+                        onChange={(e) => {
+                          setConDelivery(e.target.checked);
+                          if (e.target.checked && !montoDelivery && impuestos.costoEnvioDelivery > 0) setMontoDelivery(String(impuestos.costoEnvioDelivery));
+                        }}
+                      />
+                      Delivery
+                    </label>
+                    {conDelivery && (
+                      <span className="flex items-center gap-1">
+                        <span className="text-slate-500">{SIM()}</span>
+                        <input
+                          type="number" min={0} step={0.5} value={montoDelivery} placeholder="0.00"
+                          onChange={(e) => setMontoDelivery(e.target.value)}
+                          className="w-20 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                        />
+                      </span>
+                    )}
+                    {impuestos.igtfActivo && (
+                      <span className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">IGTF {impuestos.alicuotaIgtf}% solo si paga en divisas</span>
+                    )}
+                  </div>
+                )}
+                {desgloseFiscal.ivaQuitado && carrito.length > 0 && (
+                  <div className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-300">
+                    Venta sin IVA: quedará marcada en el libro de ventas con tu usuario.
+                  </div>
+                )}
                 <div className="space-y-1 bg-slate-100/60 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-300/60 dark:border-slate-700/40">
+                  {(desgloseFiscal.cobraIva || desgloseFiscal.delivery > 0) && carrito.length > 0 && (
+                    <div className="space-y-0.5 pb-1.5 mb-1 border-b border-slate-300/60 dark:border-slate-700/50 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                      {desgloseFiscal.exento > 0 && (
+                        <div className="flex justify-between"><span>Exento</span><span>{SIM()}{desgloseFiscal.exento.toFixed(2)}</span></div>
+                      )}
+                      <div className="flex justify-between"><span>{desgloseFiscal.cobraIva ? "Base imponible" : "Productos"}{desgloseFiscal.delivery > 0 ? " (incl. delivery)" : ""}</span><span>{SIM()}{desgloseFiscal.base.toFixed(2)}</span></div>
+                      {desgloseFiscal.cobraIva && (
+                        <div className="flex justify-between"><span>IVA {desgloseFiscal.ivaQuitado ? "(quitado)" : `${desgloseFiscal.alicuota}%`}</span><span>{SIM()}{desgloseFiscal.iva.toFixed(2)}</span></div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">TOTAL {CODIGO()}:</span>
-                    <span className="font-mono font-black text-xl text-teal-400">{SIM()}{totalUSD.toFixed(2)}</span>
+                    <span className="font-mono font-black text-xl text-teal-400">{SIM()}{desgloseFiscal.subtotal.toFixed(2)}</span>
                   </div>
+                  {desgloseFiscal.alicuotaIgtf > 0 && carrito.length > 0 && (
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-500 dark:text-slate-400">Pagando en divisas (+IGTF):</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-bold">{SIM()}{(desgloseFiscal.subtotal + igtfSobre(desgloseFiscal.subtotal)).toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className={`flex items-center justify-between text-xs font-mono ${modoEuro() ? "hidden" : ""}`}>
                     <span className="text-slate-500 dark:text-slate-400">Total Bolívares (Bs):</span>
                     <span className="text-slate-800 dark:text-slate-200 font-bold">Bs. {totalBs.toFixed(2)}</span>
@@ -3632,7 +3782,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   disabled={carrito.length === 0}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-400 text-slate-950 font-black text-sm cursor-pointer hover:opacity-95 disabled:opacity-40 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all flex items-center justify-center gap-2"
                 >
-                  <span> Cobrar en Mostrador ({SIM()}{totalUSD.toFixed(2)})</span>
+                  <span> Cobrar en Mostrador ({SIM()}{desgloseFiscal.subtotal.toFixed(2)})</span>
                   <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-950/25 text-[10px] font-mono text-slate-950 font-black">
                     F4
                   </kbd>
@@ -4496,6 +4646,12 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 <span>Total a Cobrar:</span>
                 <span className="font-mono text-xl font-black text-teal-400">{SIM()}{totalUSD.toFixed(2)}</span>
               </div>
+              {igtfCobro > 0 && (
+                <div className="flex justify-between items-center text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                  <span>Incluye IGTF {desgloseFiscal.alicuotaIgtf}% por pago en divisas:</span>
+                  <span>{SIM()}{igtfCobro.toFixed(2)}</span>
+                </div>
+              )}
               <div className={`flex justify-between items-center text-xs font-mono text-slate-600 dark:text-slate-300 ${modoEuro() ? "hidden" : ""}`}>
                 <span>En Bolívares (Bs):</span>
                 <span className="font-bold">Bs. {totalBs.toFixed(2)}</span>
@@ -5193,6 +5349,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 const precioMayorista = fd.get("precioMayorista") ? Number(fd.get("precioMayorista")) : undefined;
                 const cantidadMinimaMayorista = fd.get("cantidadMinimaMayorista") ? Number(fd.get("cantidadMinimaMayorista")) : undefined;
                 const fechaVencimiento = String(fd.get("fechaVencimiento") || "") || undefined;
+                const exentoIva = fd.get("exentoIva") === "on";
 
                 let backendId: number | undefined = undefined;
 
@@ -5209,6 +5366,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       precioMayorista,
                       cantidadMinimaMayorista,
                       fechaVencimiento,
+                      exentoIva,
                     });
                     backendId = guardado.id;
                     const ubicacionInicial = String(fd.get("ubicacion") || "").trim();
@@ -5240,6 +5398,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   precio,
                   costo,
                   stock,
+                  exentoIva,
                   stockMinimo: Number(fd.get("stockMinimo")) || 5,
                   principioActivo: String(fd.get("principioActivo") || "") || undefined,
                   unidadMedida,
@@ -5326,6 +5485,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       <input name="cantidadMinimaMayorista" type="number" step="1" placeholder="Ej. 10" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                     </div>
                   </div>
+                  {!modoEuro() && (
+                    <label className="flex items-start gap-2 p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/60 dark:border-slate-700/60 cursor-pointer">
+                      <input name="exentoIva" type="checkbox" className="w-4 h-4 mt-0.5 accent-teal-600 cursor-pointer" />
+                      <span>
+                        <span className="block text-xs font-bold text-slate-900 dark:text-white">Exento de IVA</span>
+                        <span className="block text-[10.5px] text-slate-500 dark:text-slate-400">Alimentos de la cesta básica, medicinas y otros que no pagan IVA. Solo cuenta si tu negocio cobra IVA.</span>
+                      </span>
+                    </label>
+                  )}
                   <div>
                     <label className="text-[10px] font-bold text-teal-400 block mb-1">Ubicación en Almacén / Estante</label>
                     <input name="ubicacion" placeholder="Ej. Pasillo 3 - Gaveta 4" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
@@ -5529,6 +5697,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 const atributoVariante = String(fd.get("atributoVariante") || "").trim();
                 const colorVariante = String(fd.get("colorVariante") || "").trim();
                 const fechaVencimiento = String(fd.get("fechaVencimiento") || "") || undefined;
+                // En modo euro la casilla no se muestra: no se manda y el servidor conserva lo que había.
+                const exentoIva = modoEuro() ? undefined : fd.get("exentoIva") === "on";
 
                 setGuardandoEdicion(true);
                 try {
@@ -5549,6 +5719,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     atributoVariante,
                     colorVariante,
                     fechaVencimiento,
+                    exentoIva,
                   });
                   setProductos((prev) => prev.map((p) => p.id === editarModalItem.id ? {
                     ...p, nombre, precio, unidadMedida, codigoOem, stockMinimo, precioMayorista, cantidadMinimaMayorista,
@@ -5556,6 +5727,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     grupoVariante: grupoVariante || undefined, atributoVariante: atributoVariante || undefined,
                     colorVariante: colorVariante || undefined,
                     fechaVencimiento: fechaVencimiento || p.fechaVencimiento,
+                    exentoIva: exentoIva ?? p.exentoIva,
                   } : p));
                   const ubicacionNueva = String(fd.get("ubicacion") ?? "").trim();
                   if (ubicacionEdicion && fd.has("ubicacion") && ubicacionNueva !== ubicacionEdicion.valor) {
@@ -5651,6 +5823,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         <input name="cantidadMinimaMayorista" type="number" step="1" defaultValue={editarModalItem.cantidadMinimaMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                       </div>
                     </div>
+                  {!modoEuro() && (
+                    <label className="flex items-start gap-2 p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/60 dark:border-slate-700/60 cursor-pointer">
+                      <input name="exentoIva" type="checkbox" defaultChecked={!!editarModalItem.exentoIva} className="w-4 h-4 mt-0.5 accent-teal-600 cursor-pointer" />
+                      <span>
+                        <span className="block text-xs font-bold text-slate-900 dark:text-white">Exento de IVA</span>
+                        <span className="block text-[10.5px] text-slate-500 dark:text-slate-400">Alimentos de la cesta básica, medicinas y otros que no pagan IVA. Solo cuenta si tu negocio cobra IVA.</span>
+                      </span>
+                    </label>
+                  )}
                     {ubicacionEdicion && (
                       <div>
                         <label className="text-[10px] font-bold text-teal-400 block mb-1">Ubicación en Almacén Principal</label>
