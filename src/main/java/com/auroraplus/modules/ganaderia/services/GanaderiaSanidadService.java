@@ -35,6 +35,59 @@ public class GanaderiaSanidadService {
     @Autowired
     private AplicacionMedicamentoRepository aplicacionMedicamentoRepository;
 
+    /** Alta de un producto en el catálogo de vacunas de la finca. */
+    @Transactional
+    public Vacuna crearVacuna(Long tenantId, Vacuna vacuna) {
+        vacuna.setId(null);
+        if (vacuna.getNombre() == null || vacuna.getNombre().isBlank()) {
+            throw new IllegalArgumentException("La vacuna debe tener un nombre");
+        }
+        if (vacuna.getDiasRetiroLeche() == null || vacuna.getDiasRetiroLeche() < 0
+                || vacuna.getDiasRetiroCarne() == null || vacuna.getDiasRetiroCarne() < 0) {
+            throw new IllegalArgumentException("Los días de retiro no pueden ser negativos");
+        }
+        vacuna.setTenantId(tenantId);
+        return vacunaRepository.save(vacuna);
+    }
+
+    /**
+     * Vacunación de un lote: todo o nada. Antes, si fallaba un animal a mitad del lote los
+     * anteriores quedaban vacunados aunque la pantalla mostrara error. Verifica que la vacuna y
+     * cada animal sean de la finca (IDOR) y reparte el costo total entre los animales.
+     */
+    @Transactional
+    public List<AplicacionVacuna> aplicarVacunaLote(Long tenantId, List<Long> animalIds, Long vacunaId, LocalDate fechaAplicacion,
+                                                    String lote, String veterinarioResponsable, BigDecimal costoTotal) {
+        if (animalIds == null || animalIds.isEmpty()) {
+            throw new RuntimeException("Debe seleccionar al menos un animal para aplicar el tratamiento");
+        }
+        if (vacunaId == null) {
+            throw new RuntimeException("Debe seleccionar una vacuna válida del catálogo");
+        }
+        Vacuna vacuna = vacunaRepository.findById(vacunaId)
+            .orElseThrow(() -> new RuntimeException("Vacuna no encontrada en el catálogo"));
+        if (vacuna.getTenantId() != null && !vacuna.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Violación de seguridad: La vacuna no pertenece a este tenant");
+        }
+        for (Long animalId : animalIds) {
+            Animal animal = animalRepository.findById(animalId)
+                .orElseThrow(() -> new RuntimeException("Animal con ID " + animalId + " no encontrado"));
+            if (!animal.getTenantId().equals(tenantId)) {
+                throw new RuntimeException("Violación de seguridad: El animal arete " + animal.getArete()
+                    + " (ID " + animalId + ") no pertenece al tenant actual");
+            }
+        }
+        LocalDate fecha = fechaAplicacion != null ? fechaAplicacion : LocalDate.now();
+        BigDecimal costoPorAnimal = costoTotal != null
+            ? costoTotal.divide(BigDecimal.valueOf(animalIds.size()), 2, java.math.RoundingMode.HALF_UP)
+            : null;
+        List<AplicacionVacuna> resultado = new ArrayList<>();
+        for (Long animalId : animalIds) {
+            resultado.add(aplicarVacuna(tenantId, animalId, vacunaId, fecha, lote, veterinarioResponsable, costoPorAnimal));
+        }
+        return resultado;
+    }
+
     @Transactional
     public AplicacionVacuna aplicarVacuna(Long tenantId, Long animalId, Long vacunaId, LocalDate fechaAplicacion,
                                            String lote, String veterinarioResponsable, BigDecimal costo) {
