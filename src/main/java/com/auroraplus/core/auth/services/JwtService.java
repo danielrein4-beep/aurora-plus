@@ -109,6 +109,24 @@ public class JwtService {
             .compact();
     }
 
+    /**
+     * Token de la app de pacientes (Mediclinic Pacientes). No lleva tenantId: el paciente no
+     * pertenece a ningún negocio, y TenantInterceptor rechaza este tipo en las rutas de negocio.
+     * Dura 30 días porque se guarda en el teléfono; se revoca subiendo tokenVersion.
+     */
+    public String generarTokenPaciente(Long pacienteAppId, int tokenVersion) {
+        Instant ahora = Instant.now();
+        return Jwts.builder()
+            .subject("paciente-" + pacienteAppId)
+            .claim("tipo", "PACIENTE")
+            .claim("pacienteAppId", pacienteAppId)
+            .claim("tokenVersion", tokenVersion)
+            .issuedAt(Date.from(ahora))
+            .expiration(Date.from(ahora.plusSeconds(30L * 24 * 3600)))
+            .signWith(signingKey())
+            .compact();
+    }
+
     /** Lanza JwtException si el token es inválido, está corrupto, mal firmado o expiró. */
     public Claims validarYParsear(String token) throws JwtException {
         return Jwts.parser()

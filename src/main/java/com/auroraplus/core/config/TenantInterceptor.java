@@ -73,6 +73,12 @@ public class TenantInterceptor implements HandlerInterceptor {
         String tipo = claims.get("tipo", String.class);
         boolean esRutaSuperAdmin = request.getRequestURI().startsWith("/api/super-admin/");
 
+        // Token de la app de pacientes: solo sirve en /api/pacientes/v1/** (ver PacienteAppInterceptor).
+        if ("PACIENTE".equals(tipo)) {
+            rechazar(response, "Este token de paciente no aplica a este recurso");
+            return false;
+        }
+
         if ("SUPER_ADMIN".equals(tipo)) {
             if (!esRutaSuperAdmin) {
                 rechazar(response, "Este token de super-admin no aplica a este recurso");
