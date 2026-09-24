@@ -5321,6 +5321,121 @@ export interface DetalleActividadVertical {
   tenants: TenantActividad[];
 }
 
+// --- Páginas dedicadas por vertical (super-admin)
+
+export interface PanoramaVertical {
+  id: string;
+  nombre: string;
+  negocios: number;
+  activos: number;
+  conActividad: number;
+  enRiesgo: number;
+  registrosPeriodo: number;
+  ingresosPeriodo: number;
+}
+
+export interface MetricaVertical {
+  clave: string;
+  etiqueta: string;
+  conFecha: boolean;
+  total: number;
+  periodo: number | null;
+  /** "USD", "litros", "unidades"... cuando la métrica además suma una columna. */
+  unidadSuma: string | null;
+  sumaPeriodo: number | null;
+  sumaTotal: number | null;
+  /** Conteo por mes, alineado con `meses` (12 meses). */
+  serie: number[] | null;
+  serieSuma: number[] | null;
+}
+
+export interface NegocioVertical {
+  tenantId: number;
+  nombre: string;
+  modulo: string;
+  plan: string;
+  activa: boolean;
+  email: string | null;
+  vencimiento: string | null;
+  diasRestantes: number | null;
+  usuarios: number;
+  ingresosHistorico: number;
+  ultimaActividad: string | null;
+  enRiesgo: boolean;
+  metricas: Record<string, { total: number; periodo?: number; sumaPeriodo?: number }>;
+}
+
+export interface DetalleVertical {
+  id: string;
+  nombre: string;
+  modulos: string[];
+  dias: number;
+  meses: string[];
+  kpis: {
+    negocios: number; activos: number; suspendidos: number; porVencer: number; conActividad: number;
+    enRiesgo: number; usuarios: number; altasPeriodo: number; ingresosPeriodo: number; ingresosHistorico: number;
+  };
+  serieIngresos: number[];
+  serieAltas: number[];
+  metricas: MetricaVertical[];
+  negocios: NegocioVertical[];
+}
+
+export interface ConteoEtiqueta { etiqueta: string; n: number }
+
+export interface OperacionRestaurantes {
+  comandas: number;
+  ventas: number;
+  ticketPromedio: number;
+  porHora: number[];
+  ventasPorHora: number[];
+  porDiaSemana: number[];
+  canales: ConteoEtiqueta[];
+  metodosPago: ConteoEtiqueta[];
+  topPlatos: { nombre: string; cantidad: number; ventas: number }[];
+  topRestaurantes: { tenantId: number; nombre: string; comandas: number; ventas: number }[];
+}
+
+export interface ProduccionGanaderia {
+  litros: number;
+  ordenos: number;
+  promedioPorOrdeno: number;
+  grasaPromedio: number;
+  proteinaPromedio: number;
+  vacasOrdenadas: number;
+  hatoPorEstado: ConteoEtiqueta[];
+  hatoPorSexo: ConteoEtiqueta[];
+  hatoPorTipo: ConteoEtiqueta[];
+  topFincas: { tenantId: number; nombre: string; litros: number; ordenos: number }[];
+}
+
+export interface ClinicaOdontologia {
+  planesPorEstado: { etiqueta: string; n: number; monto: number; pagado: number }[];
+  carteraTotal: number;
+  carteraPagada: number;
+  topProcedimientos: ConteoEtiqueta[];
+}
+
+export function obtenerPanoramaVerticales(dias: number): Promise<PanoramaVertical[]> {
+  return requestSuperAdmin(`/api/super-admin/verticales?dias=${dias}`);
+}
+
+export function obtenerDetalleVertical(id: string, dias: number): Promise<DetalleVertical> {
+  return requestSuperAdmin(`/api/super-admin/verticales/${encodeURIComponent(id)}?dias=${dias}`);
+}
+
+export function obtenerOperacionRestaurantes(dias: number): Promise<OperacionRestaurantes> {
+  return requestSuperAdmin(`/api/super-admin/verticales/restaurantes/operacion?dias=${dias}`);
+}
+
+export function obtenerProduccionGanaderia(dias: number): Promise<ProduccionGanaderia> {
+  return requestSuperAdmin(`/api/super-admin/verticales/ganaderia/produccion?dias=${dias}`);
+}
+
+export function obtenerClinicaOdontologia(dias: number): Promise<ClinicaOdontologia> {
+  return requestSuperAdmin(`/api/super-admin/verticales/odontologia/clinica?dias=${dias}`);
+}
+
 /** Reporte de una enfermedad en toda la red: casos por médico y por mes (año vs anterior). */
 export interface MedicoReporteEnfermedad {
   tenantId: number;

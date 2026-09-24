@@ -2,8 +2,9 @@ import { obtenerCuentasCobro, guardarCuentasCobro, combinarCuentasCobro, type Sa
 import { obtenerCuentasCobroSuperAdmin, guardarCuentasCobroSuperAdmin } from "../api";
 import React, { useState, useEffect, useMemo } from "react";
 import AuroraLogo from "../AuroraLogo";
-import SuperAdminActividad from "./SuperAdminActividad";
-import SuperAdminInteligencia from "./SuperAdminInteligencia";
+import SuperAdminPanorama from "./SuperAdminPanorama";
+import { VistaNegocio } from "./SuperAdminInteligencia";
+import SuperAdminVertical, { VERTICALES_SUPERADMIN } from "./SuperAdminVertical";
 import SuperAdminFichaTenant from "./SuperAdminFichaTenant";
 import SuperAdminSeguridad from "./SuperAdminSeguridad";
 import SuperAdminEquipo, { ROLES_EQUIPO } from "./SuperAdminEquipo";
@@ -95,13 +96,14 @@ const MODULOS_SISTEMA = [
 ];
 
 /** [migas de pan, título] de cada vista del panel. */
-const TITULOS_VISTA: Record<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO", [string, string]> = {
+const TITULOS_VISTA: Record<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "VERTICAL" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO", [string, string]> = {
   TENANTS: ["Clientes", "Directorio de negocios"],
   PAGOS: ["Ingresos", "Cobros y suscripciones"],
   FINANZAS: ["Ingresos", "Finanzas, gastos fijos y flujo de caja"],
   METRICAS: ["Inteligencia", "Métricas y rendimiento del SaaS"],
-  ACTIVIDAD: ["Inteligencia", "Actividad por vertical"],
-  INTELIGENCIA: ["Inteligencia", "Datos de negocios, comercios y salud"],
+  ACTIVIDAD: ["Verticales", "Panorama de verticales"],
+  INTELIGENCIA: ["Inteligencia", "Clientes: ingresos recurrentes, bajas y salud"],
+  VERTICAL: ["Verticales", "Vertical"],
   SOPORTE: ["Operaciones", "Soporte y asistencia a negocios"],
   AUDITORIA: ["Seguridad", "Bitácora de auditoría"],
   SEGURIDAD: ["Seguridad", "Configuración de la cuenta"],
@@ -116,6 +118,7 @@ const ROLES_POR_VISTA: Record<keyof typeof TITULOS_VISTA, RolEquipoSuperAdmin[]>
   METRICAS: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
   ACTIVIDAD: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
   INTELIGENCIA: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
+  VERTICAL: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
   SOPORTE: ["PROPIETARIO", "SOPORTE"],
   AUDITORIA: ["PROPIETARIO"],
   SEGURIDAD: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
@@ -283,6 +286,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const puedeVer = (vista: keyof typeof TITULOS_VISTA) =>
     !perfil || (perfil.debeCambiarClave ? vista === "SEGURIDAD" : ROLES_POR_VISTA[vista].includes(perfil.rol));
 
+  // Vertical abierta en su página dedicada (grupo "Verticales" del menú)
+  const [verticalActiva, setVerticalActiva] = useState("mediclinic");
+  const abrirVertical = (id: string) => { setVerticalActiva(id); setVistaPrincipal("VERTICAL"); };
+
   // Ficha completa del negocio (panel lateral)
   const [fichaTenantId, setFichaTenantId] = useState<number | null>(null);
 
@@ -291,7 +298,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   // VISTA PRINCIPAL (TENANTS vs FINANZAS)
   // VISTA PRINCIPAL (TENANTS vs PAGOS vs FINANZAS)
-  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO">("TENANTS");
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "VERTICAL" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO">("TENANTS");
 
   // FILTROS Y ESTADOS DEL MODULO DEDICADO DE HISTORIAL DE PAGOS
   const [filtroPagosTenant, setFiltroPagosTenant] = useState<number | "TODOS">("TODOS");
@@ -1351,7 +1358,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         <nav className="p-4 space-y-5 flex-1 overflow-y-auto">
           {(() => {
             const abiertosSoporte = pendientesSoporte;
-            const grupos: { titulo: string; items: { vista: typeof vistaPrincipal; label: string; icono: string; badge?: string | number; alerta?: boolean; alAbrir?: () => void }[] }[] = [
+            const grupos: { titulo: string; items: { vista: typeof vistaPrincipal; label: string; icono: string; badge?: string | number; alerta?: boolean; alAbrir?: () => void; verticalId?: string }[] }[] = [
               { titulo: "Clientes", items: [
                 { vista: "TENANTS", label: "Directorio de negocios", icono: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4", badge: tenants.length },
               ]},
@@ -1359,10 +1366,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 { vista: "PAGOS", label: "Cobros y suscripciones", icono: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z", badge: historialPagos.length, alAbrir: () => cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant) },
                 { vista: "FINANZAS", label: "Finanzas y contabilidad", icono: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", alAbrir: () => cargarDatosFinancieros() },
               ]},
+              { titulo: "Verticales", items: [
+                { vista: "ACTIVIDAD", label: "Panorama de verticales", icono: "M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" },
+                ...VERTICALES_SUPERADMIN.map((v) => ({ vista: "VERTICAL" as const, label: v.nombre, icono: v.icono, verticalId: v.id, alAbrir: () => setVerticalActiva(v.id) })),
+              ]},
               { titulo: "Inteligencia", items: [
                 { vista: "METRICAS", label: "Métricas del SaaS", icono: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", alAbrir: () => cargarAnalytics() },
-                { vista: "ACTIVIDAD", label: "Actividad por vertical", icono: "M3 12h4l3-8 4 16 3-8h4" },
-                { vista: "INTELIGENCIA", label: "Inteligencia de datos", icono: "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" },
+                { vista: "INTELIGENCIA", label: "Clientes y retención", icono: "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" },
               ]},
               { titulo: "Operaciones", items: [
                 { vista: "SOPORTE", label: "Soporte y asistencia", icono: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z", badge: abiertosSoporte, alerta: abiertosSoporte > 0, alAbrir: () => cargarTicketsSoporte() },
@@ -1381,10 +1391,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">{g.titulo}</div>
                 <div className="space-y-0.5">
                   {g.items.map((it) => {
-                    const activo = vistaPrincipal === it.vista;
+                    const activo = vistaPrincipal === it.vista && (!it.verticalId || it.verticalId === verticalActiva);
                     return (
                       <button
-                        key={it.vista}
+                        key={it.verticalId ?? it.vista}
                         onClick={() => { setVistaPrincipal(it.vista); it.alAbrir?.(); }}
                         className={`w-full px-3 py-2 rounded-xl text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
                           activo ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" : "text-slate-700 hover:bg-slate-50"
@@ -1486,7 +1496,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               <span className="text-slate-300 text-xs">/</span>
               <span className="font-bold text-slate-800 text-xs">{TITULOS_VISTA[vistaPrincipal][0]}</span>
             </div>
-            <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">{TITULOS_VISTA[vistaPrincipal][1]}</h1>
+            <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">{vistaPrincipal === "VERTICAL" ? VERTICALES_SUPERADMIN.find((v) => v.id === verticalActiva)?.nombre : TITULOS_VISTA[vistaPrincipal][1]}</h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -2464,17 +2474,24 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       )}
 
-      {/* VISTA: ACTIVIDAD OPERATIVA POR VERTICAL (incluye Canal Endémico de la red) */}
+      {/* VISTA: PANORAMA DE VERTICALES (compara todas y lleva a cada página) */}
       {vistaPrincipal === "ACTIVIDAD" && (
         <div className="animate-fadeIn">
-          <SuperAdminActividad />
+          <SuperAdminPanorama onAbrirVertical={abrirVertical} />
         </div>
       )}
 
-      {/* VISTA: INTELIGENCIA DE DATOS (MRR/churn/salud de clientes, comercios, salud y canal endémico) */}
+      {/* VISTA: PÁGINA DEDICADA DE UNA VERTICAL (métricas, gráficas, reportes y control) */}
+      {vistaPrincipal === "VERTICAL" && (
+        <div className="animate-fadeIn">
+          <SuperAdminVertical key={verticalActiva} verticalId={verticalActiva} onAbrirFicha={(id) => setFichaTenantId(id)} />
+        </div>
+      )}
+
+      {/* VISTA: CLIENTES Y RETENCIÓN (ingresos recurrentes, bajas y salud de clientes) */}
       {vistaPrincipal === "INTELIGENCIA" && (
         <div className="animate-fadeIn">
-          <SuperAdminInteligencia />
+          <VistaNegocio />
         </div>
       )}
 

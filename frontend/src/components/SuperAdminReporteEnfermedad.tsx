@@ -18,13 +18,19 @@ const numero = new Intl.NumberFormat("es-VE");
  * muestra todos los médicos con casos y, debajo, el Canal Endémico tal cual lo
  * ve el médico en Mediclinic (el componente se usa sin modificarlo).
  */
-export default function SuperAdminReporteEnfermedad() {
+interface Props {
+  /** Enfermedad y médico con los que abre (p. ej. al tocar un diagnóstico en "Clínicas"). */
+  cie10Inicial?: string;
+  tenantInicial?: number;
+}
+
+export default function SuperAdminReporteEnfermedad({ cie10Inicial, tenantInicial }: Props = {}) {
   const anioActual = new Date().getFullYear();
-  const [cie10, setCie10] = useState("");
+  const [cie10, setCie10] = useState(cie10Inicial ?? "");
   const [descripcion, setDescripcion] = useState("");
   const [anio, setAnio] = useState(anioActual);
   /** null = toda la red. */
-  const [alcance, setAlcance] = useState<number | null>(null);
+  const [alcance, setAlcance] = useState<number | null>(tenantInicial ?? null);
   /** Remonta el canal cuando la enfermedad o el médico se eligen desde aquí (su prop inicial solo se lee al montar). */
   const [versionCanal, setVersionCanal] = useState(0);
   const [reporte, setReporte] = useState<ReporteEnfermedad | null>(null);

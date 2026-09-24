@@ -33,7 +33,8 @@ public final class PermisosSuperAdmin {
         if (ruta.startsWith("/equipo") || ruta.startsWith("/tenants/auditoria")) return false;
 
         // Lectura común a todo el equipo: directorio, analítica y vigilancia epidemiológica.
-        if (ruta.startsWith("/actividad") || ruta.startsWith("/canal-endemico") || ruta.startsWith("/inteligencia")) return lectura;
+        if (ruta.startsWith("/actividad") || ruta.startsWith("/canal-endemico") || ruta.startsWith("/inteligencia")
+                || ruta.startsWith("/verticales")) return lectura;
         if (lectura && (ruta.equals("/tenants") || ruta.equals("/tenants/stats") || ruta.equals("/tenants/analytics")
                 || ruta.matches("/tenants/\\d+(/modulos|/usuarios)?"))) {
             return true;

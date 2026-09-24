@@ -192,7 +192,7 @@ function Ranking({ filas }: { filas: { clave: string; titulo: string; subtitulo?
 
 // ─────────────────────────── NEGOCIO ───────────────────────────
 
-function VistaNegocio() {
+export function VistaNegocio() {
   const { datos, error, cargando } = useCarga<InteligenciaNegocio>(() => obtenerInteligenciaNegocio(), []);
   const [filtro, setFiltro] = useState<Semaforo | "TODOS">("TODOS");
   if (!datos) return <Estado cargando={cargando} error={error} />;
@@ -327,7 +327,7 @@ function VistaNegocio() {
 
 // ─────────────────────────── COMERCIO ───────────────────────────
 
-function VistaComercio({ dias }: { dias: number }) {
+export function VistaComercio({ dias }: { dias: number }) {
   const { datos, error, cargando } = useCarga<InteligenciaComercio>(() => obtenerInteligenciaComercio(dias), [dias]);
   const [busqueda, setBusqueda] = useState("");
   const [filtroRubro, setFiltroRubro] = useState("TODOS");
@@ -490,7 +490,12 @@ function FilaComercio({ c, dias, abierto, alTocar }: { c: InteligenciaComercio["
 
 // ─────────────────────────── SALUD ───────────────────────────
 
-function VistaSalud({ dias }: { dias: number }) {
+/**
+ * `onAbrirCanal`: si se pasa, tocar un diagnóstico o una clínica lo delega (p. ej. a la
+ * pestaña "Reporte por enfermedad" de la página de Mediclinic) y esta vista no dibuja su
+ * propio canal, para que el Canal Endémico viva en un solo lugar.
+ */
+export function VistaSalud({ dias, onAbrirCanal }: { dias: number; onAbrirCanal?: (cie10?: string, tenantId?: number) => void }) {
   const { datos, error, cargando } = useCarga<InteligenciaSalud>(() => obtenerInteligenciaSalud(dias), [dias]);
   const nombresCie10 = useCatalogoCie10(true);
   const [busqueda, setBusqueda] = useState("");
@@ -514,6 +519,10 @@ function VistaSalud({ dias }: { dias: number }) {
   }, [datos, busqueda]);
 
   const verCanal = (nuevaClinica: { id: number; nombre: string } | null, cie10?: string) => {
+    if (onAbrirCanal) {
+      onAbrirCanal(cie10, nuevaClinica?.id);
+      return;
+    }
     setClinica(nuevaClinica);
     setCie10Canal(cie10);
     setTimeout(() => canalRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -623,7 +632,7 @@ function VistaSalud({ dias }: { dias: number }) {
         </div>
       </div>
 
-      <div ref={canalRef} className="scroll-mt-4 space-y-3">
+      {!onAbrirCanal && <div ref={canalRef} className="scroll-mt-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => verCanal(null, cie10Actual.current)}
@@ -648,7 +657,7 @@ function VistaSalud({ dias }: { dias: number }) {
             onCambioDiagnostico={(cie10) => { cie10Actual.current = cie10; }}
           />
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -661,7 +670,7 @@ const TIPO_SOSPECHA: Record<string, string> = {
   ARETE_EN_HATO_DEL_INTERESADO: "Arete en hato del interesado",
 };
 
-function VistaMercado({ dias }: { dias: number }) {
+export function VistaMercado({ dias }: { dias: number }) {
   const [version, setVersion] = useState(0);
   const { datos, error, cargando } = useCarga<PanelMercadoSuperAdmin>(() => obtenerMercadoGanaderoSuperAdmin(dias), [dias, version]);
   if (!datos) return <Estado cargando={cargando} error={error} />;
