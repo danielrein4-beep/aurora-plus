@@ -12,6 +12,7 @@ import {
   type Semaforo,
 } from "../api";
 import CanalEndemico from "./CanalEndemico";
+import SuperAdminVerificacionesMercado from "./SuperAdminVerificacionesMercado";
 
 type Pestana = "NEGOCIO" | "COMERCIO" | "SALUD" | "MERCADO";
 
@@ -700,6 +701,7 @@ export function VistaMercado({ dias }: { dias: number }) {
 
   return (
     <div className="space-y-6">
+      <SuperAdminVerificacionesMercado />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Kpi titulo="En venta ahora" valor={numero.format(resumen.publicacionesActivas)} />
         <Kpi titulo="Tratos cerrados" valor={numero.format(resumen.tratosPeriodo)} nota={`Volumen ${dinero.format(Number(resumen.volumenPeriodo))}`} color="text-emerald-600" />

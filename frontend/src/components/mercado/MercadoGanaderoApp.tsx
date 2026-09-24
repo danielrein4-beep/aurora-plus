@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { listarConversacionesMercado, obtenerComisionesMercado, obtenerResumenMercado, type ConversacionMercado } from "../../api";
+import { listarConversacionesMercado, obtenerComisionesMercado, obtenerResumenMercado, obtenerVerificacionMercado, type ConversacionMercado, type VerificacionMercado } from "../../api";
 import Explorar from "./Explorar";
 import FichaAnimal from "./FichaAnimal";
 import Publicar from "./Publicar";
+import Verificacion from "./Verificacion";
 import { MiPuesto, MisCompras, BandejaMensajes } from "./Paneles";
 import { useCondiciones, dinero, mensajeError, BOTON } from "./comun";
 
-type Vista = "EXPLORAR" | "PUESTO" | "COMPRAS" | "MENSAJES" | "PUBLICAR";
+type Vista = "EXPLORAR" | "PUESTO" | "COMPRAS" | "MENSAJES" | "PUBLICAR" | "VERIFICACION";
 
 const ICONOS: Record<string, string> = {
   EXPLORAR: "M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z",
@@ -42,6 +43,7 @@ export default function MercadoGanaderoApp() {
   const [pendiente, setPendiente] = useState(0);
   const [sinAcceso, setSinAcceso] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [verificacion, setVerificacion] = useState<VerificacionMercado | null>(null);
 
   const sinLeer = conversaciones.reduce((s, c) => s + Number(c.sinLeer), 0);
 
@@ -52,6 +54,7 @@ export default function MercadoGanaderoApp() {
 
   useEffect(() => {
     obtenerResumenMercado().catch((e) => setSinAcceso(mensajeError(e)));
+    obtenerVerificacionMercado().then(setVerificacion).catch(() => {});
     refrescar();
     const intervalo = setInterval(refrescar, 20_000);
     return () => clearInterval(intervalo);
@@ -67,6 +70,19 @@ export default function MercadoGanaderoApp() {
 
   const ir = (v: Vista) => { setAbierta(null); setAviso(null); setVista(v); };
   const abrir = (id: number, comprador?: string) => setAbierta({ id, comprador });
+
+  // Mirar es libre; ofertar y escribir piden la verificación de comprador, publicar la de vendedor.
+  // Si falta, se lleva a la pantalla de verificación en vez de dejar que el servidor lo rechace.
+  const exigirNivel = (nivel: "COMPRAR" | "VENDER") => (accion: () => void) => {
+    const ok = nivel === "VENDER" ? verificacion?.puedeVender : verificacion?.puedeComprar;
+    if (ok || !verificacion) { conCondiciones(accion); return; }
+    ir("VERIFICACION");
+    setAviso(nivel === "VENDER"
+      ? "Para publicar ganado, Aurora verifica primero tu cédula y tu registro de hierro."
+      : "Para ofertar o escribir, Aurora verifica primero la ubicación de tu finca y la cédula del titular.");
+  };
+  const conCompra = exigirNivel("COMPRAR");
+  const conVenta = exigirNivel("VENDER");
 
   const nav: [Vista, string, number?][] = [
     ["EXPLORAR", "Explorar"],
@@ -103,7 +119,7 @@ export default function MercadoGanaderoApp() {
           </nav>
           <span className="flex-1 md:hidden font-bold font-['Outfit'] text-stone-900 dark:text-white truncate">Mercado Ganadero</span>
           {puedeNegociar && (
-            <button onClick={() => ir("PUBLICAR")} className="px-4 py-2 rounded-xl bg-[#66B891] hover:bg-[#57A882] text-white text-sm font-bold cursor-pointer shrink-0 shadow-sm">
+            <button onClick={() => (verificacion && !verificacion.puedeVender ? conVenta(() => ir("PUBLICAR")) : ir("PUBLICAR"))} className="px-4 py-2 rounded-xl bg-[#66B891] hover:bg-[#57A882] text-white text-sm font-bold cursor-pointer shrink-0 shadow-sm">
               Publicar
             </button>
           )}
@@ -132,6 +148,22 @@ export default function MercadoGanaderoApp() {
                 Tienes <strong>{dinero.format(pendiente)}</strong> en comisiones del mercado que se sumarán a tu próxima factura de Aurora.
               </div>
             )}
+            {verificacion && !verificacion.puedeVender && vista !== "VERIFICACION" && (
+              <button
+                type="button"
+                onClick={() => ir("VERIFICACION")}
+                className="w-full text-left rounded-2xl px-4 py-3 bg-white border border-[#CFE6D9] text-sm text-stone-700 flex flex-wrap items-center gap-2 cursor-pointer hover:bg-[#F4F8F5]"
+              >
+                <span className="flex-1 min-w-0">
+                  {verificacion.puedeComprar
+                    ? "Ya puedes comprar. Para publicar tu ganado, verifica tu registro de hierro."
+                    : Object.keys(verificacion.documentos).length > 0
+                      ? "Tu verificación está en revisión. Mientras tanto puedes mirar el mercado."
+                      : "Puedes mirar el mercado. Para ofertar, escribir o vender, verifica tu finca: toma unos minutos."}
+                </span>
+                <span className="font-bold text-[#3E8A66]">Ver verificación</span>
+              </button>
+            )}
             {aviso && (
               <div className="rounded-2xl px-4 py-3 bg-[#EEF6F1] border border-[#CFE6D9] text-sm text-[#2F6B4F] font-bold">{aviso}</div>
             )}
@@ -141,7 +173,7 @@ export default function MercadoGanaderoApp() {
                 id={abierta.id}
                 compradorInicial={abierta.comprador}
                 puedeNegociar={puedeNegociar}
-                conCondiciones={conCondiciones}
+                conCondiciones={conCompra}
                 onVolver={() => { setAbierta(null); setAviso(null); refrescar(); }}
                 onCambio={refrescar}
               />
@@ -153,9 +185,11 @@ export default function MercadoGanaderoApp() {
               <MisCompras onAbrir={abrir} />
             ) : vista === "MENSAJES" ? (
               <BandejaMensajes conversaciones={conversaciones} onAbrir={abrir} />
+            ) : vista === "VERIFICACION" ? (
+              <Verificacion estado={verificacion} onActualizado={setVerificacion} puedeEditar={puedeNegociar} />
             ) : (
               <Publicar
-                conCondiciones={conCondiciones}
+                conCondiciones={conVenta}
                 onCancelar={() => ir("EXPLORAR")}
                 onListo={(id, oculto) => {
                   setVista("PUESTO");

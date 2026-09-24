@@ -6341,7 +6341,12 @@ export type CategoriaMercado = "PADROTE" | "VACA_PARIDA" | "VACA_ORDENO" | "NOVI
 export interface PerfilMercado {
   nombre: string;
   revelado: boolean;
+  /** El equipo de Aurora verificó la cédula del titular. */
   verificado: boolean;
+  /** Registro de hierro verificado: la prueba de que el ganado es suyo. */
+  hierroVerificado?: boolean;
+  /** Título de propiedad o arrendamiento verificado (opcional). */
+  tierraVerificada?: boolean;
   mesesEnAurora: number | null;
   diasEnAurora: number | null;
   ventas: number;
@@ -6552,6 +6557,43 @@ export function calificarTratoMercado(ofertaId: number, estrellas: number, comen
   return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/calificar`, { method: "POST", body: JSON.stringify({ estrellas, comentario }) });
 }
 
+export type TipoDocumentoMercado = "CEDULA" | "HIERRO" | "TIERRA";
+
+export interface DocumentoVerificacionMercado {
+  estado: "PENDIENTE" | "APROBADO" | "RECHAZADO";
+  nombreArchivo: string | null;
+  subidoEn: string | null;
+  revisadoEn: string | null;
+  motivoRechazo: string | null;
+}
+
+/** Nivel de la finca en el mercado: MIRAR (libre), COMPRAR (ubicación + cédula), VENDER (+ hierro). */
+export interface VerificacionMercado {
+  titularNombre: string | null;
+  titularCedula: string | null;
+  numeroHierro: string | null;
+  tipoTierra: string | null;
+  ubicacionCargada: boolean;
+  documentos: Partial<Record<TipoDocumentoMercado, DocumentoVerificacionMercado>>;
+  nivel: "MIRAR" | "COMPRAR" | "VENDER";
+  puedeComprar: boolean;
+  puedeVender: boolean;
+}
+
+export function obtenerVerificacionMercado(): Promise<VerificacionMercado> {
+  return request(`/api/ganaderia/mercado/verificacion`);
+}
+
+export function enviarVerificacionMercado(datos: {
+  titularNombre?: string;
+  titularCedula?: string;
+  numeroHierro?: string;
+  tipoTierra?: string;
+  archivos?: Partial<Record<TipoDocumentoMercado, { nombre: string; dataUrl: string }>>;
+}): Promise<VerificacionMercado> {
+  return request(`/api/ganaderia/mercado/verificacion`, { method: "POST", body: JSON.stringify(datos) });
+}
+
 export function obtenerCondicionesMercado(): Promise<{ aceptadas: boolean; version: number }> {
   return request(`/api/ganaderia/mercado/condiciones`);
 }
@@ -6609,6 +6651,44 @@ export function suspenderFincaMercado(tenantId: number, motivo: string): Promise
 
 export function reactivarFincaMercado(tenantId: number): Promise<{ suspendida: boolean }> {
   return requestSuperAdmin(`/api/super-admin/inteligencia/mercado-ganadero/fincas/${tenantId}/reactivar`, { method: "POST" });
+}
+
+export interface SolicitudVerificacionMercado {
+  tenant_id: number;
+  nombre_empresa: string | null;
+  titular_nombre: string | null;
+  titular_cedula: string | null;
+  numero_hierro: string | null;
+  tipo_tierra: string | null;
+  ultimo_envio: string;
+  ubicacionCargada: boolean;
+  nivel: "MIRAR" | "COMPRAR" | "VENDER";
+  documentos: {
+    id: number; tipo: TipoDocumentoMercado; estado: "PENDIENTE" | "APROBADO" | "RECHAZADO"; nombre_archivo: string | null;
+    tipo_contenido: string; tamano_bytes: number; subido_en: string; revisado_por: string | null; revisado_en: string | null;
+    motivo_rechazo: string | null;
+  }[];
+}
+
+export function listarVerificacionesMercado(estado: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "TODOS"): Promise<SolicitudVerificacionMercado[]> {
+  return requestSuperAdmin(`/api/super-admin/verificaciones-mercado?estado=${estado}`);
+}
+
+/** Descarga el documento descifrado (queda anotado quién lo abrió). */
+export async function abrirDocumentoVerificacionMercado(id: number): Promise<Blob> {
+  const sesion = leerSesionSuperAdmin();
+  const res = await fetch(`/api/super-admin/verificaciones-mercado/documentos/${id}`, {
+    headers: sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {},
+  });
+  if (!res.ok) throw new Error((await res.text()) || "No se pudo abrir el documento");
+  return res.blob();
+}
+
+export function revisarDocumentoVerificacionMercado(id: number, aprobar: boolean, motivo?: string): Promise<{ ok: boolean }> {
+  return requestSuperAdmin(`/api/super-admin/verificaciones-mercado/documentos/${id}/${aprobar ? "aprobar" : "rechazar"}`, {
+    method: "POST",
+    body: JSON.stringify({ motivo }),
+  });
 }
 
 export function obtenerMercadoGanaderoSuperAdmin(dias: number): Promise<PanelMercadoSuperAdmin> {

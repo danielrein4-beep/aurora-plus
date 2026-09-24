@@ -48,6 +48,9 @@ import java.util.stream.Collectors;
  *   super-admin.
  * - Al entrar, la finca acepta que la comisión aplica aunque el trato que
  *   nació aquí se cierre por fuera.
+ *
+ * Acceso por niveles (VerificacionMercadoService): mirar es libre; ofertar y
+ * chatear piden ubicación y cédula verificada; publicar pide además el hierro.
  */
 @RestController
 @RequestMapping("/api/ganaderia/mercado")
@@ -69,6 +72,9 @@ public class MercadoGanaderoController {
 
     @Autowired
     private AvisosMercadoService avisos;
+
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.VerificacionMercadoService verificacion;
 
     /** Clave para los alias y referencias opacas: sin ella no se puede volver del alias a la finca. */
     @Value("${jwt.secret}")
@@ -309,6 +315,31 @@ public class MercadoGanaderoController {
         return condiciones();
     }
 
+    // ─────────────────────────── verificación de la finca ───────────────────────────
+
+    /** Qué tiene verificado la finca y qué le falta. Nunca devuelve el contenido de los documentos. */
+    @GetMapping("/verificacion")
+    public Map<String, Object> miVerificacion() {
+        return verificacion.estado(tenantActual());
+    }
+
+    public static class VerificacionRequest {
+        public String titularNombre;
+        public String titularCedula;
+        public String numeroHierro;
+        /** PROPIEDAD, ARRENDAMIENTO o COMODATO (opcional). */
+        public String tipoTierra;
+        /** CEDULA, HIERRO, TIERRA → archivo nuevo (los que no vienen no se tocan). */
+        public Map<String, com.auroraplus.modules.ganaderia.services.VerificacionMercadoService.Archivo> archivos;
+    }
+
+    @PostMapping("/verificacion")
+    public Map<String, Object> enviarVerificacion(@RequestBody VerificacionRequest req) {
+        AuthContext.exigirRol(ROLES_NEGOCIO);
+        return verificacion.guardar(tenantActual(), AuthContext.getUsername(), req.titularNombre, req.titularCedula,
+            req.numeroHierro, req.tipoTierra, req.archivos);
+    }
+
     private void exigirCondiciones() {
         if (!Boolean.TRUE.equals(condiciones().get("aceptadas"))) {
             throw new RuntimeException("Antes de negociar en el mercado debes aceptar sus condiciones");
@@ -339,6 +370,7 @@ public class MercadoGanaderoController {
         AuthContext.exigirRol(ROLES_NEGOCIO);
         exigirCondiciones();
         Long yo = tenantActual();
+        verificacion.exigir(yo, com.auroraplus.modules.ganaderia.services.VerificacionMercadoService.Nivel.VENDER);
         List<Long> ids = req.animalIds != null && !req.animalIds.isEmpty() ? req.animalIds.stream().distinct().toList()
             : req.animalId != null ? List.of(req.animalId) : List.of();
         if (ids.isEmpty()) throw new RuntimeException("Elige el animal que vas a publicar");
@@ -463,6 +495,7 @@ public class MercadoGanaderoController {
         AuthContext.exigirRol(ROLES_NEGOCIO);
         exigirCondiciones();
         Long yo = tenantActual();
+        verificacion.exigir(yo, com.auroraplus.modules.ganaderia.services.VerificacionMercadoService.Nivel.COMPRAR);
         Map<String, Object> pub = unaFila("SELECT id, tenant_id, estado FROM publicaciones_venta WHERE id = ?", id);
         if (pub == null || !"ACTIVA".equals(pub.get("estado"))) throw new RuntimeException("Esta publicación ya no está disponible");
         Long vendedor = numero(pub.get("tenant_id"));
@@ -759,6 +792,7 @@ public class MercadoGanaderoController {
         exigirCondiciones();
         if (!texto(req.contenido)) throw new RuntimeException("Escribe un mensaje");
         Long yo = tenantActual();
+        verificacion.exigir(yo, com.auroraplus.modules.ganaderia.services.VerificacionMercadoService.Nivel.COMPRAR);
         Long compradorConv = compradorDeConversacion(id, req.comprador);
         Map<String, Object> pub = unaFila("SELECT estado, tenant_id FROM publicaciones_venta WHERE id = ?", id);
         Long vendedor = numero(pub.get("tenant_id"));
@@ -888,9 +922,13 @@ public class MercadoGanaderoController {
             p.put("totalCalificaciones", 0L);
             salida.put(numero(r.get("tenant_id")), p);
         }
-        for (Long t : jdbc.queryForList("SELECT DISTINCT tenant_id FROM pagos_suscripcion_tenant WHERE tenant_id IN (" + en + ") "
-                + "AND monto > 0 AND (estado IS NULL OR estado = 'CONFIRMADO')", Long.class, ids)) {
-            if (salida.containsKey(t)) salida.get(t).put("verificado", true);
+        // "Verificado por Aurora" = el equipo revisó la cédula del titular; hierro y tierra suman sellos aparte.
+        for (Map.Entry<Long, Set<String>> e : verificacion.aprobadosDe(tenants).entrySet()) {
+            Map<String, Object> p = salida.get(e.getKey());
+            if (p == null) continue;
+            p.put("verificado", e.getValue().contains("CEDULA"));
+            p.put("hierroVerificado", e.getValue().contains("HIERRO"));
+            p.put("tierraVerificada", e.getValue().contains("TIERRA"));
         }
         for (Map<String, Object> r : jdbc.queryForList("SELECT tenant_id, COUNT(*) AS n FROM publicaciones_venta WHERE estado = 'VENDIDA' "
                 + "AND tenant_id IN (" + en + ") GROUP BY tenant_id", ids)) {
@@ -919,6 +957,8 @@ public class MercadoGanaderoController {
         p.put("nombre", revelado && datos != null && datos.get("nombreReal") != null ? datos.get("nombreReal") : alias);
         p.put("revelado", revelado);
         p.put("verificado", datos != null && Boolean.TRUE.equals(datos.get("verificado")));
+        p.put("hierroVerificado", datos != null && Boolean.TRUE.equals(datos.get("hierroVerificado")));
+        p.put("tierraVerificada", datos != null && Boolean.TRUE.equals(datos.get("tierraVerificada")));
         Object alta = datos == null ? null : datos.get("fechaAlta");
         p.put("mesesEnAurora", alta == null ? null : ChronoUnit.MONTHS.between(((java.sql.Date) alta).toLocalDate(), LocalDate.now()));
         p.put("diasEnAurora", alta == null ? null : ChronoUnit.DAYS.between(((java.sql.Date) alta).toLocalDate(), LocalDate.now()));

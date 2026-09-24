@@ -8,8 +8,9 @@ import java.util.Set;
  * el panel nunca es la única barrera.
  *
  * - PROPIETARIO: todo, incluido gestionar el equipo y ver la auditoría global.
- * - SOPORTE: directorio en lectura, tickets, entrar como soporte a un negocio y
- *   gestionar los usuarios de un negocio.
+ * - SOPORTE: directorio en lectura, tickets, entrar como soporte a un negocio,
+ *   gestionar los usuarios de un negocio y verificar fincas del Mercado Ganadero
+ *   (cédulas y hierros: ni FINANZAS ni ANALISTA ven esos documentos).
  * - FINANZAS: directorio en lectura, cobros, cortesías, planes, suspensiones,
  *   finanzas del SaaS y comisiones.
  * - ANALISTA: solo lectura del directorio, métricas, actividad, inteligencia y Canal Endémico.
@@ -42,6 +43,7 @@ public final class PermisosSuperAdmin {
 
         return switch (rol) {
             case "SOPORTE" -> ruta.startsWith("/soporte")
+                || ruta.startsWith("/verificaciones-mercado")
                 || ruta.matches("/tenants/\\d+/impersonate")
                 || ruta.matches("/tenants/\\d+/usuarios(/\\d+/toggle-activo)?");
             case "FINANZAS" -> ruta.startsWith("/tenants/pagos")
