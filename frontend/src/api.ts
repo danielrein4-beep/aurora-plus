@@ -2535,11 +2535,11 @@ export function obtenerCanalEndemico(cie10: string, anio: number): Promise<Canal
 
 /** Vista consolidada de TODA la red (solo super-admin). */
 export function diagnosticosFrecuentesRed(limite = 20): Promise<DiagnosticoFrecuente[]> {
-  return request(`/api/super-admin/canal-endemico/diagnosticos-frecuentes?limite=${limite}`);
+  return requestSuperAdmin(`/api/super-admin/canal-endemico/diagnosticos-frecuentes?limite=${limite}`);
 }
 
 export function obtenerCanalEndemicoRed(cie10: string, anio: number): Promise<CanalEndemico> {
-  return request(`/api/super-admin/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+  return requestSuperAdmin(`/api/super-admin/canal-endemico?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
 }
 
 export interface CasosPorClinica {
@@ -2548,7 +2548,7 @@ export interface CasosPorClinica {
 }
 
 export function desglosePorClinicaRed(cie10: string, anio: number): Promise<CasosPorClinica[]> {
-  return request(`/api/super-admin/canal-endemico/desglose-por-clinica?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+  return requestSuperAdmin(`/api/super-admin/canal-endemico/desglose-por-clinica?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
 }
 
 // --- Importación de historiales epidemiológicos desde Excel (ver
@@ -2848,6 +2848,7 @@ export function listarInboxLaboratorio(tenantId: number): Promise<OrdenLaborator
 }
 
 export function contadorInboxLaboratorio(tenantId: number): Promise<{ pendientes: number }> {
+      else if (parsed.message) msg = parsed.message;
   return request(`/api/salud/laboratorio/ordenes/inbox/contador?tenantId=${tenantId}`);
 }
 
@@ -2973,17 +2974,124 @@ export async function subirExamenPortalLaboratorioPublico(
   return res.json();
 }
 
-export async function loginSuperAdminApi(username: string, password: string): Promise<string> {
+/** Si la cuenta tiene segundo factor y no se envió `codigo`, vuelve `{ requiere2fa: true }` sin token. */
+export async function loginSuperAdminApi(username: string, password: string, codigo?: string): Promise<{ token?: string; requiere2fa?: boolean }> {
   // Nunca fingir un login de super-admin exitoso — antes esto aceptaba
   // "admin"/"admin123" o "ceo"/"aurora2026" como puerta trasera hardcodeada
   // cada vez que el backend rechazaba o no respondía, sin importar si el
   // rechazo era real. Un token real, firmado por el backend, es la única
   // forma válida de entrar al panel de super-admin.
-  const data = await requestSuperAdmin<{ token: string }>("/api/auth/login-super-admin", {
+  const data = await requestSuperAdmin<{ token?: string; requiere2fa?: string }>("/api/auth/login-super-admin", {
     method: "POST",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, codigo }),
   });
-  return data.token;
+  if (data.requiere2fa === "true") return { requiere2fa: true };
+  return { token: data.token };
+}
+
+// --- Seguridad de la cuenta de administración (2FA y contraseña)
+
+export type RolEquipoSuperAdmin = "PROPIETARIO" | "SOPORTE" | "FINANZAS" | "ANALISTA";
+
+export interface PerfilSuperAdmin {
+  username: string;
+  nombreCompleto: string | null;
+  rol: RolEquipoSuperAdmin;
+  totpActivo: boolean;
+  debeCambiarClave: boolean;
+  email: string | null;
+  telefono: string | null;
+}
+
+export type CanalContactoSuperAdmin = "EMAIL" | "TELEFONO";
+export type AccionContactoSuperAdmin = "AGREGAR" | "CAMBIAR" | "QUITAR";
+
+export interface SolicitudContactoSuperAdmin {
+  solicitudId: number;
+  pideCodigoActual: boolean;
+  pideCodigoNuevo: boolean;
+  destinos: string[];
+  /** Solo desarrollo: el código quedó en el log del servidor. */
+  simulado: boolean;
+}
+
+/** Envía los códigos: al dato actual (cambiar/quitar) y al nuevo (agregar/cambiar). */
+export function solicitarCambioContactoSuperAdmin(datos: { canal: CanalContactoSuperAdmin; accion: AccionContactoSuperAdmin; valor?: string; password: string }): Promise<SolicitudContactoSuperAdmin> {
+  return requestSuperAdmin("/api/super-admin/seguridad/contacto/solicitar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function confirmarCambioContactoSuperAdmin(datos: { solicitudId: number; codigoActual?: string; codigoNuevo?: string }): Promise<{ email: string | null; telefono: string | null }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/contacto/confirmar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+// --- "Olvidé mi contraseña" del equipo de administración (público, sin sesión)
+
+/** Siempre responde lo mismo exista o no la cuenta (no revela usuarios). */
+export function solicitarRecuperacionClaveSuperAdmin(username: string): Promise<{ mensaje: string; simulado: boolean }> {
+  return requestSuperAdmin("/api/auth/super-admin/recuperar-clave/solicitar", { method: "POST", body: JSON.stringify({ username }) });
+}
+
+export function confirmarRecuperacionClaveSuperAdmin(datos: { username: string; codigoEmail?: string; codigoTelefono?: string; nuevaClave: string }): Promise<{ mensaje: string }> {
+  return requestSuperAdmin("/api/auth/super-admin/recuperar-clave/confirmar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function obtenerEstadoSeguridadSuperAdmin(): Promise<PerfilSuperAdmin> {
+  return requestSuperAdmin("/api/super-admin/seguridad/estado");
+}
+
+// --- Equipo de administración (solo PROPIETARIO)
+
+export interface MiembroEquipoSuperAdmin {
+  id: number;
+  username: string;
+  nombreCompleto: string | null;
+  rol: RolEquipoSuperAdmin;
+  email: string | null;
+  telefono: string | null;
+  activo: boolean;
+  totpActivo: boolean;
+  debeCambiarClave: boolean;
+  fechaCreacion: string;
+  ultimoAcceso: string | null;
+  esUstedMismo: boolean;
+  /** Solo viene al crear o resetear: se muestra una única vez. */
+  claveTemporal?: string;
+}
+
+export function listarEquipoSuperAdmin(): Promise<MiembroEquipoSuperAdmin[]> {
+  return requestSuperAdmin("/api/super-admin/equipo");
+}
+
+export function crearMiembroEquipoSuperAdmin(datos: { username: string; nombreCompleto: string; rol: RolEquipoSuperAdmin }): Promise<MiembroEquipoSuperAdmin> {
+  return requestSuperAdmin("/api/super-admin/equipo", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function cambiarRolMiembroSuperAdmin(id: number, rol: RolEquipoSuperAdmin): Promise<MiembroEquipoSuperAdmin> {
+  return requestSuperAdmin(`/api/super-admin/equipo/${id}/rol`, { method: "PUT", body: JSON.stringify({ rol }) });
+}
+
+export function cambiarActivoMiembroSuperAdmin(id: number, activo: boolean): Promise<MiembroEquipoSuperAdmin> {
+  return requestSuperAdmin(`/api/super-admin/equipo/${id}/activo`, { method: "POST", body: JSON.stringify({ activo }) });
+}
+
+export function resetearAccesoMiembroSuperAdmin(id: number): Promise<MiembroEquipoSuperAdmin> {
+  return requestSuperAdmin(`/api/super-admin/equipo/${id}/resetear-acceso`, { method: "POST" });
+}
+
+export function iniciar2faSuperAdmin(password: string): Promise<{ secreto: string; uri: string }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/2fa/iniciar", { method: "POST", body: JSON.stringify({ password }) });
+}
+
+export function confirmar2faSuperAdmin(codigo: string): Promise<{ totpActivo: boolean }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/2fa/confirmar", { method: "POST", body: JSON.stringify({ codigo }) });
+}
+
+export function desactivar2faSuperAdmin(password: string, codigo: string): Promise<{ totpActivo: boolean }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/2fa/desactivar", { method: "POST", body: JSON.stringify({ password, codigo }) });
+}
+
+export function cambiarClaveSuperAdmin(actual: string, nueva: string, codigo?: string): Promise<{ token: string }> {
+  return requestSuperAdmin("/api/super-admin/seguridad/cambiar-clave", { method: "POST", body: JSON.stringify({ actual, nueva, codigo }) });
 }
 
 export async function listarTenantsSuperAdmin(): Promise<LicenciaTenant[]> {
@@ -4718,6 +4826,69 @@ export async function listarAuditoriaGlobalSuperAdmin(params?: {
   modulo?: string;
   accion?: string;
   pagina?: number;
+// --- Actividad operativa por vertical (super-admin): qué registran los tenants, no lo que pagan.
+
+export interface ResumenActividadVertical {
+  vertical: string;
+  totalTenants: number;
+  tenantsConActividad: number;
+  registrosPeriodo: number;
+}
+
+export interface TotalMetricaActividad {
+  clave: string;
+  etiqueta: string;
+  conFecha: boolean;
+  total: number;
+  periodo: number | null;
+  monto: number | null;
+}
+
+export interface ValorMetricaTenant {
+  total: number;
+  periodo: number | null;
+  monto: number | null;
+}
+
+export interface TenantActividad {
+  tenantId: number;
+  nombreEmpresa: string;
+  moduloPrincipal: string;
+  activa: boolean;
+  plan: string;
+  usuarios: number;
+  ultimaActividad: string | null;
+  metricas: Record<string, ValorMetricaTenant>;
+}
+
+export interface DetalleActividadVertical {
+  vertical: string;
+  dias: number;
+  metricaPrincipal: string;
+  totales: TotalMetricaActividad[];
+  serie: { fecha: string; cantidad: number }[];
+  tenants: TenantActividad[];
+}
+
+export function obtenerResumenActividadSuperAdmin(dias: number): Promise<ResumenActividadVertical[]> {
+  return requestSuperAdmin(`/api/super-admin/actividad/resumen?dias=${dias}`);
+}
+
+export interface ActividadTenant {
+  tenantId: number;
+  dias: number;
+  ultimaActividad: string | null;
+  metricas: (TotalMetricaActividad & { vertical: string })[];
+}
+
+export function obtenerActividadTenantSuperAdmin(tenantId: number, dias: number): Promise<ActividadTenant> {
+  return requestSuperAdmin(`/api/super-admin/actividad/tenant/${tenantId}?dias=${dias}`);
+}
+
+export function obtenerDetalleActividadSuperAdmin(vertical: string, dias: number): Promise<DetalleActividadVertical> {
+  return requestSuperAdmin(`/api/super-admin/actividad/${encodeURIComponent(vertical)}?dias=${dias}`);
+}
+
   tamano?: number;
 }): Promise<{ content: RegistroAuditoriaItem[]; totalElements: number; totalPages: number; number: number }> {
   const qs = new URLSearchParams();

@@ -79,11 +79,21 @@ public class TenantInterceptor implements HandlerInterceptor {
                 return false;
             }
             Integer tokenVersionClaim = claims.get("tokenVersion", Integer.class);
-            if (tokenVersionClaim != null && usuarioSuperAdminRepository != null) {
+            if (usuarioSuperAdminRepository != null) {
                 com.auroraplus.core.auth.entities.UsuarioSuperAdmin admin = usuarioSuperAdminRepository
                     .findByUsername(claims.getSubject()).orElse(null);
-                if (admin == null || !admin.isActivo() || admin.getTokenVersion() != tokenVersionClaim) {
+                if (admin == null || !admin.isActivo()
+                        || (tokenVersionClaim != null && admin.getTokenVersion() != tokenVersionClaim)) {
                     rechazar(response, "Sesion administrativa invalidada o expirada. Inicie sesion de nuevo");
+                    return false;
+                }
+                // Clave temporal (cuenta nueva o reseteada): solo puede cambiarla.
+                if (admin.isDebeCambiarClave() && !request.getRequestURI().startsWith("/api/super-admin/seguridad/")) {
+                    prohibir(response, "Debe cambiar su contraseña temporal antes de continuar");
+                    return false;
+                }
+                if (!PermisosSuperAdmin.permitido(admin.getRol(), request.getMethod(), request.getRequestURI())) {
+                    prohibir(response, "Su rol no tiene permiso para esta acción");
                     return false;
                 }
             }
@@ -153,6 +163,13 @@ public class TenantInterceptor implements HandlerInterceptor {
 
     private void rechazar(HttpServletResponse response, String mensaje) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"error\":\"" + mensaje.replace("\"", "'") + "\"}");
+    }
+
+    /** 403: la sesión es válida pero no alcanza para esta acción (no debe cerrar la sesión en el panel). */
+    private void prohibir(HttpServletResponse response, String mensaje) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json;charset=UTF-8");
         response.getWriter().write("{\"error\":\"" + mensaje.replace("\"", "'") + "\"}");
     }

@@ -29,7 +29,9 @@ public class WebConfig implements WebMvcConfigurer {
     private static final String[] RUTAS_LOGIN_PUBLICAS = {
         "/api/auth/login", "/api/auth/login-super-admin", "/api/auth/login-directo", "/api/auth/registro-negocio",
         "/api/auth/olvide-clave", "/api/auth/resetear-clave",
-        "/api/public/**"
+        "/api/public/**",
+        // Recuperación de clave del equipo de administración (SuperAdminRecuperacionController)
+        "/api/auth/super-admin/recuperar-clave/*"
     };
 
     @Override
@@ -43,6 +45,7 @@ public class WebConfig implements WebMvcConfigurer {
             .addPathPatterns(
                 "/api/auth/login", "/api/auth/login-super-admin", "/api/auth/login-directo",
                 "/api/auth/registro-negocio", "/api/auth/olvide-clave", "/api/auth/resetear-clave",
+                "/api/auth/super-admin/recuperar-clave/*",
                 "/api/public/contacto",
                 // Portal público de recepción de laboratorio (sin login, como los de
                 // arriba) — sin límite, cualquiera podría martillarlo con cargas falsas.
@@ -60,7 +63,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(licenciaInterceptor)
             .addPathPatterns("/api/**")
             .excludePathPatterns("/api/super-admin/**", "/api/public/**", RUTAS_LOGIN_PUBLICAS[0], RUTAS_LOGIN_PUBLICAS[1],
-                RUTAS_LOGIN_PUBLICAS[2], RUTAS_LOGIN_PUBLICAS[3], RUTAS_LOGIN_PUBLICAS[4], RUTAS_LOGIN_PUBLICAS[5]);
+                RUTAS_LOGIN_PUBLICAS[2], RUTAS_LOGIN_PUBLICAS[3], RUTAS_LOGIN_PUBLICAS[4], RUTAS_LOGIN_PUBLICAS[5],
+                "/api/auth/super-admin/recuperar-clave/*");
         // Registrado DESPUÉS de tenantInterceptor a propósito: Spring ejecuta afterCompletion en
         // orden inverso al de registro, así que el de auditoría corre ANTES de que
         // TenantInterceptor limpie AuthContext/TenantContext — los necesita para saber quién y

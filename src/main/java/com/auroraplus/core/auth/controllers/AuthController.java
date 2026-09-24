@@ -117,12 +117,18 @@ public class AuthController {
     public static class LoginSuperAdminRequest {
         public String username;
         public String password;
+        /** Código TOTP de 6 dígitos; solo cuando la cuenta tiene segundo factor activo. */
+        public String codigo;
     }
 
     @PostMapping("/login-super-admin")
     public ResponseEntity<Map<String, String>> loginSuperAdmin(@RequestBody LoginSuperAdminRequest request) {
-        String token = authService.loginSuperAdmin(request.username, request.password);
-        return ResponseEntity.ok(Map.of("token", token));
+        try {
+            String token = authService.loginSuperAdmin(request.username, request.password, request.codigo);
+            return ResponseEntity.ok(Map.of("token", token));
+        } catch (AuthService.Requiere2FAException e) {
+            return ResponseEntity.ok(Map.of("requiere2fa", "true"));
+        }
     }
 
     // --- Gestión de usuarios del propio tenant — solo el DUEÑO_ADMIN autenticado

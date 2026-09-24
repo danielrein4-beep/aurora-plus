@@ -50,6 +50,17 @@ public class AuthService {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private TotpService totpService;
+
+    @Autowired
+    private com.auroraplus.core.config.CifradoSimetricoService cifradoSimetricoService;
+
+    /** La clave fue correcta pero la cuenta tiene segundo factor: el cliente debe pedir el código y reintentar. */
+    public static class Requiere2FAException extends RuntimeException {
+        public Requiere2FAException() { super("Se requiere el código de verificación"); }
+    }
+
     @Value("${app.frontend.url:http://localhost:8443}")
     private String frontendUrl;
 
@@ -135,6 +146,10 @@ public class AuthService {
     }
 
     public String loginSuperAdmin(String username, String password) {
+        return loginSuperAdmin(username, password, null);
+    }
+
+    public String loginSuperAdmin(String username, String password, String codigo2fa) {
         String userKey = username != null ? username.trim().toLowerCase() : "";
         long ahora = System.currentTimeMillis();
         IntentosSuperAdmin intentos = intentosSuperAdmin.computeIfAbsent(userKey, k -> new IntentosSuperAdmin());
@@ -149,7 +164,19 @@ public class AuthService {
         UsuarioSuperAdmin admin = usuarioSuperAdminRepository.findByUsername(username)
             .orElse(null);
 
-        if (admin == null || !admin.isActivo() || !passwordEncoder.matches(password, admin.getPasswordHash())) {
+        boolean credencialesOk = admin != null && admin.isActivo() && passwordEncoder.matches(password, admin.getPasswordHash());
+        boolean falloSegundoFactor = false;
+        if (credencialesOk && admin.isTotpActivo()) {
+            if (codigo2fa == null || codigo2fa.isBlank()) {
+                throw new Requiere2FAException();
+            }
+            if (!totpService.verificar(cifradoSimetricoService.descifrar(admin.getTotpSecreto()), codigo2fa)) {
+                credencialesOk = false;
+                falloSegundoFactor = true;
+            }
+        }
+
+        if (!credencialesOk) {
             int numFallos;
             synchronized (intentos) {
                 intentos.fallos++;
@@ -171,7 +198,7 @@ public class AuthService {
             if (numFallos >= MAX_INTENTOS_SUPERADMIN) {
                 throw new RuntimeException("Demasiados intentos fallidos. Su cuenta ha sido bloqueada temporalmente por 15 minutos.");
             }
-            throw new RuntimeException("Usuario o contrasenia incorrectos");
+            throw new RuntimeException(falloSegundoFactor ? "Código de verificación incorrecto" : "Usuario o contraseña incorrectos");
         }
 
         synchronized (intentos) {
@@ -179,6 +206,8 @@ public class AuthService {
             intentos.bloqueadoHasta = 0;
         }
 
+        admin.setUltimoAcceso(java.time.LocalDateTime.now());
+        usuarioSuperAdminRepository.save(admin);
         return jwtService.generarTokenSuperAdmin(admin.getUsername(), admin.getTokenVersion());
     }
 

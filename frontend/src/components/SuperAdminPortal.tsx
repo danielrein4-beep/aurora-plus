@@ -1,6 +1,12 @@
 import { obtenerCuentasCobro, guardarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
 import React, { useState, useEffect, useMemo } from "react";
 import AuroraLogo from "../AuroraLogo";
+import SuperAdminActividad from "./SuperAdminActividad";
+import SuperAdminFichaTenant from "./SuperAdminFichaTenant";
+import SuperAdminSeguridad from "./SuperAdminSeguridad";
+import SuperAdminEquipo, { ROLES_EQUIPO } from "./SuperAdminEquipo";
+import SuperAdminRecuperarClave from "./SuperAdminRecuperarClave";
+import { obtenerEstadoSeguridadSuperAdmin, type PerfilSuperAdmin, type RolEquipoSuperAdmin } from "../api";
 import {
   LicenciaTenant,
   ModuloTenant,
@@ -83,6 +89,32 @@ const MODULOS_SISTEMA = [
   { id: "tamanaco-comercial", tag: "TAM", label: "Tamanaco Enterprise", desc: "Despliegue integral multi-empresa e industrial" },
 ];
 
+/** [migas de pan, título] de cada vista del panel. */
+const TITULOS_VISTA: Record<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO", [string, string]> = {
+  TENANTS: ["Clientes", "Directorio de negocios"],
+  PAGOS: ["Ingresos", "Cobros y suscripciones"],
+  FINANZAS: ["Ingresos", "Finanzas, gastos fijos y flujo de caja"],
+  METRICAS: ["Inteligencia", "Métricas y rendimiento del SaaS"],
+  ACTIVIDAD: ["Inteligencia", "Actividad por vertical"],
+  SOPORTE: ["Operaciones", "Soporte y asistencia a negocios"],
+  AUDITORIA: ["Seguridad", "Bitácora de auditoría"],
+  SEGURIDAD: ["Seguridad", "Configuración de la cuenta"],
+  EQUIPO: ["Seguridad", "Equipo de administración"],
+};
+
+/** Qué vistas ve cada rol. El backend (PermisosSuperAdmin) es quien realmente lo hace cumplir. */
+const ROLES_POR_VISTA: Record<keyof typeof TITULOS_VISTA, RolEquipoSuperAdmin[]> = {
+  TENANTS: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
+  PAGOS: ["PROPIETARIO", "FINANZAS"],
+  FINANZAS: ["PROPIETARIO", "FINANZAS"],
+  METRICAS: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
+  ACTIVIDAD: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
+  SOPORTE: ["PROPIETARIO", "SOPORTE"],
+  AUDITORIA: ["PROPIETARIO"],
+  SEGURIDAD: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
+  EQUIPO: ["PROPIETARIO"],
+};
+
 function calcularDiasRestantes(fechaVencimiento: string | null): number {
   if (!fechaVencimiento) return 0;
   const partes = fechaVencimiento.split("-");
@@ -113,6 +145,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const [sesion, setSesion] = useState<SuperAdminSession | null>(() => leerSesionSuperAdmin());
   const [usernameInput, setUsernameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
+  const [codigo2faInput, setCodigo2faInput] = useState("");
+  const [pide2fa, setPide2fa] = useState(false);
+  const [modoRecuperar, setModoRecuperar] = useState(false);
+  const [avisoLogin, setAvisoLogin] = useState<string | null>(null);
   const [loginError, setLoginError] = useState("");
   const [loadingLogin, setLoadingLogin] = useState(false);
 
@@ -225,12 +261,27 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const [historialPagos, setHistorialPagos] = useState<PagoSuscripcion[]>([]);
   const [loadingPagos, setLoadingPagos] = useState(false);
 
+  // Perfil de la cuenta en sesión (rol del equipo, 2FA, clave temporal)
+  const [perfil, setPerfil] = useState<PerfilSuperAdmin | null>(null);
+  const cargarPerfil = () =>
+    obtenerEstadoSeguridadSuperAdmin()
+      .then((p) => {
+        setPerfil(p);
+        if (p.debeCambiarClave) setVistaPrincipal("SEGURIDAD");
+      })
+      .catch(() => setPerfil(null));
+  const puedeVer = (vista: keyof typeof TITULOS_VISTA) =>
+    !perfil || (perfil.debeCambiarClave ? vista === "SEGURIDAD" : ROLES_POR_VISTA[vista].includes(perfil.rol));
+
+  // Ficha completa del negocio (panel lateral)
+  const [fichaTenantId, setFichaTenantId] = useState<number | null>(null);
+
   // Barrido de suspension
   const [ejecutandoBarrido, setEjecutandoBarrido] = useState(false);
 
   // VISTA PRINCIPAL (TENANTS vs FINANZAS)
   // VISTA PRINCIPAL (TENANTS vs PAGOS vs FINANZAS)
-  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "FINANZAS" | "SOPORTE" | "AUDITORIA">("TENANTS");
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO">("TENANTS");
 
   // FILTROS Y ESTADOS DEL MODULO DEDICADO DE HISTORIAL DE PAGOS
   const [filtroPagosTenant, setFiltroPagosTenant] = useState<number | "TODOS">("TODOS");
@@ -548,6 +599,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   useEffect(() => {
     if (sesion) {
+      cargarPerfil();
       cargarTodo();
     }
   }, [sesion]);
@@ -566,7 +618,15 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     setLoginError("");
     setLoadingLogin(true);
     try {
-      const token = await loginSuperAdminApi(usernameInput.trim(), passwordInput);
+      const res = await loginSuperAdminApi(usernameInput.trim(), passwordInput, pide2fa ? codigo2faInput : undefined);
+      if (res.requiere2fa || !res.token) {
+        setPide2fa(true);
+        setCodigo2faInput("");
+        return;
+      }
+      const token = res.token;
+      setPide2fa(false);
+      setCodigo2faInput("");
       const s: SuperAdminSession = {
         token,
         username: usernameInput.trim(),
@@ -588,6 +648,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   };
 
   const handleBarrido = async () => {
+    if (!window.confirm("Se suspenderán todos los negocios cuya licencia ya venció. ¿Continuar?")) return;
     setEjecutandoBarrido(true);
     try {
       const res = await ejecutarBarridoSuspensionSuperAdmin();
@@ -648,7 +709,8 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     e.preventDefault();
     try {
       const res = await loginSuperAdminApi(sesion?.username || "admin", masterLockPassword);
-      if (res) {
+      // Con 2FA activo el backend responde "requiere2fa" solo si la contraseña fue correcta.
+      if (res.token || res.requiere2fa) {
         sessionStorage.setItem("aurora_superadmin_master_unlocked", "true");
         setShowMasterLockModal(false);
         avisar("Autorizacion Maestra concedida para esta sesion");
@@ -1061,6 +1123,23 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </p>
           </div>
 
+          {modoRecuperar ? (
+            <SuperAdminRecuperarClave
+              usernameInicial={usernameInput}
+              onVolver={(mensaje) => {
+                setModoRecuperar(false);
+                setAvisoLogin(mensaje || null);
+                setLoginError("");
+                setPasswordInput("");
+                setPide2fa(false);
+              }}
+            />
+          ) : (<>
+          {avisoLogin && (
+            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold text-center">
+              {avisoLogin}
+            </div>
+          )}
           {loginError && (
             <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold text-center">
               {loginError}
@@ -1091,19 +1170,51 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 required
                 placeholder="••••••••"
                 value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
+                onChange={(e) => { setPasswordInput(e.target.value); setPide2fa(false); }}
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:border-slate-800 focus:ring-1 focus:ring-slate-800 bg-white font-mono"
               />
             </div>
+
+            {pide2fa && (
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">
+                  Código de verificación
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  autoFocus
+                  maxLength={6}
+                  placeholder="000000"
+                  value={codigo2faInput}
+                  onChange={(e) => setCodigo2faInput(e.target.value.replace(/\D/g, ""))}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-hidden focus:border-slate-800 focus:ring-1 focus:ring-slate-800 bg-white font-mono tracking-[0.4em] text-center text-lg"
+                />
+                <p className="text-[11px] text-slate-500">Abra su app de autenticación y escriba el código de 6 dígitos.</p>
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={loadingLogin}
               className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-sm tracking-wide transition-all shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
             >
-              {loadingLogin ? "Validando credenciales..." : "Iniciar Sesion SuperAdmin"}
+              {loadingLogin ? "Validando..." : pide2fa ? "Verificar e ingresar" : "Iniciar sesión"}
             </button>
           </form>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => { setModoRecuperar(true); setAvisoLogin(null); }}
+              className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold cursor-pointer"
+            >
+              ¿Olvidó su contraseña?
+            </button>
+          </div>
+          </>)}
 
           {onClose && (
             <div className="text-center pt-2">
@@ -1155,7 +1266,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 </span>
               </div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Consola SuperAdmin
+                Administración de la plataforma
               </p>
             </div>
           </div>
@@ -1163,222 +1274,95 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-[11px]">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold text-slate-700">Sistema Operativo</span>
+              <span className="font-semibold text-slate-700">Sistema operativo</span>
             </div>
             <span className="px-1.5 py-0.5 rounded-md bg-emerald-100/60 text-emerald-800 font-mono font-bold text-[9px]">
-              MODO DIOS
+              PRODUCCIÓN
             </span>
           </div>
         </div>
 
-        {/* NAVEGACION DE MODULOS PRINCIPALES */}
-        <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
-          <div className="px-2 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Modulos del Ecosistema
-          </div>
-
-          {/* ITEM 1: DIRECTORIO DE TENANTS */}
-          <button
-            onClick={() => setVistaPrincipal("TENANTS")}
-            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
-              vistaPrincipal === "TENANTS"
-                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
-                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "TENANTS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
-              }`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-bold text-xs">Directorio de Tenants</div>
-                <div className={`text-[10px] ${vistaPrincipal === "TENANTS" ? "text-white/80" : "text-slate-400"}`}>
-                  Gestion de clientes y licencias
+        {/* NAVEGACION AGRUPADA POR AREA DE TRABAJO */}
+        <nav className="p-4 space-y-5 flex-1 overflow-y-auto">
+          {(() => {
+            const abiertosSoporte = ticketsSoporte.filter((t) => t.estado === "ABIERTO" || t.estado === "EN_ATENCION").length;
+            const grupos: { titulo: string; items: { vista: typeof vistaPrincipal; label: string; icono: string; badge?: string | number; alerta?: boolean; alAbrir?: () => void }[] }[] = [
+              { titulo: "Clientes", items: [
+                { vista: "TENANTS", label: "Directorio de negocios", icono: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4", badge: tenants.length },
+              ]},
+              { titulo: "Ingresos", items: [
+                { vista: "PAGOS", label: "Cobros y suscripciones", icono: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z", badge: historialPagos.length, alAbrir: () => cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant) },
+                { vista: "FINANZAS", label: "Finanzas y contabilidad", icono: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", alAbrir: () => cargarDatosFinancieros() },
+              ]},
+              { titulo: "Inteligencia", items: [
+                { vista: "METRICAS", label: "Métricas del SaaS", icono: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", alAbrir: () => cargarAnalytics() },
+                { vista: "ACTIVIDAD", label: "Actividad por vertical", icono: "M3 12h4l3-8 4 16 3-8h4" },
+              ]},
+              { titulo: "Operaciones", items: [
+                { vista: "SOPORTE", label: "Soporte y asistencia", icono: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z", badge: abiertosSoporte, alerta: abiertosSoporte > 0, alAbrir: () => cargarTicketsSoporte() },
+              ]},
+              { titulo: "Seguridad", items: [
+                { vista: "AUDITORIA", label: "Bitácora de auditoría", icono: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" },
+                { vista: "EQUIPO", label: "Equipo", icono: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
+                { vista: "SEGURIDAD", label: "Configuración de la cuenta", icono: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
+              ]},
+            ];
+            return grupos
+              .map((g) => ({ ...g, items: g.items.filter((it) => puedeVer(it.vista)) }))
+              .filter((g) => g.items.length > 0)
+              .map((g) => (
+              <div key={g.titulo}>
+                <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">{g.titulo}</div>
+                <div className="space-y-0.5">
+                  {g.items.map((it) => {
+                    const activo = vistaPrincipal === it.vista;
+                    return (
+                      <button
+                        key={it.vista}
+                        onClick={() => { setVistaPrincipal(it.vista); it.alAbrir?.(); }}
+                        className={`w-full px-3 py-2 rounded-xl text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                          activo ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" : "text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5 min-w-0">
+                          <svg className={`w-4 h-4 shrink-0 ${activo ? "text-white" : "text-emerald-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={it.icono} />
+                          </svg>
+                          <span className="font-semibold text-xs truncate">{it.label}</span>
+                        </span>
+                        {it.badge !== undefined && (
+                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold shrink-0 ${
+                            activo ? "bg-white/20 text-white" : it.alerta ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"
+                          }`}>
+                            {it.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </div>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-              vistaPrincipal === "TENANTS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-            }`}>
-              {tenants.length}
-            </span>
-          </button>
+            ));
+          })()}
 
-          {/* ITEM 2: HISTORIAL DE PAGOS */}
-          <button
-            onClick={() => {
-              setVistaPrincipal("PAGOS");
-              cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant);
-            }}
-            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
-              vistaPrincipal === "PAGOS"
-                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
-                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "PAGOS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
-              }`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-bold text-xs">Historial de Cobros</div>
-                <div className={`text-[10px] ${vistaPrincipal === "PAGOS" ? "text-white/80" : "text-slate-400"}`}>
-                  Pagos y prorrogas SaaS
-                </div>
-              </div>
-            </div>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-              vistaPrincipal === "PAGOS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-            }`}>
-              {historialPagos.length}
-            </span>
-          </button>
-
-          {/* ITEM 3: METRICAS Y ANALITICA */}
-          <button
-            onClick={() => {
-              setVistaPrincipal("METRICAS");
-              cargarAnalytics();
-            }}
-            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
-              vistaPrincipal === "METRICAS"
-                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
-                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "METRICAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
-              }`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-bold text-xs">Metricas & Estadisticas</div>
-                <div className={`text-[10px] ${vistaPrincipal === "METRICAS" ? "text-white/80" : "text-slate-400"}`}>
-                  KPIs, tendencias y ranking
-                </div>
-              </div>
-            </div>
-            {analyticsData && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                vistaPrincipal === "METRICAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              }`}>
-                ${analyticsData.kpis.facturacionPeriodoUsd.toFixed(0)}
-              </span>
-            )}
-          </button>
-
-          {/* ITEM 4: FINANZAS Y CONTABILIDAD */}
-          <button
-            onClick={() => {
-              setVistaPrincipal("FINANZAS");
-              cargarDatosFinancieros();
-            }}
-            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
-              vistaPrincipal === "FINANZAS"
-                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
-                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
-              }`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-bold text-xs">Finanzas & Contabilidad</div>
-                <div className={`text-[10px] ${vistaPrincipal === "FINANZAS" ? "text-white/80" : "text-slate-400"}`}>
-                  Gastos fijos, ingresos y P&L
-                </div>
-              </div>
-            </div>
-            {resumenFinanzas && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                vistaPrincipal === "FINANZAS" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              }`}>
-                ${resumenFinanzas.totalIngresos.toFixed(0)}
-              </span>
-            )}
-          </button>
-
-          {/* ITEM 5: CENTRO DE SOPORTE Y CHAT EN VIVO */}
-          <button
-            onClick={() => {
-              setVistaPrincipal("SOPORTE");
-              cargarTicketsSoporte();
-            }}
-            className={`w-full p-3 rounded-2xl text-left transition-all cursor-pointer flex items-center justify-between ${
-              vistaPrincipal === "SOPORTE"
-                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
-                : "hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${
-                vistaPrincipal === "SOPORTE" ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
-              }`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-bold text-xs">Soporte & Asistencia</div>
-                <div className={`text-[10px] ${vistaPrincipal === "SOPORTE" ? "text-white/80" : "text-slate-400"}`}>
-                  Tickets y chat en vivo
-                </div>
-              </div>
-            </div>
-            {(() => {
-              const abiertosCnt = ticketsSoporte.filter((t) => t.estado === "ABIERTO" || t.estado === "EN_ATENCION").length;
-              return (
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                  vistaPrincipal === "SOPORTE"
-                    ? "bg-white/20 text-white"
-                    : abiertosCnt > 0
-                    ? "bg-amber-100 text-amber-800 border border-amber-300"
-                    : "bg-slate-100 text-slate-600"
-                }`}>
-                  {abiertosCnt} abiertos
-                </span>
-              );
-            })()}
-          </button>
-
-          {/* ACCIONES GLOBALES EN SIDEBAR */}
-          <div className="pt-4 space-y-2">
-            <div className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Acciones Globales
-            </div>
-            <button
+          {/* ACCIONES */}
+          <div className="pt-2 space-y-2">
+            {(!perfil || (!perfil.debeCambiarClave && perfil.rol === "PROPIETARIO")) && <button
               onClick={() => setShowNuevoModal(true)}
-              className="w-full py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-xs shadow-emerald-500/20 transition-all cursor-pointer"
             >
-              <span>+ Nuevo Negocio SaaS</span>
-            </button>
-
-            <button
+              + Nuevo negocio
+            </button>}
+            {(!perfil || (!perfil.debeCambiarClave && (perfil.rol === "PROPIETARIO" || perfil.rol === "FINANZAS"))) && <button
               onClick={handleBarrido}
               disabled={ejecutandoBarrido}
-              className="w-full py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100/70 text-amber-800 border border-amber-300 font-bold text-xs transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-              title="Suspende automaticamente los negocios que ya expiraron su fecha de vencimiento"
+              className="w-full py-2 px-3 rounded-xl text-amber-800 hover:bg-amber-50 border border-amber-200 font-semibold text-[11px] transition-all cursor-pointer disabled:opacity-50"
+              title="Suspende los negocios cuya licencia ya venció"
             >
-              <span>{ejecutandoBarrido ? "Ejecutando..." : "Barrido de Suspension"}</span>
-            </button>
+              {ejecutandoBarrido ? "Ejecutando..." : "Ejecutar barrido de suspensión"}
+            </button>}
           </div>
-        </div>
+        </nav>
 
         {/* PIE DEL SIDEBAR: USUARIO Y SALIDA */}
         <div className="p-4 border-t border-slate-200 space-y-2.5 bg-slate-50/50">
@@ -1388,10 +1372,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-xs text-slate-800 truncate">
-                {sesion?.username || "SuperAdmin"}
+                {perfil?.nombreCompleto || sesion?.username || "Administrador"}
               </div>
               <div className="text-[10px] text-slate-400 truncate">
-                Administrador Global
+                {ROLES_EQUIPO.find((r) => r.id === perfil?.rol)?.label || "Administración"}
               </div>
             </div>
           </div>
@@ -1432,31 +1416,11 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10 shadow-2xs">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 text-xs font-medium">Consola Maestro</span>
+              <span className="text-slate-400 text-xs font-medium">Administración</span>
               <span className="text-slate-300 text-xs">/</span>
-              <span className="font-bold text-slate-800 text-xs">
-                {vistaPrincipal === "TENANTS"
-                  ? "Directorio de Clientes & Licencias"
-                  : vistaPrincipal === "PAGOS"
-                  ? "Historial de Cobros & Facturas"
-                  : vistaPrincipal === "METRICAS"
-                  ? "Metricas & Business Intelligence"
-                  : vistaPrincipal === "FINANZAS"
-                  ? "Finanzas & Contabilidad SaaS"
-                  : vistaPrincipal === "AUDITORIA" ? "Seguridad & Auditoria Global" : "Centro de Soporte & Chat en Vivo"}
-              </span>
+              <span className="font-bold text-slate-800 text-xs">{TITULOS_VISTA[vistaPrincipal][0]}</span>
             </div>
-            <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">
-              {vistaPrincipal === "TENANTS"
-                ? "Directorio General de Tenants"
-                : vistaPrincipal === "PAGOS"
-                ? "Historial de Cobros y Suscripciones"
-                : vistaPrincipal === "METRICAS"
-                ? "Metricas, Estadisticas y Rendimiento SaaS"
-                : vistaPrincipal === "FINANZAS"
-                ? "Finanzas, Gastos Fijos y Flujo de Caja"
-                : vistaPrincipal === "AUDITORIA" ? "Bitacora Inmutable de Seguridad y Trazabilidad Global" : "Mesa de Ayuda, Tickets y Chat con Tenants"}
-            </h1>
+            <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">{TITULOS_VISTA[vistaPrincipal][1]}</h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1626,14 +1590,14 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
           <table className="w-full text-left text-xs text-slate-700">
             <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400 tracking-wider border-b border-slate-100">
               <tr>
-                <th className="py-3 px-4">Tenant ID</th>
-                <th className="py-3 px-4">Empresa / Negocio</th>
-                <th className="py-3 px-4">Modulo Base</th>
-                <th className="py-3 px-4">Plan Licencia</th>
-                <th className="py-3 px-4">Usuarios (Uso / Tope)</th>
-                <th className="py-3 px-4">Estado & Dias Restantes</th>
+                <th className="py-3 px-4">ID</th>
+                <th className="py-3 px-4">Negocio</th>
+                <th className="py-3 px-4">Módulo base</th>
+                <th className="py-3 px-4">Plan</th>
+                <th className="py-3 px-4">Usuarios</th>
+                <th className="py-3 px-4">Estado</th>
                 <th className="py-3 px-4">Vencimiento</th>
-                <th className="py-3 px-4 text-right">Acciones Operativas</th>
+                <th className="py-3 px-4 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -1660,8 +1624,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
                       {/* Empresa */}
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900">{t.nombreEmpresa}</div>
-                        <div className="text-[10px] text-slate-400">{t.emailContacto || "Sin correo"}</div>
+                        <button onClick={() => setFichaTenantId(t.tenantId)} className="text-left cursor-pointer group">
+                          <div className="font-bold text-slate-900 group-hover:text-emerald-700 group-hover:underline">{t.nombreEmpresa}</div>
+                          <div className="text-[10px] text-slate-400">{t.emailContacto || "Sin correo"}</div>
+                        </button>
                       </td>
 
                       {/* Modulo */}
@@ -1699,10 +1665,8 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                         >
                           <span className="font-mono font-black">{cantUsuarios}</span>
                           <span className="text-slate-400">/</span>
-                          <span className="font-mono">{limite ? limite : "Ilim."}</span>
-                          <span className="text-[9px] uppercase font-semibold">
-                            {cupoLleno ? "[Lleno]" : limite ? "[Tope]" : "[Libre]"}
-                          </span>
+                          <span className="font-mono">{limite ? limite : "∞"}</span>
+                          {cupoLleno && <span className="text-[9px] uppercase font-semibold">Lleno</span>}
                         </button>
                       </td>
 
@@ -1720,72 +1684,23 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                         {t.fechaVencimientoPago || "Indefinido"}
                       </td>
 
-                      {/* Acciones */}
-                      <td className="py-3 px-4 text-right">
+                      {/* Acciones: la principal a la vista, el resto en la ficha */}
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Registrar Pago */}
                           <button
                             onClick={() => abrirModalPago(t)}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-[10px] shadow-xs cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] shadow-xs cursor-pointer"
                             title="Registrar pago y extender licencia"
                           >
-                            Cobro
+                            Cobrar
                           </button>
-
-                          {/* Regalar Dias */}
                           <button
-                            onClick={() => abrirModalRegalo(t)}
-                            className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[10px] cursor-pointer"
-                            title="Regalar dias de cortesia"
+                            onClick={() => setFichaTenantId(t.tenantId)}
+                            className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px] cursor-pointer"
+                            title="Ver ficha completa: módulos, usuarios, soporte, cobros y auditoría"
                           >
-                            Cortesia
+                            Ficha
                           </button>
-
-                          {/* Modulos */}
-                          <button
-                            onClick={() => abrirModalModulos(t)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-[10px] cursor-pointer"
-                            title="Gestionar modulos de industria"
-                          >
-                            Modulos
-                          </button>
-
-                          {/* Usuarios */}
-                          <button
-                            onClick={() => abrirModalUsuariosDirectorio(t)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-[10px] cursor-pointer"
-                            title="Ver usuarios y definir limites de cuentas"
-                          >
-                            Usuarios
-                          </button>
-
-                          {/* Impersonar Soporte */}
-                          <button
-                            onClick={() => ejecutarConAutorizacionMaestra(() => handleImpersonar(t.tenantId))}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[10px] cursor-pointer transition-colors shadow-2xs"
-                            title="Acceso de soporte tecnico directo"
-                          >
-                            Soporte
-                          </button>
-
-                          {/* Activar / Suspender */}
-                          {t.activa ? (
-                            <button
-                              onClick={() => handleDesactivar(t.tenantId)}
-                              className="p-1 text-slate-400 hover:text-rose-600 font-bold text-xs cursor-pointer"
-                              title="Suspender acceso"
-                            >
-                              [Off]
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleActivar(t.tenantId)}
-                              className="p-1 text-slate-400 hover:text-emerald-600 font-bold text-xs cursor-pointer"
-                              title="Reactivar acceso"
-                            >
-                              [On]
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -2430,6 +2345,59 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* FICHA DEL NEGOCIO (panel lateral) */}
+      {(() => {
+        const t = fichaTenantId !== null ? tenants.find((x) => x.tenantId === fichaTenantId) : undefined;
+        if (!t) return null;
+        return (
+          <SuperAdminFichaTenant
+            tenant={t}
+            diasRestantes={calcularDiasRestantes(t.fechaVencimientoPago)}
+            onCerrar={() => setFichaTenantId(null)}
+            onCobro={() => abrirModalPago(t)}
+            onCortesia={() => abrirModalRegalo(t)}
+            onModulos={() => abrirModalModulos(t)}
+            onUsuarios={() => abrirModalUsuariosDirectorio(t)}
+            onSoporte={() => ejecutarConAutorizacionMaestra(() => handleImpersonar(t.tenantId))}
+            onActivar={() => handleActivar(t.tenantId)}
+            onSuspender={() => handleDesactivar(t.tenantId)}
+          />
+        );
+      })()}
+
+      {/* VISTA: SEGURIDAD DE LA CUENTA (2FA y contraseña) */}
+      {vistaPrincipal === "SEGURIDAD" && sesion && (
+        <div className="animate-fadeIn space-y-4">
+          {perfil?.debeCambiarClave && (
+            <div className="max-w-3xl p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-sm">
+              Está usando una contraseña temporal. Cámbiela para poder usar el panel.
+            </div>
+          )}
+          <SuperAdminSeguridad
+            avisar={avisar}
+            onNuevoToken={(token) => {
+              const s = { ...sesion, token };
+              guardarSesionSuperAdmin(s);
+              setSesion(s);
+            }}
+          />
+        </div>
+      )}
+
+      {/* VISTA: EQUIPO DE ADMINISTRACION (solo Propietario) */}
+      {vistaPrincipal === "EQUIPO" && (
+        <div className="animate-fadeIn">
+          <SuperAdminEquipo avisar={avisar} />
+        </div>
+      )}
+
+      {/* VISTA: ACTIVIDAD OPERATIVA POR VERTICAL (incluye Canal Endémico de la red) */}
+      {vistaPrincipal === "ACTIVIDAD" && (
+        <div className="animate-fadeIn">
+          <SuperAdminActividad />
         </div>
       )}
 
