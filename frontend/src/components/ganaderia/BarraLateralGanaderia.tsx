@@ -67,6 +67,23 @@ export default function BarraLateralGanaderia({
     </button>
 
     <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
+      {/* Mercado ganadero: arriba y destacado, no escondido entre las acciones rápidas. */}
+      <button
+        type="button"
+        onClick={() => { abrirMercado(); setSidebarAbierto(false); }}
+        title="Compra y venta de ganado entre fincas de Aurora"
+        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-emerald-50 hover:from-teal-100 hover:to-emerald-100 hover:border-teal-300 text-left cursor-pointer transition-colors"
+      >
+        <span className="w-8 h-8 rounded-lg bg-teal-700 text-[#ffffff] flex items-center justify-center flex-shrink-0"><IconCow size={16} /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-semibold text-[13px] text-teal-900">Mercado ganadero</span>
+          <span className="block text-[11px] text-teal-700/80">Compra y vende entre fincas</span>
+        </span>
+        {sinLeerMercado > 0 && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500 text-[#ffffff]" title="Mensajes sin leer">{sinLeerMercado}</span>
+        )}
+      </button>
+
       {([
         {
           titulo: "Operación",
@@ -143,18 +160,6 @@ export default function BarraLateralGanaderia({
         >
           <span className="text-slate-400"><IconCoins size={16} /></span>
           <span className="flex-1 text-left">Vender animales</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => { abrirMercado(); setSidebarAbierto(false); }}
-          title="Compra y venta entre fincas de Aurora"
-          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900"
-        >
-          <span className="text-slate-400"><IconCoins size={16} /></span>
-          <span className="flex-1 text-left">Mercado ganadero</span>
-          {sinLeerMercado > 0 && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500 text-white">{sinLeerMercado}</span>
-          )}
         </button>
         {puedeImportarHato && (
           <button
