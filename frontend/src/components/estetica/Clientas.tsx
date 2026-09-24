@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { crearPaciente, actualizarPaciente, type Paciente, type NuevoPaciente, type ProcedimientoMedico, type ProfesionalEstetica } from "../../api";
-import { IconChevronLeft, IconEdit, IconSearch, IconWhatsApp } from "../../Icons";
+import { IconEdit, IconSearch, IconWhatsApp } from "../../Icons";
+import { IconoAnterior } from "./iconos";
 import { Aviso, Boton, Campo, EncabezadoPagina, Modal, Tarjeta, Vacio, claseInput, enlaceWhatsApp, formatearFecha, mensajeError } from "./comun";
 import FichaPiel from "./FichaPiel";
 import SesionesClienta from "./SesionesClienta";
@@ -96,7 +97,7 @@ export default function Clientas({
                       onClick={() => { onSeleccionar(c); setPestana("sesiones"); }}
                       className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left transition cursor-pointer ${activa ? "bg-[#9E4A63]/10" : "hover:bg-slate-50 dark:hover:bg-white/5"}`}
                     >
-                      <span className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${activa ? "bg-[#9E4A63] text-white" : "bg-[#E3A6B4]/25 text-[#9E4A63]"}`}>
+                      <span className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${activa ? "bg-[#9E4A63] text-[#ffffff]" : "bg-[#E3A6B4]/25 text-[#9E4A63]"}`}>
                         {iniciales(c.nombreCompleto)}
                       </span>
                       <span className="min-w-0">
@@ -147,11 +148,11 @@ function DetalleClienta({ clienta, servicios, profesionales, negocio, pestana, o
     <Tarjeta className="overflow-hidden">
       <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-0 bg-gradient-to-br from-[#E3A6B4]/15 via-transparent to-transparent">
         <button onClick={onVolver} className="lg:hidden inline-flex items-center gap-1 text-xs font-semibold text-slate-500 mb-3 cursor-pointer">
-          <IconChevronLeft size={14} /> Clientas
+          <IconoAnterior size={14} /> Clientas
         </button>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="w-12 h-12 rounded-full bg-[#9E4A63] text-white flex items-center justify-center font-bold flex-shrink-0">{iniciales(clienta.nombreCompleto)}</span>
+            <span className="w-12 h-12 rounded-full bg-[#9E4A63] text-[#ffffff] flex items-center justify-center font-bold flex-shrink-0">{iniciales(clienta.nombreCompleto)}</span>
             <div className="min-w-0">
               <h2 className="font-['Outfit'] font-bold text-lg text-slate-900 dark:text-white truncate">{clienta.nombreCompleto}</h2>
               <p className="text-xs text-slate-500 dark:text-white/50">

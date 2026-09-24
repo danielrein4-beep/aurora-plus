@@ -173,7 +173,7 @@ export default function FichaPiel({ pacienteId, onGuardada }: { pacienteId: numb
                 onClick={() => alternarLesion(l)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium border transition cursor-pointer ${
                   activa
-                    ? "bg-[#9E4A63] border-[#9E4A63] text-white"
+                    ? "bg-[#9E4A63] border-[#9E4A63] text-[#ffffff]"
                     : "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/70 hover:border-[#9E4A63]/50"
                 }`}
               >

@@ -123,7 +123,7 @@ export function Boton({
   title?: string;
 }) {
   const estilos = {
-    primario: "bg-[#9E4A63] hover:bg-[#873C54] text-white shadow-sm",
+    primario: "bg-[#9E4A63] hover:bg-[#873C54] text-[#ffffff] shadow-sm",
     secundario: "bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/10",
     peligro: "bg-white dark:bg-white/5 border border-rose-200 dark:border-rose-500/30 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10",
     fantasma: "text-slate-500 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10",

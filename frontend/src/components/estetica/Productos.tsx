@@ -3,7 +3,8 @@ import {
   listarProductosEstetica, crearProductoEstetica, actualizarProductoEstetica, entradaProductoEstetica, venderProductosEstetica,
   type ProductoEstetica, type Paciente, type ProfesionalEstetica,
 } from "../../api";
-import { IconEdit, IconTrash } from "../../Icons";
+import { IconEdit } from "../../Icons";
+import { IconoPapelera } from "./iconos";
 import {
   Aviso, Boton, Campo, Cargando, EncabezadoPagina, Insignia, Kpi, Modal, Tarjeta, Vacio, claseInput, formatearMonto, mensajeError,
 } from "./comun";
@@ -323,7 +324,7 @@ function VentaProductos({ productos, moneda, clientas, profesionales, onCerrar, 
                   <span className="flex-1 min-w-0 text-sm text-slate-800 dark:text-white truncate">{p.nombre}</span>
                   <input type="number" min={1} max={num(p.stock_actual)} className={`${claseInput} !w-16 !py-1 text-center`} value={it.cantidad} onChange={(e) => cambiarCantidad(it.id, Number(e.target.value) || 1)} />
                   <span className="w-20 text-right text-sm font-semibold">{formatearMonto(num(p.precio_venta) * it.cantidad, moneda)}</span>
-                  <button onClick={() => setCarrito((c) => c.filter((x) => x.id !== it.id))} className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer" title="Quitar"><IconTrash size={14} /></button>
+                  <button onClick={() => setCarrito((c) => c.filter((x) => x.id !== it.id))} className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer" title="Quitar"><IconoPapelera size={14} /></button>
                 </li>
               );
             })}

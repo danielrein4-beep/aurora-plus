@@ -4,7 +4,8 @@ import {
   listarPaquetesEstetica, obtenerFichaEstetica,
   type SesionEstetica, type PaqueteEstetica, type ProcedimientoMedico, type ProfesionalEstetica,
 } from "../../api";
-import { IconCamera, IconTrash } from "../../Icons";
+import { IconCamera } from "../../Icons";
+import { IconoPapelera } from "./iconos";
 import {
   Aviso, Boton, Campo, Cargando, Insignia, Modal, Vacio, claseInput, comprimirImagen, formatearFecha, formatearMonto, hoyISO, mensajeError,
 } from "./comun";
@@ -79,7 +80,7 @@ export default function SesionesClienta({ pacienteId, servicios, profesionales }
                       </Boton>
                     )}
                     <button onClick={() => eliminar(s)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer" title="Eliminar sesión">
-                      <IconTrash size={15} />
+                      <IconoPapelera size={15} />
                     </button>
                   </div>
                 </div>
@@ -287,7 +288,7 @@ function SelectorFoto({ titulo, foto, onElegir, onQuitar }: { titulo: string; fo
       {foto ? (
         <div className="relative aspect-[4/5] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10">
           <img src={foto} alt={titulo} className="w-full h-full object-cover" />
-          <button onClick={onQuitar} className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-white text-[11px] font-semibold cursor-pointer">Quitar</button>
+          <button onClick={onQuitar} className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-[#ffffff] text-[11px] font-semibold cursor-pointer">Quitar</button>
         </div>
       ) : (
         <label className="aspect-[4/5] rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/15 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-[#9E4A63]/50 hover:text-[#9E4A63] cursor-pointer transition">
@@ -325,8 +326,8 @@ function VisorFotos({ sesion, onCerrar }: { sesion: SesionEstetica; onCerrar: ()
               <img src={fotos.antes!} alt="Antes" className="absolute inset-0 w-full h-full object-contain bg-slate-100" />
             </div>
             <div className="absolute inset-y-0 w-0.5 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.15)]" style={{ left: `${corte}%` }} />
-            <span className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-black/55 text-white text-[11px] font-semibold">Antes</span>
-            <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md bg-black/55 text-white text-[11px] font-semibold">Después</span>
+            <span className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-black/55 text-[#ffffff] text-[11px] font-semibold">Antes</span>
+            <span className="absolute top-3 right-3 px-2 py-0.5 rounded-md bg-black/55 text-[#ffffff] text-[11px] font-semibold">Después</span>
           </div>
           <input type="range" min={0} max={100} value={corte} onChange={(e) => setCorte(Number(e.target.value))} className="w-full accent-[#9E4A63]" aria-label="Deslizar para comparar" />
           <p className="text-center text-xs text-slate-400">Desliza para comparar</p>

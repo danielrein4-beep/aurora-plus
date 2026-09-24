@@ -3,7 +3,8 @@ import {
   listarCitasPorRango, agendarCita, actualizarEstadoCita,
   type CitaMedica, type Paciente, type ProcedimientoMedico,
 } from "../../api";
-import { IconChevronLeft, IconChevronRight, IconWhatsApp } from "../../Icons";
+import { IconWhatsApp } from "../../Icons";
+import { IconoAnterior, IconoSiguiente } from "./iconos";
 import {
   Aviso, Boton, Campo, Cargando, EncabezadoPagina, Insignia, Modal, Tarjeta, Vacio, claseInput,
   enlaceWhatsApp, formatearFecha, hoyISO, mensajeError, sumarDias,
@@ -82,7 +83,7 @@ export default function Agenda({ clientas, servicios, onCambio }: { clientas: Pa
       <Tarjeta className="p-3 sm:p-4 mb-4">
         <div className="flex items-center gap-2">
           <button onClick={() => setDia(sumarDias(dia, -7))} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer" aria-label="Semana anterior">
-            <IconChevronLeft size={16} />
+            <IconoAnterior size={16} />
           </button>
           <div className="flex-1 grid grid-cols-7 gap-1">
             {semana.map((f) => {
@@ -94,9 +95,9 @@ export default function Agenda({ clientas, servicios, onCambio }: { clientas: Pa
                 <button
                   key={f}
                   onClick={() => setDia(f)}
-                  className={`flex flex-col items-center py-2 rounded-xl transition cursor-pointer ${activo ? "bg-[#9E4A63] text-white" : "hover:bg-slate-50 dark:hover:bg-white/5"}`}
+                  className={`flex flex-col items-center py-2 rounded-xl transition cursor-pointer ${activo ? "bg-[#9E4A63] text-[#ffffff]" : "hover:bg-slate-50 dark:hover:bg-white/5"}`}
                 >
-                  <span className={`text-[10px] font-semibold uppercase ${activo ? "text-white/80" : "text-slate-400"}`}>{DIAS[new Date(y, m - 1, d).getDay()]}</span>
+                  <span className={`text-[10px] font-semibold uppercase ${activo ? "text-[#ffffff]/80" : "text-slate-400"}`}>{DIAS[new Date(y, m - 1, d).getDay()]}</span>
                   <span className={`text-base font-bold ${activo ? "" : esHoy ? "text-[#9E4A63] dark:text-[#E3A6B4]" : "text-slate-800 dark:text-white"}`}>{d}</span>
                   <span className={`h-1.5 mt-0.5 flex gap-0.5`}>
                     {Array.from({ length: Math.min(n, 4) }).map((_, i) => (
@@ -108,7 +109,7 @@ export default function Agenda({ clientas, servicios, onCambio }: { clientas: Pa
             })}
           </div>
           <button onClick={() => setDia(sumarDias(dia, 7))} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer" aria-label="Semana siguiente">
-            <IconChevronRight size={16} />
+            <IconoSiguiente size={16} />
           </button>
         </div>
         {dia !== hoyISO() && (

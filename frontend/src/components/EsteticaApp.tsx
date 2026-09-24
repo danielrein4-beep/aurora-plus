@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { listarPacientes, listarProcedimientos, listarProfesionalesEstetica, obtenerMiNegocio, type Paciente, type ProcedimientoMedico, type ProfesionalEstetica } from "../api";
-import {
-  IconBox, IconCalendarSolido, IconDashboardGrid, IconDoorExit, IconSparkles, IconTag, IconUser, IconUsers, IconWallet, IconWarning,
-} from "../Icons";
+import { IconCalendarSolido, IconDashboardGrid, IconDoorExit, IconSparkles, IconTag, IconUsers, IconWallet, IconWarning } from "../Icons";
+import { IconoCaja, IconoPersona } from "./estetica/iconos";
 import { COLOR, mensajeError, type PaginaEstetica } from "./estetica/comun";
 import VistaGeneral from "./estetica/VistaGeneral";
 import Clientas from "./estetica/Clientas";
@@ -20,9 +19,9 @@ const NAV: { id: PaginaEstetica; label: string; Icon: (p: { size?: number }) => 
   { id: "agenda", label: "Agenda", Icon: IconCalendarSolido },
   { id: "paquetes", label: "Paquetes", Icon: IconSparkles },
   { id: "servicios", label: "Servicios", Icon: IconTag },
-  { id: "productos", label: "Productos", Icon: IconBox },
+  { id: "productos", label: "Productos", Icon: IconoCaja },
   { id: "caja", label: "Caja", Icon: IconWallet },
-  { id: "equipo", label: "Equipo y comisiones", Icon: IconUser },
+  { id: "equipo", label: "Equipo y comisiones", Icon: IconoPersona },
 ];
 
 export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
@@ -105,7 +104,7 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
           <span className="inline-flex text-rose-500 mb-3"><IconWarning size={40} /></span>
           <h2 className="text-lg font-bold text-slate-900 mb-1">No hay un negocio en la sesión</h2>
           <p className="text-sm text-slate-500 mb-5">Inicia sesión con la cuenta de tu centro de estética para continuar.</p>
-          <button onClick={logout} className="px-4 py-2 rounded-xl bg-[#9E4A63] text-white text-sm font-semibold cursor-pointer">Cerrar sesión</button>
+          <button onClick={logout} className="px-4 py-2 rounded-xl bg-[#9E4A63] text-[#ffffff] text-sm font-semibold cursor-pointer">Cerrar sesión</button>
         </div>
       </div>
     );
@@ -121,7 +120,7 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
             <h2 className="text-lg font-bold text-slate-900 mb-1">Estética aún no está disponible</h2>
             <p className="text-sm text-slate-500 mb-5">Este módulo está en preparación y todavía no se ofrece a los negocios.</p>
             {onSalir && (
-              <button onClick={onSalir} className="px-4 py-2 rounded-xl bg-[#9E4A63] text-white text-sm font-semibold cursor-pointer">Volver al Hub</button>
+              <button onClick={onSalir} className="px-4 py-2 rounded-xl bg-[#9E4A63] text-[#ffffff] text-sm font-semibold cursor-pointer">Volver al Hub</button>
             )}
           </div>
         )}
@@ -140,14 +139,14 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
         style={{ backgroundColor: COLOR.sidebar }}
       >
         <div className="px-2 pb-3 mb-2 border-b border-white/10">
-          <div className="font-['Outfit'] font-black text-lg text-white flex items-center gap-2">
+          <div className="font-['Outfit'] font-black text-lg text-[#ffffff] flex items-center gap-2">
             <span className="text-[#E3A6B4]"><IconSparkles size={20} /></span>
             Aurora Estética
           </div>
-          <div className="text-[10px] text-white/40 uppercase tracking-wider mt-0.5 truncate">{negocio}</div>
+          <div className="text-[10px] text-[#ffffff]/40 uppercase tracking-wider mt-0.5 truncate">{negocio}</div>
         </div>
 
-        <div className="px-2 pb-1 text-[11px] font-bold text-white/30 uppercase tracking-wider">Estética y cosmiatría</div>
+        <div className="px-2 pb-1 text-[11px] font-bold text-[#ffffff]/30 uppercase tracking-wider">Estética y cosmiatría</div>
 
         <div className="space-y-1">
           {NAV.map((n) => {
@@ -157,7 +156,7 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
                 key={n.id}
                 onClick={() => ir(n.id)}
                 className={`sidebar-glare w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                  activo ? "sidebar-glare--active bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
+                  activo ? "sidebar-glare--active bg-white/10 text-[#ffffff]" : "text-[#ffffff]/60 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 <n.Icon size={16} />
@@ -171,7 +170,7 @@ export default function EsteticaApp({ onSalir }: { onSalir?: () => void }) {
 
         <div className="space-y-1 pt-1 border-t border-white/10">
           {onSalir && (
-            <button onClick={onSalir} className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-white/70 hover:bg-white/10 cursor-pointer">
+            <button onClick={onSalir} className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-left text-[#ffffff]/70 hover:bg-white/10 cursor-pointer">
               ← Volver a Aurora Hub
             </button>
           )}
