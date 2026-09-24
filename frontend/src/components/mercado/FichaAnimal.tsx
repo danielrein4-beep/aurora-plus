@@ -6,6 +6,7 @@ import {
   type DetallePublicacionMercado, type PublicarMercadoRequest,
 } from "../../api";
 import Chat from "./Chat";
+import NotaMovilizacionTrato from "./NotaMovilizacionTrato";
 import {
   CAJA, INPUT, BOTON, BOTON_ORO, BOTON_SUAVE, CATEGORIAS, ESTADOS_VE, dinero, numero, precioTexto, totalEstimado, edadTexto, sexoTexto,
   nombreCategoria, fechaCorta, mensajeError, PerfilFinca,
@@ -186,6 +187,7 @@ export default function FichaAnimal({ id, compradorInicial, puedeNegociar, conCo
                 <Calificar onCalificar={(estrellas, comentario) => accion(() => calificarTratoMercado(d.ofertaCerrada!.id, estrellas, comentario), "Gracias por calificar")} />
               )}
               {d.yaCalifique && <p className="text-xs text-[#3E8A66]">Ya calificaste este trato.</p>}
+              {d.notaMovilizacion && puedeNegociar && <NotaMovilizacionTrato datos={d.notaMovilizacion} onEmitida={cargar} />}
             </div>
           )}
 

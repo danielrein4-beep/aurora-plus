@@ -276,8 +276,21 @@ public class MercadoGanaderoController {
             }
             salida.put("ofertas", ofertas);
             if ("VENDIDA".equals(fila.get("estado")) && compradorCerrado != null) {
-                salida.put("contraparte", contacto(compradorCerrado));
+                Map<String, Object> comprador = contacto(compradorCerrado);
+                salida.put("contraparte", comprador);
                 cerrada = ofertaAceptada(id);
+                // Datos para la nota de movilización (la emite quien vende: los animales salen de su finca).
+                Map<String, Object> nota = new LinkedHashMap<>();
+                nota.put("animalIds", delLote);
+                nota.put("destino", comprador.get("nombre"));
+                nota.put("origen", jdbc.queryForList("SELECT nombre FROM fincas_ganaderia WHERE tenant_id = ?", String.class, yo).stream().findFirst()
+                    .orElseGet(() -> (String) contacto(yo).get("nombre")));
+                // Si ya se emitió una nota de venta con estos animales, se ofrece descargarla en vez de duplicarla.
+                nota.put("emitidas", jdbc.queryForList(
+                    "SELECT DISTINCT g.id, g.numero_guia AS \"numeroGuia\", g.fecha FROM guias_traslado g JOIN detalles_guia_traslado d ON d.guia_id = g.id "
+                        + "WHERE g.tenant_id = ? AND g.motivo = 'VENTA' AND d.animal_id IN (" + marcadores(delLote.size()) + ") ORDER BY g.id DESC",
+                    concatenar(List.<Object>of(yo), new ArrayList<Object>(delLote)).toArray()));
+                salida.put("notaMovilizacion", nota);
             }
         } else {
             salida.put("misOfertas", jdbc.queryForList(

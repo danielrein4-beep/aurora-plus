@@ -6500,6 +6500,13 @@ export interface DetallePublicacionMercado extends PublicacionMercado {
   misOfertas?: OfertaMercado[];
   contraparte?: ContactoMercado;
   ofertaCerrada: { id: number; monto: number; traspasado: boolean } | null;
+  /** Solo para quien vende un trato cerrado: con qué armar la nota de movilización. */
+  notaMovilizacion?: {
+    animalIds: number[];
+    destino: string | null;
+    origen: string | null;
+    emitidas: { id: number; numeroGuia: string; fecha: string }[];
+  };
   yaCalifique?: boolean;
   animalRecibidoId?: number;
   datosOcultos?: boolean;
