@@ -37,16 +37,16 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
       {/* Estado de las fuentes del módulo */}
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono font-semibold border border-[#177E89]/30">
+          <span className="px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono font-light uppercase tracking-wide border border-[#177E89]/30">
             EN LÍNEA
           </span>
-          <span className="text-slate-500">
+          <span className="text-slate-500 font-light uppercase tracking-wide">
             Datos de tu negocio, según los permisos de tu usuario.
           </span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#177E89] animate-pulse" />
-          <span className="text-slate-900 font-medium font-mono">Personal & Nómina</span>
+          <span className="text-slate-900 font-light uppercase tracking-wide font-mono">Personal & Nómina</span>
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('empleados')}
         >
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+          <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
             <span>Total Colaboradores</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-mono text-[#177E89]">
               {activosCount} Activos
@@ -70,9 +70,9 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-900">
               {empleados.length}
             </span>
-            <span className="text-xs text-slate-500">registrados</span>
+            <span className="text-xs font-light uppercase tracking-wide text-slate-500">registrados</span>
           </div>
-          <div className="mt-2 text-xs text-slate-500 flex items-center gap-2">
+          <div className="mt-2 text-xs font-light uppercase tracking-wide text-slate-500 flex items-center gap-2">
             <span className="text-[#177E89]">&bull;</span>
             <span>{vacacionesCount} de vacaciones</span>
           </div>
@@ -86,7 +86,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('asistencia')}
         >
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+          <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
             <span>Asistencia Hoy</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-mono text-sky-600">
               {asistenciasHoy.length} Registros
@@ -96,11 +96,11 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-900">
               {presentesHoy}
             </span>
-            <span className="text-xs text-slate-500">en jornada</span>
+            <span className="text-xs font-light uppercase tracking-wide text-slate-500">en jornada</span>
           </div>
-          <div className="mt-2 text-xs text-slate-500 flex items-center gap-2">
+          <div className="mt-2 text-xs font-light uppercase tracking-wide text-slate-500 flex items-center gap-2">
             {retardoHoy > 0 ? (
-              <span className="text-amber-600 font-medium">{retardoHoy} con retardo registrado</span>
+              <span className="text-amber-600 font-light uppercase tracking-wide">{retardoHoy} con retardo registrado</span>
             ) : asistenciasHoy.length > 0 ? (
               <span className="text-[#177E89]">Sin retardos registrados</span>
             ) : (
@@ -117,7 +117,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('turnos')}
         >
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+          <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
             <span>Cobertura de Turnos</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-mono text-sky-600">
               Jornada Activa
@@ -127,9 +127,9 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-900">
               {turnosHoy.filter((t) => t.estado === 'EN_CURSO').length}
             </span>
-            <span className="text-xs text-slate-500">en puesto</span>
+            <span className="text-xs font-light uppercase tracking-wide text-slate-500">en puesto</span>
           </div>
-          <div className="mt-2 text-xs text-slate-500">
+          <div className="mt-2 text-xs font-light uppercase tracking-wide text-slate-500">
             <span>Áreas clínicas, cocina y campo activas</span>
           </div>
         </div>
@@ -142,12 +142,12 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('nomina')}
         >
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+          <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
             <span>Aurora Nómina</span>
             {nominaHabilitada ? (
               <EstadoNominaBadge estado={periodoActual.estado} />
             ) : (
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/15 text-amber-600 font-mono font-medium border border-[#f59e0b]/30">
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/15 text-amber-600 font-mono font-light uppercase tracking-wide border border-[#f59e0b]/30">
                 Desactivado
               </span>
             )}
@@ -156,9 +156,9 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
             <span className="text-xl sm:text-2xl font-bold font-mono text-[#177E89]">
               {ocultarSueldo ? '••••••' : formatearMoneda(periodoActual.montoTotalNeto, periodoActual.monedaPrincipal)}
             </span>
-            <span className="text-xs text-slate-500">neto</span>
+            <span className="text-xs font-light uppercase tracking-wide text-slate-500">neto</span>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 truncate font-mono">
+          <div className="mt-2 text-[11px] font-light uppercase tracking-wide text-slate-500 truncate font-mono">
             {periodoActual.nombre}
           </div>
         </div>
@@ -170,12 +170,12 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Distribución del Equipo</h3>
-              <p className="text-xs text-slate-500">Colaboradores por departamento operativo</p>
+              <h3 className="text-base font-bold tracking-tight text-slate-900">Distribución del Equipo</h3>
+              <p className="text-xs font-light uppercase tracking-wide text-slate-500">Colaboradores por departamento operativo</p>
             </div>
             <button
               onClick={() => onNavegarSeccion('empleados')}
-              className="text-xs text-[#177E89] hover:underline font-medium"
+              className="text-xs text-[#177E89] hover:underline font-light uppercase tracking-wide"
             >
               Ver todos &rarr;
             </button>
@@ -187,7 +187,7 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
               return (
                 <div key={depto} className="space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span className="text-slate-700 font-medium">{depto}</span>
+                    <span className="text-slate-700 font-light uppercase tracking-wide">{depto}</span>
                     <span className="font-mono text-slate-500">
                       {count} ({porcentaje}%)
                     </span>
@@ -208,12 +208,12 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
         <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Turnos de la Jornada</h3>
-              <p className="text-xs text-slate-500">Personal actualmente en servicio programado</p>
+              <h3 className="text-base font-bold tracking-tight text-slate-900">Turnos de la Jornada</h3>
+              <p className="text-xs font-light uppercase tracking-wide text-slate-500">Personal actualmente en servicio programado</p>
             </div>
             <button
               onClick={() => onNavegarSeccion('turnos')}
-              className="text-xs text-[#177E89] hover:underline font-medium"
+              className="text-xs text-[#177E89] hover:underline font-light uppercase tracking-wide"
             >
               Gestionar matriz &rarr;
             </button>
@@ -227,22 +227,22 @@ export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
               >
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-900">{t.empleadoNombre}</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500">
+                    <span className="font-bold text-slate-900">{t.empleadoNombre}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-light uppercase tracking-wide">
                       {t.departamento}
                     </span>
                   </div>
-                  <p className="text-slate-500 text-[11px]">{t.turnoNombre}</p>
+                  <p className="text-slate-500 text-[11px] font-light uppercase tracking-wide">{t.turnoNombre}</p>
                 </div>
 
                 <div>
                   {t.estado === 'EN_CURSO' ? (
-                    <span className="inline-flex items-center gap-1 text-[#177E89] font-medium font-mono text-[11px]">
+                    <span className="inline-flex items-center gap-1 text-[#177E89] font-light uppercase tracking-wide font-mono text-[11px]">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#177E89] animate-pulse" />
                       En Servicio
                     </span>
                   ) : (
-                    <span className="text-slate-500 font-mono text-[11px]">Programado</span>
+                    <span className="text-slate-500 font-mono text-[11px] font-light uppercase tracking-wide">Programado</span>
                   )}
                 </div>
               </div>

@@ -46,28 +46,28 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
     switch (estado) {
       case 'ACTIVO':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#177E89] bg-[#177E89]/10 px-2 py-0.5 rounded-full border border-[#177E89]/20">
+          <span className="inline-flex items-center gap-1 text-[11px] font-light uppercase tracking-wide text-[#177E89] bg-[#177E89]/10 px-2 py-0.5 rounded-full border border-[#177E89]/20">
             <span className="w-1.5 h-1.5 rounded-full bg-[#177E89]" />
             Activo
           </span>
         );
       case 'DE_VACACIONES':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 bg-[#fbbf24]/10 px-2 py-0.5 rounded-full border border-[#fbbf24]/20">
+          <span className="inline-flex items-center gap-1 text-[11px] font-light uppercase tracking-wide text-amber-600 bg-[#fbbf24]/10 px-2 py-0.5 rounded-full border border-[#fbbf24]/20">
             <span className="w-1.5 h-1.5 rounded-full bg-[#fbbf24]" />
             Vacaciones
           </span>
         );
       case 'LICENCIA':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-600 bg-[#38bdf8]/10 px-2 py-0.5 rounded-full border border-[#38bdf8]/20">
+          <span className="inline-flex items-center gap-1 text-[11px] font-light uppercase tracking-wide text-sky-600 bg-[#38bdf8]/10 px-2 py-0.5 rounded-full border border-[#38bdf8]/20">
             <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
             Licencia
           </span>
         );
       case 'INACTIVO':
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 bg-[#f87171]/10 px-2 py-0.5 rounded-full border border-[#f87171]/20">
+          <span className="inline-flex items-center gap-1 text-[11px] font-light uppercase tracking-wide text-rose-600 bg-[#f87171]/10 px-2 py-0.5 rounded-full border border-[#f87171]/20">
             <span className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
             Inactivo
           </span>
@@ -128,7 +128,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
           {/* Botón de Privacidad Salarial */}
           <button
             onClick={onAlternarPrivacidadSueldo}
-            className={`px-3 py-2 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89] ${
+            className={`px-3 py-2 rounded-lg text-xs font-light uppercase tracking-wide border flex items-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89] ${
               ocultarSueldo
                 ? 'bg-slate-100 border-slate-300 text-slate-500 hover:text-slate-900'
                 : 'bg-[#177E89]/15 border-[#177E89]/40 text-[#177E89]'
@@ -154,38 +154,38 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] text-[#177E89] font-medium">{emp.codigoEmpleado}</span>
+                  <span className="font-mono text-[11px] text-[#177E89] font-light uppercase tracking-wide">{emp.codigoEmpleado}</span>
                   {getEstadoBadge(emp.estado)}
                 </div>
-                <h4 className="font-semibold text-slate-900 text-sm mt-0.5">
+                <h4 className="font-bold tracking-tight text-slate-900 text-sm mt-0.5">
                   {emp.nombre} {emp.apellidos}
                 </h4>
-                <p className="text-xs text-slate-500">{emp.cargo}</p>
+                <p className="text-xs font-light uppercase tracking-wide text-slate-500">{emp.cargo}</p>
               </div>
               <span className="text-xs text-slate-500 font-mono">{emp.identificacion}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-200">
               <div>
-                <span className="text-slate-500 block text-[10px]">Departamento</span>
-                <span className="text-slate-700 truncate block">{emp.departamento}</span>
+                <span className="text-slate-500 block text-[10px] font-light uppercase tracking-wide">Departamento</span>
+                <span className="text-slate-700 truncate block font-light uppercase tracking-wide">{emp.departamento}</span>
               </div>
               <div>
-                <span className="text-slate-500 block text-[10px]">Sueldo pactado</span>
-                <span className="font-mono font-medium text-[#177E89]">
+                <span className="text-slate-500 block text-[10px] font-light uppercase tracking-wide">Sueldo pactado</span>
+                <span className="font-mono font-light uppercase tracking-wide text-[#177E89]">
                   {ocultarSueldo ? '••••••' : formatearMoneda(emp.salarioBaseReferencial, emp.moneda)}
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+            <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 pt-1">
               <span>Turno: {emp.turnoAsignado}</span>
-              <span className="text-[#177E89] font-medium">Ver Ficha &rarr;</span>
+              <span className="text-[#177E89] font-light uppercase tracking-wide">Ver Ficha &rarr;</span>
             </div>
           </div>
         ))}
         {filtrados.length === 0 && (
-          <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500">
+          <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl text-xs font-light uppercase tracking-wide text-slate-500">
             No se encontraron colaboradores con los criterios seleccionados.
           </div>
         )}
@@ -195,7 +195,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
       <div className="hidden md:block bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-white text-slate-500 border-b border-slate-200 uppercase tracking-wider font-semibold">
+            <thead className="bg-white text-slate-500 border-b border-slate-200 uppercase tracking-wider font-light">
               <tr>
                 <th className="py-3 px-4">Código / Cédula</th>
                 <th className="py-3 px-4">Colaborador</th>
@@ -214,22 +214,22 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
                   onClick={() => onSeleccionarEmpleado(emp)}
                 >
                   <td className="py-3 px-4">
-                    <div className="font-mono text-[#177E89] font-medium">{emp.codigoEmpleado}</div>
+                    <div className="font-mono text-[#177E89] font-light uppercase tracking-wide">{emp.codigoEmpleado}</div>
                     <div className="text-[11px] text-slate-500 font-mono">{emp.identificacion}</div>
                   </td>
-                  <td className="py-3 px-4 font-medium text-slate-900">
+                  <td className="py-3 px-4 font-bold tracking-tight text-slate-900">
                     <div>
                       {emp.nombre} {emp.apellidos}
                     </div>
-                    <div className="text-[11px] text-slate-500">{emp.email}</div>
+                    <div className="text-[11px] text-slate-500 font-light uppercase tracking-wide">{emp.email}</div>
                   </td>
                   <td className="py-3 px-4">
-                    <div className="font-semibold text-slate-900">{emp.departamento}</div>
-                    <div className="text-[11px] text-slate-500">{emp.cargo}</div>
+                    <div className="font-bold tracking-tight text-slate-900">{emp.departamento}</div>
+                    <div className="text-[11px] text-slate-500 font-light uppercase tracking-wide">{emp.cargo}</div>
                   </td>
-                  <td className="py-3 px-4 text-slate-500">{emp.turnoAsignado}</td>
+                  <td className="py-3 px-4 text-slate-500 font-light uppercase tracking-wide">{emp.turnoAsignado}</td>
                   <td className="py-3 px-4">{getEstadoBadge(emp.estado)}</td>
-                  <td className="py-3 px-4 text-right font-mono font-medium text-[#177E89]">
+                  <td className="py-3 px-4 text-right font-mono font-light uppercase tracking-wide text-[#177E89]">
                     {ocultarSueldo ? '••••••' : formatearMoneda(emp.salarioBaseReferencial, emp.moneda)}
                   </td>
                   <td className="py-3 px-4 text-center">
@@ -238,7 +238,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
                         e.stopPropagation();
                         onSeleccionarEmpleado(emp);
                       }}
-                      className="px-2.5 py-1 rounded bg-white border border-slate-200 text-xs text-[#177E89] hover:border-[#177E89]/50 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+                      className="px-2.5 py-1 rounded bg-white border border-slate-200 text-xs font-light uppercase tracking-wide text-[#177E89] hover:border-[#177E89]/50 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
                     >
                       Ver Ficha
                     </button>
@@ -247,7 +247,7 @@ export const ListaEmpleados: React.FC<ListaEmpleadosProps> = ({
               ))}
               {filtrados.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                  <td colSpan={7} className="py-8 text-center text-slate-500 font-light uppercase tracking-wide">
                     No se encontraron colaboradores con los criterios seleccionados.
                   </td>
                 </tr>

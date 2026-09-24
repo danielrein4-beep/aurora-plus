@@ -827,7 +827,7 @@ export default function Dashboard() {
               <div className="font-['Outfit'] font-black text-lg text-aurora leading-none">
                 Aurora Hub
               </div>
-              <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium flex items-center gap-1.5">
+              <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-light flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
                 <span>{user?.empresa || "Mi negocio"}</span>
               </div>
@@ -839,7 +839,7 @@ export default function Dashboard() {
         <nav className="flex items-center gap-1.5 apple-glass-pill rounded-full p-1.5 border border-slate-300/80 dark:border-white/15 bg-slate-100/90 dark:bg-white/[0.04] shadow-inner text-xs overflow-x-auto whitespace-nowrap">
           <button
             onClick={() => setActiveTab("vertical")}
-            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-full font-light uppercase tracking-wide transition-all duration-300 cursor-pointer flex items-center gap-2 ${
               activeTab === "vertical"
                 ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
                 : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
@@ -850,7 +850,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => setActiveTab("billing")}
-            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-full font-light uppercase tracking-wide transition-all duration-300 cursor-pointer flex items-center gap-2 ${
               activeTab === "billing"
                 ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
                 : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
@@ -862,7 +862,7 @@ export default function Dashboard() {
           {esDuenoAdmin && (
             <button
               onClick={() => setActiveTab("team")}
-              className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-full font-light uppercase tracking-wide transition-all duration-300 cursor-pointer flex items-center gap-2 ${
                 activeTab === "team"
                   ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
                   : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
@@ -881,7 +881,7 @@ export default function Dashboard() {
           {esVerticalReal && (
             <button
               onClick={() => navigate(rutaVertical)}
-              className="btn-cyber-neon text-white text-xs font-extrabold px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.5)] hover:scale-105 transition-all cursor-pointer"
+              className="btn-cyber-neon text-white text-xs font-light uppercase tracking-wide px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.5)] hover:scale-105 transition-all cursor-pointer"
               title={`Abrir ${vertical.name}`}
             >
               <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
@@ -890,7 +890,7 @@ export default function Dashboard() {
           )}
 
           {/* Badge de Licencia compacto en 1 línea */}
-          <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${
+          <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-light uppercase tracking-wide ${
             isTrial
               ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
               : "bg-teal-500/10 border-teal-500/30 text-teal-700 dark:text-teal-300"
@@ -901,7 +901,7 @@ export default function Dashboard() {
 
           <button
             onClick={logout}
-            className="apple-glass-btn text-xs font-semibold px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
+            className="apple-glass-btn text-xs font-light uppercase tracking-wide px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
             title="Cerrar sesión de Aurora"
           >
             Salir
@@ -921,7 +921,7 @@ export default function Dashboard() {
                 Puedes seguir trabajando hasta el {suscripcion.accesoHasta ? new Date(suscripcion.accesoHasta + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long" }) : "final del período de gracia"}. Después el acceso se pausa hasta que se confirme tu pago; tus datos no se borran.
               </p>
             </div>
-            <button onClick={() => setShowPaymentModal(true)} className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer">
+            <button onClick={() => setShowPaymentModal(true)} className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-light uppercase tracking-wide px-5 py-2.5 rounded-xl cursor-pointer">
               Reportar mi pago →
             </button>
           </div>
@@ -946,7 +946,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="btn-electric-blue text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md cursor-pointer hover:scale-105 transition-all">
+                className="btn-electric-blue text-white text-xs font-light uppercase tracking-wide px-5 py-2.5 rounded-xl shadow-md cursor-pointer hover:scale-105 transition-all">
                 Activar mi plan →
               </button>
             </div>
@@ -964,7 +964,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
                 {/* Lado Izquierdo: Presentación y Botones Principales */}
                 <div className="lg:col-span-7 space-y-5 text-left">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-xs font-extrabold text-teal-300 tracking-wider uppercase shadow-xs">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-xs font-light text-teal-300 tracking-wider uppercase shadow-xs">
                     <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
                     <span>{vertical.badge}</span>
                   </div>
@@ -973,14 +973,14 @@ export default function Dashboard() {
                     <span className="text-aurora">{vertical.name}</span> — Centro de Operaciones
                   </h2>
 
-                  <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
+                  <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-light uppercase tracking-wide">
                     {vertical.desc}
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
                       onClick={() => navigate(rutaVertical)}
-                      className="btn-cyber-neon text-white text-xs sm:text-sm font-extrabold px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
+                      className="btn-cyber-neon text-white text-xs sm:text-sm font-light uppercase tracking-wide px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
                       <IconRocket size={17} />
                       <span>Entrar a {vertical.name}</span>
                       <span className="text-base">→</span>
@@ -1008,7 +1008,7 @@ export default function Dashboard() {
                 <div>
                   <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
                     <span>Módulos de tu Empresa</span>
-                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-semibold">
+                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-light uppercase tracking-wide">
                       Multi-Tenant Cloud
                     </span>
                   </h3>
@@ -1029,7 +1029,7 @@ export default function Dashboard() {
                       <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-400/10 text-teal-600 dark:text-teal-300 flex items-center justify-center border border-teal-500/20 group-hover:scale-110 transition-transform">
                         <VerticalIcon size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 uppercase">
+                      <span className="text-[10px] font-light font-mono tracking-wider px-2.5 py-1 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 uppercase">
                         Vertical Activa
                       </span>
                     </div>
@@ -1044,7 +1044,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-teal-600 dark:text-teal-300">
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-light uppercase tracking-wide text-teal-600 dark:text-teal-300">
                     <span>Entrar al Sistema</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
@@ -1060,7 +1060,7 @@ export default function Dashboard() {
                       <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-300 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
                         <IconBank size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase">
+                      <span className="text-[10px] font-light font-mono tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase">
                         Finanzas & Control
                       </span>
                     </div>
@@ -1075,7 +1075,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-300">
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-light uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
                     <span>Abrir Centro Financiero</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
@@ -1092,7 +1092,7 @@ export default function Dashboard() {
                       <div className="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-400/10 text-purple-600 dark:text-purple-300 flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
                         <IconUsers size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 uppercase">
+                      <span className="text-[10px] font-light font-mono tracking-wider px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 uppercase">
                         Talento & Nómina
                       </span>
                     </div>
@@ -1107,7 +1107,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-purple-600 dark:text-purple-300">
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-light uppercase tracking-wide text-purple-600 dark:text-purple-300">
                     <span>Abrir Gestión de Personal</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
@@ -1125,7 +1125,7 @@ export default function Dashboard() {
                         <div className="w-12 h-12 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-300 flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
                           <IconShield size={24} />
                         </div>
-                        <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 uppercase">
+                        <span className="text-[10px] font-light font-mono tracking-wider px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 uppercase">
                           Solo Dueño/Admin
                         </span>
                       </div>
@@ -1140,7 +1140,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-300">
+                    <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-light uppercase tracking-wide text-amber-600 dark:text-amber-300">
                       <span>Abrir Auditoría</span>
                       <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </div>
@@ -1182,14 +1182,14 @@ export default function Dashboard() {
                 <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1 text-xs">
                   <button
                     onClick={() => setWorkspaceTab("kpis")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
+                    className={`px-3.5 py-1.5 rounded-full font-light uppercase tracking-wide transition-all ${
                       workspaceTab === "kpis" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
                     Panel General
                   </button>
                   <button
                     onClick={() => setWorkspaceTab("patients")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
+                    className={`px-3.5 py-1.5 rounded-full font-light uppercase tracking-wide transition-all ${
                       workspaceTab === "patients" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
                     {userIndustry === "finca" || userIndustry === "ganaderia" ? "Hato & Animales" :
@@ -1201,7 +1201,7 @@ export default function Dashboard() {
                   </button>
                   <button
                     onClick={() => setWorkspaceTab("agenda")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
+                    className={`px-3.5 py-1.5 rounded-full font-light uppercase tracking-wide transition-all ${
                       workspaceTab === "agenda" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
                     {userIndustry === "finca" || userIndustry === "ganaderia" ? "Agenda Sanitaria" :
@@ -1226,7 +1226,7 @@ export default function Dashboard() {
                     </h4>
                     <button
                       onClick={() => navigate(rutaVertical)}
-                      className="btn-electric-blue text-xs font-semibold px-4 py-2 rounded-full cursor-pointer">
+                      className="btn-electric-blue text-xs font-light uppercase tracking-wide px-4 py-2 rounded-full cursor-pointer">
                       {userIndustry === "finca" || userIndustry === "ganaderia" ? "+ Registrar Animal" :
                        userIndustry === "restaurante" ? "+ Abrir Mesa" :
                        esRubroComercio || userIndustry === "farmacia" ? "+ Nuevo Artículo" :
@@ -1258,20 +1258,20 @@ export default function Dashboard() {
                             ) : (
                               animalesGanaderia.slice(0, 8).map((a) => (
                                 <tr key={a.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold font-mono text-emerald-600 dark:text-emerald-400">{a.arete}</td>
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{a.nombre || "—"}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide font-mono text-emerald-600 dark:text-emerald-400">{a.arete}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-slate-900 dark:text-white">{a.nombre || "—"}</td>
                                   <td className="p-3.5 text-slate-600 dark:text-white/70">{a.raza || a.especie || "Bovino"}</td>
                                   <td className="p-3.5 text-slate-700 dark:text-white/80">{a.tipoAnimal || "VACA"} · {a.sexo}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{a.pesoActual ? `${a.pesoActual} kg` : "—"}</td>
                                   <td className="p-3.5">
-                                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-semibold text-[10px]">
+                                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-light uppercase tracking-wide text-[10px]">
                                       {a.estado || "ACTIVO"}
                                     </span>
                                   </td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer">
+                                      className="text-emerald-600 dark:text-emerald-400 font-light uppercase tracking-wide hover:underline cursor-pointer">
                                       Ver Ficha →
                                     </button>
                                   </td>
@@ -1300,15 +1300,15 @@ export default function Dashboard() {
                             ) : (
                               repuestosReales.slice(0, 8).map((r) => (
                                 <tr key={r.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold font-mono text-teal-600 dark:text-teal-400">{r.codigoSku}</td>
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{r.descripcion}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide font-mono text-teal-600 dark:text-teal-400">{r.codigoSku}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-slate-900 dark:text-white">{r.descripcion}</td>
                                   <td className="p-3.5 text-slate-700 dark:text-white/80 font-mono">{r.stockActual}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/50">{r.unidadBase || "UNIDAD"}</td>
-                                  <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">${Number(r.precioVenta || 0).toFixed(2)}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">${Number(r.precioVenta || 0).toFixed(2)}</td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      className="text-teal-600 dark:text-teal-400 font-light uppercase tracking-wide hover:underline cursor-pointer">
                                       Ver Kárdex →
                                     </button>
                                   </td>
@@ -1337,10 +1337,10 @@ export default function Dashboard() {
                             ) : (
                               mapaReales.slice(0, 8).map((m) => (
                                 <tr key={m.mesa.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">Mesa #{m.mesa.numero}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-slate-900 dark:text-white">Mesa #{m.mesa.numero}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/60">{m.mesa.zona || "Principal"} · {m.mesa.capacidad || 4}p</td>
                                   <td className="p-3.5">
-                                    <span className={`px-2.5 py-1 rounded-full font-semibold text-[10px] ${
+                                    <span className={`px-2.5 py-1 rounded-full font-light uppercase tracking-wide text-[10px] ${
                                       m.estado === "OCUPADA"
                                         ? "bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-300"
                                         : "bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300"
@@ -1349,11 +1349,11 @@ export default function Dashboard() {
                                     </span>
                                   </td>
                                   <td className="p-3.5 text-slate-700 dark:text-white/80">{m.comandaAbierta ? `Comanda #${m.comandaAbierta.id} (${m.comandaAbierta.mesero})` : "Sin comanda"}</td>
-                                  <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{m.comandaAbierta ? `$${Number(m.comandaAbierta.totalConsumo || 0).toFixed(2)}` : "—"}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">{m.comandaAbierta ? `$${Number(m.comandaAbierta.totalConsumo || 0).toFixed(2)}` : "—"}</td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      className="text-teal-600 dark:text-teal-400 font-light uppercase tracking-wide hover:underline cursor-pointer">
                                       Abrir Mesa →
                                     </button>
                                   </td>
@@ -1382,19 +1382,19 @@ export default function Dashboard() {
                             ) : (
                               citasReales.map((c) => (
                                 <tr key={c.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{c.paciente?.nombreCompleto || "—"}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-slate-900 dark:text-white">{c.paciente?.nombreCompleto || "—"}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/60">{c.paciente?.edad ? `${c.paciente.edad} años` : "—"}</td>
                                   <td className="p-3.5 text-slate-700 dark:text-white/80">{c.motivo || c.especialidad || "—"}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{c.horaInicio}</td>
                                   <td className="p-3.5">
-                                    <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
+                                    <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-light uppercase tracking-wide text-[10px]">
                                       {c.estado}
                                     </span>
                                   </td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate("/mediclinic")}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      className="text-teal-600 dark:text-teal-400 font-light uppercase tracking-wide hover:underline cursor-pointer">
                                       Abrir Historia →
                                     </button>
                                   </td>
@@ -1425,10 +1425,10 @@ export default function Dashboard() {
                       ].slice(0, 3).map((item, i) => (
                         <div key={i} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold">{item.tag}</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-mono font-light uppercase tracking-wide">{item.tag}</span>
                             <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">Pendiente</span>
                           </div>
-                          <div className="font-bold text-sm text-slate-900 dark:text-white">{item.titulo}</div>
+                          <div className="font-light uppercase tracking-wide text-sm text-slate-900 dark:text-white">{item.titulo}</div>
                           <p className="text-slate-500 dark:text-white/40 text-xs">{item.sub}</p>
                         </div>
                       ))
@@ -1446,10 +1446,10 @@ export default function Dashboard() {
                       citasReales.map((c) => (
                         <div key={c.id} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">{c.horaInicio} — {c.horaFin}</span>
+                            <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-light uppercase tracking-wide">{c.horaInicio} — {c.horaFin}</span>
                             <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">{c.estado}</span>
                           </div>
-                          <div className="font-bold text-sm text-slate-900 dark:text-white">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
+                          <div className="font-light uppercase tracking-wide text-sm text-slate-900 dark:text-white">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
                           <p className="text-slate-500 dark:text-white/40 text-xs">{c.motivo}</p>
                         </div>
                       ))
@@ -1498,7 +1498,7 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => setShowPaymentModal(true)}
-                  className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md flex items-center gap-2">
+                  className="btn-electric-blue text-xs font-light uppercase tracking-wide px-6 py-3 rounded-full cursor-pointer shadow-md flex items-center gap-2">
                   <IconCard size={14} />
                   <span>Reportar Nuevo Pago</span>
                 </button>
@@ -1507,7 +1507,7 @@ export default function Dashboard() {
               {/* Tarjetas de Estado del Plan */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="apple-glass rounded-2xl p-5 border border-teal-500/30 space-y-2">
-                  <div className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Plan Actual</div>
+                  <div className="text-xs font-light text-teal-600 dark:text-teal-400 uppercase tracking-wider">Plan Actual</div>
                   <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
                     {suscripcion?.vencida ? "Plan vencido" : isTrial ? "Prueba gratis" : "Plan activo"}
                   </div>
@@ -1517,7 +1517,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">{isTrial ? "Tu prueba termina" : "Próxima fecha de corte"}</div>
+                  <div className="text-xs font-light text-sky-600 dark:text-sky-400 uppercase tracking-wider">{isTrial ? "Tu prueba termina" : "Próxima fecha de corte"}</div>
                   <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
                     {suscripcion?.fechaVencimiento
                       ? new Date(suscripcion.fechaVencimiento + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" })
@@ -1529,8 +1529,8 @@ export default function Dashboard() {
                 </div>
 
                 <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Métodos Disponibles</div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-white/90">
+                  <div className="text-xs font-light text-purple-600 dark:text-purple-400 uppercase tracking-wider">Métodos Disponibles</div>
+                  <div className="text-sm font-light uppercase tracking-wide text-slate-800 dark:text-white/90">
                     Pago Móvil · Binance · Zelle
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
@@ -1560,12 +1560,12 @@ export default function Dashboard() {
                       {(suscripcion?.pagos && suscripcion.pagos.length > 0) ? (
                         suscripcion.pagos.map((p) => (
                           <tr key={p.id}>
-                            <td className="p-3.5 font-mono font-bold text-slate-900 dark:text-white">#{p.id}</td>
+                            <td className="p-3.5 font-mono font-light uppercase tracking-wide text-slate-900 dark:text-white">#{p.id}</td>
                             <td className="p-3.5 text-slate-600 dark:text-white/60">{new Date(p.fecha).toLocaleDateString("es-VE")}</td>
-                            <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{Number(p.monto).toFixed(2)} {p.moneda}</td>
+                            <td className="p-3.5 font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">{Number(p.monto).toFixed(2)} {p.moneda}</td>
                             <td className="p-3.5 text-slate-600 dark:text-white/70">{p.metodoPago}{p.referencia ? ` · Ref: ${p.referencia}` : ""}</td>
                             <td className="p-3.5">
-                              <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
+                              <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-300 font-light uppercase tracking-wide text-[10px]">
                                 CONFIRMADO
                               </span>
                             </td>
@@ -1600,13 +1600,13 @@ export default function Dashboard() {
               </div>
               <button
                 onClick={() => setModalNuevoColaborador(true)}
-                className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md">
+                className="btn-electric-blue text-xs font-light uppercase tracking-wide px-6 py-3 rounded-full cursor-pointer shadow-md">
                 + Nuevo Colaborador
               </button>
             </div>
 
             {errorEquipo && (
-              <p className="text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{errorEquipo}</p>
+              <p className="text-xs font-light uppercase tracking-wide text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{errorEquipo}</p>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1615,13 +1615,13 @@ export default function Dashboard() {
                 <div className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
                   {user?.nombre || "Usuario Administrador"}
                 </div>
-                <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">
+                <div className="text-xs font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">
                   {ROL_LABEL[user?.rol || ""] || user?.rol || "Propietario / Admin"}
                 </div>
                 <div className="text-xs text-slate-500 dark:text-white/40 font-mono">
                   {user?.email || "admin@auroraplus.com"}
                 </div>
-                <span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">
+                <span className="inline-block text-[9px] font-light uppercase tracking-wider bg-teal-500/15 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">
                   Tú (Dueño/Administrador)
                 </span>
               </div>
@@ -1646,18 +1646,18 @@ export default function Dashboard() {
                             {u.nombreCompleto || u.username}
                           </span>
                           {!u.activo && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-500/15 text-slate-500 dark:text-white/50 px-2 py-0.5 rounded-full shrink-0">
+                            <span className="text-[9px] font-light uppercase tracking-wider bg-slate-500/15 text-slate-500 dark:text-white/50 px-2 py-0.5 rounded-full shrink-0">
                               Desactivado
                             </span>
                           )}
                         </div>
                         <div className="text-xs text-slate-500 dark:text-white/40 font-mono">@{u.username}</div>
-                        <div className="text-[11px] font-semibold text-teal-600 dark:text-teal-400">{ROL_LABEL[u.rol] || u.rol}</div>
+                        <div className="text-[11px] font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">{ROL_LABEL[u.rol] || u.rol}</div>
                       </div>
                       {u.activo && (
                         <button
                           onClick={() => desactivarColaborador(u.id)}
-                          className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 cursor-pointer shrink-0"
+                          className="px-3 py-1.5 rounded-xl text-[11px] font-light uppercase tracking-wide bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 cursor-pointer shrink-0"
                         >
                           Desactivar
                         </button>
@@ -1705,19 +1705,19 @@ export default function Dashboard() {
                 className="space-y-3 text-sm"
               >
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Nombre completo</label>
+                  <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Nombre completo</label>
                   <input name="nombreCompleto" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Usuario (para iniciar sesión)</label>
+                  <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Usuario (para iniciar sesión)</label>
                   <input required name="username" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Contraseña</label>
+                  <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Contraseña</label>
                   <input required name="password" type="password" minLength={6} className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Rol</label>
+                  <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Rol</label>
                   <select required name="rol" defaultValue="" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white">
                     <option value="" disabled>Selecciona un rol…</option>
                     {Object.entries(ROL_LABEL).filter(([id]) => id !== "DUENO_ADMIN").map(([id, label]) => (
@@ -1729,10 +1729,10 @@ export default function Dashboard() {
                   Este colaborador no tendrá acceso a Equipo & Roles ni a Auditoría — eso queda reservado al Dueño/Administrador.
                 </p>
                 <div className="pt-2 flex justify-end gap-2">
-                  <button type="button" onClick={() => setModalNuevoColaborador(false)} className="px-4 py-2 rounded-xl bg-slate-200/70 dark:bg-white/10 text-xs font-bold text-slate-800 dark:text-white cursor-pointer">
+                  <button type="button" onClick={() => setModalNuevoColaborador(false)} className="px-4 py-2 rounded-xl bg-slate-200/70 dark:bg-white/10 text-xs font-light uppercase tracking-wide text-slate-800 dark:text-white cursor-pointer">
                     Cancelar
                   </button>
-                  <button type="submit" disabled={guardandoColaborador} className="px-5 py-2 rounded-xl btn-electric-blue text-xs font-bold cursor-pointer disabled:opacity-60">
+                  <button type="submit" disabled={guardandoColaborador} className="px-5 py-2 rounded-xl btn-electric-blue text-xs font-light uppercase tracking-wide cursor-pointer disabled:opacity-60">
                     {guardandoColaborador ? "Creando…" : "Crear Colaborador"}
                   </button>
                 </div>
@@ -1779,11 +1779,11 @@ export default function Dashboard() {
 
                 {/* Datos bancarios oficiales para transferir */}
                 <div className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-300/80 dark:border-white/10 text-xs space-y-2.5">
-                  <div className="font-bold text-emerald-600 dark:text-emerald-400 font-sans text-xs flex items-center justify-between">
+                  <div className="font-light uppercase tracking-wide text-emerald-600 dark:text-emerald-400 font-sans text-xs flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <IconBank size={14} /> Cuentas Oficiales para Transferir:
                     </div>
-                    <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-mono font-light uppercase tracking-wide bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
                       {tasaBcv ? `Tasa de referencia: ${tasaBcv.toFixed(2)} Bs/$` : "Paga a la tasa BCV del día"}
                     </span>
                   </div>
@@ -1791,14 +1791,14 @@ export default function Dashboard() {
                   {/* Pago Movil Banesco */}
                   <div className="p-3 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 space-y-1.5 font-mono text-[11px]">
                     <div className="flex items-center justify-between">
-                      <span className="font-sans font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span className="font-sans font-light uppercase tracking-wide text-slate-900 dark:text-white flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                         Pago Movil {cuentasCobro.banco || "Banesco (0134)"}
                       </span>
                       <button
                         type="button"
                         onClick={() => copiarTexto(`${cuentasCobro.telefono} ${cuentasCobro.cedula}`, "todo")}
-                        className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer font-sans"
+                        className="text-[10px] text-emerald-600 dark:text-emerald-400 font-light uppercase tracking-wide hover:underline cursor-pointer font-sans"
                       >
                         {copiadoCampo === "todo" ? "Copiado!" : "Copiar Datos"}
                       </button>
@@ -1836,7 +1836,7 @@ export default function Dashboard() {
                     {tasaBcv && (
                     <div className="pt-1.5 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px] font-sans">
                       <span className="text-slate-500 dark:text-slate-400">Monto exacto a transferir:</span>
-                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs">
+                      <span className="font-mono font-light uppercase tracking-wide text-emerald-600 dark:text-emerald-400 text-xs">
                         Bs. {((parseFloat(paymentForm.monto.replace(/[^0-9.]/g, "")) || 25.0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -1850,7 +1850,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => copiarTexto(cuentasCobro.binanceUsdt, "binance")}
-                        className="text-[10px] text-sky-500 font-bold hover:underline cursor-pointer flex-shrink-0"
+                        className="text-[10px] text-sky-500 font-light uppercase tracking-wide hover:underline cursor-pointer flex-shrink-0"
                       >
                         {copiadoCampo === "binance" ? "Copiado!" : "Copiar"}
                       </button>
@@ -1864,7 +1864,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => copiarTexto(cuentasCobro.zelle, "zelle")}
-                        className="text-[10px] text-purple-500 font-bold hover:underline cursor-pointer flex-shrink-0"
+                        className="text-[10px] text-purple-500 font-light uppercase tracking-wide hover:underline cursor-pointer flex-shrink-0"
                       >
                         {copiadoCampo === "zelle" ? "Copiado!" : "Copiar"}
                       </button>
@@ -1879,7 +1879,7 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                  <label className="block text-xs font-light uppercase tracking-wide text-slate-700 dark:text-white/70 mb-1">
                     Metodo de Pago Utilizado
                   </label>
                   <select
@@ -1895,7 +1895,7 @@ export default function Dashboard() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                    <label className="block text-xs font-light uppercase tracking-wide text-slate-700 dark:text-white/70 mb-1">
                       Monto a Reportar
                     </label>
                     <input
@@ -1907,7 +1907,7 @@ export default function Dashboard() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                    <label className="block text-xs font-light uppercase tracking-wide text-slate-700 dark:text-white/70 mb-1">
                       Número de Referencia
                     </label>
                     <input
@@ -1927,13 +1927,13 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowPaymentModal(false)}
-                    className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl text-slate-700 dark:text-white cursor-pointer">
+                    className="apple-glass-btn text-xs font-light uppercase tracking-wide px-4 py-2.5 rounded-xl text-slate-700 dark:text-white cursor-pointer">
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={enviandoPago}
-                    className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-md disabled:opacity-60">
+                    className="btn-electric-blue text-xs font-light uppercase tracking-wide px-6 py-2.5 rounded-xl cursor-pointer shadow-md disabled:opacity-60">
                     {enviandoPago ? "Enviando…" : "Enviar reporte de pago →"}
                   </button>
                 </div>
