@@ -4359,6 +4359,87 @@ export function listarPrenezActualGanaderia(): Promise<PrenezActualGanaderia[]> 
   return request(`/api/ganaderia/animales/prenez-actual`);
 }
 
+/** Margen de un animal: costos directos (compra, sanidad, alimento) e indirectos (nómina, gastos) contra su ingreso. */
+export interface MargenAnimalGanaderia {
+  animalId: number;
+  arete: string;
+  nombre: string | null;
+  tipoAnimal: string | null;
+  lote: string | null;
+  estado: string | null;
+  entrada: string | null;
+  salida: string | null;
+  dias: number;
+  pesoActual: number | null;
+  adquisicion: number;
+  vacunas: number;
+  medicamentos: number;
+  sanidadGeneral: number;
+  alimentacion: number;
+  costoDirecto: number;
+  manoDeObra: number;
+  gastosGenerales: number;
+  costoIndirecto: number;
+  costoTotal: number;
+  tipoIngreso: "VENTA" | "PROYECTADO" | "BAJA" | "SIN_VALORAR";
+  ingreso: number | null;
+  margenBruto: number | null;
+  margenNeto: number | null;
+}
+
+export interface MargenLoteGanaderia {
+  lote: string;
+  animales: number;
+  vendidos: number;
+  bajas: number;
+  sinValorar: number;
+  adquisicion: number;
+  sanidad: number;
+  alimentacion: number;
+  costoDirecto: number;
+  costoIndirecto: number;
+  costoTotal: number;
+  ingreso: number;
+  margenBruto: number;
+  margenNeto: number;
+  margenPorAnimal: number | null;
+}
+
+export type AlcanceMargen = "TODOS" | "ACTIVOS" | "VENDIDOS";
+
+export interface MargenGanaderia {
+  fechaCorte: string;
+  monedaBase: string;
+  alcance: AlcanceMargen;
+  precioKg: number | null;
+  precioKgSugerido: number | null;
+  animales: MargenAnimalGanaderia[];
+  lotes: MargenLoteGanaderia[];
+  totales: MargenLoteGanaderia;
+  notas: string[];
+}
+
+function consultaMargen(params: { precioKg?: number; alcance?: AlcanceMargen; lote?: string }): string {
+  const q = new URLSearchParams();
+  if (params.precioKg && params.precioKg > 0) q.set("precioKg", String(params.precioKg));
+  if (params.alcance) q.set("alcance", params.alcance);
+  if (params.lote) q.set("lote", params.lote);
+  const texto = q.toString();
+  return texto ? `?${texto}` : "";
+}
+
+export function obtenerMargenGanaderia(params: { precioKg?: number; alcance?: AlcanceMargen }): Promise<MargenGanaderia> {
+  return request(`/api/ganaderia/margen${consultaMargen(params)}`);
+}
+
+export function descargarMargenLotesPdf(params: { precioKg?: number; alcance?: AlcanceMargen; lote?: string }): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/margen/pdf${consultaMargen(params)}`);
+}
+
+export function descargarMargenAnimalPdf(animalId: number, precioKg?: number): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/margen/animal/${animalId}/pdf${consultaMargen({ precioKg })}`);
+}
+
 async function descargarPdfGanaderia(ruta: string): Promise<Blob> {
   const sesion = leerSesion();
   const headers: Record<string, string> = {};
@@ -4789,6 +4870,8 @@ export interface GastoGanaderia {
   descripcion: string;
   monto: number;
   fecha: string;
+  /** Lote al que se le carga el gasto en el margen; null = todo el hato. */
+  lote?: string | null;
 }
 
 export function listarGastosGanaderia(tenantId?: number): Promise<GastoGanaderia[]> {
@@ -4801,6 +4884,7 @@ export function crearGastoGanaderia(tenantId: number, datos: {
   descripcion: string;
   monto: number;
   fecha: string;
+  lote?: string;
 }): Promise<GastoGanaderia> {
   return request(`/api/ganaderia/gastos?tenantId=${tenantId}`, {
     method: "POST",

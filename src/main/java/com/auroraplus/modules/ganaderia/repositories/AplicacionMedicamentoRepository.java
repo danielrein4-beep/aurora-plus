@@ -18,4 +18,7 @@ public interface AplicacionMedicamentoRepository extends JpaRepository<Aplicacio
 
     @Query("SELECT a FROM AplicacionMedicamento a JOIN FETCH a.animal JOIN FETCH a.medicamento WHERE a.tenantId = :tenantId AND a.fechaFinRetiroCarne >= :hoy AND a.fechaFinRetiroCarne > a.fechaAplicacion")
     List<AplicacionMedicamento> findConRetiroCarneActivo(@Param("tenantId") Long tenantId, @Param("hoy") LocalDate hoy);
+
+    /** Todo lo de la finca de una vez (margen por animal): evita una consulta por animal. */
+    List<AplicacionMedicamento> findByTenantId(Long tenantId);
 }

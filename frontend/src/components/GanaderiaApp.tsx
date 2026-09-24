@@ -803,6 +803,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             ordenos={ordenos}
             potreros={potreros}
             precioLecheUSD={precioLecheUSD}
+            puedeVerMargen={puedeImportarHato}
             tasaBCV={tasaBCV}
             tasaCOP={tasaCOP}
             vacunas={vacunas}
@@ -1136,6 +1137,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           tasaCOP={tasaCOP}
           monedasConfig={monedasConfig}
           tenantId={tenantId}
+          lotes={[...new Set(animales.filter(a => a.estado === "ACTIVO" || !a.estado).map(a => (a.lote || "").trim()).filter(Boolean))].sort()}
           notificar={notificar}
           onRegistrado={g => setGastos(prev => [g, ...prev])}
           onCerrar={() => setGastoAbierto(false)}

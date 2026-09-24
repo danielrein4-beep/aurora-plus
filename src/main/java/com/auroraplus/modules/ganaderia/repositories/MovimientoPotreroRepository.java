@@ -11,4 +11,7 @@ import java.util.List;
 public interface MovimientoPotreroRepository extends JpaRepository<MovimientoPotrero, Long> {
     @Query("SELECT m FROM MovimientoPotrero m JOIN FETCH m.animal WHERE m.animal.id = :animalId ORDER BY m.fechaRegistro DESC")
     List<MovimientoPotrero> findByAnimalIdOrderByFechaRegistroDesc(@Param("animalId") Long animalId);
+
+    /** Todo lo de la finca de una vez (margen por animal): evita una consulta por animal. */
+    List<MovimientoPotrero> findByTenantId(Long tenantId);
 }

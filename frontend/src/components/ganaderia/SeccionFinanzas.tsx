@@ -5,6 +5,7 @@ import ReportesCampoGanaderia, { fechaLocalISO } from "../ReportesCampoGanaderia
 import { CATEGORIAS_GASTO_GANADERIA } from "./catalogos";
 import type { MonedasConfig, Notificar, TabGanaderia, SubPotreros } from "./tipos";
 import { num, verFecha } from "./formato";
+import MargenGanadero from "./MargenGanadero";
 
 interface Props {
   gastos: GastoGanaderia[];
@@ -13,6 +14,8 @@ interface Props {
   ordenos: RegistroOrdenoGanaderia[];
   potreros: PotreroGanaderia[];
   precioLecheUSD: number;
+  /** Dueño o administrador: el margen reparte la nómina, no lo ve el resto del personal. */
+  puedeVerMargen: boolean;
   tasaBCV: number;
   tasaCOP: number;
   vacunas: VacunaGanaderia[];
@@ -26,7 +29,7 @@ interface Props {
 
 /** Finanzas del hato: ingresos por leche y ventas de animales, gastos operativos y rentabilidad. */
 export default function SeccionFinanzas({
-  gastos, monedasConfig, notificar, ordenos, potreros, precioLecheUSD, tasaBCV, tasaCOP, vacunas,
+  gastos, monedasConfig, notificar, ordenos, potreros, precioLecheUSD, puedeVerMargen, tasaBCV, tasaCOP, vacunas,
   ventasAnimales, ventasLeche, exportarInventarioXLSX, setGastoAbierto, setSubPotreros, setTab,
 }: Props) {
   // Helper para calcular semana ISO (YYYY-Www)
@@ -301,6 +304,8 @@ export default function SeccionFinanzas({
           )}
         </div>
       </div>
+
+      {puedeVerMargen && <MargenGanadero notificar={notificar} />}
 
       {/* Sección 1: Gastos Operativos Recientes */}
       <div className="space-y-3 pt-2">

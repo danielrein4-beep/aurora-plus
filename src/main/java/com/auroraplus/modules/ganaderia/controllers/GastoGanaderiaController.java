@@ -32,6 +32,8 @@ public class GastoGanaderiaController {
         public String descripcion;
         public BigDecimal monto;
         public LocalDate fecha;
+        /** Opcional: lote al que se le carga el gasto en el margen. */
+        public String lote;
     }
 
     // P0: el tenant SIEMPRE sale de TenantContext (JWT verificado) — antes se aceptaba un
@@ -46,7 +48,7 @@ public class GastoGanaderiaController {
     public ResponseEntity<GastoGanaderia> registrar(@RequestBody GastoRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        GastoGanaderia gasto = ganaderiaGastoService.registrarGasto(tenantId, request.categoria, request.descripcion, request.monto, request.fecha);
+        GastoGanaderia gasto = ganaderiaGastoService.registrarGasto(tenantId, request.categoria, request.descripcion, request.monto, request.fecha, request.lote);
         auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "GastoGanaderia", gasto.getId(), "Registró un gasto — categoría: " + request.categoria);
         return ResponseEntity.ok(gasto);
     }
