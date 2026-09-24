@@ -5,12 +5,14 @@ import {
 } from "recharts";
 import {
   obtenerInteligenciaNegocio, obtenerInteligenciaComercio, obtenerInteligenciaSalud, obtenerDetalleComercioInteligencia,
+  obtenerMercadoGanaderoSuperAdmin,
   type InteligenciaNegocio, type InteligenciaComercio, type InteligenciaSalud, type DetalleComercioInteligencia,
+  type PanelMercadoSuperAdmin,
   type Semaforo,
 } from "../api";
 import CanalEndemico from "./CanalEndemico";
 
-type Pestana = "NEGOCIO" | "COMERCIO" | "SALUD";
+type Pestana = "NEGOCIO" | "COMERCIO" | "SALUD" | "MERCADO";
 
 const PERIODOS = [
   { dias: 7, label: "7 días" },
@@ -76,6 +78,7 @@ export default function SuperAdminInteligencia() {
             ["NEGOCIO", "Negocio: MRR, churn y clientes"],
             ["COMERCIO", "Comercios"],
             ["SALUD", "Salud y canal endémico"],
+            ["MERCADO", "Mercado ganadero"],
           ] as [Pestana, string][]).map(([id, label]) => (
             <button
               key={id}
@@ -104,6 +107,7 @@ export default function SuperAdminInteligencia() {
       {pestana === "NEGOCIO" && <VistaNegocio />}
       {pestana === "COMERCIO" && <VistaComercio dias={dias} />}
       {pestana === "SALUD" && <VistaSalud dias={dias} />}
+      {pestana === "MERCADO" && <VistaMercado dias={dias} />}
     </div>
   );
 }
@@ -644,6 +648,78 @@ function VistaSalud({ dias }: { dias: number }) {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────── MERCADO GANADERO ───────────────────────────
+
+const TIPO_SOSPECHA: Record<string, string> = {
+  RETIRADA_TRAS_NEGOCIAR: "Retiró tras negociar",
+  ANIMAL_SALIO_DEL_HATO: "Animal salió del hato",
+  ARETE_EN_HATO_DEL_INTERESADO: "Arete en hato del interesado",
+};
+
+function VistaMercado({ dias }: { dias: number }) {
+  const { datos, error, cargando } = useCarga<PanelMercadoSuperAdmin>(() => obtenerMercadoGanaderoSuperAdmin(dias), [dias]);
+  if (!datos) return <Estado cargando={cargando} error={error} />;
+  const { resumen, alertas, sospechas } = datos;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Kpi titulo="En venta ahora" valor={numero.format(resumen.publicacionesActivas)} />
+        <Kpi titulo="Tratos cerrados" valor={numero.format(resumen.tratosPeriodo)} nota={`Volumen ${dinero.format(Number(resumen.volumenPeriodo))}`} color="text-emerald-600" />
+        <Kpi titulo="Comisiones generadas" valor={dinero.format(Number(resumen.comisionesGeneradas))} nota={`Por cobrar: ${dinero.format(Number(resumen.comisionesPendientes))} · cobradas: ${dinero.format(Number(resumen.comisionesCobradas))}`} />
+        <Kpi titulo="Intentos de contacto" valor={numero.format(resumen.intentosContactoPeriodo)} nota="Datos ocultados en chat o publicaciones" color={resumen.intentosContactoPeriodo > 0 ? "text-rose-600" : "text-slate-900"} />
+      </div>
+
+      <Tarjeta titulo="Posibles tratos por fuera" nota="Casos para revisar y cobrar según las condiciones del mercado">
+        {sospechas.length === 0 ? (
+          <p className="text-sm text-slate-400">No hay casos sospechosos.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] font-bold text-slate-500 uppercase border-b border-slate-100">
+                  <th className="py-2 pr-4">Señal</th><th className="py-2 pr-4">Publicación</th><th className="py-2 pr-4">Vendedor</th><th className="py-2">Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sospechas.map((s, i) => (
+                  <tr key={i} className="border-b border-slate-50 align-top">
+                    <td className="py-2.5 pr-4"><span className="px-2 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-bold whitespace-nowrap">{TIPO_SOSPECHA[s.tipo] ?? s.tipo}</span></td>
+                    <td className="py-2.5 pr-4 font-bold text-slate-900">{s.titulo}</td>
+                    <td className="py-2.5 pr-4 text-slate-700">{s.vendedor}</td>
+                    <td className="py-2.5 text-xs text-slate-600">{s.detalle}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Tarjeta>
+
+      <Tarjeta titulo="Datos de contacto ocultados" nota="Lo que escribieron antes de que el filtro lo tapara">
+        {alertas.length === 0 ? (
+          <p className="text-sm text-slate-400">Nadie ha intentado pasar datos de contacto en este período.</p>
+        ) : (
+          <div className="space-y-2">
+            {alertas.map((a) => (
+              <div key={a.id} className="rounded-2xl border border-slate-100 p-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
+                  <span className="font-bold text-slate-900">
+                    {a.finca ?? "Finca"}{a.otraFinca ? ` a ${a.otraFinca}` : ""}
+                    <span className="ml-2 font-normal text-slate-500">{a.tipo === "CONTACTO_EN_PUBLICACION" ? "en su publicación" : "en el chat"}{a.titulo ? ` · ${a.titulo}` : ""}</span>
+                  </span>
+                  <span className="text-slate-400">{new Date(a.fecha).toLocaleString("es-VE")}</span>
+                </div>
+                <p className="text-sm text-slate-700 mt-1 font-mono break-words">{a.contenido}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Tarjeta>
     </div>
   );
 }

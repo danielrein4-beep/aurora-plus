@@ -5763,12 +5763,36 @@ export function obtenerInteligenciaNegocio(): Promise<InteligenciaNegocio> {
 
 // --- Mercado ganadero entre fincas de Aurora (ver MercadoGanaderoController) ---
 
+export type CategoriaMercado = "PADROTE" | "VACA_PARIDA" | "VACA_ORDENO" | "NOVILLA" | "MAUTE" | "CEBA";
+
+/** Cómo se ve una finca en el mercado: anónima ("Finca en Barinas #K7Q") hasta cerrar el trato. */
+export interface PerfilMercado {
+  nombre: string;
+  revelado: boolean;
+  verificado: boolean;
+  mesesEnAurora: number | null;
+  diasEnAurora: number | null;
+  ventas: number;
+  compras: number;
+  calificacion: number | null;
+  totalCalificaciones: number;
+}
+
+export interface ReferenciaPrecioMercado {
+  promedio: number;
+  minimo: number;
+  maximo: number;
+  muestras: number;
+  alcance: string;
+}
+
 export interface PublicacionMercado {
   id: number;
   titulo: string;
+  categoria: CategoriaMercado | null;
   precio: number;
   tipoPrecio: "POR_CABEZA" | "POR_KG";
-  ubicacion: string | null;
+  estadoRegion: string | null;
   negociable: boolean;
   estado: "ACTIVA" | "VENDIDA" | "RETIRADA";
   fechaPublicacion: string;
@@ -5777,14 +5801,17 @@ export interface PublicacionMercado {
   raza: string | null;
   sexo: "MACHO" | "HEMBRA" | string;
   tipoAnimal: string | null;
-  arete: string;
+  arete: string | null;
   edadMeses: number | null;
-  finca: string;
   esMia: boolean;
+  guardado: boolean;
   ofertasPendientes: number;
   totalFotos: number;
   precioFinal: number | null;
   fechaCierre: string | null;
+  vendedor: PerfilMercado;
+  mejorOferta?: number | null;
+  referencia?: ReferenciaPrecioMercado | null;
 }
 
 export interface OfertaMercado {
@@ -5794,37 +5821,65 @@ export interface OfertaMercado {
   fecha: string;
   mensaje: string | null;
   compradorTenantId?: number;
-  compradorNombre?: string;
+  comprador?: PerfilMercado;
   traspasado?: boolean;
+}
+
+export interface ContactoMercado {
+  nombre: string | null;
+  telefono: string | null;
+  email: string | null;
 }
 
 export interface DetallePublicacionMercado extends PublicacionMercado {
   descripcion: string | null;
+  municipio: string | null;
   fotos: { id: number; imagen: string }[];
   pesos: { fecha: string; pesoKg: number }[];
   vacunas: { nombre: string; enfermedadPrevenida: string | null; fechaAplicacion: string }[];
+  referencia: ReferenciaPrecioMercado | null;
   ofertas?: OfertaMercado[];
   misOfertas?: OfertaMercado[];
+  contraparte?: ContactoMercado;
+  ofertaCerrada: { id: number; monto: number; traspasado: boolean } | null;
+  yaCalifique?: boolean;
   animalRecibidoId?: number;
+  datosOcultos?: boolean;
 }
 
 export interface FiltrosMercado {
+  categoria?: CategoriaMercado;
   raza?: string;
   sexo?: string;
+  estadoRegion?: string;
   pesoMin?: number;
   pesoMax?: number;
   precioMax?: number;
-  ubicacion?: string;
   q?: string;
   orden?: "recientes" | "precio_asc" | "precio_desc" | "peso_desc";
 }
 
+export interface ResumenMercado {
+  total: number;
+  categorias: { categoria: CategoriaMercado; total: number }[];
+  razas: { raza: string; total: number }[];
+  estados: { estado: string; total: number }[];
+  tratosCerrados: number;
+}
+
+export interface MiPuestoMercado {
+  resumen: { activas: number; ofertasPendientes: number; vendidas: number; montoVendido: number };
+  publicaciones: PublicacionMercado[];
+}
+
 export interface PublicarMercadoRequest {
   animalId?: number;
+  categoria: CategoriaMercado;
   titulo?: string;
   precio: number;
   tipoPrecio: "POR_CABEZA" | "POR_KG";
-  ubicacion?: string;
+  estadoRegion?: string;
+  municipio?: string;
   descripcion?: string;
   negociable: boolean;
   fotos?: string[];
@@ -5838,7 +5893,7 @@ export interface ConversacionMercado {
   estado: string;
   miniatura: string | null;
   soyVendedor: boolean;
-  otraFinca: string | null;
+  otraFinca: string;
   ultimaFecha: string;
   ultimoMensaje: string;
   sinLeer: number;
@@ -5860,8 +5915,24 @@ export function listarMercadoGanadero(filtros: FiltrosMercado = {}): Promise<Pub
   return request(`/api/ganaderia/mercado/publicaciones${query}`);
 }
 
-export function listarMisPublicacionesMercado(): Promise<PublicacionMercado[]> {
-  return request(`/api/ganaderia/mercado/mis-publicaciones`);
+export function obtenerResumenMercado(): Promise<ResumenMercado> {
+  return request(`/api/ganaderia/mercado/resumen`);
+}
+
+export function obtenerMiPuestoMercado(): Promise<MiPuestoMercado> {
+  return request(`/api/ganaderia/mercado/mi-puesto`);
+}
+
+export function listarMisOfertasMercado(): Promise<{ oferta: OfertaMercado; publicacion: PublicacionMercado }[]> {
+  return request(`/api/ganaderia/mercado/mis-ofertas`);
+}
+
+export function listarGuardadosMercado(): Promise<PublicacionMercado[]> {
+  return request(`/api/ganaderia/mercado/guardados`);
+}
+
+export function guardarPublicacionMercado(id: number, guardar: boolean): Promise<{ guardado: boolean }> {
+  return request(`/api/ganaderia/mercado/publicaciones/${id}/guardar`, { method: guardar ? "POST" : "DELETE" });
 }
 
 export function obtenerPublicacionMercado(id: number): Promise<DetallePublicacionMercado> {
@@ -5896,6 +5967,18 @@ export function recibirAnimalMercado(ofertaId: number): Promise<DetallePublicaci
   return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/recibir`, { method: "POST" });
 }
 
+export function calificarTratoMercado(ofertaId: number, estrellas: number, comentario?: string): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/calificar`, { method: "POST", body: JSON.stringify({ estrellas, comentario }) });
+}
+
+export function obtenerCondicionesMercado(): Promise<{ aceptadas: boolean; version: number }> {
+  return request(`/api/ganaderia/mercado/condiciones`);
+}
+
+export function aceptarCondicionesMercado(): Promise<{ aceptadas: boolean; version: number }> {
+  return request(`/api/ganaderia/mercado/condiciones/aceptar`, { method: "POST" });
+}
+
 export function listarConversacionesMercado(): Promise<ConversacionMercado[]> {
   return request(`/api/ganaderia/mercado/conversaciones`);
 }
@@ -5909,7 +5992,7 @@ export function listarMensajesMercado(publicacionId: number, comprador?: number)
   return request(`/api/ganaderia/mercado/publicaciones/${publicacionId}/mensajes${query}`);
 }
 
-export function enviarMensajeMercado(publicacionId: number, contenido: string, comprador?: number): Promise<MensajeMercado[]> {
+export function enviarMensajeMercado(publicacionId: number, contenido: string, comprador?: number): Promise<{ mensajes: MensajeMercado[]; datosOcultos: boolean }> {
   return request(`/api/ganaderia/mercado/publicaciones/${publicacionId}/mensajes`, {
     method: "POST",
     body: JSON.stringify({ contenido, comprador }),
@@ -5918,4 +6001,17 @@ export function enviarMensajeMercado(publicacionId: number, contenido: string, c
 
 export function obtenerComisionesMercado(): Promise<{ pendiente: number; comisiones: { id: number; descripcion: string | null; montoComision: number; pagada: boolean; fecha: string }[] }> {
   return request(`/api/ganaderia/mercado/comisiones`);
+}
+
+export interface PanelMercadoSuperAdmin {
+  resumen: {
+    publicacionesActivas: number; tratosPeriodo: number; volumenPeriodo: number; comisionesGeneradas: number;
+    comisionesPendientes: number; comisionesCobradas: number; intentosContactoPeriodo: number;
+  };
+  alertas: { id: number; tipo: string; fecha: string; contenido: string; publicacionId: number | null; titulo: string | null; finca: string | null; otraFinca: string | null }[];
+  sospechas: { tipo: string; publicacionId: number; titulo: string; vendedor: string | null; fecha: string; detalle: string }[];
+}
+
+export function obtenerMercadoGanaderoSuperAdmin(dias: number): Promise<PanelMercadoSuperAdmin> {
+  return requestSuperAdmin(`/api/super-admin/inteligencia/mercado-ganadero?dias=${dias}`);
 }

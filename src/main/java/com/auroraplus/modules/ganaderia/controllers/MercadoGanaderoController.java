@@ -2,6 +2,7 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
+import com.auroraplus.modules.ganaderia.services.FiltroContactoMercado;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -18,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Mercado ganadero: vitrina donde las fincas de Aurora publican sus animales,
@@ -31,18 +33,26 @@ import java.util.*;
  * finca que llama sale siempre de la sesión (TenantContext), nunca de un
  * parámetro.
  *
- * Al cerrar un trato se cobra 1% al vendedor y 1% al comprador, como comisión
- * pendiente que se suma a la siguiente factura de Aurora de cada uno.
+ * Protección de la comisión (1% al vendedor y 1% al comprador al cerrar):
+ * - Ninguna de las dos partes ve el nombre de la otra hasta cerrar el trato;
+ *   se muestran como "Finca en Barinas #K7Q" con su sello y reputación.
+ * - Los datos de contacto que se cuelan en el chat, la oferta o la
+ *   publicación se tapan (FiltroContactoMercado) y quedan como alerta para el
+ *   super-admin.
+ * - Al entrar, la finca acepta que la comisión aplica aunque el trato que
+ *   nació aquí se cierre por fuera.
  */
 @RestController
 @RequestMapping("/api/ganaderia/mercado")
 public class MercadoGanaderoController {
 
     private static final BigDecimal COMISION_PORCENTAJE = new BigDecimal("1.00");
+    private static final int VERSION_CONDICIONES = 1;
     private static final int MAX_FOTOS = 6;
     private static final int MAX_LARGO_FOTO = 1_500_000;
     private static final int MAX_LARGO_MINIATURA = 250_000;
     private static final String[] ROLES_NEGOCIO = {"DUENO_ADMIN", "ADMINISTRADOR_FINCA"};
+    private static final Set<String> CATEGORIAS = Set.of("PADROTE", "VACA_PARIDA", "VACA_ORDENO", "NOVILLA", "MAUTE", "CEBA");
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -51,26 +61,27 @@ public class MercadoGanaderoController {
 
     @GetMapping("/publicaciones")
     public List<Map<String, Object>> vitrina(
+            @RequestParam(required = false) String categoria,
             @RequestParam(required = false) String raza,
             @RequestParam(required = false) String sexo,
+            @RequestParam(required = false) String estadoRegion,
             @RequestParam(required = false) BigDecimal pesoMin,
             @RequestParam(required = false) BigDecimal pesoMax,
             @RequestParam(required = false) BigDecimal precioMax,
-            @RequestParam(required = false) String ubicacion,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "recientes") String orden) {
         Long yo = tenantActual();
-        StringBuilder sql = new StringBuilder(SELECT_TARJETA + " WHERE p.estado = 'ACTIVA' AND l.activa = TRUE");
-        List<Object> params = new ArrayList<>();
-        params.add(yo);
+        StringBuilder sql = new StringBuilder(SELECT_TARJETA + " WHERE p.estado = 'ACTIVA' AND a.estado = 'ACTIVO' AND l.activa = TRUE");
+        List<Object> params = new ArrayList<>(List.of(yo, yo));
+        if (texto(categoria)) { sql.append(" AND p.categoria = ?"); params.add(categoria.trim().toUpperCase()); }
         if (texto(raza)) { sql.append(" AND a.raza ILIKE ?"); params.add("%" + raza.trim() + "%"); }
         if (texto(sexo)) { sql.append(" AND a.sexo = ?"); params.add(sexo.trim().toUpperCase()); }
+        if (texto(estadoRegion)) { sql.append(" AND p.estado_region = ?"); params.add(estadoRegion.trim()); }
         if (pesoMin != null) { sql.append(" AND COALESCE(p.peso_publicado, a.peso_actual) >= ?"); params.add(pesoMin); }
         if (pesoMax != null) { sql.append(" AND COALESCE(p.peso_publicado, a.peso_actual) <= ?"); params.add(pesoMax); }
         if (precioMax != null) { sql.append(" AND p.precio_solicitado <= ?"); params.add(precioMax); }
-        if (texto(ubicacion)) { sql.append(" AND p.ubicacion ILIKE ?"); params.add("%" + ubicacion.trim() + "%"); }
         if (texto(q)) {
-            sql.append(" AND (p.titulo ILIKE ? OR a.raza ILIKE ? OR p.descripcion ILIKE ? OR l.nombre_empresa ILIKE ?)");
+            sql.append(" AND (p.titulo ILIKE ? OR a.raza ILIKE ? OR p.descripcion ILIKE ? OR p.estado_region ILIKE ?)");
             String patron = "%" + q.trim() + "%";
             params.addAll(List.of(patron, patron, patron, patron));
         }
@@ -81,21 +92,100 @@ public class MercadoGanaderoController {
             default -> " ORDER BY p.fecha_publicacion DESC, p.id DESC";
         });
         sql.append(" LIMIT 200");
-        return jdbc.queryForList(sql.toString(), params.toArray()).stream().map(this::tarjeta).toList();
+        return tarjetas(jdbc.queryForList(sql.toString(), params.toArray()), yo);
     }
 
-    /** Mis publicaciones (todas, no solo activas) con ofertas y mensajes sin leer. */
-    @GetMapping("/mis-publicaciones")
-    public List<Map<String, Object>> misPublicaciones() {
+    /** Cuántos animales activos hay por categoría, raza y estado, para la portada y los filtros. */
+    @GetMapping("/resumen")
+    public Map<String, Object> resumenVitrina() {
+        String base = "FROM publicaciones_venta p JOIN animales a ON a.id = p.animal_id JOIN licencias_tenant l ON l.tenant_id = p.tenant_id "
+            + "WHERE p.estado = 'ACTIVA' AND a.estado = 'ACTIVO' AND l.activa = TRUE";
+        Map<String, Object> salida = new LinkedHashMap<>();
+        salida.put("total", jdbc.queryForObject("SELECT COUNT(*) " + base, Long.class));
+        salida.put("categorias", jdbc.queryForList("SELECT p.categoria, COUNT(*) AS total " + base + " AND p.categoria IS NOT NULL GROUP BY p.categoria"));
+        salida.put("razas", jdbc.queryForList("SELECT a.raza, COUNT(*) AS total " + base + " AND a.raza IS NOT NULL AND a.raza <> '' GROUP BY a.raza ORDER BY total DESC LIMIT 20"));
+        salida.put("estados", jdbc.queryForList("SELECT p.estado_region AS estado, COUNT(*) AS total " + base + " AND p.estado_region IS NOT NULL GROUP BY p.estado_region ORDER BY total DESC"));
+        salida.put("tratosCerrados", jdbc.queryForObject("SELECT COUNT(*) FROM publicaciones_venta WHERE estado = 'VENDIDA'", Long.class));
+        return salida;
+    }
+
+    /** Panel del vendedor: sus publicaciones con la mejor oferta y el precio de referencia del mercado. */
+    @GetMapping("/mi-puesto")
+    public Map<String, Object> miPuesto() {
         Long yo = tenantActual();
-        return jdbc.queryForList(SELECT_TARJETA + " WHERE p.tenant_id = ? ORDER BY p.fecha_publicacion DESC, p.id DESC", yo, yo)
-            .stream().map(this::tarjeta).toList();
+        List<Map<String, Object>> publicaciones = tarjetas(
+            jdbc.queryForList(SELECT_TARJETA + " WHERE p.tenant_id = ? ORDER BY p.estado = 'ACTIVA' DESC, p.fecha_publicacion DESC, p.id DESC", yo, yo, yo), yo);
+        for (Map<String, Object> p : publicaciones) {
+            Long id = numero(p.get("id"));
+            List<Map<String, Object>> mejor = jdbc.queryForList(
+                "SELECT monto_ofertado FROM ofertas_compra WHERE publicacion_id = ? AND estado = 'PENDIENTE' AND comprador_tenant_id IS NOT NULL "
+                    + "ORDER BY monto_ofertado DESC LIMIT 1", id);
+            p.put("mejorOferta", mejor.isEmpty() ? null : mejor.get(0).get("monto_ofertado"));
+            p.put("referencia", referenciaPrecio(id));
+        }
+        Map<String, Object> resumen = new LinkedHashMap<>();
+        resumen.put("activas", publicaciones.stream().filter(p -> "ACTIVA".equals(p.get("estado"))).count());
+        resumen.put("ofertasPendientes", publicaciones.stream().mapToLong(p -> numero(p.get("ofertasPendientes"))).sum());
+        resumen.put("vendidas", publicaciones.stream().filter(p -> "VENDIDA".equals(p.get("estado"))).count());
+        resumen.put("montoVendido", publicaciones.stream().filter(p -> p.get("precioFinal") != null)
+            .map(p -> (BigDecimal) p.get("precioFinal")).reduce(BigDecimal.ZERO, BigDecimal::add));
+        return Map.of("resumen", resumen, "publicaciones", publicaciones);
+    }
+
+    /** Ofertas que hizo mi finca, con el animal y su estado. */
+    @GetMapping("/mis-ofertas")
+    public List<Map<String, Object>> misOfertas() {
+        Long yo = tenantActual();
+        List<Map<String, Object>> ofertas = jdbc.queryForList(
+            "SELECT DISTINCT ON (o.publicacion_id) o.id, o.publicacion_id, o.monto_ofertado AS monto, o.estado, o.fecha, o.traspasado "
+                + "FROM ofertas_compra o WHERE o.comprador_tenant_id = ? ORDER BY o.publicacion_id, o.id DESC", yo);
+        if (ofertas.isEmpty()) return List.of();
+        Map<Long, Map<String, Object>> cards = tarjetas(jdbc.queryForList(
+                SELECT_TARJETA + " WHERE p.id IN (" + marcadores(ofertas.size()) + ")",
+                concatenar(List.of(yo, yo), ofertas.stream().map(o -> o.get("publicacion_id")).toList()).toArray()), yo)
+            .stream().collect(Collectors.toMap(t -> numero(t.get("id")), t -> t));
+        List<Map<String, Object>> salida = new ArrayList<>();
+        for (Map<String, Object> o : ofertas) {
+            Map<String, Object> publicacion = cards.get(numero(o.get("publicacion_id")));
+            if (publicacion == null) continue;
+            Map<String, Object> oferta = new LinkedHashMap<>();
+            oferta.put("id", o.get("id"));
+            oferta.put("monto", o.get("monto"));
+            oferta.put("estado", o.get("estado"));
+            oferta.put("fecha", o.get("fecha"));
+            oferta.put("traspasado", o.get("traspasado"));
+            Map<String, Object> fila = new LinkedHashMap<>();
+            fila.put("oferta", oferta);
+            fila.put("publicacion", publicacion);
+            salida.add(fila);
+        }
+        salida.sort((a, b) -> Long.compare(numero(((Map<?, ?>) b.get("oferta")).get("id")), numero(((Map<?, ?>) a.get("oferta")).get("id"))));
+        return salida;
+    }
+
+    @GetMapping("/guardados")
+    public List<Map<String, Object>> guardados() {
+        Long yo = tenantActual();
+        return tarjetas(jdbc.queryForList(SELECT_TARJETA + " JOIN mercado_ganado_guardados g ON g.publicacion_id = p.id AND g.tenant_id = ? "
+            + "ORDER BY g.fecha DESC", yo, yo, yo), yo);
+    }
+
+    @PostMapping("/publicaciones/{id:[0-9]+}/guardar")
+    public Map<String, Object> guardar(@PathVariable Long id) {
+        jdbc.update("INSERT INTO mercado_ganado_guardados (tenant_id, publicacion_id) VALUES (?, ?) ON CONFLICT DO NOTHING", tenantActual(), id);
+        return Map.of("guardado", true);
+    }
+
+    @DeleteMapping("/publicaciones/{id:[0-9]+}/guardar")
+    public Map<String, Object> dejarDeGuardar(@PathVariable Long id) {
+        jdbc.update("DELETE FROM mercado_ganado_guardados WHERE tenant_id = ? AND publicacion_id = ?", tenantActual(), id);
+        return Map.of("guardado", false);
     }
 
     @GetMapping("/publicaciones/{id:[0-9]+}")
     public Map<String, Object> detalle(@PathVariable Long id) {
         Long yo = tenantActual();
-        Map<String, Object> fila = unaFila(SELECT_TARJETA + " WHERE p.id = ?", yo, id);
+        Map<String, Object> fila = unaFila(SELECT_TARJETA + " WHERE p.id = ?", yo, yo, id);
         if (fila == null) throw new RuntimeException("Publicación no encontrada");
         Long vendedor = numero(fila.get("tenant_id"));
         boolean esMia = vendedor.equals(yo);
@@ -107,8 +197,9 @@ public class MercadoGanaderoController {
             throw new RuntimeException("Esta publicación ya no está disponible");
         }
 
-        Map<String, Object> salida = tarjeta(fila);
+        Map<String, Object> salida = tarjetas(List.of(fila), yo).get(0);
         salida.put("descripcion", fila.get("descripcion"));
+        salida.put("municipio", fila.get("ubicacion"));
         salida.put("fotos", jdbc.queryForList(
             "SELECT id, imagen_base64 AS imagen FROM mercado_ganado_fotos WHERE publicacion_id = ? ORDER BY orden, id", id));
         Long animalId = numero(fila.get("animal_id"));
@@ -118,28 +209,77 @@ public class MercadoGanaderoController {
             "SELECT v.nombre, v.enfermedad_prevenida AS \"enfermedadPrevenida\", av.fecha_aplicacion AS \"fechaAplicacion\" "
                 + "FROM aplicaciones_vacuna av JOIN vacunas v ON v.id = av.vacuna_id "
                 + "WHERE av.animal_id = ? AND av.tenant_id = ? ORDER BY av.fecha_aplicacion DESC LIMIT 20", animalId, vendedor));
+        salida.put("referencia", referenciaPrecio(id));
+
+        Long compradorCerrado = fila.get("comprador_tenant_id") == null ? null : numero(fila.get("comprador_tenant_id"));
+        Map<String, Object> cerrada = null;
         if (esMia) {
-            salida.put("ofertas", jdbc.queryForList(
-                "SELECT o.id, o.monto_ofertado AS monto, o.estado, o.fecha, o.mensaje, o.comprador_tenant_id AS \"compradorTenantId\", "
-                    + "COALESCE(l.nombre_empresa, o.nombre_comprador) AS \"compradorNombre\" "
-                    + "FROM ofertas_compra o LEFT JOIN licencias_tenant l ON l.tenant_id = o.comprador_tenant_id "
-                    + "WHERE o.publicacion_id = ? AND o.comprador_tenant_id IS NOT NULL ORDER BY o.monto_ofertado DESC, o.fecha", id));
+            List<Map<String, Object>> ofertas = jdbc.queryForList(
+                "SELECT o.id, o.monto_ofertado AS monto, o.estado, o.fecha, o.mensaje, o.comprador_tenant_id AS \"compradorTenantId\" "
+                    + "FROM ofertas_compra o WHERE o.publicacion_id = ? AND o.comprador_tenant_id IS NOT NULL ORDER BY o.monto_ofertado DESC, o.id", id);
+            Map<Long, Map<String, Object>> perfiles = perfiles(ofertas.stream().map(o -> numero(o.get("compradorTenantId"))).collect(Collectors.toSet()));
+            for (Map<String, Object> o : ofertas) {
+                Long comprador = numero(o.get("compradorTenantId"));
+                boolean revelado = "ACEPTADA".equals(o.get("estado"));
+                o.put("comprador", perfilPublico(perfiles.get(comprador), comprador, "COMPRADOR", revelado));
+            }
+            salida.put("ofertas", ofertas);
+            if ("VENDIDA".equals(fila.get("estado")) && compradorCerrado != null) {
+                salida.put("contraparte", contacto(compradorCerrado));
+                cerrada = ofertaAceptada(id);
+            }
         } else {
             salida.put("misOfertas", jdbc.queryForList(
                 "SELECT id, monto_ofertado AS monto, estado, fecha, mensaje, traspasado FROM ofertas_compra "
-                    + "WHERE publicacion_id = ? AND comprador_tenant_id = ? ORDER BY fecha DESC", id, yo));
+                    + "WHERE publicacion_id = ? AND comprador_tenant_id = ? ORDER BY id DESC", id, yo));
+            if ("VENDIDA".equals(fila.get("estado")) && yo.equals(compradorCerrado)) {
+                salida.put("contraparte", contacto(vendedor));
+                cerrada = ofertaAceptada(id);
+            }
+        }
+        salida.put("ofertaCerrada", cerrada);
+        if (cerrada != null) {
+            salida.put("yaCalifique", Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM mercado_ganado_calificaciones WHERE oferta_id = ? AND calificador_tenant_id = ?)",
+                Boolean.class, cerrada.get("id"), yo)));
         }
         return salida;
+    }
+
+    // ─────────────────────────── condiciones ───────────────────────────
+
+    @GetMapping("/condiciones")
+    public Map<String, Object> condiciones() {
+        Integer version = jdbc.queryForList("SELECT version FROM mercado_ganado_condiciones WHERE tenant_id = ?", Integer.class, tenantActual())
+            .stream().findFirst().orElse(null);
+        return Map.of("aceptadas", version != null && version >= VERSION_CONDICIONES, "version", VERSION_CONDICIONES);
+    }
+
+    @PostMapping("/condiciones/aceptar")
+    public Map<String, Object> aceptarCondiciones() {
+        AuthContext.exigirRol(ROLES_NEGOCIO);
+        jdbc.update("INSERT INTO mercado_ganado_condiciones (tenant_id, usuario, version, fecha) VALUES (?, ?, ?, ?) "
+                + "ON CONFLICT (tenant_id) DO UPDATE SET usuario = EXCLUDED.usuario, version = EXCLUDED.version, fecha = EXCLUDED.fecha",
+            tenantActual(), AuthContext.getUsername(), VERSION_CONDICIONES, Timestamp.valueOf(LocalDateTime.now()));
+        return condiciones();
+    }
+
+    private void exigirCondiciones() {
+        if (!Boolean.TRUE.equals(condiciones().get("aceptadas"))) {
+            throw new RuntimeException("Antes de negociar en el mercado debes aceptar sus condiciones");
+        }
     }
 
     // ─────────────────────────── publicar ───────────────────────────
 
     public static class PublicacionRequest {
         public Long animalId;
+        public String categoria;
         public String titulo;
         public BigDecimal precio;
         public String tipoPrecio; // POR_CABEZA, POR_KG
-        public String ubicacion;
+        public String estadoRegion;
+        public String municipio;
         public String descripcion;
         public Boolean negociable;
         public List<String> fotos;
@@ -150,9 +290,12 @@ public class MercadoGanaderoController {
     @Transactional
     public Map<String, Object> publicar(@RequestBody PublicacionRequest req) {
         AuthContext.exigirRol(ROLES_NEGOCIO);
+        exigirCondiciones();
         Long yo = tenantActual();
         if (req.animalId == null) throw new RuntimeException("Elige el animal que vas a publicar");
+        String categoria = validarCategoria(req.categoria);
         validarPrecio(req.precio);
+        if (!texto(req.estadoRegion)) throw new RuntimeException("Indica en qué estado está el animal");
         Map<String, Object> animal = unaFila("SELECT id, estado, arete, raza, peso_actual FROM animales WHERE id = ? AND tenant_id = ?", req.animalId, yo);
         if (animal == null) throw new RuntimeException("Ese animal no está en tu hato");
         if (!"ACTIVO".equals(animal.get("estado"))) throw new RuntimeException("Solo se pueden publicar animales activos");
@@ -161,50 +304,71 @@ public class MercadoGanaderoController {
         if (yaPublicado != null && yaPublicado > 0) throw new RuntimeException("Ese animal ya está publicado en el mercado");
         List<String> fotos = validarFotos(req.fotos, req.miniatura);
 
-        String titulo = texto(req.titulo) ? recortar(req.titulo, 120)
-            : (animal.get("raza") != null ? animal.get("raza") + " " : "") + "arete " + animal.get("arete");
+        String tituloBase = recortar(texto(req.titulo) ? req.titulo
+            : (animal.get("raza") != null ? animal.get("raza") + " " : "") + "arete " + animal.get("arete"), 120);
+        String descripcionBase = recortar(req.descripcion, 2000);
+        String municipioBase = recortar(req.municipio, 80);
+        String titulo = limpiarPublicacion(tituloBase, null, yo);
+        String descripcion = limpiarPublicacion(descripcionBase, null, yo);
+        String municipio = limpiarPublicacion(municipioBase, null, yo);
+
         KeyHolder llave = new GeneratedKeyHolder();
         jdbc.update(con -> {
             PreparedStatement ps = con.prepareStatement(
                 "INSERT INTO publicaciones_venta (tenant_id, animal_id, precio_solicitado, descripcion, estado, fecha_publicacion, "
-                    + "titulo, tipo_precio, ubicacion, negociable, peso_publicado, miniatura_base64) "
-                    + "VALUES (?, ?, ?, ?, 'ACTIVA', ?, ?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
+                    + "titulo, tipo_precio, ubicacion, negociable, peso_publicado, miniatura_base64, categoria, estado_region) "
+                    + "VALUES (?, ?, ?, ?, 'ACTIVA', ?, ?, ?, ?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
             ps.setLong(1, yo);
             ps.setLong(2, req.animalId);
             ps.setBigDecimal(3, req.precio);
-            ps.setString(4, recortar(req.descripcion, 2000));
+            ps.setString(4, descripcion);
             ps.setObject(5, LocalDate.now());
             ps.setString(6, titulo);
             ps.setString(7, "POR_KG".equals(req.tipoPrecio) ? "POR_KG" : "POR_CABEZA");
-            ps.setString(8, recortar(req.ubicacion, 120));
+            ps.setString(8, municipio);
             ps.setBoolean(9, req.negociable == null || req.negociable);
             ps.setBigDecimal(10, (BigDecimal) animal.get("peso_actual"));
             ps.setString(11, req.miniatura);
+            ps.setString(12, categoria);
+            ps.setString(13, recortar(req.estadoRegion, 40));
             return ps;
         }, llave);
         Long id = ((Number) llave.getKeys().get("id")).longValue();
+        jdbc.update("UPDATE mercado_ganado_alertas SET publicacion_id = ? WHERE publicacion_id IS NULL AND tenant_id = ? AND tipo = 'CONTACTO_EN_PUBLICACION'", id, yo);
         guardarFotos(id, yo, fotos);
-        return detalle(id);
+        Map<String, Object> salida = detalle(id);
+        salida.put("datosOcultos", !Objects.equals(titulo, tituloBase) || !Objects.equals(descripcion, descripcionBase)
+            || !Objects.equals(municipio, municipioBase));
+        return salida;
     }
 
     @PutMapping("/publicaciones/{id:[0-9]+}")
     @Transactional
     public Map<String, Object> editar(@PathVariable Long id, @RequestBody PublicacionRequest req) {
         AuthContext.exigirRol(ROLES_NEGOCIO);
-        Map<String, Object> pub = publicacionPropiaActiva(id);
+        Long yo = tenantActual();
+        publicacionPropiaActiva(id);
         validarPrecio(req.precio);
+        String categoria = validarCategoria(req.categoria);
+        String descripcionBase = recortar(req.descripcion, 2000);
+        String municipioBase = recortar(req.municipio, 80);
+        String titulo = texto(req.titulo) ? limpiarPublicacion(recortar(req.titulo, 120), id, yo) : null;
+        String descripcion = limpiarPublicacion(descripcionBase, id, yo);
+        String municipio = limpiarPublicacion(municipioBase, id, yo);
         jdbc.update("UPDATE publicaciones_venta SET precio_solicitado = ?, titulo = COALESCE(?, titulo), tipo_precio = ?, ubicacion = ?, "
-                + "descripcion = ?, negociable = ? WHERE id = ?",
-            req.precio, texto(req.titulo) ? recortar(req.titulo, 120) : null,
-            "POR_KG".equals(req.tipoPrecio) ? "POR_KG" : "POR_CABEZA", recortar(req.ubicacion, 120),
-            recortar(req.descripcion, 2000), req.negociable == null || req.negociable, id);
+                + "descripcion = ?, negociable = ?, categoria = ?, estado_region = COALESCE(?, estado_region) WHERE id = ?",
+            req.precio, titulo, "POR_KG".equals(req.tipoPrecio) ? "POR_KG" : "POR_CABEZA", municipio,
+            descripcion, req.negociable == null || req.negociable, categoria, texto(req.estadoRegion) ? recortar(req.estadoRegion, 40) : null, id);
         if (req.fotos != null) {
             List<String> fotos = validarFotos(req.fotos, req.miniatura);
             jdbc.update("DELETE FROM mercado_ganado_fotos WHERE publicacion_id = ?", id);
             jdbc.update("UPDATE publicaciones_venta SET miniatura_base64 = ? WHERE id = ?", req.miniatura, id);
-            guardarFotos(id, numero(pub.get("tenant_id")), fotos);
+            guardarFotos(id, yo, fotos);
         }
-        return detalle(id);
+        Map<String, Object> salida = detalle(id);
+        salida.put("datosOcultos", !Objects.equals(descripcion, descripcionBase) || !Objects.equals(municipio, municipioBase)
+            || (titulo != null && !Objects.equals(titulo, recortar(req.titulo, 120))));
+        return salida;
     }
 
     @PostMapping("/publicaciones/{id:[0-9]+}/retirar")
@@ -228,25 +392,30 @@ public class MercadoGanaderoController {
     @Transactional
     public Map<String, Object> ofertar(@PathVariable Long id, @RequestBody OfertaRequest req) {
         AuthContext.exigirRol(ROLES_NEGOCIO);
+        exigirCondiciones();
         Long yo = tenantActual();
         Map<String, Object> pub = unaFila("SELECT id, tenant_id, estado FROM publicaciones_venta WHERE id = ?", id);
         if (pub == null || !"ACTIVA".equals(pub.get("estado"))) throw new RuntimeException("Esta publicación ya no está disponible");
-        if (numero(pub.get("tenant_id")).equals(yo)) throw new RuntimeException("No puedes ofertar por tu propio animal");
+        Long vendedor = numero(pub.get("tenant_id"));
+        if (vendedor.equals(yo)) throw new RuntimeException("No puedes ofertar por tu propio animal");
         validarPrecio(req.monto);
-        Integer pendientes = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM ofertas_compra WHERE publicacion_id = ? AND comprador_tenant_id = ? AND estado = 'PENDIENTE'",
-            Integer.class, id, yo);
-        if (pendientes != null && pendientes > 0) {
-            jdbc.update("UPDATE ofertas_compra SET estado = 'RETIRADA' WHERE publicacion_id = ? AND comprador_tenant_id = ? AND estado = 'PENDIENTE'", id, yo);
+        jdbc.update("UPDATE ofertas_compra SET estado = 'RETIRADA' WHERE publicacion_id = ? AND comprador_tenant_id = ? AND estado = 'PENDIENTE'", id, yo);
+
+        String mensaje = null;
+        boolean oculto = false;
+        if (texto(req.mensaje)) {
+            FiltroContactoMercado.Resultado f = FiltroContactoMercado.filtrar(recortar(req.mensaje, 500));
+            mensaje = f.texto();
+            if (f.huboContacto()) { oculto = true; registrarAlerta(id, yo, vendedor, "CONTACTO_EN_CHAT", req.mensaje); }
         }
-        String finca = nombreFinca(yo);
         jdbc.update("INSERT INTO ofertas_compra (tenant_id, publicacion_id, nombre_comprador, monto_ofertado, estado, fecha, "
                 + "comprador_tenant_id, comprador_usuario, mensaje) VALUES (?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?)",
-            pub.get("tenant_id"), id, finca, req.monto, Timestamp.valueOf(LocalDateTime.now()), yo,
-            AuthContext.getUsername(), recortar(req.mensaje, 500));
-        String texto = "Oferta de " + dinero(req.monto) + (texto(req.mensaje) ? ": " + req.mensaje.trim() : "");
-        insertarMensaje(id, yo, yo, nombreEmisor(yo), recortar(texto, 2000), true);
-        return detalle(id);
+            vendedor, id, nombreFinca(yo), req.monto, Timestamp.valueOf(LocalDateTime.now()), yo, AuthContext.getUsername(), mensaje);
+        insertarMensaje(id, yo, yo, nombreEmisor(yo),
+            recortar("Oferta de " + dinero(req.monto) + (mensaje != null ? ": " + mensaje : ""), 2000), true);
+        Map<String, Object> salida = detalle(id);
+        salida.put("datosOcultos", oculto);
+        return salida;
     }
 
     @PostMapping("/ofertas/{ofertaId:[0-9]+}/rechazar")
@@ -285,7 +454,7 @@ public class MercadoGanaderoController {
         registrarComision(comprador, "mercado-ganado-comprador", ofertaId, monto, "Compra en el mercado: " + titulo + " (1% comprador)");
 
         insertarMensaje(pubId, comprador, yo, nombreEmisor(yo),
-            "Trato cerrado por " + dinero(monto) + ". Ya puedes recibir el animal en tu hato desde el mercado.", true);
+            "Trato cerrado por " + dinero(monto) + ". Ya pueden ver los datos de contacto del otro para coordinar la entrega.", true);
         return detalle(pubId);
     }
 
@@ -348,26 +517,63 @@ public class MercadoGanaderoController {
         return salida;
     }
 
+    public static class CalificacionRequest {
+        public Integer estrellas;
+        public String comentario;
+    }
+
+    /** Cada parte califica a la otra una sola vez, solo en tratos cerrados en Aurora. */
+    @PostMapping("/ofertas/{ofertaId:[0-9]+}/calificar")
+    public Map<String, Object> calificar(@PathVariable Long ofertaId, @RequestBody CalificacionRequest req) {
+        AuthContext.exigirRol(ROLES_NEGOCIO);
+        Long yo = tenantActual();
+        if (req.estrellas == null || req.estrellas < 1 || req.estrellas > 5) throw new RuntimeException("Elige de 1 a 5 estrellas");
+        Map<String, Object> oferta = unaFila(
+            "SELECT o.id, o.estado, o.comprador_tenant_id, o.publicacion_id, p.tenant_id AS vendedor "
+                + "FROM ofertas_compra o JOIN publicaciones_venta p ON p.id = o.publicacion_id WHERE o.id = ?", ofertaId);
+        if (oferta == null || !"ACEPTADA".equals(oferta.get("estado"))) throw new RuntimeException("Solo se califica un trato cerrado");
+        Long vendedor = numero(oferta.get("vendedor"));
+        Long comprador = numero(oferta.get("comprador_tenant_id"));
+        Long calificado = yo.equals(vendedor) ? comprador : yo.equals(comprador) ? vendedor : null;
+        if (calificado == null) throw new RuntimeException("No participaste en este trato");
+        String comentario = texto(req.comentario) ? FiltroContactoMercado.filtrar(recortar(req.comentario, 500)).texto() : null;
+        jdbc.update("INSERT INTO mercado_ganado_calificaciones (oferta_id, calificador_tenant_id, calificado_tenant_id, estrellas, comentario) "
+            + "VALUES (?, ?, ?, ?, ?) ON CONFLICT (oferta_id, calificador_tenant_id) DO NOTHING", ofertaId, yo, calificado, req.estrellas, comentario);
+        return detalle(numero(oferta.get("publicacion_id")));
+    }
+
     // ─────────────────────────── chat ───────────────────────────
 
     /** Conversaciones de mi finca, como vendedora o como compradora. */
     @GetMapping("/conversaciones")
     public List<Map<String, Object>> conversaciones() {
         Long yo = tenantActual();
-        return jdbc.queryForList(
+        List<Map<String, Object>> filas = jdbc.queryForList(
             "SELECT m.publicacion_id AS \"publicacionId\", m.comprador_tenant_id AS \"compradorTenantId\", p.titulo, p.estado, "
-                + "p.miniatura_base64 AS miniatura, p.tenant_id = ? AS \"soyVendedor\", "
-                + "CASE WHEN p.tenant_id = ? THEN lc.nombre_empresa ELSE lv.nombre_empresa END AS \"otraFinca\", "
+                + "p.miniatura_base64 AS miniatura, p.tenant_id AS vendedor, p.comprador_tenant_id AS cerrado_con, "
                 + "MAX(m.fecha) AS \"ultimaFecha\", "
                 + "(ARRAY_AGG(m.contenido ORDER BY m.fecha DESC))[1] AS \"ultimoMensaje\", "
                 + "COUNT(*) FILTER (WHERE m.emisor_tenant_id <> ? AND NOT m.leido) AS \"sinLeer\" "
                 + "FROM mercado_ganado_mensajes m JOIN publicaciones_venta p ON p.id = m.publicacion_id "
-                + "LEFT JOIN licencias_tenant lc ON lc.tenant_id = m.comprador_tenant_id "
-                + "LEFT JOIN licencias_tenant lv ON lv.tenant_id = p.tenant_id "
                 + "WHERE p.tenant_id = ? OR m.comprador_tenant_id = ? "
-                + "GROUP BY m.publicacion_id, m.comprador_tenant_id, p.titulo, p.estado, p.miniatura_base64, p.tenant_id, lc.nombre_empresa, lv.nombre_empresa "
+                + "GROUP BY m.publicacion_id, m.comprador_tenant_id, p.titulo, p.estado, p.miniatura_base64, p.tenant_id, p.comprador_tenant_id "
                 + "ORDER BY MAX(m.fecha) DESC",
-            yo, yo, yo, yo, yo);
+            yo, yo, yo);
+        Set<Long> otros = new HashSet<>();
+        filas.forEach(f -> otros.add(numero(f.get("vendedor")).equals(yo) ? numero(f.get("compradorTenantId")) : numero(f.get("vendedor"))));
+        Map<Long, Map<String, Object>> perfiles = perfiles(otros);
+        for (Map<String, Object> f : filas) {
+            boolean soyVendedor = numero(f.get("vendedor")).equals(yo);
+            Long otro = soyVendedor ? numero(f.get("compradorTenantId")) : numero(f.get("vendedor"));
+            boolean revelado = "VENDIDA".equals(f.get("estado")) && f.get("cerrado_con") != null
+                && numero(f.get("cerrado_con")).equals(numero(f.get("compradorTenantId")));
+            Map<String, Object> perfil = perfilPublico(perfiles.get(otro), otro, soyVendedor ? "COMPRADOR" : "VENDEDOR", revelado);
+            f.put("soyVendedor", soyVendedor);
+            f.put("otraFinca", perfil.get("nombre"));
+            f.remove("vendedor");
+            f.remove("cerrado_con");
+        }
+        return filas;
     }
 
     @GetMapping("/sin-leer")
@@ -387,10 +593,23 @@ public class MercadoGanaderoController {
         Long compradorConv = compradorDeConversacion(id, comprador);
         jdbc.update("UPDATE mercado_ganado_mensajes SET leido = TRUE WHERE publicacion_id = ? AND comprador_tenant_id = ? AND emisor_tenant_id <> ? AND NOT leido",
             id, compradorConv, yo);
-        return jdbc.queryForList(
-            "SELECT id, emisor_tenant_id = ? AS \"esMio\", emisor_nombre AS \"emisorNombre\", contenido, es_sistema AS \"esSistema\", fecha "
+        boolean revelado = tratoCerradoEntre(id, compradorConv);
+        Long vendedor = jdbc.queryForObject("SELECT tenant_id FROM publicaciones_venta WHERE id = ?", Long.class, id);
+        Long otro = vendedor.equals(yo) ? compradorConv : vendedor;
+        Map<String, Object> perfilOtro = perfilPublico(perfiles(Set.of(otro)).get(otro), otro, vendedor.equals(yo) ? "COMPRADOR" : "VENDEDOR", revelado);
+
+        List<Map<String, Object>> filas = jdbc.queryForList(
+            "SELECT id, emisor_tenant_id, emisor_nombre, contenido, es_sistema AS \"esSistema\", fecha "
                 + "FROM mercado_ganado_mensajes WHERE publicacion_id = ? AND comprador_tenant_id = ? ORDER BY fecha, id",
-            yo, id, compradorConv);
+            id, compradorConv);
+        for (Map<String, Object> f : filas) {
+            boolean mio = numero(f.get("emisor_tenant_id")).equals(yo);
+            f.put("esMio", mio);
+            f.put("emisorNombre", mio ? null : revelado ? f.get("emisor_nombre") : perfilOtro.get("nombre"));
+            f.remove("emisor_tenant_id");
+            f.remove("emisor_nombre");
+        }
+        return filas;
     }
 
     public static class MensajeRequest {
@@ -399,20 +618,33 @@ public class MercadoGanaderoController {
     }
 
     @PostMapping("/publicaciones/{id:[0-9]+}/mensajes")
-    public List<Map<String, Object>> enviarMensaje(@PathVariable Long id, @RequestBody MensajeRequest req) {
+    public Map<String, Object> enviarMensaje(@PathVariable Long id, @RequestBody MensajeRequest req) {
         AuthContext.exigirRol(ROLES_NEGOCIO);
+        exigirCondiciones();
         if (!texto(req.contenido)) throw new RuntimeException("Escribe un mensaje");
         Long yo = tenantActual();
         Long compradorConv = compradorDeConversacion(id, req.comprador);
         Map<String, Object> pub = unaFila("SELECT estado, tenant_id FROM publicaciones_venta WHERE id = ?", id);
-        boolean soyVendedor = numero(pub.get("tenant_id")).equals(yo);
+        Long vendedor = numero(pub.get("tenant_id"));
+        boolean soyVendedor = vendedor.equals(yo);
         if (!soyVendedor && !"ACTIVA".equals(pub.get("estado"))) {
             Integer participo = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM mercado_ganado_mensajes WHERE publicacion_id = ? AND comprador_tenant_id = ?", Integer.class, id, yo);
             if (participo == null || participo == 0) throw new RuntimeException("Esta publicación ya no está disponible");
         }
-        insertarMensaje(id, compradorConv, yo, nombreEmisor(yo), recortar(req.contenido.trim(), 2000), false);
-        return mensajes(id, compradorConv);
+        String contenido = recortar(req.contenido.trim(), 2000);
+        boolean oculto = false;
+        // Una vez cerrado el trato ya se ven los datos del otro: el filtro solo cuida la negociación.
+        if (!tratoCerradoEntre(id, compradorConv)) {
+            FiltroContactoMercado.Resultado f = FiltroContactoMercado.filtrar(contenido);
+            if (f.huboContacto()) {
+                oculto = true;
+                registrarAlerta(id, yo, soyVendedor ? compradorConv : vendedor, "CONTACTO_EN_CHAT", contenido);
+                contenido = f.texto();
+            }
+        }
+        insertarMensaje(id, compradorConv, yo, nombreEmisor(yo), contenido, false);
+        return Map.of("mensajes", mensajes(id, compradorConv), "datosOcultos", oculto);
     }
 
     // ─────────────────────────── comisiones ───────────────────────────
@@ -429,42 +661,188 @@ public class MercadoGanaderoController {
         return Map.of("pendiente", pendiente, "comisiones", filas);
     }
 
-    // ─────────────────────────── utilidades ───────────────────────────
+    // ─────────────────────────── tarjetas y perfiles ───────────────────────────
 
+    /** Primer ? = finca que mira (es_mia), segundo ? = finca que mira (guardado). */
     private static final String SELECT_TARJETA =
-        "SELECT p.id, p.tenant_id, p.animal_id, p.titulo, p.precio_solicitado, p.tipo_precio, p.ubicacion, p.negociable, p.estado, "
-            + "p.fecha_publicacion, p.descripcion, p.miniatura_base64, p.precio_final, p.fecha_cierre, "
+        "SELECT p.id, p.tenant_id, p.animal_id, p.titulo, p.precio_solicitado, p.tipo_precio, p.ubicacion, p.estado_region, p.categoria, "
+            + "p.negociable, p.estado, p.fecha_publicacion, p.descripcion, p.miniatura_base64, p.precio_final, p.fecha_cierre, p.comprador_tenant_id, "
             + "COALESCE(p.peso_publicado, a.peso_actual) AS peso, a.raza, a.sexo, a.tipo_animal, a.fecha_nacimiento, a.arete, "
-            + "l.nombre_empresa AS finca, p.tenant_id = ? AS es_mia, "
+            + "p.tenant_id = ? AS es_mia, "
+            + "EXISTS (SELECT 1 FROM mercado_ganado_guardados g2 WHERE g2.publicacion_id = p.id AND g2.tenant_id = ?) AS guardado, "
             + "(SELECT COUNT(*) FROM ofertas_compra o WHERE o.publicacion_id = p.id AND o.estado = 'PENDIENTE' AND o.comprador_tenant_id IS NOT NULL) AS ofertas_pendientes, "
             + "(SELECT COUNT(*) FROM mercado_ganado_fotos f WHERE f.publicacion_id = p.id) AS total_fotos "
             + "FROM publicaciones_venta p JOIN animales a ON a.id = p.animal_id JOIN licencias_tenant l ON l.tenant_id = p.tenant_id";
 
-    private Map<String, Object> tarjeta(Map<String, Object> f) {
-        Map<String, Object> t = new LinkedHashMap<>();
-        t.put("id", f.get("id"));
-        t.put("titulo", f.get("titulo"));
-        t.put("precio", f.get("precio_solicitado"));
-        t.put("tipoPrecio", f.get("tipo_precio"));
-        t.put("ubicacion", f.get("ubicacion"));
-        t.put("negociable", f.get("negociable"));
-        t.put("estado", f.get("estado"));
-        t.put("fechaPublicacion", f.get("fecha_publicacion"));
-        t.put("miniatura", f.get("miniatura_base64"));
-        t.put("peso", f.get("peso"));
-        t.put("raza", f.get("raza"));
-        t.put("sexo", f.get("sexo"));
-        t.put("tipoAnimal", f.get("tipo_animal"));
-        t.put("arete", f.get("arete"));
-        t.put("edadMeses", f.get("fecha_nacimiento") == null ? null
-            : ChronoUnit.MONTHS.between(((java.sql.Date) f.get("fecha_nacimiento")).toLocalDate(), LocalDate.now()));
-        t.put("finca", f.get("finca"));
-        t.put("esMia", f.get("es_mia"));
-        t.put("ofertasPendientes", f.get("ofertas_pendientes"));
-        t.put("totalFotos", f.get("total_fotos"));
-        t.put("precioFinal", f.get("precio_final"));
-        t.put("fechaCierre", f.get("fecha_cierre"));
-        return t;
+    private List<Map<String, Object>> tarjetas(List<Map<String, Object>> filas, Long yo) {
+        Map<Long, Map<String, Object>> perfiles = perfiles(filas.stream().map(f -> numero(f.get("tenant_id"))).collect(Collectors.toSet()));
+        List<Map<String, Object>> salida = new ArrayList<>();
+        for (Map<String, Object> f : filas) {
+            Long vendedor = numero(f.get("tenant_id"));
+            boolean esMia = vendedor.equals(yo);
+            boolean revelado = esMia || ("VENDIDA".equals(f.get("estado")) && f.get("comprador_tenant_id") != null
+                && numero(f.get("comprador_tenant_id")).equals(yo));
+            Map<String, Object> t = new LinkedHashMap<>();
+            t.put("id", f.get("id"));
+            t.put("titulo", f.get("titulo"));
+            t.put("categoria", f.get("categoria"));
+            t.put("precio", f.get("precio_solicitado"));
+            t.put("tipoPrecio", f.get("tipo_precio"));
+            t.put("estadoRegion", f.get("estado_region"));
+            t.put("negociable", f.get("negociable"));
+            t.put("estado", f.get("estado"));
+            t.put("fechaPublicacion", f.get("fecha_publicacion"));
+            t.put("miniatura", f.get("miniatura_base64"));
+            t.put("peso", f.get("peso"));
+            t.put("raza", f.get("raza"));
+            t.put("sexo", f.get("sexo"));
+            t.put("tipoAnimal", f.get("tipo_animal"));
+            t.put("arete", esMia ? f.get("arete") : null);
+            t.put("edadMeses", f.get("fecha_nacimiento") == null ? null
+                : ChronoUnit.MONTHS.between(((java.sql.Date) f.get("fecha_nacimiento")).toLocalDate(), LocalDate.now()));
+            t.put("esMia", esMia);
+            t.put("guardado", f.get("guardado"));
+            t.put("ofertasPendientes", esMia ? f.get("ofertas_pendientes") : 0L);
+            t.put("totalFotos", f.get("total_fotos"));
+            t.put("precioFinal", f.get("precio_final"));
+            t.put("fechaCierre", f.get("fecha_cierre"));
+            Map<String, Object> perfil = perfilPublico(perfiles.get(vendedor), vendedor, "VENDEDOR", revelado);
+            if (!revelado && f.get("estado_region") != null) perfil.put("nombre", "Finca en " + f.get("estado_region") + " #" + codigo(vendedor));
+            t.put("vendedor", perfil);
+            salida.add(t);
+        }
+        return salida;
+    }
+
+    /** Datos de reputación de varias fincas en pocas consultas. */
+    private Map<Long, Map<String, Object>> perfiles(Set<Long> tenants) {
+        Map<Long, Map<String, Object>> salida = new HashMap<>();
+        if (tenants.isEmpty()) return salida;
+        Object[] ids = tenants.toArray();
+        String en = marcadores(ids.length);
+        for (Map<String, Object> r : jdbc.queryForList("SELECT tenant_id, nombre_empresa, fecha_alta FROM licencias_tenant WHERE tenant_id IN (" + en + ")", ids)) {
+            Map<String, Object> p = new HashMap<>();
+            p.put("nombreReal", r.get("nombre_empresa"));
+            p.put("fechaAlta", r.get("fecha_alta"));
+            p.put("verificado", false);
+            p.put("ventas", 0L);
+            p.put("compras", 0L);
+            p.put("calificacion", null);
+            p.put("totalCalificaciones", 0L);
+            salida.put(numero(r.get("tenant_id")), p);
+        }
+        for (Long t : jdbc.queryForList("SELECT DISTINCT tenant_id FROM pagos_suscripcion_tenant WHERE tenant_id IN (" + en + ") "
+                + "AND monto > 0 AND (estado IS NULL OR estado = 'CONFIRMADO')", Long.class, ids)) {
+            if (salida.containsKey(t)) salida.get(t).put("verificado", true);
+        }
+        for (Map<String, Object> r : jdbc.queryForList("SELECT tenant_id, COUNT(*) AS n FROM publicaciones_venta WHERE estado = 'VENDIDA' "
+                + "AND tenant_id IN (" + en + ") GROUP BY tenant_id", ids)) {
+            Map<String, Object> p = salida.get(numero(r.get("tenant_id")));
+            if (p != null) p.put("ventas", numero(r.get("n")));
+        }
+        for (Map<String, Object> r : jdbc.queryForList("SELECT comprador_tenant_id AS t, COUNT(*) AS n FROM ofertas_compra WHERE estado = 'ACEPTADA' "
+                + "AND comprador_tenant_id IN (" + en + ") GROUP BY comprador_tenant_id", ids)) {
+            Map<String, Object> p = salida.get(numero(r.get("t")));
+            if (p != null) p.put("compras", numero(r.get("n")));
+        }
+        for (Map<String, Object> r : jdbc.queryForList("SELECT calificado_tenant_id AS t, AVG(estrellas) AS prom, COUNT(*) AS n "
+                + "FROM mercado_ganado_calificaciones WHERE calificado_tenant_id IN (" + en + ") GROUP BY calificado_tenant_id", ids)) {
+            Map<String, Object> p = salida.get(numero(r.get("t")));
+            if (p == null) continue;
+            p.put("calificacion", new BigDecimal(r.get("prom").toString()).setScale(1, RoundingMode.HALF_UP));
+            p.put("totalCalificaciones", numero(r.get("n")));
+        }
+        return salida;
+    }
+
+    /** Lo que se muestra de una finca: su nombre real solo si el trato ya se cerró con ella. */
+    private Map<String, Object> perfilPublico(Map<String, Object> datos, Long tenantId, String rol, boolean revelado) {
+        Map<String, Object> p = new LinkedHashMap<>();
+        String alias = ("COMPRADOR".equals(rol) ? "Comprador" : "Finca vendedora") + " #" + codigo(tenantId);
+        p.put("nombre", revelado && datos != null && datos.get("nombreReal") != null ? datos.get("nombreReal") : alias);
+        p.put("revelado", revelado);
+        p.put("verificado", datos != null && Boolean.TRUE.equals(datos.get("verificado")));
+        Object alta = datos == null ? null : datos.get("fechaAlta");
+        p.put("mesesEnAurora", alta == null ? null : ChronoUnit.MONTHS.between(((java.sql.Date) alta).toLocalDate(), LocalDate.now()));
+        p.put("diasEnAurora", alta == null ? null : ChronoUnit.DAYS.between(((java.sql.Date) alta).toLocalDate(), LocalDate.now()));
+        p.put("ventas", datos == null ? 0L : datos.get("ventas"));
+        p.put("compras", datos == null ? 0L : datos.get("compras"));
+        p.put("calificacion", datos == null ? null : datos.get("calificacion"));
+        p.put("totalCalificaciones", datos == null ? 0L : datos.get("totalCalificaciones"));
+        return p;
+    }
+
+    /** Código corto y estable para reconocer a una finca sin revelar quién es ni su número interno. */
+    private static String codigo(Long tenantId) {
+        long v = Math.floorMod(tenantId * 7919L + 1237L, 46656L);
+        String c = Long.toString(v, 36).toUpperCase();
+        return "0".repeat(Math.max(0, 3 - c.length())) + c;
+    }
+
+    /** Datos de la otra parte, solo después de cerrar el trato. */
+    private Map<String, Object> contacto(Long tenantId) {
+        Map<String, Object> l = unaFila("SELECT nombre_empresa, telefono_contacto, email_contacto FROM licencias_tenant WHERE tenant_id = ?", tenantId);
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put("nombre", l == null ? null : l.get("nombre_empresa"));
+        c.put("telefono", l == null ? null : l.get("telefono_contacto"));
+        c.put("email", l == null ? null : l.get("email_contacto"));
+        return c;
+    }
+
+    private Map<String, Object> ofertaAceptada(Long publicacionId) {
+        return unaFila("SELECT id, monto_ofertado AS monto, traspasado FROM ofertas_compra WHERE publicacion_id = ? AND estado = 'ACEPTADA' LIMIT 1", publicacionId);
+    }
+
+    /**
+     * Precio de referencia: lo que se pide y se pagó por animales de la misma
+     * categoría (y raza, si hay suficientes) en los últimos 6 meses.
+     */
+    private Map<String, Object> referenciaPrecio(Long publicacionId) {
+        Map<String, Object> pub = unaFila("SELECT p.categoria, p.tipo_precio, a.raza FROM publicaciones_venta p JOIN animales a ON a.id = p.animal_id WHERE p.id = ?", publicacionId);
+        if (pub == null || pub.get("categoria") == null) return null;
+        String base = "SELECT AVG(COALESCE(p.precio_final, p.precio_solicitado)) AS promedio, MIN(COALESCE(p.precio_final, p.precio_solicitado)) AS minimo, "
+            + "MAX(COALESCE(p.precio_final, p.precio_solicitado)) AS maximo, COUNT(*) AS muestras "
+            + "FROM publicaciones_venta p JOIN animales a ON a.id = p.animal_id "
+            + "WHERE p.categoria = ? AND p.tipo_precio = ? AND p.id <> ? AND p.estado IN ('ACTIVA', 'VENDIDA') AND p.fecha_publicacion >= ?";
+        LocalDate desde = LocalDate.now().minusMonths(6);
+        Map<String, Object> r = null;
+        String alcance = "categoría";
+        if (pub.get("raza") != null) {
+            r = unaFila(base + " AND a.raza ILIKE ?", pub.get("categoria"), pub.get("tipo_precio"), publicacionId, desde, pub.get("raza"));
+            alcance = "categoría y raza";
+        }
+        if (r == null || numero(r.get("muestras")) < 3) {
+            r = unaFila(base, pub.get("categoria"), pub.get("tipo_precio"), publicacionId, desde);
+            alcance = "categoría";
+        }
+        if (r == null || numero(r.get("muestras")) < 2) return null;
+        Map<String, Object> ref = new LinkedHashMap<>();
+        ref.put("promedio", new BigDecimal(r.get("promedio").toString()).setScale(2, RoundingMode.HALF_UP));
+        ref.put("minimo", r.get("minimo"));
+        ref.put("maximo", r.get("maximo"));
+        ref.put("muestras", r.get("muestras"));
+        ref.put("alcance", alcance);
+        return ref;
+    }
+
+    // ─────────────────────────── utilidades ───────────────────────────
+
+    private String limpiarPublicacion(String texto, Long publicacionId, Long yo) {
+        if (texto == null) return null;
+        FiltroContactoMercado.Resultado f = FiltroContactoMercado.filtrar(texto);
+        if (f.huboContacto()) registrarAlerta(publicacionId, yo, null, "CONTACTO_EN_PUBLICACION", texto);
+        return f.texto();
+    }
+
+    private void registrarAlerta(Long publicacionId, Long tenantId, Long otraParte, String tipo, String original) {
+        jdbc.update("INSERT INTO mercado_ganado_alertas (publicacion_id, tenant_id, otra_parte_tenant_id, tipo, contenido_original, fecha) VALUES (?, ?, ?, ?, ?, ?)",
+            publicacionId, tenantId, otraParte, tipo, recortar(original, 2000), Timestamp.valueOf(LocalDateTime.now()));
+    }
+
+    private boolean tratoCerradoEntre(Long publicacionId, Long comprador) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+            "SELECT EXISTS (SELECT 1 FROM publicaciones_venta WHERE id = ? AND estado = 'VENDIDA' AND comprador_tenant_id = ?)",
+            Boolean.class, publicacionId, comprador));
     }
 
     private Map<String, Object> publicacionPropiaActiva(Long id) {
@@ -515,6 +893,12 @@ public class MercadoGanaderoController {
             tenantId, origen, ofertaId, monto, COMISION_PORCENTAJE, comision, Timestamp.valueOf(LocalDateTime.now()), recortar(descripcion, 200));
     }
 
+    private static String validarCategoria(String categoria) {
+        String c = categoria == null ? "" : categoria.trim().toUpperCase();
+        if (!CATEGORIAS.contains(c)) throw new RuntimeException("Elige la categoría del animal");
+        return c;
+    }
+
     private List<String> validarFotos(List<String> fotos, String miniatura) {
         List<String> limpias = fotos == null ? List.of() : fotos.stream().filter(MercadoGanaderoController::texto).toList();
         if (limpias.isEmpty()) throw new RuntimeException("Agrega al menos una foto del animal");
@@ -546,7 +930,7 @@ public class MercadoGanaderoController {
         return n.isEmpty() || n.get(0) == null ? "Finca #" + tenantId : n.get(0);
     }
 
-    /** "Juan Pérez · Hacienda El Samán": quién escribe y de qué finca. */
+    /** "Juan Pérez · Hacienda El Samán": quién escribe y de qué finca (solo se muestra tras cerrar el trato). */
     private String nombreEmisor(Long tenantId) {
         List<String> n = jdbc.queryForList("SELECT nombre_completo FROM usuarios WHERE tenant_id = ? AND username = ?",
             String.class, tenantId, AuthContext.getUsername());
@@ -565,6 +949,14 @@ public class MercadoGanaderoController {
     private Map<String, Object> unaFila(String sql, Object... params) {
         List<Map<String, Object>> filas = jdbc.queryForList(sql, params);
         return filas.isEmpty() ? null : filas.get(0);
+    }
+
+    private static String marcadores(int n) { return String.join(",", Collections.nCopies(n, "?")); }
+
+    private static List<Object> concatenar(List<Object> a, List<Object> b) {
+        List<Object> r = new ArrayList<>(a);
+        r.addAll(b);
+        return r;
     }
 
     private static Long numero(Object o) { return ((Number) o).longValue(); }

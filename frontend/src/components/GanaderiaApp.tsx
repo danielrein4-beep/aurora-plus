@@ -1,5 +1,5 @@
-import MercadoGanadero from "./MercadoGanadero";
 import { contarSinLeerMercado } from "../api";
+import { useNavigate } from "react-router-dom";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import ModalBasculaBluetooth from "./ModalBasculaBluetooth";
 import {
@@ -134,6 +134,7 @@ const CATEGORIAS_GASTO_GANADERIA = [
 
 export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const tenantId = user?.tenantId ? Number(user.tenantId) : 1;
 
   // Tasas de cambio multi-moneda (configurables a mano y persistidas)
@@ -245,7 +246,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   });
 
   // Pestaña principal activa
-  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "mercado" | "auditoria">("resumen");
+  const [tab, setTab] = useState<"resumen" | "potreros" | "inventario" | "sanidad" | "eventos" | "produccion" | "reportes" | "auditoria">("resumen");
   const [sinLeerMercado, setSinLeerMercado] = useState(0);
   // Mensajes del mercado sin leer, para avisar en la pestaña aunque se esté en otra sección.
   useEffect(() => {
@@ -1756,12 +1757,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           </button>
 
           <button
-            onClick={() => setTab("mercado")}
-            className={`px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 ${
-              tab === "mercado"
-                ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                : "text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5"
-            }`}>
+            onClick={() => navigate("/mercado")}
+            title="Abrir el Mercado Ganadero: compra y venta entre fincas de Aurora"
+            className="px-4 py-2 rounded-full font-bold transition-all cursor-pointer flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-emerald-950 shadow-md shadow-amber-500/20">
             <span>Mercado ganadero</span>
             {sinLeerMercado > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] leading-none">{sinLeerMercado}</span>
@@ -4207,13 +4205,6 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             </div>
           );
         })()}
-
-        {tab === "mercado" && (
-          <MercadoGanadero
-            puedeNegociar={user?.rol === "DUENO_ADMIN" || user?.rol === "ADMINISTRADOR_FINCA"}
-            onSinLeer={setSinLeerMercado}
-          />
-        )}
 
         {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (
           <BitacoraAuditoria moduloSugerido="GANADERIA" />

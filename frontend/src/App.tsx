@@ -8,6 +8,7 @@ import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
 import PortalOdontologiaPaciente from "./pages/PortalOdontologiaPaciente";
 import { BrowserRouter, Routes, Route, Outlet, useNavigate, useParams } from "react-router-dom";
 import TenantSoporteWidget from "./components/TenantSoporteWidget";
+import MercadoGanaderoApp from "./components/mercado/MercadoGanaderoApp";
 import Layout from "./Layout";
 import Home from "./pages/Home";
 import Soluciones from "./pages/Soluciones";
@@ -191,6 +192,7 @@ export default function App() {
               <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
               <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />
               <Route path="/ganaderia/animal/:animalId" element={<ProtectedRoute><AnimatedRoute><GanaderiaAnimalPage /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/mercado" element={<ProtectedRoute><AnimatedRoute><MercadoGanaderoApp /></AnimatedRoute></ProtectedRoute>} />
               <Route path="/construccion" element={<ProtectedRoute><AnimatedRoute><ConstruccionPage /></AnimatedRoute></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />

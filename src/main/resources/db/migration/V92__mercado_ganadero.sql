@@ -56,3 +56,57 @@ CREATE INDEX IF NOT EXISTS idx_mercado_ganado_mensajes_conv ON mercado_ganado_me
 ALTER TABLE comisiones_plataforma
     ADD COLUMN IF NOT EXISTS descripcion VARCHAR(200),
     ADD COLUMN IF NOT EXISTS pago_id BIGINT;
+
+-- ───────── Mercado dedicado: categorías, reputación y protección de la comisión ─────────
+
+-- PADROTE, VACA_PARIDA, VACA_ORDENO, NOVILLA, MAUTE, CEBA
+ALTER TABLE publicaciones_venta
+    ADD COLUMN IF NOT EXISTS categoria VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS estado_region VARCHAR(40);
+
+CREATE INDEX IF NOT EXISTS idx_publicaciones_venta_categoria ON publicaciones_venta (categoria, estado);
+
+-- Animales que una finca guardó para mirar después.
+CREATE TABLE IF NOT EXISTS mercado_ganado_guardados (
+    tenant_id BIGINT NOT NULL,
+    publicacion_id BIGINT NOT NULL REFERENCES publicaciones_venta (id) ON DELETE CASCADE,
+    fecha TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (tenant_id, publicacion_id)
+);
+
+-- Calificación que cada parte deja a la otra tras un trato cerrado en Aurora.
+CREATE TABLE IF NOT EXISTS mercado_ganado_calificaciones (
+    id BIGSERIAL PRIMARY KEY,
+    oferta_id BIGINT NOT NULL REFERENCES ofertas_compra (id) ON DELETE CASCADE,
+    calificador_tenant_id BIGINT NOT NULL,
+    calificado_tenant_id BIGINT NOT NULL,
+    estrellas INTEGER NOT NULL CHECK (estrellas BETWEEN 1 AND 5),
+    comentario VARCHAR(500),
+    fecha TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (oferta_id, calificador_tenant_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mercado_calificaciones_calificado ON mercado_ganado_calificaciones (calificado_tenant_id);
+
+-- Intentos de pasar datos de contacto por el chat o la publicación antes de
+-- cerrar el trato: el texto se tapa y queda aquí para el super-admin.
+CREATE TABLE IF NOT EXISTS mercado_ganado_alertas (
+    id BIGSERIAL PRIMARY KEY,
+    publicacion_id BIGINT REFERENCES publicaciones_venta (id) ON DELETE CASCADE,
+    tenant_id BIGINT NOT NULL,
+    otra_parte_tenant_id BIGINT,
+    tipo VARCHAR(30) NOT NULL, -- CONTACTO_EN_CHAT, CONTACTO_EN_PUBLICACION
+    contenido_original VARCHAR(2000),
+    fecha TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mercado_alertas_fecha ON mercado_ganado_alertas (fecha DESC);
+
+-- Aceptación de las condiciones del mercado (la comisión aplica aunque el
+-- trato que nació aquí se cierre por fuera).
+CREATE TABLE IF NOT EXISTS mercado_ganado_condiciones (
+    tenant_id BIGINT PRIMARY KEY,
+    usuario VARCHAR(120),
+    version INTEGER NOT NULL,
+    fecha TIMESTAMP NOT NULL DEFAULT NOW()
+);
