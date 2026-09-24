@@ -2133,6 +2133,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   const [cargandoCompra, setCargandoCompra] = useState(false);
   const [toast, setToast] = useState<{ tipo: "success" | "error" | "info"; mensaje: string } | null>(null);
   const [editarModalItem, setEditarModalItem] = useState<ProductoComercio | null>(null);
+  // Ubicación del artículo en el almacén principal, para poder cambiarla desde "Editar Producto".
+  const [ubicacionEdicion, setUbicacionEdicion] = useState<{ almacenId: number; valor: string } | null>(null);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   // Foto del producto para el catálogo público — aparte del resto del formulario (que es
   // no controlado, vía FormData) porque necesita previsualización inmediata al elegir el
@@ -2268,6 +2270,21 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
         });
     }
   }, [clientes, sincronizacionListo]);
+
+  useEffect(() => {
+    setUbicacionEdicion(null);
+    if (!editarModalItem?.backendId || !user?.tenantId) return;
+    const tenantId = user.tenantId;
+    const repuestoId = editarModalItem.backendId;
+    Promise.all([listarAlmacenes(tenantId), obtenerDistribucionAlmacen(tenantId, repuestoId)])
+      .then(([almacenesData, dist]) => {
+        const principal = almacenesData.find((a) => a.esPrincipal) || almacenesData[0];
+        if (!principal) return;
+        const fila = dist.distribucion.find((d) => d.almacenId === principal.id);
+        setUbicacionEdicion({ almacenId: principal.id, valor: fila?.ubicacion || "" });
+      })
+      .catch(() => { /* sin almacenes: el campo no aparece y se sigue editando lo demás */ });
+  }, [editarModalItem?.backendId, user?.tenantId]);
 
   const cargarRepuestosBackend = async () => {
     if (!user?.tenantId) return;
@@ -5055,10 +5072,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         mostrarToast("Artículo creado, pero no se pudo guardar su ubicación. Agrégala desde 'Almacenes'.", "info");
                       }
                     }
-                    mostrarToast("Artículo registrado exitosamente en base de datos PostgreSQL", "success");
+                    mostrarToast("Artículo registrado.", "success");
                   } catch (err: any) {
-                    console.warn("Error persistiendo en backend repuestos:", err);
-                    mostrarToast("Registrado localmente", "info");
+                    // Antes quedaba "registrado localmente" y desaparecía al recargar: no se finge el guardado.
+                    mostrarToast(err?.message ? `No se guardó el artículo: ${err.message}` : "No se guardó el artículo. Revisa la conexión e intenta de nuevo.", "error");
+                    return;
                   }
                 }
 
@@ -5390,6 +5408,17 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     colorVariante: colorVariante || undefined,
                     fechaVencimiento: fechaVencimiento || p.fechaVencimiento,
                   } : p));
+                  const ubicacionNueva = String(fd.get("ubicacion") ?? "").trim();
+                  if (ubicacionEdicion && fd.has("ubicacion") && ubicacionNueva !== ubicacionEdicion.valor) {
+                    try {
+                      await fijarUbicacionAlmacen(user.tenantId, { repuestoId: editarModalItem.backendId, almacenId: ubicacionEdicion.almacenId, ubicacion: ubicacionNueva });
+                      cargarRepuestosBackend();
+                    } catch (err: any) {
+                      mostrarToast(`Producto actualizado, pero la ubicación no se guardó: ${err?.message || "error del servidor"}`, "error");
+                      setEditarModalItem(null);
+                      return;
+                    }
+                  }
                   mostrarToast("Producto actualizado correctamente.", "success");
                   setEditarModalItem(null);
                 } catch (err: any) {
@@ -5473,6 +5502,13 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         <input name="cantidadMinimaMayorista" type="number" step="1" defaultValue={editarModalItem.cantidadMinimaMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                       </div>
                     </div>
+                    {ubicacionEdicion && (
+                      <div>
+                        <label className="text-[10px] font-bold text-teal-400 block mb-1">Ubicación en Almacén Principal</label>
+                        <input name="ubicacion" key={`ub-${ubicacionEdicion.almacenId}-${ubicacionEdicion.valor}`} defaultValue={ubicacionEdicion.valor} maxLength={120} placeholder="Ej. Pasillo 3, Estante B" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">La de otros almacenes se cambia desde el botón "Almacenes".</p>
+                      </div>
+                    )}
                     <div>
                       <label className="text-[10px] font-bold text-amber-500 block mb-1">Fecha de Vencimiento (Opcional)</label>
                       <input name="fechaVencimiento" type="date" defaultValue={editarModalItem.fechaVencimiento || ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
