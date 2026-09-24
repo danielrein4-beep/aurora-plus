@@ -58,6 +58,8 @@ public class TenantProvisioningService {
         public String passwordInicial;
         public Boolean accesoTotal;
         public Integer limiteUsuarios;
+        /** Solo el alta desde el superadmin lo enciende; el registro de autoservicio nunca. */
+        public boolean permiteCambioVertical;
     }
 
     @Transactional
@@ -113,6 +115,7 @@ public class TenantProvisioningService {
         if (request.limiteUsuarios != null && request.limiteUsuarios > 0) {
             licencia.setLimiteUsuarios(request.limiteUsuarios);
         }
+        licencia.setPermiteCambioVertical(request.permiteCambioVertical);
         // El catálogo público (CatalogoPublicoController) solo resuelve tiendas por
         // slug — nunca por tenantId numérico, para no permitir enumeración
         // secuencial (IDOR). Sin esto, cada tenant nuevo nacía con slugCatalogo nulo

@@ -123,6 +123,12 @@ public class LicenciaService {
                 "Tu plan venció el " + licencia.getFechaVencimientoPago() + ". Reporta tu pago desde Aurora Hub > Facturación & Pagos para reactivar el acceso.");
         }
 
+        // Cuenta de verificacion creada por el superadmin: recorre todas las verticales sin
+        // depender del plan ni de los modulos contratados (sigue sujeta a activa y vencimiento).
+        if (licencia.isPermiteCambioVertical()) {
+            return ResultadoValidacion.ok();
+        }
+
         if (licencia.getTipoLicencia().ordinal() < nivelRequerido.ordinal()) {
             return ResultadoValidacion.bloqueado(403,
                 "Su licencia actual (" + licencia.getTipoLicencia() + ") no incluye el módulo '" + pathModulo

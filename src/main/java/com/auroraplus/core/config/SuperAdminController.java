@@ -344,6 +344,7 @@ public class SuperAdminController {
         public String passwordInicial;
         public Boolean accesoTotal;
         public Integer limiteUsuarios;
+        public Boolean permiteCambioVertical;
     }
 
     @PostMapping
@@ -360,6 +361,8 @@ public class SuperAdminController {
         alta.passwordInicial = request.passwordInicial;
         alta.accesoTotal = request.accesoTotal;
         alta.limiteUsuarios = request.limiteUsuarios;
+        // Las cuentas creadas aqui son de verificacion: pueden cambiar de vertical desde el Hub.
+        alta.permiteCambioVertical = request.permiteCambioVertical == null || request.permiteCambioVertical;
         return ResponseEntity.ok(tenantProvisioningService.crear(alta));
     }
 
@@ -394,6 +397,26 @@ public class SuperAdminController {
         }
 
         return ResponseEntity.ok(licenciaTenantRepository.save(licencia));
+    }
+
+    /** Enciende o apaga el cambio de vertical desde el Hub (cuentas de verificacion). */
+    @PatchMapping("/{tenantId}/cambio-vertical")
+    public ResponseEntity<LicenciaTenant> permitirCambioVertical(@PathVariable Long tenantId, @RequestParam boolean permitido) {
+        LicenciaTenant licencia = licenciaTenantRepository.findByTenantId(tenantId)
+            .orElseThrow(() -> new RuntimeException("Tenant no encontrado: " + tenantId));
+        licencia.setPermiteCambioVertical(permitido);
+        LicenciaTenant res = licenciaTenantRepository.save(licencia);
+        if (registroAuditoriaService != null) {
+            registroAuditoriaService.registrar(
+                tenantId,
+                "super-admin:" + com.auroraplus.core.auth.AuthContext.getUsername(),
+                "ACTUALIZAR",
+                "LicenciaTenant",
+                tenantId,
+                (permitido ? "Permitio" : "Quito") + " el cambio de vertical desde el Hub: " + licencia.getNombreEmpresa()
+            );
+        }
+        return ResponseEntity.ok(res);
     }
 
     @PostMapping("/{tenantId}/activar")

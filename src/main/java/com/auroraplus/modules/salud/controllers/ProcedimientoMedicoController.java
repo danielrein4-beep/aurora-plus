@@ -25,7 +25,9 @@ public class ProcedimientoMedicoController {
     @PostMapping
     public ResponseEntity<ProcedimientoMedico> crear(@RequestParam(required = false) Long tenantId, @RequestBody ProcedimientoMedico proc) {
         AuthContext.exigirRol("DUENO_ADMIN", "MEDICO");
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        // El negocio sale siempre de la sesion: el ?tenantId= que aun manda el frontend se ignora,
+        // si no cualquier clinica podia crear procedimientos en otra pasando su numero.
+        Long tenantActivo = TenantContext.getCurrentTenant();
         proc.setTenantId(tenantActivo);
         return ResponseEntity.ok(procedimientoMedicoRepository.save(proc));
     }

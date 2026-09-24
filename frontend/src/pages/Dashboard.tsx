@@ -44,6 +44,7 @@ import {
   type EstadoSuscripcion,
 } from "../api";
 import MediclinicApp from "../components/MediclinicApp";
+import SelectorVertical from "../components/SelectorVertical";
 
 const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
   clinica: IconClinic,
@@ -875,6 +876,7 @@ export default function Dashboard() {
 
         {/* Derecha: Botón Directo a la vertical + Estado + Salir */}
         <div className="flex items-center gap-2.5 whitespace-nowrap">
+          <SelectorVertical />
           {/* Botón Destacado: Entrar a la app de la vertical activa */}
           {esVerticalReal && (
             <button

@@ -117,6 +117,8 @@ public class ModuloTenantController {
         public String hierroBase64;
         /** Hasta cuándo tiene acceso (fin de la prueba o del período pagado). El Hub cuenta los días con esto. */
         public String fechaVencimientoPago;
+        /** Cuenta de verificacion: el Hub muestra el selector de vertical. */
+        public boolean permiteCambioVertical;
     }
 
     @GetMapping("/mi-negocio/marca")
@@ -130,6 +132,7 @@ public class ModuloTenantController {
         r.logoBase64 = licencia.getLogoBase64();
         r.hierroBase64 = licencia.getHierroBase64();
         r.fechaVencimientoPago = licencia.getFechaVencimientoPago() != null ? licencia.getFechaVencimientoPago().toString() : null;
+        r.permiteCambioVertical = licencia.isPermiteCambioVertical();
         return r;
     }
 

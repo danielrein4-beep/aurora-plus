@@ -226,6 +226,8 @@ export interface MiNegocio {
   hierroBase64: string | null;
   /** Fin de la prueba o del período pagado (AAAA-MM-DD). */
   fechaVencimientoPago?: string | null;
+  /** Cuenta de verificación creada desde el superadmin: puede cambiar de vertical en el Hub. */
+  permiteCambioVertical?: boolean;
 }
 
 export function obtenerMiNegocio(): Promise<MiNegocio> {
@@ -2845,6 +2847,8 @@ export interface LicenciaTenant {
   createdAt?: string;
   limiteUsuarios?: number | null;
   cantidadUsuarios?: number;
+  /** Cuenta de verificación: puede cambiar de vertical desde el Hub (V101). */
+  permiteCambioVertical?: boolean;
 }
 
 export interface ModuloTenant {
@@ -3303,6 +3307,12 @@ export async function crearTenantSuperAdmin(requestData: CrearTenantRequest): Pr
   const lista = obtenerTenantsLocales();
   guardarTenantsLocales([nuevo, ...lista]);
   return nuevo;
+}
+
+export async function permitirCambioVerticalSuperAdmin(tenantId: number, permitido: boolean): Promise<LicenciaTenant> {
+  return requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/cambio-vertical?permitido=${permitido}`, {
+    method: "PATCH",
+  });
 }
 
 export async function activarTenantSuperAdmin(tenantId: number): Promise<LicenciaTenant> {

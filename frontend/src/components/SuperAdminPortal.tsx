@@ -36,6 +36,7 @@ import {
   salirDeImpersonacion,
   crearTenantSuperAdmin,
   activarTenantSuperAdmin,
+  permitirCambioVerticalSuperAdmin,
   desactivarTenantSuperAdmin,
   cambiarPlanTenantSuperAdmin,
   listarModulosTenantSuperAdmin,
@@ -692,6 +693,21 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       cargarTodo();
     } catch (err: any) {
       avisar(err?.message || "Error al reactivar tenant", "error");
+    }
+  };
+
+  const handleCambioVertical = async (tenantId: number, permitido: boolean) => {
+    const nombre = tenants.find((x) => x.tenantId === tenantId)?.nombreEmpresa || `Negocio #${tenantId}`;
+    const aviso = permitido
+      ? `¿Permitir que "${nombre}" cambie de vertical desde el Hub? Podrá entrar a todas las verticales sin importar su plan. Úsalo solo en cuentas de verificación.`
+      : `¿Quitarle a "${nombre}" el cambio de vertical? Volverá a ver solo lo que tiene contratado.`;
+    if (!window.confirm(aviso)) return;
+    try {
+      await permitirCambioVerticalSuperAdmin(tenantId, permitido);
+      avisar(permitido ? `${nombre} ya puede cambiar de vertical.` : `${nombre} ya no puede cambiar de vertical.`);
+      cargarTodo();
+    } catch (err: any) {
+      avisar(err?.message || "No se pudo cambiar el permiso", "error");
     }
   };
 
@@ -2417,6 +2433,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             onSoporte={() => ejecutarConAutorizacionMaestra(() => handleImpersonar(t.tenantId))}
             onActivar={() => handleActivar(t.tenantId)}
             onSuspender={() => handleDesactivar(t.tenantId)}
+            onCambioVertical={(permitido) => handleCambioVertical(t.tenantId, permitido)}
           />
         );
       })()}

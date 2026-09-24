@@ -260,6 +260,11 @@ public class LicenciaTenant {
     @Column(name = "limite_usuarios")
     private Integer limiteUsuarios;
 
+    // Cuenta de verificacion (V101): puede cambiar de vertical desde el Hub y usar todas las
+    // verticales. Nace activa en las cuentas creadas desde el superadmin.
+    @Column(name = "permite_cambio_vertical", nullable = false)
+    private boolean permiteCambioVertical = false;
+
     @Transient
     private Long cantidadUsuarios;
 
@@ -345,6 +350,8 @@ public class LicenciaTenant {
     public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
     public Integer getLimiteUsuarios() { return limiteUsuarios; }
     public void setLimiteUsuarios(Integer limiteUsuarios) { this.limiteUsuarios = limiteUsuarios; }
+    public boolean isPermiteCambioVertical() { return permiteCambioVertical; }
+    public void setPermiteCambioVertical(boolean permiteCambioVertical) { this.permiteCambioVertical = permiteCambioVertical; }
     public Long getCantidadUsuarios() { return cantidadUsuarios; }
     public void setCantidadUsuarios(Long cantidadUsuarios) { this.cantidadUsuarios = cantidadUsuarios; }
 
