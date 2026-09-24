@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SpecularButton from "../components/SpecularButton";
+import Kicker from "../components/Kicker";
 import { IconCheck } from "../Icons";
 
 const INDUSTRIES = [
@@ -48,19 +49,16 @@ export default function Industrias() {
   const ind = INDUSTRIES.find((i) => i.name === active)!;
 
   return (
-    <main className="aurora-public-page pt-32 pb-24 relative">
+    <main className="pt-32 pb-24 relative">
 
       {/* Header */}
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
-        <div className="inline-flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 rounded-full px-4 py-1.5 text-xs text-teal-600 dark:text-teal-300 mb-6 font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
-          6 industrias con módulos propios
-        </div>
-        <h1 className="font-['Outfit'] font-black text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 dark:text-white mb-5">
+        <Kicker>6 industrias con módulos propios</Kicker>
+        <h1 className="font-bold text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 mb-5">
           Hecho para tu industria,<br />
-          <span className="text-aurora">no para todas en general</span>
+          <span className="text-[#177E89]">no para todas en general</span>
         </h1>
-        <p className="text-slate-500 dark:text-white/45 text-lg max-w-2xl mx-auto leading-relaxed">
+        <p className="text-slate-500 text-lg font-light uppercase tracking-wide max-w-2xl mx-auto leading-relaxed">
           Cada vertical tiene sus propios módulos preconfigurados y flujos adaptados. Elige tu industria y ve exactamente qué incluye.
         </p>
       </section>
@@ -74,10 +72,10 @@ export default function Industrias() {
             {INDUSTRIES.map((ind) => (
               <button key={ind.name}
                 onClick={() => setActive(ind.name)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap lg:whitespace-normal flex-shrink-0 cursor-pointer ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-light uppercase tracking-wide transition-all whitespace-nowrap lg:whitespace-normal flex-shrink-0 cursor-pointer ${
                   active === ind.name
-                    ? "g-aurora text-white shadow-lg"
-                    : "bg-white/70 dark:bg-white/5 text-slate-700 dark:text-white/50 hover:bg-white dark:hover:bg-white/8 hover:text-black dark:hover:text-white border border-slate-200/80 dark:border-white/5"
+                    ? "bg-[#177E89] text-white"
+                    : "bg-white/70 text-slate-700 hover:bg-white hover:text-black border border-slate-200/80"
                 }`}>
                 {ind.name}
               </button>
@@ -86,26 +84,26 @@ export default function Industrias() {
 
           {/* Detail panel */}
           <div className="flex-1 min-w-0">
-            <div className="relative apple-glass rounded-3xl overflow-hidden shadow-xl">
-              <div className="line-aurora absolute top-0 left-0 right-0" />
+            <div className="relative apple-glass rounded-3xl overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-px bg-[#177E89]/30" />
 
               <div className="p-8 sm:p-10">
                 {/* Header */}
                 <div className="mb-6">
-                  <div className="text-teal-600 dark:text-white/35 text-xs font-semibold tracking-widest uppercase mb-2">{ind.tagline}</div>
-                  <h2 className="font-['Outfit'] font-bold text-3xl text-slate-900 dark:text-white">{ind.name}</h2>
+                  <p className="font-light uppercase tracking-wide text-sm text-[#177E89] mb-2">{ind.tagline}</p>
+                  <h2 className="font-bold text-3xl text-slate-900">{ind.name}</h2>
                 </div>
 
-                <p className="text-slate-600 dark:text-white/55 text-base leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
+                <p className="text-slate-600 text-base font-light uppercase tracking-wide leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
 
                 {/* Modules */}
                 <div className="mb-8">
-                  <p className="text-xs font-semibold tracking-widest text-teal-600 dark:text-teal-400 uppercase mb-4">Módulos incluidos</p>
+                  <p className="text-xs font-light uppercase tracking-wide text-[#177E89] mb-4">Módulos incluidos</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {ind.modulos.map((m) => (
-                      <div key={m} className="flex items-center gap-3 bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/5 rounded-xl px-4 py-3">
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0" aria-hidden="true" />
-                        <span className="text-slate-700 dark:text-white/65 text-sm font-medium">{m}</span>
+                      <div key={m} className="flex items-center gap-3 bg-slate-50/80 border border-slate-200/70 rounded-xl px-4 py-3">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#177E89] flex-shrink-0" aria-hidden="true" />
+                        <span className="text-slate-700 text-sm font-light uppercase tracking-wide">{m}</span>
                       </div>
                     ))}
                   </div>

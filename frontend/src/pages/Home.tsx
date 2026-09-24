@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import SpecularButton from "../components/SpecularButton";
+import Kicker from "../components/Kicker";
 import { useAuth } from "../context/AuthContext";
 import {
   IconClinic, IconHardware,
@@ -10,11 +11,11 @@ import {
 } from "../Icons";
 
 const INDUSTRIES = [
-  { Icon: IconClinic,     name: "Mediclinic Pro",    desc: "Historias clínicas, agenda, sala de espera en vivo, cotizador multidivisa.", imgs: ["/industrias/mediclinic.jpg"], placeholder: "" },
-  { Icon: IconTooth,      name: "Odontología",       desc: "Odontograma FDI interactivo, periodontograma de 6 puntos, planes por fases.", imgs: ["/industrias/odontologia.jpg"], placeholder: "linear-gradient(135deg,#0ea5b8,#0d3b3d)" },
-  { Icon: IconHardware,   name: "Comercio",          desc: "POS mostrador, inventario en tiempo real, catálogo con pedidos por WhatsApp.", imgs: ["/industrias/comercio-electronica.jpg", "/industrias/comercio-ferreteria.jpg", "/industrias/comercio-telefonos.jpg"], placeholder: "linear-gradient(135deg,#d97706,#7c2d12)" },
-  { Icon: IconRestaurant, name: "Restaurantes",      desc: "Comandas digitales, mesas, cocina en tiempo real y cierres de caja automáticos.", imgs: ["/industrias/restaurantes.jpg"], placeholder: "linear-gradient(135deg,#e11d48,#4c0519)" },
-  { Icon: IconFarm,       name: "Control de Fincas", desc: "Mapa satelital de potreros, básculas bluetooth y control sanitario.", imgs: ["/industrias/ganaderia.jpg"], placeholder: "linear-gradient(135deg,#16a34a,#052e16)" },
+  { Icon: IconClinic,     name: "Mediclinic Pro",    desc: "Historias clínicas, agenda, sala de espera en vivo, cotizador multidivisa.", imgs: ["/industrias/mediclinic.jpg"] },
+  { Icon: IconTooth,      name: "Odontología",       desc: "Odontograma FDI interactivo, periodontograma de 6 puntos, planes por fases.", imgs: ["/industrias/odontologia.jpg"] },
+  { Icon: IconHardware,   name: "Comercio",          desc: "POS mostrador, inventario en tiempo real, catálogo con pedidos por WhatsApp.", imgs: ["/industrias/comercio-electronica.jpg", "/industrias/comercio-ferreteria.jpg", "/industrias/comercio-telefonos.jpg"] },
+  { Icon: IconRestaurant, name: "Restaurantes",      desc: "Comandas digitales, mesas, cocina en tiempo real y cierres de caja automáticos.", imgs: ["/industrias/restaurantes.jpg"] },
+  { Icon: IconFarm,       name: "Control de Fincas", desc: "Mapa satelital de potreros, básculas bluetooth y control sanitario.", imgs: ["/industrias/ganaderia.jpg"] },
   // Veterinaria: aún en construcción, no se muestra en esta grilla hasta que tenga foto y esté lista.
 ];
 
@@ -73,7 +74,7 @@ const PLANS = [
   {
     name: "Aurora Full", price: "Desde $40", period: "/mes", desc: "Todo lo del Básico + nuestras herramientas avanzadas",
     features: ["Comercio: catálogo público + IA por WhatsApp", "Mediclinic/Odontología: vademécum y récipe oficial", "Ganadería: mapa satelital y básculas bluetooth", "Reportes y BI avanzado", "Acompañamiento prioritario"],
-    cta: "Quiero Aurora Full", highlight: true, badge: "MÁS POPULAR",
+    cta: "Quiero Aurora Full", highlight: true, badge: "Más popular",
   },
 ];
 
@@ -93,14 +94,15 @@ export default function Home() {
     <main className="w-full bg-white text-[#1D1D1F] antialiased">
       
       {/* ── HERO SECTION APPLE AESTHETIC ── */}
-      <section className="relative pt-28 pb-20 md:pt-40 md:pb-28 px-6 sm:px-8 border-b border-[#E5E5EA] overflow-hidden">
+      <section className="relative pt-28 pb-16 md:pt-36 md:pb-20 px-6 sm:px-8 border-b border-[#E5E5EA] overflow-hidden">
         {/* Imagen de fondo a todo el ancho de la página, difuminada en los 4 bordes para fundirse con el blanco */}
         <div className="absolute inset-x-0 bottom-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
-          <div className="relative w-full h-[760px] sm:h-[900px] md:h-[1080px]">
+          <div className="relative w-full h-[760px] sm:h-[900px] md:h-[1080px] translate-y-20">
             <img
               src="/hero-laptop.png"
               alt="Aurora Productividad"
-              className="w-full h-full object-cover object-center opacity-45 select-none mix-blend-multiply"
+              className="w-full h-full object-cover object-center opacity-60 select-none mix-blend-multiply"
+              style={{ filter: "contrast(1.08) drop-shadow(0 24px 32px rgba(13,59,61,0.3))" }}
             />
             {/* Difuminado perimetral: arriba fuerte (no pelea con el texto), abajo hacia el blanco del borde de sección, y en ambos lados para que no se vea recortada */}
             <div className="absolute inset-0 bg-gradient-to-b from-white via-transparent to-white pointer-events-none" />
@@ -109,7 +111,9 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="relative z-10 max-w-5xl mx-auto text-center flex flex-col items-center">
+        <div className="relative z-10 w-full max-w-5xl mx-auto text-center flex flex-col items-center">
+
+          <p className="text-sm font-light uppercase tracking-wide text-[#177E89] mb-4">Software de gestión, hecho a tu medida</p>
 
           {/* H1 Monumental */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#1D1D1F] max-w-4xl leading-[1.06] mb-6">
@@ -117,15 +121,15 @@ export default function Home() {
           </h1>
 
           {/* Subtítulo */}
-          <p className="text-lg sm:text-xl md:text-2xl text-[#6E6E73] max-w-2xl font-normal leading-relaxed mb-10 tracking-tight">
+          <p className="text-sm sm:text-base text-[#1D1D1F] max-w-2xl font-light uppercase tracking-wide leading-relaxed mb-8">
             De la libreta y las hojas de Excel a la tranquilidad de un sistema integrado. Controla caja, inventario, agenda clínica y producción en tiempo real.
           </p>
 
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mb-16">
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mb-10">
             <SpecularButton
               size="lg"
-              radius={999}
+              radius={4}
               tint="#177E89"
               tintOpacity={1}
               textColor="#f5f5f5"
@@ -141,23 +145,12 @@ export default function Home() {
             >
               Solicitar demo gratis
             </SpecularButton>
-            <SpecularButton
-              size="lg"
-              radius={999}
-              tint="#F5F5F7"
-              tintOpacity={0.92}
-              blur={14}
-              textColor="#1D1D1F"
-              lineColor="#ffffff"
-              baseColor="#D1D1D6"
-              shineSize={10}
-              shineFade={40}
-              proximity={280}
-              className="w-full sm:w-auto shadow-sm"
+            <button
               onClick={() => navigate("/industrias")}
+              className="text-sm font-light uppercase tracking-wide text-[#1D1D1F] border-b border-[#1D1D1F]/30 hover:border-[#1D1D1F] pb-0.5 transition-colors cursor-pointer"
             >
-              Ver los 6 rubros
-            </SpecularButton>
+              Ver los 6 rubros →
+            </button>
           </div>
 
           {/* Acceso Directo de Sesión (si está logueado) */}
@@ -170,18 +163,18 @@ export default function Home() {
                     <miSistema.Icon size={24} />
                   </div>
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-wider text-[#177E89]">
-                      Sistema Asignado
+                    <div className="font-light uppercase tracking-wide text-sm text-[#177E89]">
+                      Sistema asignado
                     </div>
-                    <div className="font-bold text-base text-[#1D1D1F]">
+                    <div className="font-light uppercase tracking-wide text-base text-[#1D1D1F]">
                       {miSistema.nombre}
                     </div>
-                    <div className="text-xs text-[#86868B]">{miSistema.desc}</div>
+                    <div className="text-xs font-light uppercase tracking-wide text-[#86868B]">{miSistema.desc}</div>
                   </div>
                 </div>
                 <button
                   onClick={() => navigate(miSistema.ruta)}
-                  className="btn-deep-black text-xs font-semibold px-5 py-2.5 rounded-full cursor-pointer whitespace-nowrap"
+                  className="btn-deep-black text-xs font-light uppercase tracking-wide px-5 py-2.5 rounded-md cursor-pointer whitespace-nowrap"
                 >
                   Abrir {miSistema.label} →
                 </button>
@@ -189,14 +182,14 @@ export default function Home() {
             );
           })()}
 
-          {/* Métricas / Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full pt-10 border-t border-[#E5E5EA] text-center">
+          {/* Métricas / Stats — deliberadamente más abajo, para que aparezcan al hacer scroll y no compitan con los botones en la primera vista */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full mt-40 sm:mt-48 pt-10 border-t border-[#E5E5EA] text-center">
             {STATS.map((s) => (
               <div key={s.label}>
                 <div className="text-4xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] mb-1">
                   {s.value}
                 </div>
-                <div className="text-xs font-medium text-[#86868B] uppercase tracking-wider">
+                <div className="text-xs font-light uppercase text-[#86868B] tracking-wide">
                   {s.label}
                 </div>
               </div>
@@ -211,34 +204,41 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
+            <Kicker>Seis industrias, un mismo motor</Kicker>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-4">
               Diseñado para la realidad de cada sector
             </h2>
-            <p className="text-base sm:text-lg text-[#86868B]">
+            <p className="text-base sm:text-lg font-light uppercase tracking-wide text-[#86868B]">
               No adaptamos un sistema genérico: cada módulo responde a los flujos operativos reales de tu empresa.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {INDUSTRIES.map((ind, idx) => {
               return (
                 <div
                   key={ind.name}
                   onClick={() => setActiveIndustry(idx)}
-                  className={`bg-white border rounded-2xl overflow-hidden cursor-pointer shadow-sm transition-all ${
-                    activeIndustry === idx ? "border-[#177E89] ring-1 ring-[#177E89]" : "border-[#E5E5EA] hover:border-[#D1D1D6]"
+                  className={`group relative overflow-hidden bg-[#0D3B3D] cursor-pointer transition-all ${
+                    idx === 2 ? "sm:col-span-2 aspect-[4/5] sm:aspect-[16/9]" : "aspect-[4/5]"
+                  } ${
+                    activeIndustry === idx ? "ring-2 ring-inset ring-[#177E89]" : ""
                   }`}
                 >
-                  <div className="group relative aspect-[16/10] overflow-hidden" style={ind.imgs.length === 0 ? { background: ind.placeholder } : undefined}>
-                    <IndustryPhoto imgs={ind.imgs} />
-                  </div>
-                  <div className="p-5">
-                    <h3 className="text-base font-bold text-[#1D1D1F] tracking-tight mb-1">
+                  <IndustryPhoto imgs={ind.imgs} />
+                  {/* Degradado oscuro para que el texto blanco sea legible sobre la foto */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent pointer-events-none" />
+                  <div className="absolute inset-x-0 bottom-0 p-6">
+                    <p className="text-[11px] font-light uppercase tracking-wide text-[#ffffff]/70 mb-1">Aurora Plus</p>
+                    <h3 className="font-['Fraunces'] text-3xl sm:text-4xl text-[#ffffff] mb-2">
                       {ind.name}
                     </h3>
-                    <p className="text-xs text-[#86868B] leading-relaxed">
+                    <p className="text-xs font-light uppercase tracking-wide text-[#ffffff]/80 leading-relaxed mb-4 max-w-[85%]">
                       {ind.desc}
                     </p>
+                    <span className="text-xs font-light uppercase tracking-wide text-[#ffffff] border-b border-[#ffffff]/50 group-hover:border-[#ffffff] pb-0.5 transition-colors">
+                      Ver más
+                    </span>
                   </div>
                 </div>
               );
@@ -260,12 +260,12 @@ export default function Home() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <h3 className="text-xl font-bold text-[#1D1D1F] tracking-tight">Aurora Engine Core</h3>
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      ONLINE v2.4
+                    <h3 className="text-xl font-light uppercase tracking-wide text-[#1D1D1F]">Aurora Engine Core</h3>
+                    <span className="text-[11px] font-light uppercase tracking-wide px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Online v2.4
                     </span>
                   </div>
-                  <p className="text-xs text-[#86868B] mt-0.5">Arquitectura Multi-Tenant · PostgreSQL · Sincronización Local</p>
+                  <p className="text-xs font-light uppercase tracking-wide text-[#86868B] mt-0.5">Arquitectura Multi-Tenant · PostgreSQL · Sincronización Local</p>
                 </div>
               </div>
             </div>
@@ -279,8 +279,8 @@ export default function Home() {
               ].map((item) => (
                 <div key={item.label} className="bg-white border border-[#E5E5EA] rounded-2xl p-5 shadow-sm">
                   <div className="w-8 h-px bg-[#177E89] mb-4" aria-hidden="true" />
-                  <div className="text-[11px] font-semibold text-[#86868B] uppercase tracking-wider mb-1">{item.label}</div>
-                  <div className="text-sm font-bold text-[#1D1D1F]">{item.val}</div>
+                  <div className="text-[11px] font-light uppercase text-[#86868B] tracking-wide mb-1">{item.label}</div>
+                  <div className="text-sm font-light uppercase tracking-wide text-[#1D1D1F]">{item.val}</div>
                 </div>
               ))}
             </div>
@@ -294,10 +294,11 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center max-w-3xl mx-auto mb-16">
+            <Kicker>Bajo el capó</Kicker>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-4">
               Potencia tecnológica sin complicaciones
             </h2>
-            <p className="text-base sm:text-lg text-[#86868B]">
+            <p className="text-base sm:text-lg font-light uppercase tracking-wide text-[#86868B]">
               Herramientas de nivel empresarial preparadas para el trabajo diario.
             </p>
           </div>
@@ -307,8 +308,8 @@ export default function Home() {
               return (
                 <div key={feat.title} className="bg-[#F5F5F7] border border-[#E5E5EA] rounded-2xl p-7">
                   <div className="w-8 h-px bg-[#177E89] mb-5" aria-hidden="true" />
-                  <h3 className="text-base font-bold text-[#1D1D1F] mb-2">{feat.title}</h3>
-                  <p className="text-xs text-[#86868B] leading-relaxed">{feat.desc}</p>
+                  <h3 className="text-base font-light uppercase tracking-wide text-[#1D1D1F] mb-2">{feat.title}</h3>
+                  <p className="text-xs font-light uppercase tracking-wide text-[#86868B] leading-relaxed">{feat.desc}</p>
                 </div>
               );
             })}
@@ -322,10 +323,11 @@ export default function Home() {
         <div className="max-w-4xl mx-auto">
           
           <div className="text-center max-w-2xl mx-auto mb-16">
+            <Kicker>Sin letra pequeña</Kicker>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#1D1D1F] mb-4">
               Planes claros y transparentes
             </h2>
-            <p className="text-base text-[#86868B]">
+            <p className="text-base font-light uppercase tracking-wide text-[#86868B]">
               Sin sorpresas ni cargos ocultos. Elige el plan que mejor se adapte a tu escala.
             </p>
           </div>
@@ -339,23 +341,23 @@ export default function Home() {
                 }`}
               >
                 {p.badge && (
-                  <span className="absolute -top-3 right-8 bg-[#177E89] text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
+                  <span className="absolute -top-3 right-8 bg-[#177E89] text-white text-[11px] font-['Fraunces'] italic px-3 py-1 rounded-full shadow-sm">
                     {p.badge}
                   </span>
                 )}
 
                 <div>
-                  <h3 className="text-xl font-bold text-[#1D1D1F] mb-2">{p.name}</h3>
-                  <p className="text-xs text-[#86868B] mb-6">{p.desc}</p>
-                  
+                  <h3 className="text-xl font-light uppercase tracking-wide text-[#1D1D1F] mb-2">{p.name}</h3>
+                  <p className="text-xs font-light uppercase tracking-wide text-[#86868B] mb-6">{p.desc}</p>
+
                   <div className="flex items-baseline gap-1 mb-8">
                     <span className="text-4xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F]">{p.price}</span>
-                    <span className="text-sm font-medium text-[#86868B]">{p.period}</span>
+                    <span className="text-sm font-light uppercase tracking-wide text-[#86868B]">{p.period}</span>
                   </div>
 
                   <ul className="space-y-3 mb-8">
                     {p.features.map((feat) => (
-                      <li key={feat} className="text-xs text-[#1D1D1F] flex items-center gap-3">
+                      <li key={feat} className="text-xs font-light uppercase tracking-wide text-[#1D1D1F] flex items-center gap-3">
                         <span className="w-4 h-4 rounded-full bg-[#177E89]/10 text-[#177E89] flex items-center justify-center flex-shrink-0">
                           <IconCheck size={9} />
                         </span>
@@ -367,7 +369,7 @@ export default function Home() {
 
                 <button
                   onClick={() => navigate("/onboarding")}
-                  className={`w-full py-3.5 rounded-full text-xs font-semibold tracking-wide transition-all cursor-pointer ${
+                  className={`w-full py-3.5 rounded-md text-xs font-light uppercase tracking-wide transition-all cursor-pointer ${
                     p.highlight
                       ? "btn-deep-black"
                       : "bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#1D1D1F] border border-[#E5E5EA]"
