@@ -22,7 +22,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * el paciente crea su cuenta con código, pide cita, la recepción la acepta y la cita
  * aparece en la agenda de Mediclinic. También cubre que los tokens no se crucen.
  */
-@TestPropertySource(properties = {"aurora.pacientes-app.habilitada=true", "VERIFICACION_SIMULAR_ENVIO=true"})
+// URL de servidor real: así el atajo de "cualquier código sirve" (solo en localhost) queda apagado
+// y la prueba comprueba que un código equivocado no entra.
+@TestPropertySource(properties = {"aurora.pacientes-app.habilitada=true", "VERIFICACION_SIMULAR_ENVIO=true",
+    "app.frontend.url=https://app.auroraplus.test", "jwt.secret=secreto-de-prueba-pacientes-app-0123456789abcdef"})
 class PacientesAppFlujoTest extends SaludIntegrationTestBase {
 
     @Autowired

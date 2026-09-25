@@ -7,6 +7,7 @@ import com.auroraplus.modules.pacientesapp.entities.PacienteApp;
 import com.auroraplus.modules.pacientesapp.repositories.CodigoAccesoPacienteRepository;
 import com.auroraplus.modules.pacientesapp.repositories.PacienteAppRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -30,6 +31,21 @@ public class AccesoPacienteService {
     @Autowired private CodigoAccesoPacienteRepository codigos;
     @Autowired private EnvioCodigoVerificacionService envio;
     @Autowired private JwtService jwtService;
+
+    @Value("${VERIFICACION_SIMULAR_ENVIO:false}")
+    private boolean simularEnvio;
+
+    @Value("${app.frontend.url:http://localhost:8443}")
+    private String urlFrontend;
+
+    /**
+     * Solo para probar en el computador: con el envío simulado y el backend en localhost,
+     * cualquier código de 6 dígitos sirve. En un servidor real nunca se cumple.
+     */
+    private boolean codigoLibreDePrueba() {
+        boolean local = urlFrontend == null || urlFrontend.contains("localhost") || urlFrontend.contains("127.0.0.1");
+        return simularEnvio && local;
+    }
 
     public record CodigoEnviado(String enviadoA, boolean simulado) {}
     public record Sesion(String token, PacienteDto paciente) {}
@@ -87,7 +103,8 @@ public class AccesoPacienteService {
             throw new RuntimeException("El código venció. Pide uno nuevo");
         }
         String limpio = codigo == null ? "" : codigo.replaceAll("\\D", "");
-        if (!MessageDigest.isEqual(hash(limpio).getBytes(StandardCharsets.UTF_8), c.getCodigoHash().getBytes(StandardCharsets.UTF_8))) {
+        boolean aceptadoEnPrueba = codigoLibreDePrueba() && limpio.length() == 6;
+        if (!aceptadoEnPrueba && !MessageDigest.isEqual(hash(limpio).getBytes(StandardCharsets.UTF_8), c.getCodigoHash().getBytes(StandardCharsets.UTF_8))) {
             c.setIntentos(c.getIntentos() + 1);
             if (c.getIntentos() >= MAX_INTENTOS) c.setUsado(true);
             codigos.save(c);
