@@ -1,6 +1,8 @@
 package com.auroraplus.modules.pacientesapp.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 /** Código de 6 dígitos enviado por WhatsApp para entrar o crear cuenta. Solo se guarda su hash. */
@@ -22,6 +24,8 @@ public class CodigoAccesoPaciente {
     @Column(length = 150)
     private String nombre;
 
+    // CHAR(64) como en V108 (el hash SHA-256 siempre mide 64); la validación de esquema lo exige igual.
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "codigo_hash", nullable = false, length = 64)
     private String codigoHash;
 
