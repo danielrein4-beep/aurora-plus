@@ -6634,9 +6634,12 @@ export interface PublicacionMercado {
 export interface OfertaMercado {
   id: number;
   monto: number;
-  estado: "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "RETIRADA";
+  estado: "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "RETIRADA" | "ANULADA";
   fecha: string;
   mensaje: string | null;
+  /** El vendedor confirmó que recibió el pago: recién entonces el comprador puede recibir el animal. */
+  pagoConfirmado?: boolean;
+  motivoAnulacion?: string | null;
   /** Referencia opaca de la finca compradora (el vendedor no ve su número interno). */
   compradorRef?: string;
   comprador?: PerfilMercado;
@@ -6661,7 +6664,7 @@ export interface DetallePublicacionMercado extends PublicacionMercado {
   ofertas?: OfertaMercado[];
   misOfertas?: OfertaMercado[];
   contraparte?: ContactoMercado;
-  ofertaCerrada: { id: number; monto: number; traspasado: boolean } | null;
+  ofertaCerrada: { id: number; monto: number; traspasado: boolean; pagoConfirmado?: boolean } | null;
   /** Solo para quien vende un trato cerrado: con qué armar la nota de movilización. */
   notaMovilizacion?: {
     animalIds: number[];
@@ -6790,6 +6793,14 @@ export function aceptarOfertaMercado(ofertaId: number): Promise<DetallePublicaci
 
 export function rechazarOfertaMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
   return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/rechazar`, { method: "POST" });
+}
+
+export function confirmarPagoMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/confirmar-pago`, { method: "POST" });
+}
+
+export function anularTratoMercado(ofertaId: number, motivo: string): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/anular`, { method: "POST", body: JSON.stringify({ motivo }) });
 }
 
 export function recibirAnimalMercado(ofertaId: number): Promise<DetallePublicacionMercado> {

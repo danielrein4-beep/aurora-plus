@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import {
   obtenerPublicacionMercado, ofertarEnMercado, aceptarOfertaMercado, rechazarOfertaMercado, recibirAnimalMercado,
+  confirmarPagoMercado, anularTratoMercado,
   retirarPublicacionMercado, editarPublicacionMercado, calificarTratoMercado, guardarPublicacionMercado,
   type DetallePublicacionMercado, type PublicarMercadoRequest,
 } from "../../api";
@@ -198,14 +199,32 @@ export default function FichaAnimal({ id, compradorInicial, puedeNegociar, conCo
                 aceptadaMia.traspasado ? (
                   <p className="text-sm font-bold text-[#2F6B4F] dark:text-emerald-300">Compraste este animal y ya está en tu hato.</p>
                 ) : (
-                  <>
-                    <p className="text-sm text-stone-700 dark:text-white/80">
-                      El vendedor aceptó tu oferta de <strong>{dinero.format(aceptadaMia.monto)}</strong>. Cuando tengas el animal, recíbelo en tu hato con su historial.
-                    </p>
-                    <button disabled={trabajando} className={`${BOTON} w-full`} onClick={() => accion(() => recibirAnimalMercado(aceptadaMia.id), "Animal agregado a tu hato")}>
-                      Recibir en mi hato
-                    </button>
-                  </>
+                  aceptadaMia.pagoConfirmado ? (
+                    <>
+                      <p className="text-sm text-stone-700 dark:text-white/80">
+                        El vendedor confirmó tu pago de <strong>{dinero.format(aceptadaMia.monto)}</strong>. Cuando tengas el animal, recíbelo en tu hato con su historial.
+                      </p>
+                      <button disabled={trabajando} className={`${BOTON} w-full`} onClick={() => accion(() => recibirAnimalMercado(aceptadaMia.id), "Animal agregado a tu hato")}>
+                        Recibir en mi hato
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-stone-700 dark:text-white/80">
+                        El vendedor aceptó tu oferta de <strong>{dinero.format(aceptadaMia.monto)}</strong>. Paga lo acordado por el chat; cuando el vendedor confirme que recibió el pago, podrás recibir el animal en tu hato.
+                      </p>
+                      <button
+                        disabled={trabajando}
+                        className={`${BOTON_SUAVE} w-full text-rose-700`}
+                        onClick={() => {
+                          const motivo = prompt("¿Por qué anulas el trato? El vendedor verá el motivo.");
+                          if (motivo && motivo.trim()) accion(() => anularTratoMercado(aceptadaMia.id, motivo.trim()), "Trato anulado");
+                        }}
+                      >
+                        Anular trato
+                      </button>
+                    </>
+                  )
                 )
               ) : activa ? (
                 <form
@@ -282,6 +301,38 @@ export default function FichaAnimal({ id, compradorInicial, puedeNegociar, conCo
                     {o.mensaje && <p className="text-sm text-stone-700 dark:text-white/70">"{o.mensaje}"</p>}
                     <div className="flex flex-wrap gap-2 pt-1">
                       <button className="text-xs font-bold text-[#2F6B4F] cursor-pointer" onClick={() => setCompradorChat(o.compradorRef)}>Abrir chat</button>
+                      {o.estado === "ACEPTADA" && !o.traspasado && puedeNegociar && (
+                        o.pagoConfirmado ? (
+                          <span className="text-xs font-bold text-[#2F6B4F] ml-auto">Pago confirmado · esperando que el comprador lo reciba</span>
+                        ) : (
+                          <>
+                            <button
+                              disabled={trabajando}
+                              className={`${BOTON} py-1.5 text-xs ml-auto`}
+                              onClick={() => {
+                                if (confirm(`¿Confirmas que ya recibiste ${dinero.format(o.monto)}? Se registra el ingreso en tu caja y el comprador podrá recibir el animal.`)) {
+                                  accion(() => confirmarPagoMercado(o.id), "Pago confirmado");
+                                }
+                              }}
+                            >
+                              Confirmar pago recibido
+                            </button>
+                            <button
+                              disabled={trabajando}
+                              className={`${BOTON_SUAVE} py-1.5 text-xs text-rose-700`}
+                              onClick={() => {
+                                const motivo = prompt("¿Por qué anulas el trato? El comprador verá el motivo. El animal vuelve a quedar publicado.");
+                                if (motivo && motivo.trim()) accion(() => anularTratoMercado(o.id, motivo.trim()), "Trato anulado");
+                              }}
+                            >
+                              Anular trato
+                            </button>
+                          </>
+                        )
+                      )}
+                      {o.estado === "ANULADA" && o.motivoAnulacion && (
+                        <span className="text-xs text-rose-700 w-full">Anulado: {o.motivoAnulacion}</span>
+                      )}
                       {o.estado === "PENDIENTE" && activa && puedeNegociar && (
                         <>
                           <button
