@@ -3311,7 +3311,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   {saludo} <span className="text-slate-300 dark:text-slate-600 font-normal">—</span> <span className="text-teal-600 dark:text-teal-400">{nombreLocal}</span>
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                 <span className="hidden sm:inline text-slate-300 dark:text-slate-700">|</span>
                 <span className="capitalize">{fechaHoyCap}</span>
                 <span className="text-slate-400 font-bold">·</span>
