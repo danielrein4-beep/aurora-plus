@@ -39,13 +39,15 @@ export default function BarraLateralGanaderia({
     <>
   {sidebarAbierto && (
     <div
-      className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+      // Por encima del aviso de la prueba gratis y del botón de soporte; touch-none evita que
+      // en el iPhone se desplace la página de atrás al tocar el fondo oscuro.
+      className="fixed inset-0 z-[70] bg-black/50 lg:hidden touch-none"
       onClick={() => setSidebarAbierto(false)}
       aria-hidden="true"
     />
   )}
   <aside
-    className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+    className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-[80] transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
       sidebarAbierto ? "translate-x-0" : "-translate-x-full"
     }`}
   >
@@ -68,7 +70,7 @@ export default function BarraLateralGanaderia({
       </div>
     </button>
 
-    <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
+    <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-5 space-y-6">
       {/* Mercado ganadero: arriba y destacado, no escondido entre las acciones rápidas. */}
       <button
         type="button"

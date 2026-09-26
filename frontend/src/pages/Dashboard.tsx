@@ -331,6 +331,23 @@ const ROL_LABEL: Record<string, string> = {
   TRABAJADOR_FINCA: "Trabajador de Finca",
 };
 
+// Roles que tienen sentido en cada rubro: antes la lista de Equipo & Roles mostraba todos
+// (en una finca salían Médico y Mesero). Rubro sin entrada: se muestran todos.
+const ROLES_POR_RUBRO: Record<string, string[]> = {
+  ganaderia: ["ADMINISTRADOR_FINCA", "ENCARGADO_FINCA", "TRABAJADOR_FINCA"],
+  finca: ["ADMINISTRADOR_FINCA", "ENCARGADO_FINCA", "TRABAJADOR_FINCA"],
+  clinica: ["MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR"],
+  odontologia: ["MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR"],
+  estetica: ["MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR"],
+  veterinaria: ["MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR"],
+  restaurante: ["CAJERO_VENDEDOR", "MESERO", "ENCARGADO_INVENTARIO"],
+  comercio: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+  ferreteria: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+  repuestos: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+  retail: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+  farmacia: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -1741,7 +1758,7 @@ export default function Dashboard() {
                   <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Rol</label>
                   <select required name="rol" defaultValue="" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white">
                     <option value="" disabled>Selecciona un rol…</option>
-                    {Object.entries(ROL_LABEL).filter(([id]) => id !== "DUENO_ADMIN").map(([id, label]) => (
+                    {Object.entries(ROL_LABEL).filter(([id]) => id !== "DUENO_ADMIN" && (!ROLES_POR_RUBRO[userIndustry] || ROLES_POR_RUBRO[userIndustry].includes(id))).map(([id, label]) => (
                       <option key={id} value={id}>{label}</option>
                     ))}
                   </select>

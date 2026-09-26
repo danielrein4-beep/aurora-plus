@@ -8,7 +8,7 @@ import SuperAdminPortal from "./components/SuperAdminPortal";
 import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
 import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
 import PortalOdontologiaPaciente from "./pages/PortalOdontologiaPaciente";
-import { BrowserRouter, Routes, Route, Outlet, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useNavigate, useParams, useLocation } from "react-router-dom";
 import TenantSoporteWidget from "./components/TenantSoporteWidget";
 import MercadoGanaderoApp from "./components/mercado/MercadoGanaderoApp";
 import Layout from "./Layout";
@@ -42,10 +42,13 @@ import { ThemeProvider } from "./context/ThemeContext";
 // Zona privada: el boton de soporte acompana al tenant en el panel general
 // y dentro de cada vertical, para que pueda abrir un ticket sin salir de ella.
 function ZonaPrivada() {
+  // Ganadería trae su propio botón de soporte (se abre desde su menú): sin esto salían dos
+  // burbujas "Soporte Aurora" una encima de la otra.
+  const { pathname } = useLocation();
   return (
     <>
       <Outlet />
-      <TenantSoporteWidget />
+      {!pathname.startsWith("/ganaderia") && <TenantSoporteWidget />}
     </>
   );
 }
