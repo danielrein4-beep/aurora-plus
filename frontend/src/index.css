@@ -791,3 +791,19 @@ input:focus, select:focus, textarea:focus {
 .animate-page-enter {
   animation: pageEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Avisos (AvisosGlobales): entran subiendo y apareciendo de a poco, y salen bajando y
+   desvaneciéndose, sin cortes bruscos. */
+@keyframes aviso-entrar {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes aviso-salir {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+.aviso-entrar { animation: aviso-entrar 340ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.aviso-salir { animation: aviso-salir 240ms ease-in both; }
+@media (prefers-reduced-motion: reduce) {
+  .aviso-entrar, .aviso-salir { animation-duration: 1ms; }
+}
