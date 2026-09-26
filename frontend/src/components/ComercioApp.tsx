@@ -319,6 +319,16 @@ export interface CotizacionComercio {
 // ══════════════════════════════════════════════════════════════════════════
 
 /** Cliente genérico de mostrador: existe en todo negocio, no es un dato de demostración. */
+/**
+ * Número de ticket único: el servidor lo usa como clave permanente contra el doble cobro, así que
+ * no puede repetirse nunca. Antes eran 6 dígitos al azar y hacia los mil tickets se repetía uno,
+ * y esa venta no descontaba stock ni entraba a caja. Milisegundos + 4 caracteres al azar.
+ */
+function nuevoNumeroTicket(): string {
+  const azar = Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, "0");
+  return `TKT-${Date.now().toString(36).toUpperCase()}${azar}`;
+}
+
 const CONSUMIDOR_FINAL: ClienteComercio = { id: "c-1", nombre: "Consumidor Final", documento: "V-00000000", telefono: "—", saldoPendiente: 0, limiteCredito: 0 };
 
 // Datos de demostración de versiones anteriores. Ya no se muestran; solo sirven para reconocerlos
@@ -2371,8 +2381,73 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       listarMovimientos(user.tenantId, "CXC"),
       listarMovimientos(user.tenantId, "CXP"),
     ])
-      .then(([cxc, cxp]) => setCuentas([...cxc, ...cxp].map(movimientoACuenta)))
-      .catch((err) => console.error("No se pudieron cargar las cuentas por cobrar/pagar:", err));
+      .then(([cxc, cxp]) => { cuentasCargadasRef.current = true; setCuentas([...cxc, ...cxp].map(movimientoACuenta)); })
+      .catch(() => avisar("No se pudieron cargar las cuentas por cobrar y pagar. Revisa la conexión.", "error"));
+  };
+  const cuentasCargadasRef = useRef(false);
+
+  // La deuda de cada cliente es la suma de sus cuentas por cobrar pendientes en el servidor.
+  // Antes era un número aparte que el navegador sumaba al vender a crédito y restaba al abonar,
+  // sin tocar la caja ni la CXC: quedaban dos saldos distintos del mismo cliente.
+  const aMonedaBase = (monto: number, moneda: string) =>
+    moneda === "VES" ? (tasaActivaBs > 0 ? monto / tasaActivaBs : 0)
+    : moneda === "COP" ? (tasaCop > 0 ? monto / tasaCop : 0)
+    : monto;
+  const cxcPendientesDe = (nombre: string) => {
+    const clave = nombre.trim().toLowerCase();
+    return cuentas
+      .filter((c) => c.tipo === "CXC" && c.estado !== "PAGADO" && c.saldoPendiente > 0.005 && c.entidadNombre.trim().toLowerCase() === clave)
+      .sort((a, b) => (a.fechaRegistro || "").localeCompare(b.fechaRegistro || ""));
+  };
+  useEffect(() => {
+    if (!cuentasCargadasRef.current) return;
+    setClientes((prev) => {
+      let cambio = false;
+      const nuevos = prev.map((c) => {
+        const saldo = Math.round(cxcPendientesDe(c.nombre).reduce((s, cta) => s + aMonedaBase(cta.saldoPendiente, cta.moneda), 0) * 100) / 100;
+        if (Math.abs(saldo - (c.saldoPendiente || 0)) < 0.005) return c;
+        cambio = true;
+        return { ...c, saldoPendiente: saldo };
+      });
+      return cambio ? nuevos : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cuentas, tasaActivaBs, tasaCop]);
+
+  // Abono desde la ficha del cliente: se aplica a sus cuentas por cobrar, de la más vieja a la
+  // más nueva, con abonarMovimiento (que también registra el ingreso en caja).
+  const [abonandoCliente, setAbonandoCliente] = useState(false);
+  const registrarAbonoCliente = async (cliente: ClienteComercio, monto: number) => {
+    if (!user?.tenantId || abonandoCliente) return;
+    const pendientes = cxcPendientesDe(cliente.nombre);
+    if (pendientes.length === 0) {
+      avisar("Este cliente no tiene cuentas por cobrar pendientes en el servidor.", "error");
+      return;
+    }
+    setAbonandoCliente(true);
+    let restante = monto;
+    let aplicado = 0;
+    try {
+      for (const cta of pendientes) {
+        if (restante <= 0.005) break;
+        const saldoBase = aMonedaBase(cta.saldoPendiente, cta.moneda);
+        if (saldoBase <= 0) continue;
+        const parteBase = Math.min(restante, saldoBase);
+        const factor = cta.moneda === "VES" ? tasaActivaBs : cta.moneda === "COP" ? tasaCop : 1;
+        const parte = Math.min(cta.saldoPendiente, Math.round(parteBase * factor * 100) / 100);
+        await abonarMovimiento(user.tenantId, Number(cta.id.slice(3)), { monto: parte, moneda: cta.moneda });
+        restante -= parteBase;
+        aplicado += parteBase;
+      }
+      avisar(`Abono de ${SIM()}${aplicado.toFixed(2)} registrado en las cuentas por cobrar de ${cliente.nombre} y en caja.`, "exito");
+      setClienteAbonoSel(null);
+    } catch (err: any) {
+      avisar(`${aplicado > 0 ? `Se registraron ${SIM()}${aplicado.toFixed(2)}, pero el resto falló: ` : ""}${err?.message || "No se pudo registrar el abono en el servidor."}`, "error");
+    } finally {
+      setAbonandoCliente(false);
+      cargarCuentas();
+      cargarIngresosCaja();
+    }
   };
 
   const registrarGasto = async () => {
@@ -2699,7 +2774,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       fiscal: [aplicaIvaVenta, aplicaIgtfVenta, conDelivery, montoDelivery],
     });
     if (!ticketEnCursoRef.current || ticketEnCursoRef.current.firma !== firmaCobro) {
-      ticketEnCursoRef.current = { numero: `TKT-${Math.floor(100000 + Math.random() * 900000)}`, firma: firmaCobro };
+      ticketEnCursoRef.current = { numero: nuevoNumeroTicket(), firma: firmaCobro };
     }
     const numRecibo = ticketEnCursoRef.current.numero;
     
@@ -5500,20 +5575,16 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 Cancelar
               </button>
               <button
+                disabled={abonandoCliente}
                 onClick={() => {
                   const val = parseFloat(montoAbono);
-                  if (!isNaN(val) && val > 0) {
-                    setClientes((prev) => {
-                      const updated = prev.map((it) => it.id === clienteAbonoSel.id ? { ...it, saldoPendiente: Math.max(0, it.saldoPendiente - val) } : it);
-                      try { localStorage.setItem("aurora_comercio_clientes", JSON.stringify(updated)); } catch {}
-                      return updated;
-                    });
-                    setClienteAbonoSel(null);
-                  }
+                  if (isNaN(val) || val <= 0) { avisar("Indica un monto válido.", "error"); return; }
+                  if (val > clienteAbonoSel.saldoPendiente + 0.005) { avisar("El abono no puede ser mayor que la deuda.", "error"); return; }
+                  registrarAbonoCliente(clienteAbonoSel, val);
                 }}
-                className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+                className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg disabled:opacity-60"
               >
-                Confirmar Abono
+                {abonandoCliente ? "Registrando…" : "Confirmar Abono"}
               </button>
             </div>
           </div>
@@ -6689,14 +6760,6 @@ function CuentasPorCobrarPagarComercio({
               );
             } else {
               cargarIngresosCaja();
-              // Descontar saldo del cliente en la lista local de clientes (solo caché de UI para el CRM del mostrador)
-              setClientes((prev) => {
-                const updated = prev.map((cl) =>
-                  cl.nombre === cta.entidadNombre ? { ...cl, saldoPendiente: Math.max(0, cl.saldoPendiente - montoAbono) } : cl
-                );
-                try { localStorage.setItem("aurora_comercio_clientes", JSON.stringify(updated)); } catch {}
-                return updated;
-              });
               mostrarToast(
                 `Cobro de ${monedaAbono === "USD" ? "$" : "Bs. "}${montoAbono.toFixed(2)} registrado (${formaPago}). Se contabilizó el ingreso en caja y se actualizó el saldo del cliente.${avisoSaldada}`,
                 "success"
@@ -8039,20 +8102,14 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
   const [cerrando, setCerrando] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
 
+  // El servidor compara contra el EFECTIVO de la moneda del turno (lo que se puede contar en la
+  // gaveta). Punto, Pago Móvil, Zelle y las otras monedas se anotan como referencia pero no entran
+  // en el monto declarado; antes se sumaban y cada cierre salía con un "sobrante" falso.
   const totalDesgloseCalculado = useMemo(() => {
-    const usd = Number(desgloseArqueo.usd) || 0;
-    const zelle = Number(desgloseArqueo.zelle) || 0;
-    const ves = (Number(desgloseArqueo.ves) || 0) + (Number(desgloseArqueo.punto) || 0) + (Number(desgloseArqueo.pagoMovil) || 0);
-    const cop = Number(desgloseArqueo.cop) || 0;
-
-    if (moneda === "USD") {
-      return usd + zelle + (tasaUsdVes > 0 ? ves / tasaUsdVes : 0) + (tasaUsdCop > 0 ? cop / tasaUsdCop : 0);
-    } else if (moneda === "VES") {
-      return ves + (usd + zelle) * tasaUsdVes + (tasaUsdCop > 0 ? (cop / tasaUsdCop) * tasaUsdVes : 0);
-    } else {
-      return cop + (usd + zelle) * tasaUsdCop;
-    }
-  }, [desgloseArqueo, moneda, tasaUsdVes, tasaUsdCop]);
+    if (moneda === "USD") return Number(desgloseArqueo.usd) || 0;
+    if (moneda === "VES") return Number(desgloseArqueo.ves) || 0;
+    return Number(desgloseArqueo.cop) || 0;
+  }, [desgloseArqueo, moneda]);
 
   const montoDeclaradoFinal = modoArqueo === "DESGLOSADO" ? totalDesgloseCalculado : (Number(montoDeclarado) || 0);
 
@@ -8207,7 +8264,7 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
             {modoArqueo === "DESGLOSADO" ? (
               <div className="space-y-3 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                 <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                  Ingresá lo contado físicamente en cada método para calcular el total sin errores:
+                  Anota lo contado en cada método. El arqueo compara solo el efectivo en {moneda}; los pagos electrónicos y las otras monedas quedan como referencia.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
@@ -8242,7 +8299,7 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
                   </div>
                 </div>
                 <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-slate-700">
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Total declarado acumulado:</span>
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Efectivo declarado en {moneda}:</span>
                   <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">{totalDesgloseCalculado.toFixed(2)} {moneda}</span>
                 </div>
               </div>
