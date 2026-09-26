@@ -43,7 +43,10 @@ public class DetallePeriodoNominaController {
         Long id, Long empleadoId, String empleadoNombre, String cargo,
         String estado, BigDecimal totalAsignaciones, BigDecimal totalDeducciones,
         BigDecimal totalAportesPatronales, BigDecimal netoCalculado,
-        BigDecimal netoEfectivo, String moneda, List<Linea> lineas, List<Ajuste> ajustes
+        BigDecimal netoEfectivo, String moneda, List<Linea> lineas, List<Ajuste> ajustes,
+        // Lo que el dueño revisa antes de pagar y cómo se le paga a esta persona.
+        BigDecimal diasTrabajados, BigDecimal horasMarcadas, BigDecimal bono, BigDecimal descuento, String nota,
+        String tipoSalario, BigDecimal salario, String frecuencia, java.time.LocalDateTime fechaPago
     ) {}
 
     public record DetallePeriodo(PeriodoNomina periodo, List<Recibo> recibos) {}
@@ -51,7 +54,7 @@ public class DetallePeriodoNominaController {
     @GetMapping("/{periodoId}/detalle")
     public DetallePeriodo obtener(@PathVariable Long periodoId) {
         Long tenantId = TenantContext.getCurrentTenant();
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirVerMontosDeNominaEnGeneral(tenantId);
         PeriodoNomina periodo = periodoRepository.findByTenantIdAndId(tenantId, periodoId)
             .orElseThrow(() -> new RuntimeException("Período de nómina no encontrado"));
@@ -78,6 +81,9 @@ public class DetallePeriodoNominaController {
         return new Recibo(nomina.getId(), empleado.getId(), empleado.getNombreCompleto(),
             cargo == null ? null : cargo.getNombre(), nomina.getEstado().name(), nomina.getTotalAsignaciones(),
             nomina.getTotalDeducciones(), nomina.getTotalAportesPatronales(), nomina.getNetoAPagar(),
-            ajusteService.calcularNetoEfectivo(tenantId, nomina), nomina.getMoneda(), lineas, ajustes);
+            ajusteService.calcularNetoEfectivo(tenantId, nomina), nomina.getMoneda(), lineas, ajustes,
+            nomina.getDiasTrabajados(), nomina.getHorasMarcadas(), nomina.getBono(), nomina.getDescuento(), nomina.getNota(),
+            asignacion.getTipoSalario().name(), asignacion.getSalarioPactado(),
+            com.auroraplus.core.personal.services.MotorNominaService.frecuenciaDe(asignacion), nomina.getFechaPago());
     }
 }

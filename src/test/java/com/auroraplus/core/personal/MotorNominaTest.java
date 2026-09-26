@@ -121,7 +121,8 @@ class MotorNominaTest {
 
         List<NominaEmpleado> nominas = nominaEmpleadoRepository.findByTenantIdAndPeriodoId(tenantId, periodo.getId());
         assertEquals(1, nominas.size());
-        assertEquals(0, new BigDecimal("300.00").compareTo(nominas.get(0).getNetoAPagar()));
+        // Sueldo mensual de 300 en una quincena (1 al 15): se paga la mitad.
+        assertEquals(0, new BigDecimal("150.00").compareTo(nominas.get(0).getNetoAPagar()));
     }
 
     @Test
@@ -162,9 +163,10 @@ class MotorNominaTest {
         AjusteNomina correccion = ajusteNominaService.corregir(tenantId, nomina.getId(), new BigDecimal("25.00"), "Bono de puntualidad olvidado");
         assertEquals(AjusteNomina.Tipo.CORRECCION, correccion.getTipo());
         NominaEmpleado tresCorregida = nominaEmpleadoRepository.findByTenantIdAndId(tenantId, nomina.getId()).get();
-        assertEquals(0, new BigDecimal("400.00").compareTo(tresCorregida.getNetoAPagar()),
+        // Quincena de un sueldo mensual de 400: 200.
+        assertEquals(0, new BigDecimal("200.00").compareTo(tresCorregida.getNetoAPagar()),
             "netoAPagar NUNCA se muta — sigue siendo el original congelado al aprobar");
-        assertEquals(0, new BigDecimal("425.00").compareTo(ajusteNominaService.calcularNetoEfectivo(tenantId, tresCorregida)),
+        assertEquals(0, new BigDecimal("225.00").compareTo(ajusteNominaService.calcularNetoEfectivo(tenantId, tresCorregida)),
             "el neto EFECTIVO (original + correcciones) sí refleja el ajuste, calculado al vuelo");
 
         // Reverso: la marca REVERSADA y queda registrado el motivo.
@@ -188,7 +190,7 @@ class MotorNominaTest {
         assertNotNull(nomina.getMontoEquivalenteBase());
         assertEquals("USD", nomina.getMonedaBaseEquivalente());
         BigDecimal equivalenteOriginal = nomina.getMontoEquivalenteBase();
-        assertEquals(0, new BigDecimal("100.00").compareTo(equivalenteOriginal)); // 4000 VES / 40 = 100 USD
+        assertEquals(0, new BigDecimal("50.00").compareTo(equivalenteOriginal)); // quincena: 2000 VES / 40 = 50 USD
 
         // La tasa sube fuerte DESPUÉS de calculada la nómina.
         motorFinancieroService.actualizarTasa(tenantId, "USD", "VES", new BigDecimal("80.000000"), "MANUAL");

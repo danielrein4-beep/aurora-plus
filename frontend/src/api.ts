@@ -5198,6 +5198,8 @@ export interface PeriodoNominaApi {
   moneda: "USD" | "VES" | "COP";
   estado: "BORRADOR" | "CALCULADA" | "EN_REVISION" | "APROBADA" | "PAGADA" | "REVERSADA";
   fechaAprobacion: string | null;
+  /** Solo entran quienes cobran con esta frecuencia (null en períodos viejos = todos). */
+  frecuencia?: "SEMANAL" | "QUINCENAL" | "MENSUAL" | null;
 }
 
 export interface DetallePeriodoNominaApi {
@@ -5233,7 +5235,102 @@ export interface DetallePeriodoNominaApi {
       moneda: "USD" | "VES" | "COP";
       fecha: string;
     }>;
+    diasTrabajados: number | null;
+    horasMarcadas: number | null;
+    bono: number | null;
+    descuento: number | null;
+    nota: string | null;
+    tipoSalario: TipoSalarioNomina;
+    salario: number;
+    frecuencia: FrecuenciaPagoNomina;
+    fechaPago: string | null;
   }>;
+}
+
+// --- Nómina cómoda del dueño: sueldo de cada quien, preparar, revisar, pagar y recibos ---
+export type FrecuenciaPagoNomina = "SEMANAL" | "QUINCENAL" | "MENSUAL";
+export type TipoSalarioNomina = "FIJO_MENSUAL" | "DIARIO" | "POR_HORA" | "POR_JORNADA";
+
+export interface TrabajadorNomina {
+  id: number;
+  nombre: string;
+  cedula: string;
+  fechaIngreso: string;
+  fechaEgreso: string | null;
+  cargo: string | null;
+  tipoSalario: TipoSalarioNomina | null;
+  salario: number | null;
+  moneda: string | null;
+  frecuencia: FrecuenciaPagoNomina | null;
+  tieneUsuario: boolean;
+  horasSemana: number;
+  diasSemana: number;
+  trabajandoAhora: boolean;
+  ultimoPagoHasta: string | null;
+}
+
+export function listarTrabajadoresNomina(): Promise<TrabajadorNomina[]> {
+  return request("/api/personal/nomina/trabajadores");
+}
+
+export function ponerSueldoTrabajador(empleadoId: number, datos: {
+  cargo: string; tipoSalario: TipoSalarioNomina; salario: number; moneda: string; frecuencia: FrecuenciaPagoNomina;
+}): Promise<unknown> {
+  return request(`/api/personal/nomina/sueldo/${empleadoId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function prepararNomina(datos: { frecuencia: FrecuenciaPagoNomina; desde: string; hasta: string }): Promise<PeriodoNominaApi> {
+  return request("/api/personal/nomina/preparar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function revisarReciboNomina(id: number, datos: {
+  dias?: number | null; horas?: number | null; bono?: number | null; descuento?: number | null; nota?: string | null;
+}): Promise<unknown> {
+  return request(`/api/personal/nomina/recibos/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function quitarReciboNomina(id: number): Promise<unknown> {
+  return request(`/api/personal/nomina/recibos/${id}`, { method: "DELETE" });
+}
+
+export function pagarPeriodoNomina(id: number): Promise<PeriodoNominaApi> {
+  return request(`/api/personal/nomina/periodos/${id}/pagar`, { method: "POST" });
+}
+
+export function descartarPeriodoNomina(id: number): Promise<unknown> {
+  return request(`/api/personal/nomina/periodos/${id}`, { method: "DELETE" });
+}
+
+export interface ReciboNominaImprimible {
+  id: number;
+  estado: string;
+  negocio: string | null;
+  razonSocial: string | null;
+  rif: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  trabajador: string;
+  cedula: string | null;
+  cargo: string | null;
+  formaDePago: TipoSalarioNomina | null;
+  frecuencia: FrecuenciaPagoNomina | null;
+  periodo: string;
+  desde: string;
+  hasta: string;
+  fechaPago: string | null;
+  diasTrabajados: number | null;
+  horasMarcadas: number | null;
+  moneda: string;
+  lineas: { descripcion: string; tipo: "ASIGNACION" | "DEDUCCION" | "APORTE_PATRONAL"; monto: number }[];
+  totalAsignaciones: number;
+  totalDeducciones: number;
+  neto: number;
+  netoEfectivo: number;
+  nota: string | null;
+}
+
+export function obtenerReciboNomina(id: number): Promise<ReciboNominaImprimible> {
+  return request(`/api/personal/nomina/recibos/${id}`);
 }
 
 export function listarDirectorioPersonal(): Promise<EntradaDirectorioPersonalApi[]> {

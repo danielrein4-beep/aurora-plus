@@ -27,7 +27,7 @@ public class PeriodoNominaService {
 
     @Transactional
     public PeriodoNomina crear(Long tenantId, PeriodoNomina periodo) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirRol(tenantId, PUEDEN_APROBAR);
         periodo.setTenantId(tenantId);
         periodo.setId(null);
@@ -37,7 +37,7 @@ public class PeriodoNominaService {
 
     @Transactional
     public PeriodoNomina aprobar(Long tenantId, Long periodoId) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirRol(tenantId, PUEDEN_APROBAR);
         PeriodoNomina periodo = obtenerOFallar(tenantId, periodoId);
         if (periodo.getEstado() != PeriodoNomina.Estado.CALCULADA && periodo.getEstado() != PeriodoNomina.Estado.EN_REVISION) {
@@ -59,7 +59,7 @@ public class PeriodoNominaService {
 
     @Transactional
     public PeriodoNomina marcarPagada(Long tenantId, Long periodoId) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirRol(tenantId, PUEDEN_APROBAR);
         PeriodoNomina periodo = obtenerOFallar(tenantId, periodoId);
         if (periodo.getEstado() != PeriodoNomina.Estado.APROBADA) {
@@ -79,13 +79,13 @@ public class PeriodoNominaService {
 
     /** Lista con MONTOS de todos los empleados de un período — solo NOMINA/AUDITOR (nunca RRHH, ver contrato §1.2). */
     public List<NominaEmpleado> listarNominasDelPeriodo(Long tenantId, Long periodoId) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirVerMontosDeNominaEnGeneral(tenantId);
         return nominaEmpleadoRepository.findByTenantIdAndPeriodoId(tenantId, periodoId);
     }
 
     public List<PeriodoNomina> listar(Long tenantId) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirVerMontosDeNominaEnGeneral(tenantId);
         return periodoRepository.findByTenantIdOrderByFechaInicioDesc(tenantId);
     }

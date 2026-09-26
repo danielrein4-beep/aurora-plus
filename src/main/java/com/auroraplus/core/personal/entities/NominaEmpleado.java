@@ -74,6 +74,45 @@ public class NominaEmpleado {
     @Column(nullable = false, columnDefinition = "bigint default 0")
     private Long version = 0L;
 
+    // Lo que el dueño revisó antes de pagar: días y horas trabajadas, bono y descuento. Se
+    // guardan para volver a mostrarlos y para el recibo.
+    @Column(name = "dias_trabajados", precision = 8, scale = 2)
+    private BigDecimal diasTrabajados;
+
+    @Column(name = "horas_marcadas", precision = 10, scale = 2)
+    private BigDecimal horasMarcadas;
+
+    @Column(precision = 18, scale = 2)
+    private BigDecimal bono;
+
+    @Column(precision = 18, scale = 2)
+    private BigDecimal descuento;
+
+    @Column(length = 255)
+    private String nota;
+
+    /** Egreso en caja con el que se pagó (null mientras no se paga). */
+    @Column(name = "movimiento_caja_id")
+    private Long movimientoCajaId;
+
+    @Column(name = "fecha_pago")
+    private java.time.LocalDateTime fechaPago;
+
+    public BigDecimal getDiasTrabajados() { return diasTrabajados; }
+    public void setDiasTrabajados(BigDecimal diasTrabajados) { this.diasTrabajados = diasTrabajados; }
+    public BigDecimal getHorasMarcadas() { return horasMarcadas; }
+    public void setHorasMarcadas(BigDecimal horasMarcadas) { this.horasMarcadas = horasMarcadas; }
+    public BigDecimal getBono() { return bono; }
+    public void setBono(BigDecimal bono) { this.bono = bono; }
+    public BigDecimal getDescuento() { return descuento; }
+    public void setDescuento(BigDecimal descuento) { this.descuento = descuento; }
+    public String getNota() { return nota; }
+    public void setNota(String nota) { this.nota = nota; }
+    public Long getMovimientoCajaId() { return movimientoCajaId; }
+    public void setMovimientoCajaId(Long movimientoCajaId) { this.movimientoCajaId = movimientoCajaId; }
+    public java.time.LocalDateTime getFechaPago() { return fechaPago; }
+    public void setFechaPago(java.time.LocalDateTime fechaPago) { this.fechaPago = fechaPago; }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }

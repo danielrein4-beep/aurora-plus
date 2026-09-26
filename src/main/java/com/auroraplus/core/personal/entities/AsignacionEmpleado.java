@@ -53,6 +53,13 @@ public class AsignacionEmpleado {
     @Column(name = "vigencia_hasta")
     private LocalDate vigenciaHasta;
 
+    /** Cada cuánto se le paga: SEMANAL, QUINCENAL o MENSUAL (el sueldo pactado sigue siendo mensual en FIJO_MENSUAL). */
+    @Column(name = "frecuencia_pago", nullable = false, length = 12)
+    private String frecuenciaPago = "QUINCENAL";
+
+    public String getFrecuenciaPago() { return frecuenciaPago; }
+    public void setFrecuenciaPago(String frecuenciaPago) { this.frecuenciaPago = frecuenciaPago; }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }

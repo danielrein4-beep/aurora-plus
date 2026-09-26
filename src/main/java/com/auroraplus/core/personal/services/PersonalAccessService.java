@@ -44,6 +44,17 @@ public class PersonalAccessService {
         }
     }
 
+    /**
+     * La nómina básica (sueldo, períodos, pagar y recibos) viene con Personal: todo negocio que
+     * tiene trabajadores tiene que poder pagarles. "nomina-avanzada" sigue siendo solo para
+     * conceptos y reglas propias (bonos o deducciones automáticas).
+     */
+    public void exigirNomina(Long tenantId) {
+        if (!tieneFlag(tenantId, FLAG_PERSONAL) && !tieneFlag(tenantId, FLAG_NOMINA_AVANZADA)) {
+            throw new AccesoPersonalDenegadoException("Este negocio no tiene activado el módulo \"personal\"");
+        }
+    }
+
     public boolean tieneFlag(Long tenantId, String flag) {
         return moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, flag)
             .map(ModuloTenant::isActivo).orElse(false);

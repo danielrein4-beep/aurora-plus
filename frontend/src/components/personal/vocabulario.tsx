@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { DepartamentoPersonal } from './types';
+import type { FrecuenciaPagoNomina, TipoSalarioNomina } from '../../api';
 
 /**
  * Palabras del módulo Personal según el rubro que lo usa. El módulo es el mismo para todos;
@@ -29,7 +30,20 @@ export interface VocabularioPersonal {
   turnosAccion: string;
   tuNegocio: string;
   mostrarMetas: boolean;
+  /** Cómo suele pagar este rubro: lo que se propone al ponerle el sueldo a alguien nuevo. */
+  nomina: NominaDelRubro;
 }
+
+export interface NominaDelRubro {
+  frecuencia: FrecuenciaPagoNomina;
+  tipoSalario: TipoSalarioNomina;
+  cargos: string[];
+}
+
+const NOMINA_GENERAL: NominaDelRubro = {
+  frecuencia: 'QUINCENAL', tipoSalario: 'FIJO_MENSUAL',
+  cargos: ['Cajero', 'Vendedor', 'Almacenista', 'Encargado', 'Administrador'],
+};
 
 const TODAS_LAS_AREAS: DepartamentoPersonal[] = [
   'Atención & Salud',
@@ -62,6 +76,25 @@ export const VOCABULARIO_GENERAL: VocabularioPersonal = {
   turnosAccion: 'Gestionar matriz',
   tuNegocio: 'tu negocio',
   mostrarMetas: true,
+  nomina: NOMINA_GENERAL,
+};
+
+export const VOCABULARIO_RESTAURANTE: VocabularioPersonal = {
+  ...VOCABULARIO_GENERAL,
+  tuNegocio: 'tu restaurante',
+  nomina: {
+    frecuencia: 'SEMANAL', tipoSalario: 'FIJO_MENSUAL',
+    cargos: ['Mesero', 'Cocinero', 'Ayudante de cocina', 'Cajero', 'Bartender', 'Encargado'],
+  },
+};
+
+export const VOCABULARIO_SALUD: VocabularioPersonal = {
+  ...VOCABULARIO_GENERAL,
+  tuNegocio: 'tu consultorio',
+  nomina: {
+    frecuencia: 'QUINCENAL', tipoSalario: 'FIJO_MENSUAL',
+    cargos: ['Recepcionista', 'Asistente', 'Enfermera', 'Higienista', 'Médico', 'Odontólogo'],
+  },
 };
 
 const AREAS_FINCA: Record<string, string> = {
@@ -92,10 +125,27 @@ export const VOCABULARIO_GANADERIA: VocabularioPersonal = {
   turnosAccion: 'Organizar jornadas',
   tuNegocio: 'tu finca',
   mostrarMetas: false,
+  // En el campo se paga la semana, por jornada (jornal).
+  nomina: {
+    frecuencia: 'SEMANAL', tipoSalario: 'POR_JORNADA',
+    cargos: ['Obrero', 'Encargado', 'Ordeñador', 'Vaquero', 'Tractorista'],
+  },
 };
 
 export const vocabularioDeRubro = (rubro?: string): VocabularioPersonal =>
-  rubro === 'ganaderia' ? VOCABULARIO_GANADERIA : VOCABULARIO_GENERAL;
+  rubro === 'ganaderia' ? VOCABULARIO_GANADERIA
+    : rubro === 'restaurante' ? VOCABULARIO_RESTAURANTE
+      : rubro === 'salud' ? VOCABULARIO_SALUD
+        : VOCABULARIO_GENERAL;
+
+/** El rubro del negocio a partir del "industry" de la sesión, cuando la pantalla no lo recibe. */
+export const rubroDeIndustria = (industry?: string | null): string => {
+  const i = (industry || '').toLowerCase();
+  if (i === 'finca' || i.includes('ganad')) return 'ganaderia';
+  if (i.includes('restaurante') || i.includes('horeca')) return 'restaurante';
+  if (['clinica', 'farmacia', 'odontologia', 'veterinaria', 'estetica', 'salud'].some((r) => i.includes(r))) return 'salud';
+  return 'comercio';
+};
 
 export const ContextoVocabularioPersonal = createContext<VocabularioPersonal>(VOCABULARIO_GENERAL);
 

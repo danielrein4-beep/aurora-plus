@@ -35,9 +35,10 @@ import { ListaEmpleados } from '../components/personal/ListaEmpleados';
 import { TurnosPersonal } from '../components/personal/TurnosPersonal';
 import { AsistenciaPersonal } from '../components/personal/AsistenciaPersonal';
 import { MetasPersonal } from '../components/personal/MetasPersonal';
-import { NominaPersonal } from '../components/personal/NominaPersonal';
+import { NominaDelNegocio } from '../components/personal/NominaDelNegocio';
 import { PerfilEmpleado } from '../components/personal/PerfilEmpleado';
-import { ContextoVocabularioPersonal, vocabularioDeRubro } from '../components/personal/vocabulario';
+import { ContextoVocabularioPersonal, rubroDeIndustria, vocabularioDeRubro } from '../components/personal/vocabulario';
+import { useAuth } from '../context/AuthContext';
 import MiAsistencia from '../components/personal/MiAsistencia';
 
 const departamentoDe = (modulo?: string | null): Empleado['departamento'] => {
@@ -111,7 +112,9 @@ const PERIODO_VACIO: PeriodoNomina = {
 
 /** rubro: el vocabulario de la pantalla (en "ganaderia" se habla de obreros y jornadas). */
 export const PersonalPage: React.FC<{ embedded?: boolean; rubro?: string }> = ({ embedded = false, rubro }) => {
-  const v = vocabularioDeRubro(rubro);
+  const { user } = useAuth();
+  // Sin rubro explícito (Comercio, Restaurante, Salud entran por /personal), se toma el del negocio.
+  const v = vocabularioDeRubro(rubro ?? rubroDeIndustria(user?.industry));
   const [seccionActiva, setSeccionActiva] = useState<SeccionPersonal>('resumen');
   
   // Regla estricta: Salarios OCULTOS por defecto en la interfaz
@@ -415,21 +418,8 @@ export const PersonalPage: React.FC<{ embedded?: boolean; rubro?: string }> = ({
             />
           )}
 
-          {!cargandoDatos && !errorDatos && seccionActiva === 'nomina' && periodosNomina.length > 0 && (
-            <NominaPersonal
-              periodos={periodosNomina}
-              ocultarSueldo={ocultarSueldo}
-              nominaHabilitada={nominaHabilitada}
-              onActualizarPeriodos={(actualizados) => {
-                setPeriodosNomina(actualizados);
-              }}
-            />
-          )}
-          {!errorDatos && seccionActiva === 'nomina' && periodosNomina.length === 0 && !cargandoDatos && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
-              <h2 className="font-bold tracking-tight text-slate-900">Aún no hay períodos de nómina</h2>
-              <p className="mt-2 text-sm font-normal text-slate-500">Crea y calcula el primer período cuando la empresa decida activar Aurora Nómina.</p>
-            </div>
+          {!cargandoDatos && !errorDatos && seccionActiva === 'nomina' && (
+            <NominaDelNegocio ocultarSueldo={ocultarSueldo} />
           )}
         </main>
 
