@@ -2,6 +2,7 @@ import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import fs from 'node:fs'
 
 import siteConfiguration from './.figma/make/site.json'
 
@@ -23,6 +24,7 @@ export default defineConfig(({ mode }) => {
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),
       figmaMakeKitPlugin({ storiesGlob: '/src/**/*.stories.{ts,tsx,js,jsx}' }),
+      auroraSinConexion(),
     ],
     resolve: {
       alias: {
@@ -48,9 +50,40 @@ export default defineConfig(({ mode }) => {
     preview: {
       host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
       port: parseInt(process.env.PORT || '8443'),
+      // La app compilada también habla con el backend (para probar el modo sin conexión en local).
+      proxy: {
+        '/api': {
+          target: process.env.AURORA_API_TARGET || 'http://localhost:8080',
+          changeOrigin: true,
+        },
+      },
     },
   }
 })
+
+/**
+ * Publica /sw.js al compilar (ver sw-plantilla.js): la lista de archivos de esta compilación para
+ * guardarlos en el teléfono, y una versión nueva en cada compilación para que se actualice.
+ */
+function auroraSinConexion(): Plugin {
+  return {
+    name: 'aurora-sin-conexion',
+    apply: 'build',
+    generateBundle(_opciones, bundle) {
+      const archivos = Object.keys(bundle)
+        .filter((f) => !f.endsWith('.map') && f !== 'index.html')
+        .map((f) => '/' + f)
+      const plantilla = fs.readFileSync(path.resolve(__dirname, 'sw-plantilla.js'), 'utf8')
+      const sw = plantilla
+        .replace('const VERSION = "__VERSION__";', `const VERSION = ${JSON.stringify(Date.now().toString(36))};`)
+        .replace('const ARCHIVOS = __ARCHIVOS__;', `const ARCHIVOS = ${JSON.stringify(archivos)};`)
+      if (sw.includes('__VERSION__') || sw.includes('__ARCHIVOS__')) {
+        this.error('sw-plantilla.js cambió: no se encontraron las líneas de VERSION o ARCHIVOS')
+      }
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source: sw })
+    },
+  }
+}
 
 type FigmaSiteConfiguration = {
   title?: string

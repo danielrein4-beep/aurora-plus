@@ -24,8 +24,11 @@ export default function ModalPesaje({ animal, tenantId, notificar, onPesado, onE
   // Manejador: Registrar pesaje con soporte offline y balanza digital
   const handleGuardarPesaje = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Misma clave en el primer intento y en la cola: si el servidor guardó y la señal se cortó
+    // antes de la respuesta, el reenvío no duplica el pesaje.
+    const claveIdempotencia = generarClaveIdempotencia();
     try {
-      await registrarPesoGanaderia(tenantId, animal.id, Number(pesoNuevo));
+      await registrarPesoGanaderia(tenantId, animal.id, Number(pesoNuevo), undefined, claveIdempotencia);
       const resGdp = await obtenerGdpGanaderia(animal.id).catch(() => null);
       if (resGdp) setGdpData(resGdp);
       onPesado(Number(pesoNuevo));
@@ -38,7 +41,7 @@ export default function ModalPesaje({ animal, tenantId, notificar, onPesado, onE
         encolarAccionGanaderia(tenantId, {
           tipo: "registrar_peso",
           id: generarClaveIdempotencia(),
-          claveIdempotencia: generarClaveIdempotencia(),
+          claveIdempotencia,
           descripcion: `Pesaje ${animal.nombre || animal.arete}: ${pesoNuevo} kg`,
           creadaEn: Date.now(),
           payload: {

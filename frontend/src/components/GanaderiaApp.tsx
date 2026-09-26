@@ -518,8 +518,12 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     alGuardarJornada([nuevoReg], litrosAlTanque);
 
   // Sincronizacion de operaciones de campo realizadas offline (manga/potreros)
+  const sincronizandoRef = useRef(false);
   const handleSincronizarManual = async () => {
-    if (sincronizandoOffline) return;
+    // El candado va en una ref: dos avisos seguidos (volver la señal y abrir la app) llegan antes
+    // de que el estado se actualice y enviarían la cola dos veces a la vez.
+    if (sincronizandoRef.current) return;
+    sincronizandoRef.current = true;
     setSincronizandoOffline(true);
     try {
       const res = await procesarColaGanaderia(tenantId, {
@@ -528,7 +532,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           await registrarPesoGanaderia(tenantId, acc.payload.animalId, acc.payload.peso, fechaLocalISO(new Date(acc.creadaEn)), acc.claveIdempotencia);
         },
         rotar_potrero: async (acc) => {
-          await rotarPotreroGanaderia(acc.payload.potreroOrigenId, tenantId, acc.payload.potreroDestinoId);
+          // Con la clave de la cola: si el servidor ya la hizo antes de cortarse la señal, no rota dos veces.
+          await rotarPotreroGanaderia(acc.payload.potreroOrigenId, tenantId, acc.payload.potreroDestinoId, acc.payload.animalIds, acc.claveIdempotencia);
         },
         registrar_ordeno: async (acc) => {
           // Si el servidor ya lo guardó y se cortó la señal, el reintento choca con "Ya existe un ordeño"
@@ -585,23 +590,41 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     } catch {
       notificar("No se pudo completar la sincronización en este momento.");
     } finally {
+      sincronizandoRef.current = false;
       setSincronizandoOffline(false);
     }
   };
 
+  // Siempre la versión más reciente de la sincronización (con el precio de la leche y el estado
+  // actuales), para que los avisos del navegador no llamen a una copia vieja.
+  const sincronizarRef = useRef(handleSincronizarManual);
+  sincronizarRef.current = handleSincronizarManual;
+
   useEffect(() => {
     setPendientesOffline(contarPendientesGanaderia(tenantId));
+    // Solo con el evento "online" no basta: si la app se abre ya con señal y con registros
+    // pendientes, o el teléfono no avisa el cambio (pasa en iPhone), la cola se quedaba quieta
+    // hasta tocar "Sincronizar". Se intenta al abrir, al volver a la app y cada 30 segundos.
+    const intentar = () => {
+      if (navigator.onLine && contarPendientesGanaderia(tenantId) > 0) sincronizarRef.current();
+    };
     const handleOnline = () => {
       setEstaOnline(true);
-      handleSincronizarManual();
+      sincronizarRef.current();
     };
     const handleOffline = () => setEstaOnline(false);
+    const alVolverALaApp = () => { if (document.visibilityState === "visible") intentar(); };
 
+    intentar();
+    const intervalo = setInterval(intentar, 30_000);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    document.addEventListener("visibilitychange", alVolverALaApp);
     return () => {
+      clearInterval(intervalo);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", alVolverALaApp);
     };
   }, [tenantId]);
 

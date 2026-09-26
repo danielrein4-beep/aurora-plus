@@ -2,6 +2,8 @@
 // simulados que había en AuthContext/Dashboard. Todo pasa por /api, que
 // vite.config.ts redirige a localhost:8080 en desarrollo (evita CORS).
 
+import { borrarDatosGuardados } from "./sinConexion";
+
 const TOKEN_KEY = "aurora_token";
 
 export interface SesionAurora {
@@ -52,6 +54,7 @@ const SESSION_USER_KEY = "aurora_session_user";
 function manejarSesionVencida() {
   borrarSesion();
   try { localStorage.removeItem(SESSION_USER_KEY); } catch {}
+  borrarDatosGuardados();
   if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
     window.location.href = "/auth";
   }
@@ -4653,10 +4656,10 @@ export function actualizarPotreroGanaderia(id: number, tenantId: number, datos: 
   });
 }
 
-export function rotarPotreroGanaderia(id: number, tenantId: number, potreroDestinoId: number, animalIds?: number[]): Promise<any> {
+export function rotarPotreroGanaderia(id: number, tenantId: number, potreroDestinoId: number, animalIds?: number[], claveIdempotencia?: string): Promise<any> {
   return request(`/api/ganaderia/potreros/${id}/rotar?tenantId=${tenantId}`, {
     method: "POST",
-    body: JSON.stringify({ potreroDestinoId, animalIds }),
+    body: JSON.stringify({ potreroDestinoId, animalIds, claveIdempotencia }),
   });
 }
 

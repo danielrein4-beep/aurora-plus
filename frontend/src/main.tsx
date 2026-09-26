@@ -3,9 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { initSentry } from './sentry'
+import { registrarAppSinConexion } from './sinConexion'
 import * as Sentry from '@sentry/react'
 
 initSentry()
+registrarAppSinConexion()
 
 // Si algo revienta en el render de React, esto evita una pantalla en blanco
 // sin explicación — y si Sentry está configurado (ver sentry.ts), el error

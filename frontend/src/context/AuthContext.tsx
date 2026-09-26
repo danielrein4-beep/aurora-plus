@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { borrarDatosGuardados } from "../sinConexion";
 import {
   leerSesion,
   borrarSesion,
@@ -346,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     borrarSesion();
     localStorage.removeItem(STORAGE_KEY);
+    borrarDatosGuardados();
     // Recarga real de página (no solo navegación de React Router): los módulos como Mediclinic
     // guardan caché por tenant en localStorage usando `useState(() => ...)`, que solo se lee al
     // MONTAR el componente. Si el siguiente login ocurre en la misma pestaña sin recargar, ese

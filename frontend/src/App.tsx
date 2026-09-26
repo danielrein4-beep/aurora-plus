@@ -10,6 +10,7 @@ import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
 import PortalOdontologiaPaciente from "./pages/PortalOdontologiaPaciente";
 import { BrowserRouter, Routes, Route, Outlet, useNavigate, useParams, useLocation } from "react-router-dom";
 import TenantSoporteWidget from "./components/TenantSoporteWidget";
+import AvisoSinConexion from "./components/AvisoSinConexion";
 import MercadoGanaderoApp from "./components/mercado/MercadoGanaderoApp";
 import Layout from "./Layout";
 import Home from "./pages/Home";
@@ -49,6 +50,7 @@ function ZonaPrivada() {
     <>
       <Outlet />
       {!pathname.startsWith("/ganaderia") && <TenantSoporteWidget />}
+      {!pathname.startsWith("/ganaderia") && !pathname.startsWith("/restaurante") && <AvisoSinConexion />}
     </>
   );
 }

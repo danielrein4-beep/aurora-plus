@@ -2,6 +2,7 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
+import com.auroraplus.core.sync.IdempotenciaService;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.Potrero;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
@@ -11,6 +12,7 @@ import com.auroraplus.modules.ganaderia.services.ReferenciaPastoreoService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -36,6 +38,9 @@ public class PotreroController {
 
     @Autowired
     private RegistroAuditoriaService auditoriaService;
+
+    @Autowired
+    private IdempotenciaService idempotenciaService;
 
     @GetMapping
     public List<Potrero> listar() {
@@ -161,16 +166,29 @@ public class PotreroController {
     public static class RotarRequest {
         public Long potreroDestinoId;
         public List<Long> animalIds; // opcional: si se omite, se mueven TODOS los animales activos del origen
+        /** Viene de la cola sin conexión: un reenvío con la misma clave no rota dos veces. */
+        public String claveIdempotencia;
     }
 
     /** Mueve el hato del potrero {id} al destino indicado: origen queda EN_DESCANSO, destino queda ACTIVO. */
     @PostMapping("/{id}/rotar")
+    @Transactional
     public Map<String, Object> rotar(@PathVariable Long id, @RequestBody RotarRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
+        if (idempotenciaService.obtenerSiYaProcesada(tenantId, request.claveIdempotencia).isPresent()) {
+            // Ya se hizo (la señal se cortó antes de la respuesta): se devuelve cómo quedaron, sin mover nada.
+            Map<String, Object> yaHecha = new LinkedHashMap<>();
+            yaHecha.put("potreroOrigen", potreroRepository.findById(id).filter(p -> tenantId.equals(p.getTenantId())).orElse(null));
+            yaHecha.put("potreroDestino", potreroRepository.findById(request.potreroDestinoId).filter(p -> tenantId.equals(p.getTenantId())).orElse(null));
+            yaHecha.put("animalesMovidos", 0);
+            yaHecha.put("yaProcesada", true);
+            return yaHecha;
+        }
         Map<String, Object> resultado = potreroRotacionService.rotar(tenantId, id, request.potreroDestinoId, request.animalIds);
         Potrero origen = (Potrero) resultado.get("potreroOrigen");
         Potrero destino = (Potrero) resultado.get("potreroDestino");
+        idempotenciaService.registrar(tenantId, request.claveIdempotencia, "rotar_potrero_ganaderia", origen.getId());
         auditoriaService.registrar(tenantId, "GANADERIA", "EDITAR", "RotacionPotrero", origen.getId(),
             "Rotó " + resultado.get("animalesMovidos") + " animales de " + origen.getNombre() + " a " + destino.getNombre() + "; origen en descanso: " + resultado.get("origenEnDescanso"));
         return resultado;

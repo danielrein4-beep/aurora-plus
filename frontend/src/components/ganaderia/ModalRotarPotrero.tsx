@@ -20,20 +20,25 @@ export default function ModalRotarPotrero({ origen, potreros, tenantId, notifica
 
   // Manejador: Rotar potrero
   const handleEjecutarRotacion = async () => {
+    // La clave se crea antes del primer intento: si el servidor alcanzó a rotar y la señal se cortó
+    // antes de la respuesta, el reenvío desde la cola lleva la misma clave y no rota dos veces.
+    const claveIdempotencia = generarClaveIdempotencia();
+    const nombreDestino = potreros.find(p => p.id === potreroDestinoId)?.nombre;
     try {
-      await rotarPotreroGanaderia(origen.id, tenantId, potreroDestinoId);
+      await rotarPotreroGanaderia(origen.id, tenantId, potreroDestinoId, undefined, claveIdempotencia);
     } catch (err) {
       if (esFalloDeConexion(err)) {
         encolarAccionGanaderia(tenantId, {
           tipo: "rotar_potrero",
           id: generarClaveIdempotencia(),
-          claveIdempotencia: generarClaveIdempotencia(),
-          descripcion: `Rotacion de ${origen.nombre} a potrero #${potreroDestinoId}`,
+          claveIdempotencia,
+          descripcion: `Rotación de ${origen.nombre} a ${nombreDestino ?? `potrero #${potreroDestinoId}`}`,
           creadaEn: Date.now(),
           payload: {
             potreroOrigenId: origen.id,
             potreroDestinoId: potreroDestinoId,
             nombreOrigen: origen.nombre,
+            nombreDestino,
           }
         });
         onRotado(origen.id, potreroDestinoId, true);
