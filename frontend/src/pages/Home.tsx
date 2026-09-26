@@ -183,13 +183,13 @@ export default function Home() {
           })()}
 
           {/* Métricas / Stats — deliberadamente más abajo, para que aparezcan al hacer scroll y no compitan con los botones en la primera vista */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full mt-16 sm:mt-24 pt-10 border-t border-[#E5E5EA] text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full mt-16 sm:mt-24 px-4 py-8 sm:py-10 rounded-3xl bg-white/85 backdrop-blur-sm border border-[#E5E5EA] text-center">
             {STATS.map((s) => (
               <div key={s.label}>
                 <div className="text-4xl sm:text-5xl font-bold tracking-tight text-[#1D1D1F] mb-1">
                   {s.value}
                 </div>
-                <div className="text-xs font-medium uppercase text-[#6E6E73] tracking-wide">
+                <div className="text-xs font-semibold uppercase text-[#424245] tracking-wide">
                   {s.label}
                 </div>
               </div>
@@ -219,7 +219,7 @@ export default function Home() {
                 <div
                   key={ind.name}
                   onClick={() => setActiveIndustry(idx)}
-                  className={`group relative overflow-hidden bg-[#0D3B3D] cursor-pointer transition-all ${
+                  className={`superficie-oscura group relative overflow-hidden bg-[#0D3B3D] cursor-pointer transition-all ${
                     idx === 2 ? "sm:col-span-2 aspect-[4/5] sm:aspect-[16/9]" : "aspect-[4/5]"
                   } ${
                     activeIndustry === idx ? "ring-2 ring-inset ring-[#177E89]" : ""
@@ -285,7 +285,7 @@ export default function Home() {
       </section>
 
       {/* ── CARACTERÍSTICAS DESTACADAS: fondo petróleo de la marca, para no encadenar secciones blancas ── */}
-      <section className="py-20 md:py-28 px-6 sm:px-8 bg-[#0D3B3D]">
+      <section className="superficie-oscura py-20 md:py-28 px-6 sm:px-8 bg-[#0D3B3D]">
         <div className="max-w-6xl mx-auto">
           
           <div className="text-center max-w-3xl mx-auto mb-16">

@@ -383,6 +383,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     setTimeout(() => setFeedback(null), 5000);
   };
 
+  // En teléfono el menú lateral es un cajón que se abre con el botón de la cabecera: antes ocupaba
+  // toda la pantalla y el contenido quedaba debajo, así que al tocar una opción "no pasaba nada".
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+
   // Pagos reportados por clientes que faltan por verificar: se ven en el menú aunque no se abra Cobros.
   const [pagosPorVerificar, setPagosPorVerificar] = useState(0);
   useEffect(() => {
@@ -1340,8 +1344,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       )}
 
-      {/* BARRA LATERAL (SIDEBAR) ENTERPRISE */}
-      <aside className="w-full md:w-64 lg:w-72 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 h-auto md:h-screen z-20 shadow-xs">
+      {/* Fondo que cierra el menú en teléfono */}
+      {menuMovilAbierto && (
+        <div className="fixed inset-0 z-30 md:hidden" style={{ backgroundColor: "rgba(15, 23, 42, 0.45)" }} onClick={() => setMenuMovilAbierto(false)} aria-hidden="true" />
+      )}
+
+      {/* BARRA LATERAL (SIDEBAR) ENTERPRISE — en teléfono, cajón deslizable */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-[82vw] max-w-xs transition-transform duration-200 ${menuMovilAbierto ? "translate-x-0" : "-translate-x-full"} md:static md:translate-x-0 md:w-64 lg:w-72 md:max-w-none bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 h-full md:h-screen shadow-xs`}>
         {/* PARTE SUPERIOR: BRANDING & ESTADO */}
         <div className="p-5 border-b border-slate-100 space-y-3">
           <div className="flex items-center gap-3">
@@ -1415,7 +1424,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                     return (
                       <button
                         key={it.verticalId ?? it.vista}
-                        onClick={() => { setVistaPrincipal(it.vista); it.alAbrir?.(); }}
+                        onClick={() => { setVistaPrincipal(it.vista); it.alAbrir?.(); setMenuMovilAbierto(false); }}
                         className={`w-full px-3 py-2 rounded-xl text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
                           activo ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" : "text-slate-700 hover:bg-slate-50"
                         }`}
@@ -1509,14 +1518,24 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       {/* AREA DE CONTENIDO PRINCIPAL (MAIN WORKSPACE) */}
       <div className="flex-1 h-full overflow-y-auto flex flex-col bg-slate-100/70">
         {/* HEADER SUPERIOR DEL WORKSPACE */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10 shadow-2xs">
-          <div>
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4 sticky top-0 z-10 shadow-2xs">
+          <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setMenuMovilAbierto(true)}
+            className="md:hidden p-2 -ml-1 rounded-xl border border-slate-200 bg-white text-slate-700 cursor-pointer shrink-0"
+            aria-label="Abrir menú"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-slate-400 text-xs font-medium">Administración</span>
               <span className="text-slate-300 text-xs">/</span>
               <span className="font-bold text-slate-800 text-xs">{TITULOS_VISTA[vistaPrincipal][0]}</span>
             </div>
-            <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">{vistaPrincipal === "VERTICAL" ? VERTICALES_SUPERADMIN.find((v) => v.id === verticalActiva)?.nombre : TITULOS_VISTA[vistaPrincipal][1]}</h1>
+            <h1 className="font-['Outfit'] font-black text-lg sm:text-xl text-slate-900 mt-0.5 truncate">{vistaPrincipal === "VERTICAL" ? VERTICALES_SUPERADMIN.find((v) => v.id === verticalActiva)?.nombre : TITULOS_VISTA[vistaPrincipal][1]}</h1>
+          </div>
           </div>
 
           <div className="flex items-center gap-3">

@@ -493,6 +493,27 @@ body {
   color: #FFFFFF !important;
 }
 
+/* Superficies oscuras a propósito fuera del Mercado (portada: sección petróleo y tarjetas con
+   foto) y botones o etiquetas de marca con fondo sólido: ahí el texto blanco tiene que seguir
+   blanco. Sin esto la regla de arriba lo volvía gris oscuro sobre fondo oscuro, ilegible. */
+.superficie-oscura .text-white,
+.superficie-oscura .text-white\/90,
+.superficie-oscura .text-white\/85,
+.bg-\[\#177E89\].text-white,
+.bg-\[\#0D3B3D\].text-white {
+  color: #FFFFFF !important;
+}
+.superficie-oscura .text-white\/80,
+.superficie-oscura .text-white\/70 {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+.superficie-oscura .text-white\/65,
+.superficie-oscura .text-white\/60,
+.superficie-oscura .text-white\/55,
+.superficie-oscura .text-white\/50 {
+  color: rgba(255, 255, 255, 0.68) !important;
+}
+
 /* El Mercado Ganadero sí se diseñó con superficies oscuras (cabecera, portada,
    categorías, botones): ahí el texto blanco va sobre fondo oscuro a propósito,
    así que se exceptúa de la neutralización de arriba. */
