@@ -125,6 +125,67 @@ export default function GanaderiaMapa({
     setModoTrazar(true);
   }, [potreroAUbicar?.id]);
 
+  // Teléfono: mapa a pantalla completa y capas en un menú de la barra inferior.
+  const [pantallaCompleta, setPantallaCompleta] = useState(false);
+  const [capasAbierto, setCapasAbierto] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => mapInstanceRef.current?.invalidateSize(), 250);
+    return () => clearTimeout(t);
+  }, [pantallaCompleta]);
+
+  // Caminar la cerca: marcado automático de un poste cada 15 m mientras la persona camina.
+  const [autoGps, setAutoGps] = useState(false);
+  const [precisionGps, setPrecisionGps] = useState<number | null>(null);
+  useEffect(() => {
+    if (!autoGps || !modoTrazar) return;
+    if (!window.isSecureContext || !navigator.geolocation) {
+      setAvisoGps("El GPS del teléfono solo funciona cuando Aurora abre con https (en el servidor). Por ahora marca los puntos tocando el mapa.");
+      setAutoGps(false);
+      return;
+    }
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        setPrecisionGps(pos.coords.accuracy);
+        if (pos.coords.accuracy > 30) return; // lectura poco confiable: se espera la siguiente
+        const punto: [number, number] = [Number(pos.coords.latitude.toFixed(6)), Number(pos.coords.longitude.toFixed(6))];
+        setVerticesTrazado((prev) => {
+          const ultimo = prev[prev.length - 1];
+          if (ultimo && L.latLng(ultimo).distanceTo(L.latLng(punto)) < 15) return prev;
+          return [...prev, punto];
+        });
+        mapInstanceRef.current?.panTo(punto);
+      },
+      () => {
+        setAvisoGps("No se pudo seguir tu ubicación. Revisa el permiso del GPS e intenta de nuevo.");
+        setAutoGps(false);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [autoGps, modoTrazar]);
+
+  // "Mi ubicación": centra el mapa donde está el teléfono y lo marca con un punto azul.
+  const miUbicacionRef = useRef<L.CircleMarker | null>(null);
+  const irAMiUbicacion = () => {
+    setAvisoGps(null);
+    if (!window.isSecureContext || !navigator.geolocation) {
+      setAvisoGps("Ver tu ubicación solo funciona cuando Aurora abre con https (en el servidor).");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        const punto: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        miUbicacionRef.current?.remove();
+        miUbicacionRef.current = L.circleMarker(punto, { radius: 8, color: "#FFFFFF", weight: 3, fillColor: "#2563EB", fillOpacity: 1 }).addTo(map);
+        map.flyTo(punto, Math.max(map.getZoom(), 16), { duration: 0.8 });
+      },
+      () => setAvisoGps("No se pudo leer tu ubicación. Revisa el permiso del GPS."),
+      { enableHighAccuracy: true, timeout: 20000 },
+    );
+  };
+
   // Caminar el borde del potrero con el teléfono: cada toque agrega un poste donde está la persona.
   const [buscandoGps, setBuscandoGps] = useState(false);
   const [avisoGps, setAvisoGps] = useState<string | null>(null);
@@ -138,6 +199,7 @@ export default function GanaderiaMapa({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setBuscandoGps(false);
+        setPrecisionGps(pos.coords.accuracy);
         const punto: [number, number] = [Number(pos.coords.latitude.toFixed(6)), Number(pos.coords.longitude.toFixed(6))];
         setVerticesTrazado((prev) => [...prev, punto]);
         mapInstanceRef.current?.flyTo(punto, Math.max(mapInstanceRef.current.getZoom(), 17), { duration: 0.6 });
@@ -728,6 +790,7 @@ export default function GanaderiaMapa({
     setVerticesTrazado([]);
     setModoTrazar(false);
     setAvisoGps(null);
+    setAutoGps(false);
     onCancelarUbicar?.();
   };
 
@@ -742,6 +805,7 @@ export default function GanaderiaMapa({
     }
     setVerticesTrazado([]);
     setModoTrazar(false);
+    setAutoGps(false);
   };
 
   const animalesSeleccionados = potreroSeleccionado
@@ -749,15 +813,15 @@ export default function GanaderiaMapa({
     : [];
 
   return (
-    <div className="modal-siempre-oscuro relative w-full h-[72dvh] min-h-[460px] sm:h-[680px] rounded-3xl overflow-hidden border border-slate-300/60 dark:border-white/10 shadow-2xl flex flex-col font-['Inter']">
+    <div className={`modal-siempre-oscuro ${pantallaCompleta ? "fixed inset-0 z-[90] h-[100dvh] rounded-none" : "relative h-[72dvh] min-h-[460px] sm:h-[680px] rounded-3xl"} w-full overflow-hidden border border-slate-300/60 dark:border-white/10 shadow-2xl flex flex-col font-['Inter']`}>
       
       {/* ── BARRA DE HERRAMIENTAS SUPERIOR DEL MAPA ── */}
       <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-[500] flex flex-nowrap sm:flex-wrap items-center sm:justify-between gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible pointer-events-auto sm:pointer-events-none [scrollbar-width:none] [&>*]:shrink-0 whitespace-nowrap">
         
         {/* Izquierda: Buscador & Centrar */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="apple-glass rounded-2xl px-3.5 py-2 border border-white/20 shadow-lg flex items-center gap-2 bg-slate-900/80 backdrop-blur-xl">
-            <span className="text-slate-400 text-xs font-semibold">Finca:</span>
+          <div className="apple-glass rounded-2xl px-3 sm:px-3.5 py-2 border border-white/20 shadow-lg flex items-center gap-1.5 sm:gap-2 bg-slate-900/80 backdrop-blur-xl">
+            <span className="hidden sm:inline text-slate-400 text-xs font-semibold">Finca:</span>
             <span className="font-['Outfit'] font-bold text-xs text-white">
               {fincaConfig.guardada ? fincaConfig.nombre : "Sin ubicar"}
             </span>
@@ -809,8 +873,16 @@ export default function GanaderiaMapa({
           </form>
         </div>
 
+        {/* Teléfono: ampliar el mapa a pantalla completa (las demás herramientas van abajo) */}
+        <button
+          type="button"
+          onClick={() => setPantallaCompleta((v) => !v)}
+          className="sm:hidden ml-auto px-3 py-2 rounded-2xl bg-white border border-slate-200 shadow-lg text-xs font-bold text-slate-700 cursor-pointer">
+          {pantallaCompleta ? "Cerrar mapa" : "Ampliar mapa"}
+        </button>
+
         {/* Derecha: Selector de Capas, Modo Trazar, Instalaciones & Agregar Potrero */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="hidden sm:flex items-center gap-2 pointer-events-auto">
           <div className="apple-glass rounded-2xl p-1 border border-white/15 shadow-lg flex items-center gap-1 bg-slate-900/80 backdrop-blur-xl text-xs font-semibold">
             <button
               onClick={() => setCapaActiva("satelital")}
@@ -890,7 +962,7 @@ export default function GanaderiaMapa({
 
       {/* ── BANNER HONESTO DE ESTADO VACÍO (SIN UBICACIÓN GUARDADA) ── */}
       {!fincaConfig.guardada && !modoFijarFinca && (
-        <div className="absolute top-16 left-3 right-3 sm:top-18 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[550] apple-glass rounded-2xl px-5 py-2.5 border border-amber-400/60 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-wrap items-center gap-3 text-xs pointer-events-auto animate-fade-in">
+        <div className="hidden sm:flex absolute top-16 left-3 right-3 sm:top-18 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[550] apple-glass rounded-2xl px-5 py-2.5 border border-amber-400/60 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex-wrap items-center gap-3 text-xs pointer-events-auto animate-fade-in">
           <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
           <span className="text-slate-700">
             Aún no has ubicado tu finca — busca tu ubicación o haz clic en el mapa para marcarla.
@@ -945,7 +1017,7 @@ export default function GanaderiaMapa({
 
       {/* ── BANNER ASISTENTE FLOTANTE DURANTE MODO TRAZAR POTRERO ── */}
       {modoTrazar && (
-        <div className="absolute top-16 left-3 right-3 sm:top-18 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[600] apple-glass rounded-2xl px-4 sm:px-5 py-2.5 border border-emerald-400 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs pointer-events-auto animate-fade-in">
+        <div className="absolute bottom-3 left-3 right-3 sm:bottom-auto sm:top-18 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[600] apple-glass rounded-2xl px-4 sm:px-5 py-3 sm:py-2.5 border border-emerald-400 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs pointer-events-auto animate-fade-in">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
             <span className="font-['Outfit'] font-bold text-white text-sm">
@@ -957,25 +1029,35 @@ export default function GanaderiaMapa({
 
           <div className="text-slate-600">
             {verticesTrazado.length === 0 ? (
-              <span>Toca el mapa en cada esquina de la cerca, o camina el borde y usa "Punto donde estoy (GPS)".</span>
+              <span>Toca el mapa en cada esquina de la cerca, o camina el borde y marca los postes con el GPS.</span>
             ) : verticesTrazado.length < 3 ? (
               <span>
-                <strong>{verticesTrazado.length}</strong> {verticesTrazado.length === 1 ? "vértice" : "vértices"} marcados (mínimo 3 requeridos).
+                <strong>{verticesTrazado.length}</strong> {verticesTrazado.length === 1 ? "poste marcado" : "postes marcados"} (mínimo 3).
               </span>
             ) : (
               <span className="text-emerald-700 font-bold">
-                {verticesTrazado.length} vértices • Superficie calculada: {hectareasTrazadas} ha
+                {verticesTrazado.length} postes · {hectareasTrazadas} ha
               </span>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 ml-2">
+          {precisionGps != null && (
+            <div className={`text-[11px] font-semibold ${precisionGps <= 10 ? "text-emerald-700" : precisionGps <= 30 ? "text-amber-700" : "text-rose-700"}`}>
+              Precisión del GPS: ±{Math.round(precisionGps)} m · {precisionGps <= 10 ? "buena" : precisionGps <= 30 ? "regular" : "baja, espera al aire libre"}
+            </div>
+          )}
+          <div className="w-full sm:w-auto grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:ml-2">
             <button
               onClick={agregarPuntoGps}
               disabled={buscandoGps}
-              className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-700 font-medium cursor-pointer transition-all disabled:opacity-50">
-              {buscandoGps ? "Buscando GPS…" : "Punto donde estoy (GPS)"}
+              style={{ backgroundColor: "#059669", color: "#FFFFFF" }}
+              className="col-span-2 sm:col-span-1 px-3 py-3 sm:py-1 rounded-xl text-sm sm:text-xs font-bold cursor-pointer transition-all disabled:opacity-50">
+              {buscandoGps ? "Buscando GPS…" : "Marcar poste aquí (GPS)"}
             </button>
+            <label className="col-span-2 sm:col-span-1 flex items-center gap-2 text-[11px] text-slate-700 cursor-pointer">
+              <input type="checkbox" checked={autoGps} onChange={(e) => setAutoGps(e.target.checked)} className="w-4 h-4" />
+              Marcar solo cada 15 m mientras camino
+            </label>
             {verticesTrazado.length > 0 && (
               <button
                 onClick={handleDeshacerVertice}
@@ -1001,7 +1083,7 @@ export default function GanaderiaMapa({
       )}
 
       {/* ── CONTROLES DE ZOOM LATERALES ── */}
-      <div className="absolute bottom-36 left-3 sm:bottom-auto sm:top-20 sm:left-4 z-[500] flex flex-col gap-1.5 pointer-events-auto">
+      <div className="hidden sm:flex absolute bottom-36 left-3 sm:bottom-auto sm:top-20 sm:left-4 z-[500] flex-col gap-1.5 pointer-events-auto">
         <button
           onClick={() => handleZoom(1)}
           className="apple-glass w-9 h-9 rounded-xl border border-white/20 text-white font-black text-base flex items-center justify-center bg-slate-900/80 backdrop-blur-xl shadow-lg hover:border-emerald-400 cursor-pointer transition-colors"
@@ -1017,7 +1099,7 @@ export default function GanaderiaMapa({
       </div>
 
       {/* ── LEYENDA DEL MAPA ── */}
-      <div className="absolute bottom-4 left-4 z-[500] apple-glass rounded-2xl p-2.5 border border-white/15 bg-slate-900/85 backdrop-blur-xl shadow-lg text-[11px] text-slate-600 space-y-1.5 pointer-events-auto">
+      <div className="hidden sm:block absolute bottom-4 left-4 z-[500] apple-glass rounded-2xl p-2.5 border border-white/15 bg-slate-900/85 backdrop-blur-xl shadow-lg text-[11px] text-slate-600 space-y-1.5 pointer-events-auto">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-md bg-emerald-400/40 border border-emerald-400" />
           <span>Potrero Activo (En Pastoreo)</span>
@@ -1031,6 +1113,54 @@ export default function GanaderiaMapa({
           <span>Instalaciones creadas ({puntosInteres.length})</span>
         </div>
       </div>
+
+      {/* ── TELÉFONO: BARRA INFERIOR AL ALCANCE DEL PULGAR ── */}
+      {!modoTrazar && !modoFijarFinca && !modoAgregarPunto && !potreroSeleccionado && (
+        <div className="sm:hidden absolute bottom-3 left-3 right-3 z-[520] grid grid-cols-4 gap-2 pointer-events-auto">
+          <button type="button" onClick={() => setCapasAbierto((v) => !v)} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-lg text-[11px] font-bold text-slate-700 cursor-pointer active:scale-95 transition-transform">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5zm-9 9l9 5 9-5M3 16l9 5 9-5" /></svg>
+            Capas
+          </button>
+          <button type="button" onClick={() => { setCapasAbierto(false); setModoTrazar(true); setModoFijarFinca(false); setModoAgregarPunto(false); setPotreroSeleccionado(null); }} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-lg text-[11px] font-bold text-slate-700 cursor-pointer active:scale-95 transition-transform">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16l-1 4zM14 6l3 3" /></svg>
+            Trazar
+          </button>
+          <button type="button" onClick={() => { setCapasAbierto(false); setModoAgregarPunto(true); setModoTrazar(false); setModoFijarFinca(false); }} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-lg text-[11px] font-bold text-slate-700 cursor-pointer active:scale-95 transition-transform">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 21s-7-6.4-7-11.5A7 7 0 0 1 19 9.5C19 14.6 12 21 12 21zM12 7v5M9.5 9.5h5" /></svg>
+            Instalación
+          </button>
+          <button type="button" onClick={() => { setCapasAbierto(false); irAMiUbicacion(); }} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-lg text-[11px] font-bold text-slate-700 cursor-pointer active:scale-95 transition-transform">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" /></svg>
+            Mi ubicación
+          </button>
+        </div>
+      )}
+      {capasAbierto && !modoTrazar && !potreroSeleccionado && (
+        <div className="sm:hidden absolute bottom-24 left-3 right-3 z-[530] rounded-2xl bg-white border border-slate-200 shadow-xl p-3 space-y-3 pointer-events-auto">
+          <div className="grid grid-cols-3 gap-2">
+            {([["satelital", "Satelital"], ["terreno", "Terreno"], ["calles", "Calles"]] as const).map(([valor, texto]) => (
+              <button
+                key={valor}
+                type="button"
+                onClick={() => { setCapaActiva(valor); setCapasAbierto(false); }}
+                style={capaActiva === valor ? { backgroundColor: "#10B981", color: "#FFFFFF" } : undefined}
+                className="py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 cursor-pointer">
+                {texto}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-1 text-[11px] text-slate-600">
+            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-md bg-emerald-400/40 border border-emerald-400" />Potrero en uso</div>
+            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-md bg-amber-400/40 border border-amber-400 border-dashed" />Potrero en descanso</div>
+            <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-md bg-sky-400/40 border border-sky-400" />Instalaciones ({puntosInteres.length})</div>
+          </div>
+        </div>
+      )}
+      {avisoGps && !modoTrazar && (
+        <div className="sm:hidden absolute bottom-24 left-3 right-3 z-[540] rounded-2xl bg-white border border-amber-300 shadow-lg p-3 text-[11px] text-amber-800 pointer-events-auto" onClick={() => setAvisoGps(null)}>
+          {avisoGps}
+        </div>
+      )}
 
       {/* ── CONTENEDOR DEL MAPA LEAFLET ── */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
@@ -1158,9 +1288,10 @@ export default function GanaderiaMapa({
 
       {/* ── PANEL LATERAL FLOTANTE: DETALLE DEL POTRERO SELECCIONADO ── */}
       {potreroSeleccionado && !modoTrazar && !modoFijarFinca && !modoAgregarPunto && (
-        <div className="absolute top-20 right-4 bottom-4 w-80 sm:w-96 z-[500] apple-glass rounded-3xl p-5 border border-emerald-500/40 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-col justify-between text-left pointer-events-auto animate-fade-in">
+        <div className="absolute left-0 right-0 bottom-0 max-h-[75%] overflow-y-auto rounded-t-3xl sm:rounded-3xl sm:left-auto sm:top-20 sm:right-4 sm:bottom-4 sm:w-96 sm:max-h-none z-[500] apple-glass p-5 border border-emerald-500/40 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-col justify-between text-left pointer-events-auto animate-fade-in">
           
           <div className="space-y-4">
+            <div className="sm:hidden mx-auto -mt-2 w-10 h-1.5 rounded-full bg-slate-300" aria-hidden="true" />
             <div className="flex items-start justify-between pb-3 border-b border-white/10">
               <div>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
@@ -1243,6 +1374,13 @@ export default function GanaderiaMapa({
               className="w-full btn-cyber-neon text-white text-xs font-bold py-2.5 rounded-xl shadow-md cursor-pointer text-center hover:scale-105 transition-all">
               Rotar Hato a este Potrero →
             </button>
+            {onEditarPotrero && (
+              <button
+                onClick={() => onEditarPotrero(potreroSeleccionado)}
+                className="sm:hidden w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold cursor-pointer">
+                Editar potrero
+              </button>
+            )}
           </div>
 
         </div>
