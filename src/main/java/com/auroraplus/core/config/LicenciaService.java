@@ -69,6 +69,8 @@ public class LicenciaService {
         "horeca", "repuestos", "farmacia", "ferreteria", "comercio", "ganaderia", "salud", "tamanaco-comercial"
     );
 
+    private static final Set<String> FAMILIA_RETAIL = Set.of("comercio", "repuestos", "ferreteria", "farmacia", "moda");
+
     public static class ResultadoValidacion {
         public final boolean permitido;
         public final int codigoHttp;
@@ -156,11 +158,16 @@ public class LicenciaService {
             boolean habilitado = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, pathModulo)
                 .map(ModuloTenant::isActivo)
                 .orElse(false);
+            // Comercio, Repuestos, Ferretería, Farmacia y Moda son el mismo motor retail: el POS,
+            // el inventario y las estadísticas de Comercio viven en /api/repuestos. Antes solo se
+            // aceptaba en un sentido (/api/comercio con módulo repuestos), así que un negocio que se
+            // registraba como "comercio" recibía 403 en todo /api/repuestos y se quedaba sin POS.
+            if (!habilitado && FAMILIA_RETAIL.contains(pathModulo)) {
+                habilitado = FAMILIA_RETAIL.stream().anyMatch(m -> moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, m)
+                        .map(ModuloTenant::isActivo).orElse(false));
+            }
             if (!habilitado && "comercio".equals(pathModulo)) {
-                habilitado = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "ferreteria").map(ModuloTenant::isActivo).orElse(false)
-                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "repuestos").map(ModuloTenant::isActivo).orElse(false)
-                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "moda").map(ModuloTenant::isActivo).orElse(false)
-                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "tamanaco-comercial").map(ModuloTenant::isActivo).orElse(false);
+                habilitado = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "tamanaco-comercial").map(ModuloTenant::isActivo).orElse(false);
             }
             if (!habilitado) {
                 return ResultadoValidacion.bloqueado(403,
