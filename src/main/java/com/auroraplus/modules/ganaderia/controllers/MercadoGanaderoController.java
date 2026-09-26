@@ -164,7 +164,7 @@ public class MercadoGanaderoController {
     public List<Map<String, Object>> misOfertas() {
         Long yo = tenantActual();
         List<Map<String, Object>> ofertas = jdbc.queryForList(
-            "SELECT DISTINCT ON (o.publicacion_id) o.id, o.publicacion_id, o.monto_ofertado AS monto, o.estado, o.fecha, o.traspasado "
+            "SELECT DISTINCT ON (o.publicacion_id) o.id, o.publicacion_id, o.monto_ofertado AS monto, o.estado, o.fecha, o.traspasado, o.pago_confirmado "
                 + "FROM ofertas_compra o WHERE o.comprador_tenant_id = ? ORDER BY o.publicacion_id, o.id DESC", yo);
         if (ofertas.isEmpty()) return List.of();
         Map<Long, Map<String, Object>> cards = tarjetas(jdbc.queryForList(
@@ -181,6 +181,7 @@ public class MercadoGanaderoController {
             oferta.put("estado", o.get("estado"));
             oferta.put("fecha", o.get("fecha"));
             oferta.put("traspasado", o.get("traspasado"));
+            oferta.put("pagoConfirmado", o.get("pago_confirmado"));
             Map<String, Object> fila = new LinkedHashMap<>();
             fila.put("oferta", oferta);
             fila.put("publicacion", publicacion);
