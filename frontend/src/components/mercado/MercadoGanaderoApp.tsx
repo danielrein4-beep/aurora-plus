@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -54,7 +55,8 @@ export default function MercadoGanaderoApp() {
 
   useEffect(() => {
     obtenerResumenMercado().catch((e) => setSinAcceso(mensajeError(e)));
-    obtenerVerificacionMercado().then(setVerificacion).catch(() => {});
+    obtenerVerificacionMercado().then(setVerificacion)
+      .catch(() => avisar("No se pudo cargar el estado de verificación de tu finca. Recarga antes de publicar u ofertar.", "error"));
     refrescar();
     const intervalo = setInterval(refrescar, 20_000);
     return () => clearInterval(intervalo);

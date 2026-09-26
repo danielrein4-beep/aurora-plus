@@ -48,6 +48,7 @@ import {
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
   type CierreCajaRegistro, type CotizacionMedicaApi, type TasaCambio, type OrigenTasaActiva,
   type PerfilMedicoDocumentos,
+  leerPreferencia, guardarPreferencia,
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
@@ -7418,15 +7419,28 @@ function AgendaMedica({
   const [citas, setCitas] = useState<CitaAgendaItem[]>([]);
   const [cargandoCitas, setCargandoCitas] = useState(false);
 
-  // Fechas bloqueadas (días no laborables / feriados / congresos) — se mantiene por ahora en
-  // localStorage (configuración de baja frecuencia, no datos clínicos); migrar a BloqueoAgenda
-  // del backend queda pendiente para una siguiente pasada.
+  // Fechas bloqueadas (días no laborables / feriados / congresos): se guardan en el servidor
+  // (preferencia "salud_agenda_bloqueos") para que Recepción y el médico vean las mismas. Antes
+  // vivían solo en este navegador y otra PC podía agendar en un día bloqueado.
   const [fechasBloqueadas, setFechasBloqueadas] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(claveFechasBloqueadas(tenantId));
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   });
+  useEffect(() => {
+    leerPreferencia<string[]>("salud_agenda_bloqueos")
+      .then((delServidor) => {
+        if (Array.isArray(delServidor)) {
+          setFechasBloqueadas(delServidor);
+          try { localStorage.setItem(claveFechasBloqueadas(tenantId), JSON.stringify(delServidor)); } catch { /* sin almacenamiento */ }
+        } else if (fechasBloqueadas.length > 0) {
+          guardarPreferencia("salud_agenda_bloqueos", fechasBloqueadas).catch(() => {});
+        }
+      })
+      .catch(() => avisar("No se pudieron cargar las fechas bloqueadas de la agenda desde el servidor.", "error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   // Formulario Agendar Cita
   const [formCedula, setFormCedula] = useState("");
@@ -7520,7 +7534,9 @@ function AgendaMedica({
       localStorage.setItem(claveFechasBloqueadas(tenantId), JSON.stringify(nuevas));
       window.dispatchEvent(new Event("aurora_agenda_updated"));
     } catch {}
-    dispararToast(yaBloqueada ? `✓ Fecha ${f} desbloqueada para consultas.` : `🔒 Fecha ${f} bloqueada (No laborable).`);
+    guardarPreferencia("salud_agenda_bloqueos", nuevas).catch((e) =>
+      avisar(`El bloqueo quedó solo en este equipo: ${e instanceof Error ? e.message : "error del servidor"}`, "error"));
+    dispararToast(yaBloqueada ? `Fecha ${f} desbloqueada para consultas.` : `Fecha ${f} bloqueada (no laborable).`);
     onCambio();
   };
 

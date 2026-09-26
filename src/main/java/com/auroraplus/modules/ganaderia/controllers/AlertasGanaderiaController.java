@@ -40,10 +40,13 @@ public class AlertasGanaderiaController {
 
         List<AplicacionVacuna> refuerzosPendientes = aplicacionVacunaRepository.findRefuerzosPendientes(tenantId, hoy, limite);
 
-        List<AplicacionVacuna> retirosVigentes = aplicacionVacunaRepository.findRefuerzosPendientes(tenantId, LocalDate.of(2000, 1, 1), limite)
-            .stream()
-            .filter(a -> a.getFechaFinRetiroLeche().isAfter(hoy) || a.getFechaFinRetiroCarne().isAfter(hoy))
-            .collect(Collectors.toList());
+        // Retiros vigentes por vacuna, de leche o de carne. Antes se reutilizaba la consulta de
+        // refuerzos: se escapaban las vacunas sin refuerzo programado y una fecha de retiro vacía
+        // tumbaba toda la pantalla de alertas.
+        Map<Long, AplicacionVacuna> retiros = new LinkedHashMap<>();
+        aplicacionVacunaRepository.findConRetiroLecheActivo(tenantId, hoy).forEach(a -> retiros.put(a.getId(), a));
+        aplicacionVacunaRepository.findConRetiroCarneActivo(tenantId, hoy).forEach(a -> retiros.putIfAbsent(a.getId(), a));
+        List<AplicacionVacuna> retirosVigentes = new java.util.ArrayList<>(retiros.values());
 
         // Partos próximos: se recorre el historial reproductivo de todas las hembras con
         // fechaProbableParto en rango — no hay una query dedicada por tenant, se filtra en memoria

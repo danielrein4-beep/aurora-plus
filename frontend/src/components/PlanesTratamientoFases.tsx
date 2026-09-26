@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { avisar } from "../avisos";
 
 // El objeto de sesion completo vive en localStorage["aurora_token"] (JSON.stringify),
 // no el JWT crudo — hay que extraer el campo .token antes de mandarlo como Bearer.
@@ -96,8 +97,10 @@ function CuotasPlan({
         headers: { Authorization: `Bearer ${obtenerTokenSesion()}` },
       });
       if (res.ok) setCuotas(await res.json());
+      else avisar(`No se pudieron cargar las cuotas del plan (error ${res.status}).`, "error");
     } catch {
       setCuotas([]);
+      avisar("No se pudieron cargar las cuotas del plan: revisa la conexión.", "error");
     }
   };
 
@@ -314,9 +317,12 @@ export const PlanesTratamientoFases: React.FC<PlanesTratamientoFasesProps> = ({
       if (res.ok) {
         const data = await res.json();
         setPlanes(data);
+      } else {
+        // Sin esto la lista quedaba vacía y parecía que el paciente no tenía planes.
+        avisar(`No se pudieron cargar los planes de tratamiento (error ${res.status}). Recarga antes de crear uno nuevo.`, "error");
       }
     } catch {
-      // Fallback
+      avisar("No se pudieron cargar los planes de tratamiento: revisa la conexión antes de crear uno nuevo.", "error");
     } finally {
       setCargando(false);
     }

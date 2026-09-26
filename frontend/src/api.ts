@@ -7287,3 +7287,16 @@ export interface CobroConsultaDetalle {
   fechaHora?: string | null;
   estado: string;
 }
+
+/** Ajustes del negocio que se guardan en el servidor (antes solo en el navegador). */
+export type ClavePreferencia = "horeca_config" | "ganaderia_config" | "salud_agenda_bloqueos";
+
+/** null = el negocio todavía no ha guardado este ajuste en el servidor. */
+export async function leerPreferencia<T>(clave: ClavePreferencia): Promise<T | null> {
+  const valor = await request<T | undefined>(`/api/preferencias/${clave}`);
+  return valor ?? null;
+}
+
+export function guardarPreferencia<T>(clave: ClavePreferencia, valor: T): Promise<T> {
+  return request<T>(`/api/preferencias/${clave}`, { method: "PUT", body: JSON.stringify(valor) });
+}

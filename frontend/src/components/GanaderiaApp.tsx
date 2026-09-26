@@ -1,7 +1,7 @@
 import { avisar } from "../avisos";
 import { contarSinLeerMercado } from "../api";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 
 import {
@@ -14,6 +14,7 @@ import {
   type TanqueLeche, type VentaLecheTanque, type GastoGanaderia, type VentaGanaderiaResumen,
   listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
   tasaVigente, actualizarTasa, crearAnimalGanaderia, registrarBajaGanaderia,
+  leerPreferencia, guardarPreferencia,
 } from "../api";
 
 import { AuroraGradientDef, IconCheckCircle, IconClose, IconCow, IconDownload, IconWarning } from "../Icons";
@@ -118,12 +119,23 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     return { USD: true, VES: true, COP: true };
   });
 
+  // Precio de la leche y monedas activas se guardan en el servidor (preferencia "ganaderia_config"):
+  // antes vivían solo en este navegador y otro equipo de la finca arrancaba con precio 0.
+  type ConfigFinca = { precioLecheUSD?: number; VES?: boolean; COP?: boolean };
+  const configFincaRef = useRef<ConfigFinca>({});
+  const persistirConfigFinca = (cambios: ConfigFinca) => {
+    configFincaRef.current = { ...configFincaRef.current, ...cambios };
+    guardarPreferencia("ganaderia_config", configFincaRef.current).catch((e) =>
+      notificar(`El ajuste quedó solo en este equipo: ${e instanceof Error ? e.message : "revise la conexión"}`));
+  };
+
   const guardarMonedasConfig = (ves: boolean, cop: boolean) => {
     const conf = { USD: true, VES: ves, COP: cop };
     setMonedasConfig(conf);
     try {
       localStorage.setItem(`aurora_finca_config_${tenantId}`, JSON.stringify(conf));
     } catch {}
+    persistirConfigFinca({ VES: ves, COP: cop });
   };
 
   // Precio de leche centralizado editable por tenant
@@ -142,11 +154,37 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     try {
       localStorage.setItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`, String(nuevoPrecio));
     } catch {}
+    persistirConfigFinca({ precioLecheUSD: nuevoPrecio });
     setModalEditarPrecioLeche(false);
     notificar(`Precio de la leche actualizado a $${nuevoPrecio.toFixed(2)} USD / Litro`);
   };
 
   const [modalEditarTasas, setModalEditarTasas] = useState(false);
+
+  useEffect(() => {
+    leerPreferencia<ConfigFinca>("ganaderia_config")
+      .then((delServidor) => {
+        if (delServidor) {
+          configFincaRef.current = delServidor;
+          if (typeof delServidor.precioLecheUSD === "number") {
+            setPrecioLecheUSD(delServidor.precioLecheUSD);
+            try { localStorage.setItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`, String(delServidor.precioLecheUSD)); } catch {}
+          }
+          if (delServidor.VES !== undefined || delServidor.COP !== undefined) {
+            const conf = { USD: true, VES: delServidor.VES !== false, COP: delServidor.COP !== false };
+            setMonedasConfig(conf);
+            try { localStorage.setItem(`aurora_finca_config_${tenantId}`, JSON.stringify(conf)); } catch {}
+          }
+        } else if (user?.rol === "DUENO_ADMIN" || user?.rol === "ADMINISTRADOR_FINCA") {
+          // Primera vez: lo que ya estaba configurado en este navegador sube al servidor.
+          if (precioLecheUSD > 0 || !monedasConfig.VES || !monedasConfig.COP) {
+            persistirConfigFinca({ precioLecheUSD, VES: monedasConfig.VES, COP: monedasConfig.COP });
+          }
+        }
+      })
+      .catch(() => notificar("No se pudo cargar el precio de la leche desde el servidor; se usa el de este equipo."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   const guardarTasas = (nuevaBcv: number, nuevaCop: number, vesActivo?: boolean, copActivo?: boolean) => {
     setTasaBCV(nuevaBcv);

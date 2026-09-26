@@ -43,6 +43,7 @@ import {
   type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket, type Turno,
   type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente, type InventarioKpis,
   type FacturaExtraidaOcr,
+  leerPreferencia, guardarPreferencia,
 } from "../api";
 
 type Pagina = "general" | "resumen" | "salon" | "cocina" | "reservas" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
@@ -232,10 +233,31 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       return { nombreLocal: user?.empresa || "Mi Restaurante" };
     }
   });
+  // La configuración del local (nombre, IVA, propina, módulos, logo) se guarda en el servidor:
+  // antes vivía solo en este navegador y otro equipo del mismo local arrancaba con otra.
   const guardarConfig = (c: any) => {
     setConfig(c);
     try { localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); } catch {}
+    guardarPreferencia("horeca_config", c).catch((e) =>
+      avisar(`La configuración quedó solo en este equipo: ${e instanceof Error ? e.message : "error del servidor"}`, "error"));
   };
+  useEffect(() => {
+    leerPreferencia<any>("horeca_config")
+      .then((delServidor) => {
+        if (delServidor) {
+          setConfig(delServidor);
+          try { localStorage.setItem(CONFIG_KEY, JSON.stringify(delServidor)); } catch {}
+        } else if (user?.rol === "DUENO_ADMIN") {
+          // Primera vez: lo que el dueño ya tenía configurado en este navegador sube al servidor.
+          try {
+            const local = localStorage.getItem(CONFIG_KEY);
+            if (local) guardarPreferencia("horeca_config", JSON.parse(local)).catch(() => {});
+          } catch { /* sin almacenamiento */ }
+        }
+      })
+      .catch(() => avisar("No se pudo cargar la configuración del local desde el servidor; se usa la de este equipo.", "error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
   // No todo negocio Horeca prepara platos con receta (una bodega o una venta
   // de productos empacados no la usa) — a diferencia de Salón/Cocina, esto
   // no es un gate de plan, es una preferencia del propio negocio, por eso el
@@ -327,14 +349,14 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   // un instante.
   const [zonasCocina, setZonasCocina] = useState<string[]>(ESTACIONES);
   const recargarZonasCocina = () => {
-    obtenerZonasCocina().then((r) => setZonasCocina(r.zonas)).catch(() => {});
+    obtenerZonasCocina().then((r) => setZonasCocina(r.zonas)).catch(() => avisar("No se pudieron cargar las zonas de cocina; los pedidos podrían no llegar a la estación correcta. Recarga la página.", "error"));
   };
   useEffect(() => { recargarZonasCocina(); }, [tenantId]);
 
   // Zonas físicas de mesas (Salón & Mesas) — mismo criterio que zonasCocina arriba.
   const [zonasMesa, setZonasMesa] = useState<string[]>(["SALON_PRINCIPAL", "TERRAZA", "BARRA"]);
   const recargarZonasMesa = () => {
-    obtenerZonasMesa().then((r) => setZonasMesa(r.zonas)).catch(() => {});
+    obtenerZonasMesa().then((r) => setZonasMesa(r.zonas)).catch(() => avisar("No se pudieron cargar las zonas del salón. Recarga la página.", "error"));
   };
   useEffect(() => { recargarZonasMesa(); }, [tenantId]);
 
@@ -5265,7 +5287,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
   // Moneda base real del negocio (Configuración > Moneda principal) — el
   // costo por defecto se asume tecleado en esta moneda, no en USD fijo.
   const [monedaBaseTenant, setMonedaBaseTenant] = useState("USD");
-  useEffect(() => { monedaBase(tenantId).then(setMonedaBaseTenant).catch(() => {}); }, [tenantId]);
+  useEffect(() => { monedaBase(tenantId).then(setMonedaBaseTenant).catch(() => avisar("No se pudo leer la moneda base del negocio; revisa los montos antes de guardar.", "error")); }, [tenantId]);
   const [form, setForm] = useState({
     nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "",
     // Al cargar cantidad inicial, por defecto se asume que fue una compra
@@ -5980,7 +6002,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
     monedaBase(tenantId).then((m) => {
       setMonedaBaseTenant(m);
       if (!articulo.monedaCosto) setMoneda(m);
-    }).catch(() => {});
+    }).catch(() => avisar("No se pudo leer la moneda base del negocio; revisa la moneda del costo.", "error"));
   }, [tenantId, articulo.monedaCosto]);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [tasaPropiaCompra, setTasaPropiaCompra] = useState("");

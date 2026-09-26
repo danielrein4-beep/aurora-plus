@@ -1,3 +1,4 @@
+import { avisar } from "./avisos";
 // Cola de persistencia offline para operaciones de campo en Ganaderia
 // Permite registrar pesajes en manga, rotaciones de potrero, ordeño, vacunas, altas (y partos) y bajas
 // sin cobertura 3G/4G/WiFi.
@@ -126,7 +127,8 @@ export function guardarColaGanaderia(tenantId: number, cola: AccionPendienteGana
   try {
     localStorage.setItem(CLAVE_STORAGE(tenantId), JSON.stringify(cola));
   } catch {
-    // Almacenamiento lleno o bloqueado
+    // Almacenamiento lleno o bloqueado: lo registrado sin señal no queda guardado en el equipo.
+    avisar("Este equipo no permite guardar datos sin conexión (modo privado o memoria llena). Lo registrado sin señal podría perderse.", "error");
   }
 }
 
