@@ -270,6 +270,20 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Alto de pantalla en el iPhone: 100vh cuenta también el espacio de las barras de Safari, así
+   que en las vistas con alto fijo y desplazamiento interno (Ganadería, Comercio, Restaurante,
+   Mediclinic, SuperAdmin) el principio o el final quedaba escondido detrás de las barras al
+   desplazarse rápido. 100dvh es la parte realmente visible y se ajusta cuando las barras
+   aparecen o se esconden. El 100vh queda de respaldo para navegadores viejos. */
+.h-screen {
+  height: 100vh;
+  height: 100dvh;
+}
+.max-h-screen {
+  max-height: 100vh;
+  max-height: 100dvh;
+}
+
 /* Force Light Surfaces & Contrast */
 body {
   background-color: #F5F5F7 !important;
