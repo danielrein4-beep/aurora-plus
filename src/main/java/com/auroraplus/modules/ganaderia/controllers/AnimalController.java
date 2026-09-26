@@ -90,6 +90,22 @@ public class AnimalController {
         public List<GanaderiaImportacionService.FilaImportacion> filas;
     }
 
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.HatoFotoService hatoFotoService;
+
+    /**
+     * Lee con IA la foto de una libreta o planilla del hato y devuelve una fila por animal para
+     * revisar en "Registrar mi ganado". No guarda nada: el guardado pasa por /importar.
+     */
+    @PostMapping(value = "/leer-foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<com.auroraplus.modules.ganaderia.services.HatoFotoService.FilaLeida>> leerFoto(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile foto) throws java.io.IOException {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        GanaderiaTenantAccess.requireTenant();
+        auditoriaService.omitirRegistroAutomatico();
+        return ResponseEntity.ok(hatoFotoService.leer(foto));
+    }
+
     /**
      * Carga inicial del hato desde Excel/CSV (el navegador lee el archivo y envía las filas).
      * confirmar=false solo valida y devuelve la vista previa; confirmar=true guarda todo o nada.

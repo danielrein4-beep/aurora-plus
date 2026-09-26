@@ -284,6 +284,14 @@ html, body, #root {
   max-height: 100dvh;
 }
 
+/* En el iPhone, Safari hace zoom al tocar un campo con letra de menos de 16px y la pantalla
+   queda corrida hacia un lado. En teléfono los campos usan 16px para que no pase. */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Force Light Surfaces & Contrast */
 body {
   background-color: #F5F5F7 !important;

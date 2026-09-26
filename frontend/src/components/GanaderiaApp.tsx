@@ -1032,6 +1032,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         <ModalRegistroRapidoHato
           potreros={potreros}
           onCerrar={() => setModalRegistroRapido(false)}
+          onUsarExcel={() => { setModalRegistroRapido(false); setModalImportarHato(true); }}
           onGuardado={(cantidad) => {
             setModalRegistroRapido(false);
             notificar(`${cantidad} animales registrados en el hato.`);

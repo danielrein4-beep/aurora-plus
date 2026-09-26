@@ -3,7 +3,7 @@ import { IconCart, IconCoins, IconSprout } from "../../Icons";
 import { crearAnimalGanaderia, crearPotreroGanaderia, type AnimalGanaderia, type PotreroGanaderia } from "../../api";
 import { encolarAccionGanaderia, esFalloDeConexion, generarClaveIdempotencia } from "../../offlineQueueGanaderia";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
-import { RAZAS_BOVINAS_COMUNES } from "./catalogos";
+import SelectorRaza from "./SelectorRaza";
 import type { Notificar } from "./tipos";
 
 /** Formulario vacío de alta: nacimiento en finca, hembra, en el potrero indicado. */
@@ -319,29 +319,11 @@ export default function ModalAltaAnimal({
           <div className="grid [&>*]:min-w-0 grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Raza</label>
-              <input
-                type="text"
-                list="razas-bovinas-catalogo"
+              <SelectorRaza
                 value={formAnimal.raza}
-                onChange={e => setFormAnimal({ ...formAnimal, raza: e.target.value })}
-                onFocus={e => {
-                  // Vaciar al enfocar muestra el catálogo completo en el datalist
-                  // (el navegador solo sugiere lo que empieza igual al texto actual);
-                  // si el usuario se va sin escribir nada, se restaura el valor previo.
-                  e.target.dataset.prevRaza = formAnimal.raza;
-                  setFormAnimal(prev => ({ ...prev, raza: "" }));
-                }}
-                onBlur={e => {
-                  if (!formAnimal.raza.trim() && e.target.dataset.prevRaza) {
-                    setFormAnimal(prev => ({ ...prev, raza: e.target.dataset.prevRaza || "" }));
-                  }
-                }}
-                placeholder="Ej. Brahman, F1 Brahman x Gyr..."
+                onChange={raza => setFormAnimal(prev => ({ ...prev, raza }))}
                 className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
               />
-              <datalist id="razas-bovinas-catalogo">
-                {RAZAS_BOVINAS_COMUNES.map(r => <option key={r} value={r} />)}
-              </datalist>
             </div>
             <div>
               <label className="text-slate-400 block mb-1">Sexo</label>

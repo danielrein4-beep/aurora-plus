@@ -2,10 +2,13 @@ import { useMemo, useState } from "react";
 import { IconClose, IconWarning, IconCheckCircle } from "../Icons";
 import {
   importarHatoGanaderia,
+  leerHatoDesdeFoto,
   type FilaImportacionHato,
   type PotreroGanaderia,
   type ResultadoImportacionHato,
 } from "../api";
+import SelectorRaza from "./ganaderia/SelectorRaza";
+import { comprimirImagenFactura } from "../utils/imageCompression";
 
 /**
  * Registro rápido del hato en 3 pasos, pensado para quien recién compra Aurora con el ganado
@@ -21,6 +24,8 @@ interface Props {
   potreros: PotreroGanaderia[];
   onCerrar: () => void;
   onGuardado: (cantidad: number) => void;
+  /** Cambia a la importación desde Excel (para quien ya tiene el hato en una hoja). */
+  onUsarExcel?: () => void;
 }
 
 const CATEGORIAS: Record<string, { valor: string; texto: string }[]> = {
@@ -52,7 +57,7 @@ const INPUT = "w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-sl
 const ETIQUETA = "text-slate-400 block mb-1";
 let siguienteId = 1;
 
-export default function ModalRegistroRapidoHato({ potreros, onCerrar, onGuardado }: Props) {
+export default function ModalRegistroRapidoHato({ potreros, onCerrar, onGuardado, onUsarExcel }: Props) {
   const [paso, setPaso] = useState<1 | 2 | 3>(1);
 
   // Paso 1: potrero por defecto (existente, nuevo o ninguno) y raza más común
@@ -66,6 +71,10 @@ export default function ModalRegistroRapidoHato({ potreros, onCerrar, onGuardado
   const [prefijo, setPrefijo] = useState("");
   const [desde, setDesde] = useState("1");
   const [cuantos, setCuantos] = useState("10");
+
+  // Foto de la libreta o planilla: la IA propone las filas y se revisan aquí antes de guardar.
+  const [leyendoFoto, setLeyendoFoto] = useState(false);
+  const [avisoFoto, setAvisoFoto] = useState("");
 
   // Paso 3: vista previa del servidor
   const [vistaPrevia, setVistaPrevia] = useState<ResultadoImportacionHato | null>(null);
@@ -114,6 +123,39 @@ export default function ModalRegistroRapidoHato({ potreros, onCerrar, onGuardado
     const nuevas = Array.from({ length: total }, (_, i) => filaVacia(`${prefijo}${String(inicio + i).padStart(ancho, "0")}`));
     // Reemplaza las filas vacías del principio y agrega el resto.
     setFilas((prev) => [...prev.filter((f) => f.arete.trim()), ...nuevas]);
+  };
+
+  const leerFoto = async (archivo: File | undefined) => {
+    if (!archivo) return;
+    setError("");
+    setAvisoFoto("");
+    setLeyendoFoto(true);
+    try {
+      const leidas = await leerHatoDesdeFoto(await comprimirImagenFactura(archivo));
+      if (leidas.length === 0) {
+        setAvisoFoto("No se encontraron animales en la foto. Asegúrate de que se vea la lista completa y con buena luz.");
+        return;
+      }
+      const nuevosPotreros = new Set<string>();
+      const filasLeidas: FilaRapida[] = leidas.map((l) => {
+        const sexo: FilaRapida["sexo"] = l.sexo === "MACHO" ? "MACHO" : "HEMBRA";
+        const tipo = CATEGORIAS[sexo].some((c) => c.valor === l.tipoAnimal) ? l.tipoAnimal : CATEGORIAS[sexo][0].valor;
+        let potrero = potreroPorDefecto;
+        if (l.potrero) {
+          const existente = nombresPotrero.find((n) => n.toLowerCase() === l.potrero.toLowerCase());
+          potrero = existente ?? l.potrero;
+          if (!existente) nuevosPotreros.add(l.potrero);
+        }
+        return { id: siguienteId++, arete: l.arete, sexo, tipoAnimal: tipo, raza: l.raza || razaComun.trim(), peso: l.peso, potrero };
+      });
+      if (nuevosPotreros.size > 0) setNuevosCreados((prev) => [...prev, ...[...nuevosPotreros].filter((n) => !prev.includes(n))]);
+      setFilas((prev) => [...prev.filter((f) => f.arete.trim()), ...filasLeidas]);
+      setAvisoFoto(`Se leyeron ${filasLeidas.length} animales. Revisa cada uno: la foto puede tener errores de lectura.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo leer la foto");
+    } finally {
+      setLeyendoFoto(false);
+    }
   };
 
   const crearPotreroEnFila = (id: number) => {
@@ -201,9 +243,15 @@ export default function ModalRegistroRapidoHato({ potreros, onCerrar, onGuardado
                 <input value={potreroNuevo} onChange={(e) => setPotreroNuevo(e.target.value)} maxLength={100} placeholder="Ej. Potrero La Vega" className={INPUT} autoFocus />
               </div>
             )}
+            {onUsarExcel && (
+              <p className="text-[11px] text-slate-500 dark:text-white/50">
+                ¿Ya tienes el hato en una hoja de Excel?{" "}
+                <button type="button" onClick={onUsarExcel} className="font-bold text-emerald-700 underline cursor-pointer">Importar desde Excel</button>
+              </p>
+            )}
             <div>
               <label className={ETIQUETA}>Raza más común (opcional)</label>
-              <input value={razaComun} onChange={(e) => setRazaComun(e.target.value)} placeholder="Ej. Brahman" className={INPUT} />
+              <SelectorRaza value={razaComun} onChange={setRazaComun} placeholder="Ej. Brahman" className={INPUT} />
               <p className="text-[11px] text-slate-400 mt-1">Se pone en cada animal; la cambias en los que sean distintos.</p>
             </div>
           </div>
@@ -212,6 +260,23 @@ export default function ModalRegistroRapidoHato({ potreros, onCerrar, onGuardado
         {/* PASO 2 */}
         {paso === 2 && (
           <div className="space-y-4 text-xs">
+            <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+              <div className="font-bold text-slate-700 dark:text-white/80">¿Tienes el hato anotado en una libreta o planilla?</div>
+              <p className="text-[11px] text-slate-500 dark:text-white/50">Tómale una foto y Aurora llena la lista. Después revisas cada animal antes de guardar.</p>
+              <label className={`inline-flex w-full sm:w-auto justify-center apple-glass-btn text-slate-700 dark:text-white font-bold px-4 py-2 rounded-xl border border-emerald-500/30 ${leyendoFoto ? "opacity-60" : "cursor-pointer"}`}>
+                {leyendoFoto ? "Leyendo la foto…" : "Leer desde foto"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  disabled={leyendoFoto}
+                  onChange={(e) => { leerFoto(e.target.files?.[0]); e.target.value = ""; }}
+                />
+              </label>
+              {avisoFoto && <p className="text-[11px] font-semibold text-emerald-700">{avisoFoto}</p>}
+            </div>
+
             <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
               <div className="font-bold text-slate-700 dark:text-white/80">¿Los aretes van seguidos? Créalos de una vez</div>
               <div className="grid [&>*]:min-w-0 grid-cols-3 gap-2">
@@ -274,7 +339,7 @@ export default function ModalRegistroRapidoHato({ potreros, onCerrar, onGuardado
                     </div>
                     <div>
                       <label className={ETIQUETA}>Raza</label>
-                      <input value={f.raza} onChange={(e) => actualizar(f.id, { raza: e.target.value })} placeholder="Opcional" className={INPUT} />
+                      <SelectorRaza value={f.raza} onChange={(raza) => actualizar(f.id, { raza })} placeholder="Opcional" className={INPUT} />
                     </div>
                     <div>
                       <label className={ETIQUETA}>Peso (kg)</label>

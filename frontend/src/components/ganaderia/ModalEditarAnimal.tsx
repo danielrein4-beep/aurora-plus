@@ -2,6 +2,7 @@ import { useState } from "react";
 import { IconEdit } from "../../Icons";
 import { actualizarAnimalGanaderia, moverAnimalGanaderia, type AnimalGanaderia, type PotreroGanaderia } from "../../api";
 import type { Notificar } from "./tipos";
+import SelectorRaza from "./SelectorRaza";
 
 interface Props {
   animal: AnimalGanaderia;
@@ -93,12 +94,9 @@ export default function ModalEditarAnimal({ animal, potreros, notificar, onActua
             </div>
             <div>
               <label className="text-slate-400 block mb-1">Raza</label>
-              <input
-                type="text"
-                list="razas-bovinas-catalogo"
+              <SelectorRaza
                 value={formEditarAnimal.raza}
-                onChange={e => setFormEditarAnimal({ ...formEditarAnimal, raza: e.target.value })}
-                onFocus={e => e.target.select()}
+                onChange={raza => setFormEditarAnimal({ ...formEditarAnimal, raza })}
                 className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
               />
             </div>

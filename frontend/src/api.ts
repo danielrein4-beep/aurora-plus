@@ -2117,6 +2117,38 @@ export async function extraerFacturaOcr(archivo: File): Promise<FacturaExtraidaO
   return res.json();
 }
 
+/** Fila que la IA leyó de la foto de una libreta o planilla del hato (propuesta para revisar). */
+export interface FilaHatoLeida {
+  arete: string;
+  sexo: "HEMBRA" | "MACHO" | "";
+  tipoAnimal: string;
+  raza: string;
+  peso: string;
+  potrero: string;
+}
+
+export async function leerHatoDesdeFoto(archivo: File): Promise<FilaHatoLeida[]> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const formData = new FormData();
+  formData.append("file", archivo);
+  const res = await fetch(`/api/ganaderia/animales/leer-foto`, { method: "POST", body: formData, headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) {
+    let mensaje = `Error ${res.status}`;
+    try {
+      const body = await res.json();
+      mensaje = body.error || body.message || mensaje;
+    } catch {}
+    throw new ApiError(mensaje);
+  }
+  return res.json();
+}
+
 export function listarComprasInsumo(tenantId: number): Promise<CompraInsumoHoreca[]> {
   return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`);
 }
