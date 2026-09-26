@@ -48,28 +48,28 @@ export default function SeccionPotreros({
         </div>
 
         {/* Sub-selector: Mapa Satelital vs. Lista de Potreros */}
-        <div className="flex items-center gap-2">
-          <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1 text-xs whitespace-nowrap">
             <button
               onClick={() => setSubPotreros("lista")}
               className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
                 subPotreros === "lista" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
               }`}>
-              Gestión de Potreros ({potreros.length})
+              <span className="sm:hidden">Lista</span><span className="hidden sm:inline">Gestión de Potreros</span> ({potreros.length})
             </button>
             <button
               onClick={() => setSubPotreros("mapa")}
               className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
                 subPotreros === "mapa" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
               }`}>
-              Mapa Satelital
+              <span className="sm:hidden">Mapa</span><span className="hidden sm:inline">Mapa Satelital</span>
             </button>
           </div>
 
           <BotonPdf etiqueta="PDF de potreros" obtener={descargarReportePotrerosPdf} notificar={notificar} />
           <button
             onClick={abrirNuevoPotrero}
-            className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer">
+            className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer whitespace-nowrap">
             + Agregar Potrero
           </button>
         </div>

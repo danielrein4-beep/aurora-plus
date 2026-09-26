@@ -78,6 +78,7 @@ export default function GanaderiaMapa({
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
+  const encuadradoRef = useRef(false);
   const polygonsLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const drawingLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const pointsLayerGroupRef = useRef<L.LayerGroup | null>(null);
@@ -217,6 +218,7 @@ export default function GanaderiaMapa({
     return () => {
       map.remove();
       mapInstanceRef.current = null;
+      encuadradoRef.current = false;
     };
   }, []);
 
@@ -397,6 +399,21 @@ export default function GanaderiaMapa({
       });
       const fincaMarker = L.marker(fincaConfig.coords, { icon: fincaIcon }).addTo(group);
       fincaMarkerRef.current = fincaMarker;
+    }
+
+    // Sin la finca ubicada el mapa arranca mostrando todo el país y los potreros quedan como un
+    // punto: se encuadran los potreros dibujados (una sola vez, para no pelear con el usuario).
+    if (!fincaConfig.guardada && !encuadradoRef.current) {
+      const puntos = potreros.flatMap((p) => (p.poligono && p.poligono.length >= 3 ? p.poligono : []));
+      if (puntos.length >= 3) {
+        encuadradoRef.current = true;
+        setTimeout(() => {
+          const vigente = mapInstanceRef.current;
+          if (!vigente) return;
+          vigente.invalidateSize();
+          vigente.fitBounds(L.latLngBounds(puntos), { padding: [40, 40], maxZoom: 17 });
+        }, 300);
+      }
     }
 
     // Dibujar cada potrero que tenga polígono trazado (o alrededor de la finca si está ubicada)
@@ -732,10 +749,10 @@ export default function GanaderiaMapa({
     : [];
 
   return (
-    <div className="modal-siempre-oscuro relative w-full h-[680px] rounded-3xl overflow-hidden border border-slate-300/60 dark:border-white/10 shadow-2xl flex flex-col font-['Inter']">
+    <div className="modal-siempre-oscuro relative w-full h-[72dvh] min-h-[460px] sm:h-[680px] rounded-3xl overflow-hidden border border-slate-300/60 dark:border-white/10 shadow-2xl flex flex-col font-['Inter']">
       
       {/* ── BARRA DE HERRAMIENTAS SUPERIOR DEL MAPA ── */}
-      <div className="absolute top-4 left-4 right-4 z-[500] flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+      <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-[500] flex flex-nowrap sm:flex-wrap items-center sm:justify-between gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible pointer-events-auto sm:pointer-events-none [scrollbar-width:none] [&>*]:shrink-0 whitespace-nowrap">
         
         {/* Izquierda: Buscador & Centrar */}
         <div className="flex items-center gap-2 pointer-events-auto">
@@ -749,7 +766,7 @@ export default function GanaderiaMapa({
               <div className="flex items-center gap-1.5 ml-1">
                 <button
                   onClick={handleCentrarFinca}
-                  className="text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer"
+                  className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
                   title="Centrar en las coordenadas de tu finca">
                   Centrar
                 </button>
@@ -770,7 +787,7 @@ export default function GanaderiaMapa({
                   setModoTrazar(false);
                   setModoAgregarPunto(false);
                 }}
-                className="text-[11px] font-bold text-amber-400 hover:underline ml-1 cursor-pointer">
+                className="text-[11px] font-bold text-amber-700 hover:underline ml-1 cursor-pointer">
                 + Ubicar Finca
               </button>
             )}
@@ -800,7 +817,7 @@ export default function GanaderiaMapa({
               className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                 capaActiva === "satelital"
                   ? "bg-emerald-500 text-white shadow-md font-bold"
-                  : "text-slate-300 hover:text-white"
+                  : "text-slate-600 hover:text-white"
               }`}>
               Satelital
             </button>
@@ -809,7 +826,7 @@ export default function GanaderiaMapa({
               className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                 capaActiva === "terreno"
                   ? "bg-emerald-500 text-white shadow-md font-bold"
-                  : "text-slate-300 hover:text-white"
+                  : "text-slate-600 hover:text-white"
               }`}>
               Terreno
             </button>
@@ -818,7 +835,7 @@ export default function GanaderiaMapa({
               className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                 capaActiva === "calles"
                   ? "bg-emerald-500 text-white shadow-md font-bold"
-                  : "text-slate-300 hover:text-white"
+                  : "text-slate-600 hover:text-white"
               }`}>
               Calles
             </button>
@@ -838,7 +855,7 @@ export default function GanaderiaMapa({
             className={`text-xs font-bold px-3 py-2 rounded-2xl shadow-lg cursor-pointer transition-all border ${
               modoAgregarPunto
                 ? "bg-sky-500 text-slate-950 border-sky-300 font-extrabold scale-105"
-                : "bg-slate-900/80 text-sky-400 border-sky-400/50 hover:bg-sky-500/20"
+                : "bg-slate-900/80 text-sky-700 border-sky-400/50 hover:bg-sky-500/20"
             }`}>
             {modoAgregarPunto ? "Cancelar Punto" : "+ Instalación"}
           </button>
@@ -858,14 +875,14 @@ export default function GanaderiaMapa({
             className={`text-xs font-bold px-3.5 py-2 rounded-2xl shadow-lg cursor-pointer transition-all border ${
               modoTrazar
                 ? "bg-amber-500 text-slate-950 border-amber-300 font-extrabold scale-105"
-                : "bg-slate-900/80 text-emerald-400 border-emerald-400/50 hover:bg-emerald-500/20"
+                : "bg-slate-900/80 text-emerald-700 border-emerald-400/50 hover:bg-emerald-500/20"
             }`}>
             {modoTrazar ? "Cancelar Trazado" : "Trazar Potrero"}
           </button>
 
           <button
             onClick={onCrearPotrero}
-            className="btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-2xl shadow-lg cursor-pointer hover:scale-105 transition-all">
+            className="hidden sm:inline-block btn-cyber-neon text-white text-xs font-bold px-4 py-2 rounded-2xl shadow-lg cursor-pointer hover:scale-105 transition-all">
             + Agregar Potrero
           </button>
         </div>
@@ -873,9 +890,9 @@ export default function GanaderiaMapa({
 
       {/* ── BANNER HONESTO DE ESTADO VACÍO (SIN UBICACIÓN GUARDADA) ── */}
       {!fincaConfig.guardada && !modoFijarFinca && (
-        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[550] apple-glass rounded-2xl px-5 py-2.5 border border-amber-400/60 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-wrap items-center gap-3 text-xs pointer-events-auto animate-fade-in">
+        <div className="absolute top-16 left-3 right-3 sm:top-18 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[550] apple-glass rounded-2xl px-5 py-2.5 border border-amber-400/60 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-wrap items-center gap-3 text-xs pointer-events-auto animate-fade-in">
           <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-          <span className="text-slate-200">
+          <span className="text-slate-700">
             Aún no has ubicado tu finca — busca tu ubicación o haz clic en el mapa para marcarla.
           </span>
           <button
@@ -892,17 +909,17 @@ export default function GanaderiaMapa({
 
       {/* ── BANNER ASISTENTE AL FIJAR FINCA ── */}
       {modoFijarFinca && (
-        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-amber-400 bg-slate-950/95 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
+        <div className="absolute top-16 left-3 right-3 sm:top-18 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-amber-400 bg-slate-950/95 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
           <span className="font-['Outfit'] font-bold text-white text-sm">
             Modo Ubicar Finca:
           </span>
-          <span className="text-slate-200">
+          <span className="text-slate-700">
             Haz clic exactamente sobre la sede o entrada de tu finca en el mapa satelital.
           </span>
           <button
             onClick={() => setModoFijarFinca(false)}
-            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer">
+            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-700 font-medium cursor-pointer">
             Cancelar
           </button>
         </div>
@@ -910,17 +927,17 @@ export default function GanaderiaMapa({
 
       {/* ── BANNER ASISTENTE AL AGREGAR PUNTO DE REFERENCIA ── */}
       {modoAgregarPunto && (
-        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-sky-400 bg-slate-950/95 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
+        <div className="absolute top-16 left-3 right-3 sm:top-18 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-sky-400 bg-slate-950/95 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
           <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping" />
           <span className="font-['Outfit'] font-bold text-white text-sm">
             Agregar Instalación:
           </span>
-          <span className="text-slate-200">
+          <span className="text-slate-700">
             Haz clic en el mapa donde se ubica tu vaquera, corral, manga o tanque.
           </span>
           <button
             onClick={() => setModoAgregarPunto(false)}
-            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer">
+            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-700 font-medium cursor-pointer">
             Cancelar
           </button>
         </div>
@@ -928,7 +945,7 @@ export default function GanaderiaMapa({
 
       {/* ── BANNER ASISTENTE FLOTANTE DURANTE MODO TRAZAR POTRERO ── */}
       {modoTrazar && (
-        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-[600] apple-glass rounded-2xl px-5 py-2.5 border border-emerald-400 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex items-center gap-4 text-xs pointer-events-auto animate-fade-in">
+        <div className="absolute top-16 left-3 right-3 sm:top-18 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[600] apple-glass rounded-2xl px-4 sm:px-5 py-2.5 border border-emerald-400 bg-slate-950/90 backdrop-blur-2xl shadow-2xl flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs pointer-events-auto animate-fade-in">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
             <span className="font-['Outfit'] font-bold text-white text-sm">
@@ -936,9 +953,9 @@ export default function GanaderiaMapa({
             </span>
           </div>
 
-          <div className="h-4 w-px bg-white/20" />
+          <div className="hidden sm:block h-4 w-px bg-white/20" />
 
-          <div className="text-slate-300">
+          <div className="text-slate-600">
             {verticesTrazado.length === 0 ? (
               <span>Toca el mapa en cada esquina de la cerca, o camina el borde y usa "Punto donde estoy (GPS)".</span>
             ) : verticesTrazado.length < 3 ? (
@@ -946,7 +963,7 @@ export default function GanaderiaMapa({
                 <strong>{verticesTrazado.length}</strong> {verticesTrazado.length === 1 ? "vértice" : "vértices"} marcados (mínimo 3 requeridos).
               </span>
             ) : (
-              <span className="text-emerald-400 font-bold">
+              <span className="text-emerald-700 font-bold">
                 {verticesTrazado.length} vértices • Superficie calculada: {hectareasTrazadas} ha
               </span>
             )}
@@ -956,13 +973,13 @@ export default function GanaderiaMapa({
             <button
               onClick={agregarPuntoGps}
               disabled={buscandoGps}
-              className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer transition-all disabled:opacity-50">
+              className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-700 font-medium cursor-pointer transition-all disabled:opacity-50">
               {buscandoGps ? "Buscando GPS…" : "Punto donde estoy (GPS)"}
             </button>
             {verticesTrazado.length > 0 && (
               <button
                 onClick={handleDeshacerVertice}
-                className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer transition-all">
+                className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-700 font-medium cursor-pointer transition-all">
                 Deshacer
               </button>
             )}
@@ -975,16 +992,16 @@ export default function GanaderiaMapa({
             </button>
             <button
               onClick={handleCancelarTrazado}
-              className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer transition-all">
+              className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-700 font-medium cursor-pointer transition-all">
               Cancelar
             </button>
           </div>
-          {avisoGps && <div className="w-full text-amber-300 text-[11px]">{avisoGps}</div>}
+          {avisoGps && <div className="w-full text-amber-700 text-[11px]">{avisoGps}</div>}
         </div>
       )}
 
       {/* ── CONTROLES DE ZOOM LATERALES ── */}
-      <div className="absolute top-20 left-4 z-[500] flex flex-col gap-1.5 pointer-events-auto">
+      <div className="absolute bottom-36 left-3 sm:bottom-auto sm:top-20 sm:left-4 z-[500] flex flex-col gap-1.5 pointer-events-auto">
         <button
           onClick={() => handleZoom(1)}
           className="apple-glass w-9 h-9 rounded-xl border border-white/20 text-white font-black text-base flex items-center justify-center bg-slate-900/80 backdrop-blur-xl shadow-lg hover:border-emerald-400 cursor-pointer transition-colors"
@@ -1000,7 +1017,7 @@ export default function GanaderiaMapa({
       </div>
 
       {/* ── LEYENDA DEL MAPA ── */}
-      <div className="absolute bottom-4 left-4 z-[500] apple-glass rounded-2xl p-2.5 border border-white/15 bg-slate-900/85 backdrop-blur-xl shadow-lg text-[11px] text-slate-300 space-y-1.5 pointer-events-auto">
+      <div className="absolute bottom-4 left-4 z-[500] apple-glass rounded-2xl p-2.5 border border-white/15 bg-slate-900/85 backdrop-blur-xl shadow-lg text-[11px] text-slate-600 space-y-1.5 pointer-events-auto">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-md bg-emerald-400/40 border border-emerald-400" />
           <span>Potrero Activo (En Pastoreo)</span>
@@ -1030,7 +1047,7 @@ export default function GanaderiaMapa({
             </p>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Nombre de la Finca / Hato
               </label>
               <input
@@ -1044,7 +1061,7 @@ export default function GanaderiaMapa({
               />
             </div>
 
-            <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-[11px] font-mono text-slate-300 space-y-1">
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-[11px] font-mono text-slate-600 space-y-1">
               <div><strong>Latitud:</strong> {coordsTempFinca[0].toFixed(6)}</div>
               <div><strong>Longitud:</strong> {coordsTempFinca[1].toFixed(6)}</div>
             </div>
@@ -1056,7 +1073,7 @@ export default function GanaderiaMapa({
                   setModalGuardarFinca(false);
                   setCoordsTempFinca(null);
                 }}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium cursor-pointer">
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-600 text-xs font-medium cursor-pointer">
                 Cancelar
               </button>
               <button
@@ -1083,7 +1100,7 @@ export default function GanaderiaMapa({
             </p>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Nombre de la Instalación
               </label>
               <input
@@ -1098,7 +1115,7 @@ export default function GanaderiaMapa({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Tipo de Instalación
               </label>
               <select
@@ -1114,7 +1131,7 @@ export default function GanaderiaMapa({
               </select>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px] font-mono text-slate-300">
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px] font-mono text-slate-600">
               Coordenadas: {nuevoPuntoForm.coords[0].toFixed(6)}, {nuevoPuntoForm.coords[1].toFixed(6)}
             </div>
 
@@ -1125,7 +1142,7 @@ export default function GanaderiaMapa({
                   setModalNuevoPunto(false);
                   setNuevoPuntoForm({ nombre: "", tipo: "ORDENO", coords: null });
                 }}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium cursor-pointer">
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-600 text-xs font-medium cursor-pointer">
                 Cancelar
               </button>
               <button
@@ -1148,8 +1165,8 @@ export default function GanaderiaMapa({
               <div>
                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
                   potreroSeleccionado.estado === "EN_DESCANSO"
-                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                    : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                    ? "bg-amber-500/20 text-amber-700 border border-amber-500/30"
+                    : "bg-emerald-500/20 text-emerald-700 border border-emerald-500/30"
                 }`}>
                   {potreroSeleccionado.estado === "EN_DESCANSO" ? "EN DESCANSO" : "ACTIVO / EN PASTOREO"}
                 </span>
@@ -1162,7 +1179,7 @@ export default function GanaderiaMapa({
                   <button
                     onClick={() => onEditarPotrero(potreroSeleccionado)}
                     title="Editar potrero"
-                    className="text-slate-400 hover:text-emerald-400 p-1 cursor-pointer">
+                    className="text-slate-400 hover:text-emerald-700 p-1 cursor-pointer">
                     <IconEdit size={16} />
                   </button>
                 )}
@@ -1185,7 +1202,7 @@ export default function GanaderiaMapa({
               </div>
             </div>
 
-            <div className="space-y-2 text-xs text-slate-300">
+            <div className="space-y-2 text-xs text-slate-600">
               <div className="flex justify-between py-1 border-b border-white/5">
                 <span className="text-slate-400">Pasto:</span>
                 <span className="font-semibold text-white">{potreroSeleccionado.tipoPasto || "Pasto Natural"}</span>
@@ -1196,7 +1213,7 @@ export default function GanaderiaMapa({
               </div>
               <div className="flex justify-between py-1 border-b border-white/5">
                 <span className="text-slate-400">Hato Pastando:</span>
-                <span className="font-bold text-emerald-400">{animalesSeleccionados.length} animales</span>
+                <span className="font-bold text-emerald-700">{animalesSeleccionados.length} animales</span>
               </div>
             </div>
 
@@ -1210,7 +1227,7 @@ export default function GanaderiaMapa({
                 ) : (
                   animalesSeleccionados.map(a => (
                     <div key={a.id} className="p-2 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
-                      <span className="font-mono font-bold text-emerald-400">{a.arete}</span>
+                      <span className="font-mono font-bold text-emerald-700">{a.arete}</span>
                       <span className="text-white font-medium">{a.nombre || a.tipoAnimal}</span>
                       <span className="text-slate-400 text-[11px]">{a.pesoActual} kg</span>
                     </div>
