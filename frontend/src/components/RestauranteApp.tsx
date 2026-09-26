@@ -785,7 +785,7 @@ function imprimirTicketTermicoDirecto(datos: {
         ${datos.recibido != null ? `<div><strong>Recibido:</strong> $${datos.recibido.toFixed(2)}</div>` : ""}
         ${datos.vuelto != null && datos.vuelto > 0.004 ? `<div class="bold" style="font-size: 12px; margin-top: 2px;">VUELTO: ${datos.vuelto.toFixed(2)} ${datos.monedaVuelto || "USD"}</div>` : ""}
         <div class="divider"></div>
-        <div class="footer">¡Muchas gracias por su preferencia!<br>Generado con Aurora HORECA</div>
+        <div class="footer">Orden de consumo · Documento no fiscal<br>¡Muchas gracias por su preferencia!</div>
       </body>
     </html>
   `;
@@ -9899,14 +9899,14 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
             <div>
               <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
                 {rango === "DIA"
-                  ? "Facturación por Horas del Día"
+                  ? "Ventas por hora del día"
                   : rango === "7_DIAS"
                   ? "Tendencia de Ingresos — Últimos 7 Días"
                   : rango === "MES"
                   ? "Evolución Diaria del Mes"
-                  : "Facturación Mensual del Año"}
+                  : "Ventas por mes del año"}
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-white/40">Total facturado en {monedaBaseNegocio || "moneda base"}</p>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">Total vendido en {monedaBaseNegocio || "moneda base"}</p>
             </div>
             <span className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg">
               {monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}{ventasTotal.toFixed(2)}
@@ -9939,7 +9939,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
               <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
                 Horas Top de Venta
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-white/40">Distribución de facturación por hora</p>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">Distribución de ventas por hora</p>
             </div>
             {horaPico && horaPico.ventas > 0 ? (
               <span className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg">
@@ -9962,7 +9962,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
                   formatter={((v: any, name: any, item: any) => {
-                    if (name === "ventas") return [`${monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}${Number(v).toFixed(2)} (${item.payload.pedidos} pedidos)`, "Facturado"];
+                    if (name === "ventas") return [`${monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}${Number(v).toFixed(2)} (${item.payload.pedidos} pedidos)`, "Vendido"];
                     return [v, name];
                   }) as any}
                   contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
@@ -9993,7 +9993,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
             <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
               Top 5 Productos más Vendidos
             </h3>
-            <span className="text-[11px] text-slate-400">Unidades facturadas</span>
+            <span className="text-[11px] text-slate-400">Unidades vendidas</span>
           </div>
 
           {topProductos.length === 0 ? (
@@ -10437,33 +10437,14 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
   const [cerrando, setCerrando] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
 
-  // Tasas reales del negocio para convertir el arqueo desglosado — nunca un valor fijo
-  // inventado (65.50 / 4180 no son cifras reales, eran solo un placeholder que además
-  // podía desincronizarse de lo que en verdad se cobró en el POS).
-  const [tasaVesArqueo, setTasaVesArqueo] = useState<number | null>(null);
-  const [tasaCopArqueo, setTasaCopArqueo] = useState<number | null>(null);
-  useEffect(() => {
-    tasaVigente(tenantId, "USD", "VES").then((t) => setTasaVesArqueo(Number(t.tasa))).catch(() => setTasaVesArqueo(null));
-    tasaVigente(tenantId, "USD", "COP").then((t) => setTasaCopArqueo(Number(t.tasa))).catch(() => setTasaCopArqueo(null));
-  }, [tenantId]);
-
+  // El servidor compara contra el EFECTIVO de la moneda del turno (lo que se puede contar en la
+  // gaveta). Punto, Pago Móvil, Zelle y las otras monedas se anotan como referencia pero no entran
+  // en el monto declarado; antes se sumaban y cada cierre salía con un "sobrante" falso.
   const totalDesgloseCalculado = useMemo(() => {
-    const usd = Number(desgloseArqueo.usd) || 0;
-    const zelle = Number(desgloseArqueo.zelle) || 0;
-    const ves = (Number(desgloseArqueo.ves) || 0) + (Number(desgloseArqueo.punto) || 0) + (Number(desgloseArqueo.pagoMovil) || 0);
-    const cop = Number(desgloseArqueo.cop) || 0;
-
-    const tasaVes = tasaVesArqueo ?? 0;
-    const tasaCop = tasaCopArqueo ?? 0;
-
-    if (moneda === "USD") {
-      return usd + zelle + (tasaVes > 0 ? ves / tasaVes : 0) + (tasaCop > 0 ? cop / tasaCop : 0);
-    } else if (moneda === "VES") {
-      return ves + (usd + zelle) * tasaVes + (tasaCop > 0 ? (cop / tasaCop) * tasaVes : 0);
-    } else {
-      return cop + (usd + zelle) * tasaCop;
-    }
-  }, [desgloseArqueo, moneda, tasaVesArqueo, tasaCopArqueo]);
+    if (moneda === "USD") return Number(desgloseArqueo.usd) || 0;
+    if (moneda === "VES") return Number(desgloseArqueo.ves) || 0;
+    return Number(desgloseArqueo.cop) || 0;
+  }, [desgloseArqueo, moneda]);
 
   const montoDeclaradoFinal = modoArqueo === "DESGLOSADO" ? totalDesgloseCalculado : (Number(montoDeclarado) || 0);
 
@@ -10616,7 +10597,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
             {modoArqueo === "DESGLOSADO" ? (
               <div className="space-y-3 bg-slate-50 dark:bg-white/[0.02] p-4 rounded-xl border border-slate-200 dark:border-white/5">
                 <p className="text-[11px] font-semibold text-slate-600 dark:text-white/60">
-                  Introduce lo contado físicamente en cada método para calcular el total sin errores:
+                  Anota lo contado en cada método. El arqueo compara solo el efectivo en {moneda}; los pagos electrónicos y las otras monedas quedan como referencia.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
@@ -10695,7 +10676,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
 
                 <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-white/10">
                   <span className="text-xs font-bold text-slate-600 dark:text-white/70">
-                    Total declarado acumulado:
+                    Efectivo declarado en {moneda}:
                   </span>
                   <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">
                     {fmtCostoEnMoneda(totalDesgloseCalculado, moneda)}

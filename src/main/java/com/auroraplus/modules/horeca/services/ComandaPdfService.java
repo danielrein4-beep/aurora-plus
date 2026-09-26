@@ -25,7 +25,7 @@ public class ComandaPdfService {
 
     public byte[] generarTicket(Comanda comanda, List<ItemComanda> items) throws Exception {
         boolean hayVuelto = comanda.getVueltoBase() != null && comanda.getVueltoBase().compareTo(BigDecimal.ZERO) > 0;
-        float alturaEstimada = 140 + items.size() * 14 + (hayVuelto ? 28 : 0);
+        float alturaEstimada = 160 + items.size() * 14 + (hayVuelto ? 28 : 0);
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(new PDRectangle(TICKET_WIDTH, alturaEstimada));
             document.addPage(page);
@@ -119,7 +119,14 @@ public class ComandaPdfService {
                     BigDecimal montoVuelto = comanda.getVueltoMonto() != null ? comanda.getVueltoMonto() : comanda.getVueltoBase();
                     cs.showText("Vuelto: " + montoVuelto.setScale(2, RoundingMode.HALF_UP) + " " + monedaVuelto);
                     cs.endText();
+                    y -= 11;
                 }
+                // Aún no se emiten facturas: el comprobante lo dice para no confundirse con una.
+                cs.beginText();
+                cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 7);
+                cs.newLineAtOffset(x, Math.max(6, y - 8));
+                cs.showText("Orden de consumo - Documento no fiscal");
+                cs.endText();
             }
 
             document.save(out);

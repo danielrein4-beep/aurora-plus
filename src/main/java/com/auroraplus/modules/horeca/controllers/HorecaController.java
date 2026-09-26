@@ -151,8 +151,17 @@ public class HorecaController {
             @RequestParam(required = false) BigDecimal precioUnitario,
             @RequestParam(required = false) String claveIdempotencia,
             @RequestParam(required = false) String notas) {
-        return ResponseEntity.ok(horecaService.agregarItemComanda(
-            comandaId, TenantContext.getCurrentTenant(), escandalloId, articuloId, fastBarTragoId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia, notas));
+        // Un precio negativo es un descuento: rebaja la cuenta, así que un mesero no puede hacerlo solo.
+        boolean esDescuento = precioUnitario != null && precioUnitario.signum() < 0;
+        if (esDescuento) AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR");
+        Long tenantId = TenantContext.getCurrentTenant();
+        ItemComanda item = horecaService.agregarItemComanda(
+            comandaId, tenantId, escandalloId, articuloId, fastBarTragoId, nombrePlato, estacionCocina, cantidad, precioUnitario, claveIdempotencia, notas);
+        if (esDescuento) {
+            auditoriaService.registrar(tenantId, "HORECA", "EDITAR", "Comanda", comandaId,
+                "Aplicó un descuento de " + precioUnitario.negate().multiply(cantidad).toPlainString() + " — " + nombrePlato);
+        }
+        return ResponseEntity.ok(item);
     }
 
     @PatchMapping("/items/{itemId}/estado")

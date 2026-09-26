@@ -1,5 +1,6 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.horeca.entities.DetalleReceta;
 import com.auroraplus.modules.horeca.entities.EscandalloReceta;
@@ -59,6 +60,7 @@ public class EscandalloRecetaController {
 
     @PostMapping
     public ResponseEntity<EscandalloReceta> crear(@RequestBody CrearEscandalloRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = new EscandalloReceta();
         escandallo.setTenantId(tenantId);
@@ -81,6 +83,7 @@ public class EscandalloRecetaController {
     /** Agrega una línea de ingrediente directo o sub-receta. Exactamente uno de ingredienteSku/subEscandalloId. */
     @PostMapping("/{id}/ingredientes")
     public ResponseEntity<EscandalloReceta> agregarIngrediente(@PathVariable Long id, @RequestBody IngredienteRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
@@ -135,6 +138,7 @@ public class EscandalloRecetaController {
 
     @PutMapping("/{id}")
     public ResponseEntity<EscandalloReceta> editar(@PathVariable Long id, @RequestBody EditarEscandalloRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
@@ -168,6 +172,7 @@ public class EscandalloRecetaController {
             @PathVariable Long id,
             @PathVariable Long detalleId,
             @RequestBody EditarIngredienteRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
@@ -212,6 +217,7 @@ public class EscandalloRecetaController {
     public ResponseEntity<EscandalloReceta> eliminarIngrediente(
             @PathVariable Long id,
             @PathVariable Long detalleId) {
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
@@ -262,6 +268,7 @@ public class EscandalloRecetaController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<EscandalloReceta> eliminar(@PathVariable Long id) {
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
@@ -285,6 +292,7 @@ public class EscandalloRecetaController {
     /** Muestra/oculta la receta del catálogo de Venta Rápida sin borrarla (para recetas que ya tienen ventas y no se pueden eliminar). */
     @PatchMapping("/{id}/activo")
     public ResponseEntity<EscandalloReceta> cambiarActivo(@PathVariable Long id, @RequestParam boolean activo) {
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
@@ -298,6 +306,7 @@ public class EscandalloRecetaController {
     /** Define si este producto pasa por el tablero de cocina (KDS) o se entrega de una vez (bebida embotellada, snack, combo sin cocción). */
     @PatchMapping("/{id}/requiere-cocina")
     public ResponseEntity<EscandalloReceta> cambiarRequiereCocina(@PathVariable Long id, @RequestParam boolean requiereCocina) {
+        AuthContext.exigirRol("DUENO_ADMIN");
         Long tenantId = TenantContext.getCurrentTenant();
         EscandalloReceta escandallo = escandalloRecetaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Escandallo no encontrado"));
