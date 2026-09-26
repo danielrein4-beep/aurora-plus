@@ -23,6 +23,9 @@ public class LicenciaSuspensionScheduler {
     @Autowired(required = false)
     private RegistroAuditoriaService auditoriaService;
 
+    @Autowired
+    private LicenciaService licenciaService;
+
     /**
      * Barrido diario automático a las 00:05 para suspender licencias vencidas.
      */
@@ -44,6 +47,11 @@ public class LicenciaSuspensionScheduler {
         int contador = 0;
 
         for (LicenciaTenant l : vencidas) {
+            // Reportó su pago y falta que lo verifiquemos: no se suspende mientras tanto.
+            if (licenciaService.tienePagoReportadoPendiente(l.getTenantId())) {
+                log.info("Tenant {} vencido pero con pago reportado en verificación: no se suspende", l.getTenantId());
+                continue;
+            }
             l.setActiva(false);
             licenciaTenantRepository.save(l);
             contador++;

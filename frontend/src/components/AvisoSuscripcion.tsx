@@ -32,6 +32,19 @@ export default function AvisoSuscripcion() {
   if (!estado.vencida && estado.diasRestantes > DIAS_DE_AVISO) return null;
 
   const fmt = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long" });
+  // Ya reportó su pago: no se le pide pagar otra vez ni se le suspende mientras lo verificamos.
+  const pagoEnVerificacion = (estado.reportes || []).some((r) => r.estado === "EN_VERIFICACION");
+  if (pagoEnVerificacion) {
+    return (
+      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-1rem)] max-w-xl">
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl shadow-lg border text-sm bg-sky-50 border-sky-200 text-sky-900">
+          <span className="flex-1 leading-snug">Recibimos el reporte de tu pago y lo estamos verificando. Mientras tanto sigues trabajando con normalidad.</span>
+          <button type="button" onClick={() => { setCerrado(true); try { sessionStorage.setItem(claveCerrado, "1"); } catch { /* sin almacenamiento */ } }}
+            aria-label="Cerrar aviso" className="shrink-0 opacity-70 hover:opacity-100 cursor-pointer px-1">×</button>
+        </div>
+      </div>
+    );
+  }
   const texto = estado.vencida
     ? `Tu plan venció el ${fmt(estado.fechaVencimiento)}. Puedes seguir trabajando hasta el ${estado.accesoHasta ? fmt(estado.accesoHasta) : "fin de la gracia"}.`
     : estado.diasRestantes === 0

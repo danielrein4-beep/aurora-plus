@@ -3467,6 +3467,44 @@ export async function registrarPagoSuperAdmin(datos: RegistrarPagoSuperAdminRequ
   });
 }
 
+/** Pago que un cliente reportó desde Aurora Hub y el equipo todavía no verifica. */
+export interface PagoReportadoSuperAdmin {
+  ticketId: number;
+  tenantId: number;
+  nombreEmpresa: string;
+  usuario: string | null;
+  fecha: string;
+  monto: number | null;
+  moneda: string;
+  metodo: string | null;
+  referencia: string | null;
+  plan: string | null;
+  nota: string | null;
+  estado: string;
+  fechaVencimiento: string | null;
+  vencida: boolean;
+}
+
+export async function listarPagosReportadosSuperAdmin(): Promise<PagoReportadoSuperAdmin[]> {
+  return requestSuperAdmin<PagoReportadoSuperAdmin[]>("/api/super-admin/tenants/pagos-reportados");
+}
+
+export async function verificarPagoReportadoSuperAdmin(ticketId: number, datos: {
+  monto?: number; moneda?: string; metodoPago?: string; referencia?: string; meses?: number; dias?: number; notas?: string;
+}): Promise<PagoSuscripcion> {
+  return requestSuperAdmin<PagoSuscripcion>(`/api/super-admin/tenants/pagos-reportados/${ticketId}/verificar`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function rechazarPagoReportadoSuperAdmin(ticketId: number, motivo: string): Promise<void> {
+  await requestSuperAdmin<void>(`/api/super-admin/tenants/pagos-reportados/${ticketId}/rechazar`, {
+    method: "POST",
+    body: JSON.stringify({ motivo }),
+  });
+}
+
 export async function regalarTiempoSuperAdmin(tenantId: number, datos: RegalarTiempoSuperAdminRequest): Promise<LicenciaTenant> {
   const res = await requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/regalar-tiempo`, {
     method: "POST",

@@ -132,7 +132,7 @@ public class SuscripcionTenantController {
             .filter(t -> "PAGO".equals(t.getCategoria()))
             .limit(30)
             .map(t -> new ReportePago(t.getId(), t.getFechaCreacion(), t.getTituloAsunto(),
-                "ABIERTO".equals(t.getEstado()) || "EN_PROCESO".equals(t.getEstado()) ? "EN_VERIFICACION" : "REVISADO"))
+                LicenciaService.ESTADOS_PAGO_PENDIENTE.contains(t.getEstado()) ? "EN_VERIFICACION" : "REVISADO"))
             .toList();
     }
 

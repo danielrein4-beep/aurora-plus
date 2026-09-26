@@ -99,6 +99,22 @@ public class LicenciaService {
      */
     public static final int DIAS_GRACIA = 3;
 
+    /**
+     * Si el cliente ya reportó su pago y el equipo de Aurora todavía no lo verifica, no se le corta
+     * el servicio por vencimiento: la demora es nuestra. El reporte cuenta por este máximo de días
+     * para que un reporte olvidado no deje acceso abierto para siempre.
+     */
+    public static final int DIAS_MAX_ESPERA_VERIFICACION = 15;
+    public static final java.util.List<String> ESTADOS_PAGO_PENDIENTE = java.util.List.of("ABIERTO", "EN_ATENCION", "EN_PROCESO");
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.auroraplus.core.soporte.repositories.SaasSoporteTicketRepository soporteTicketRepository;
+
+    public boolean tienePagoReportadoPendiente(Long tenantId) {
+        return soporteTicketRepository.existsByTenantIdAndCategoriaAndEstadoInAndFechaCreacionAfter(
+            tenantId, "PAGO", ESTADOS_PAGO_PENDIENTE, java.time.LocalDateTime.now().minusDays(DIAS_MAX_ESPERA_VERIFICACION));
+    }
+
     public ResultadoValidacion validarAcceso(Long tenantId, String pathModulo) {
         LicenciaTenant.TipoLicencia nivelRequerido = NIVEL_REQUERIDO_POR_MODULO.getOrDefault(pathModulo, LicenciaTenant.TipoLicencia.BASICA);
         if (nivelRequerido == null) {
@@ -118,7 +134,8 @@ public class LicenciaService {
                 "La licencia de este tenant está desactivada. Regularice su suscripción para continuar.");
         }
 
-        if (licencia.getFechaVencimientoPago() != null && licencia.getFechaVencimientoPago().plusDays(DIAS_GRACIA).isBefore(LocalDate.now())) {
+        if (licencia.getFechaVencimientoPago() != null && licencia.getFechaVencimientoPago().plusDays(DIAS_GRACIA).isBefore(LocalDate.now())
+                && !tienePagoReportadoPendiente(tenantId)) {
             return ResultadoValidacion.bloqueado(402,
                 "Tu plan venció el " + licencia.getFechaVencimientoPago() + ". Reporta tu pago desde Aurora Hub > Facturación & Pagos para reactivar el acceso.");
         }

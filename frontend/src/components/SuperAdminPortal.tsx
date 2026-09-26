@@ -1,5 +1,6 @@
 import { obtenerCuentasCobro, guardarCuentasCobro, combinarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
 import { obtenerCuentasCobroSuperAdmin, guardarCuentasCobroSuperAdmin } from "../api";
+import PagosPorVerificar from "./PagosPorVerificar";
 import React, { useState, useEffect, useMemo } from "react";
 import AuroraLogo from "../AuroraLogo";
 import SuperAdminPanorama from "./SuperAdminPanorama";
@@ -26,6 +27,7 @@ import {
   obtenerStatsSuperAdmin,
   ejecutarBarridoSuspensionSuperAdmin,
   listarPagosSuperAdmin,
+  listarPagosReportadosSuperAdmin,
   registrarPagoSuperAdmin,
   listarComisionesPendientesSuperAdmin,
   type ComisionPlataforma,
@@ -368,6 +370,12 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     setFeedback({ msg, tipo });
     setTimeout(() => setFeedback(null), 5000);
   };
+
+  // Pagos reportados por clientes que faltan por verificar: se ven en el menú aunque no se abra Cobros.
+  const [pagosPorVerificar, setPagosPorVerificar] = useState(0);
+  useEffect(() => {
+    listarPagosReportadosSuperAdmin().then((r) => setPagosPorVerificar(r.length)).catch(() => {});
+  }, []);
 
   const cargarTodo = async () => {
     setLoadingData(true);
@@ -1363,7 +1371,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 { vista: "TENANTS", label: "Directorio de negocios", icono: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4", badge: tenants.length },
               ]},
               { titulo: "Ingresos", items: [
-                { vista: "PAGOS", label: "Cobros y suscripciones", icono: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z", badge: historialPagos.length, alAbrir: () => cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant) },
+                { vista: "PAGOS", label: "Cobros y suscripciones", icono: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z", badge: pagosPorVerificar > 0 ? `${pagosPorVerificar} por verificar` : historialPagos.length, alerta: pagosPorVerificar > 0, alAbrir: () => cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant) },
                 { vista: "FINANZAS", label: "Finanzas y contabilidad", icono: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", alAbrir: () => cargarDatosFinancieros() },
               ]},
               { titulo: "Verticales", items: [
@@ -1796,6 +1804,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       {/* VISTA: MODULO DEDICADO DE HISTORIAL DE COBROS Y PAGOS */}
       {vistaPrincipal === "PAGOS" && (
         <div className="space-y-6 animate-fadeIn">
+          <PagosPorVerificar
+            onConteo={setPagosPorVerificar}
+            onCambio={() => { cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant); cargarTodo(); }}
+          />
           {/* BARRA SUPERIOR DE PAGOS */}
           <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
             <div>
