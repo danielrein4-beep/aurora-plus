@@ -70,16 +70,41 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
   const [oculta, setOculta] = useState(() => {
     try { return localStorage.getItem("aurora_soporte_oculto") === "1"; } catch { return false; }
   });
-  const [pos, setPos] = useState<{ derecha: number; abajo: number }>(() => {
+  // Al soltarla se pega sola al costado más cercano (izquierdo o derecho) para no estorbar; solo se
+  // recuerda el lado y la altura, así queda bien aunque el teléfono gire.
+  const MARGEN_BURBUJA = 12;
+  const burbujaRef = useRef<HTMLDivElement | null>(null);
+  const [anchoPantalla, setAnchoPantalla] = useState(() => (typeof window === "undefined" ? 1024 : window.innerWidth));
+  const [pos, setPos] = useState<{ lado: "izq" | "der"; abajo: number }>(() => {
     try {
       const g = JSON.parse(localStorage.getItem("aurora_soporte_pos") || "null");
-      if (g && typeof g.derecha === "number" && typeof g.abajo === "number") return g;
+      if (g && (g.lado === "izq" || g.lado === "der") && typeof g.abajo === "number") return g;
+      // Posición guardada con el formato anterior (distancia a la derecha): se lleva al lado más cercano.
+      if (g && typeof g.derecha === "number" && typeof g.abajo === "number") {
+        return { lado: g.derecha > window.innerWidth / 2 ? "izq" : "der", abajo: g.abajo };
+      }
     } catch { /* sin almacenamiento */ }
-    return { derecha: 20, abajo: 20 };
+    return { lado: "der", abajo: 20 };
   });
+  // Mientras se arrastra, la burbuja sigue al dedo con coordenadas libres (distancia a la derecha y abajo).
+  const [libre, setLibre] = useState<{ derecha: number; abajo: number } | null>(null);
+  useEffect(() => {
+    const alCambiarTamano = () => setAnchoPantalla(window.innerWidth);
+    window.addEventListener("resize", alCambiarTamano);
+    return () => window.removeEventListener("resize", alCambiarTamano);
+  }, []);
+  // El ancho real de la burbuja solo se conoce ya dibujada (en computadora lleva texto): se mide y se
+  // vuelve a ubicar, para que pegada a la izquierda no quede corrida.
+  const [, setAnchoMedido] = useState(0);
+  useEffect(() => { setAnchoMedido(burbujaRef.current?.offsetWidth ?? 0); }, [oculta, pos.lado, anchoPantalla]);
+  const anchoBurbuja = () => burbujaRef.current?.offsetWidth ?? 48;
+  const altoBurbuja = () => burbujaRef.current?.offsetHeight ?? 48;
+  const derechaDelLado = (lado: "izq" | "der") => (lado === "der" ? MARGEN_BURBUJA : anchoPantalla - anchoBurbuja() - MARGEN_BURBUJA);
+  const limitarAbajo = (abajo: number) => Math.min(Math.max(MARGEN_BURBUJA, abajo), window.innerHeight - altoBurbuja() - MARGEN_BURBUJA);
+
   const arrastre = useRef<{ x: number; y: number; derecha: number; abajo: number; movido: boolean; ultima?: { derecha: number; abajo: number } } | null>(null);
   const alPresionar = (e: React.PointerEvent) => {
-    arrastre.current = { x: e.clientX, y: e.clientY, derecha: pos.derecha, abajo: pos.abajo, movido: false };
+    arrastre.current = { x: e.clientX, y: e.clientY, derecha: derechaDelLado(pos.lado), abajo: pos.abajo, movido: false };
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
   const alMover = (e: React.PointerEvent) => {
@@ -90,18 +115,23 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
     if (!a.movido && Math.hypot(dx, dy) < 6) return;
     a.movido = true;
     a.ultima = {
-      derecha: Math.min(Math.max(8, a.derecha - dx), window.innerWidth - 64),
-      abajo: Math.min(Math.max(8, a.abajo - dy), window.innerHeight - 64),
+      derecha: Math.min(Math.max(0, a.derecha - dx), window.innerWidth - anchoBurbuja()),
+      abajo: Math.min(Math.max(0, a.abajo - dy), window.innerHeight - altoBurbuja()),
     };
-    setPos(a.ultima);
+    setLibre(a.ultima);
   };
   const alSoltar = () => {
     const a = arrastre.current;
     arrastre.current = null;
     if (!a) return;
-    if (a.movido) {
-      try { localStorage.setItem("aurora_soporte_pos", JSON.stringify(a.ultima ?? pos)); } catch { /* sin almacenamiento */ }
+    if (a.movido && a.ultima) {
+      const centro = window.innerWidth - a.ultima.derecha - anchoBurbuja() / 2;
+      const nueva = { lado: centro < window.innerWidth / 2 ? "izq" as const : "der" as const, abajo: limitarAbajo(a.ultima.abajo) };
+      setPos(nueva);
+      setLibre(null);
+      try { localStorage.setItem("aurora_soporte_pos", JSON.stringify(nueva)); } catch { /* sin almacenamiento */ }
     } else {
+      setLibre(null);
       setAbierto(true);
     }
   };
@@ -246,7 +276,24 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
     <>
       {/* BOTON FLOTANTE DE ASISTENCIA */}
       {mostrarBurbuja && (
-        <div className="soporte-flotante fixed z-40" style={{ right: pos.derecha, bottom: pos.abajo }}>
+        <div
+          ref={burbujaRef}
+          className="soporte-flotante fixed z-40"
+          style={{
+            right: libre ? libre.derecha : derechaDelLado(pos.lado),
+            // En el teléfono, donde hay barra de navegación abajo (Mercado), no se mete debajo de ella.
+            bottom: libre ? libre.abajo
+              : Math.max(pos.abajo, typeof document !== "undefined" && anchoPantalla < 768
+                && document.body.classList.contains("con-barra-inferior") ? 88 : 0),
+            // Suelta: se desliza suave hasta su costado. Arrastrando: sigue al dedo sin retraso,
+            // un poco más grande, y vuelve a su tamaño con suavidad.
+            transition: libre
+              ? "transform 180ms ease-out, filter 180ms ease-out"
+              : "right 420ms cubic-bezier(0.22, 1, 0.36, 1), bottom 420ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms ease-out, filter 260ms ease-out",
+            transform: libre ? "scale(1.08)" : "scale(1)",
+            filter: libre ? "drop-shadow(0 10px 18px rgba(15, 23, 42, 0.25))" : "none",
+          }}
+        >
           <button
             type="button"
             onClick={esconderBurbuja}
@@ -261,7 +308,7 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
             onPointerDown={alPresionar}
             onPointerMove={alMover}
             onPointerUp={alSoltar}
-            onPointerCancel={() => { arrastre.current = null; }}
+            onPointerCancel={() => { arrastre.current = null; setLibre(null); }}
             style={{ touchAction: "none" }}
             className="flex items-center gap-2.5 p-3 sm:px-4 sm:py-3 bg-emerald-500 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 font-bold text-xs transition-colors cursor-pointer select-none"
             title="Soporte Aurora (arrastra para moverlo)"

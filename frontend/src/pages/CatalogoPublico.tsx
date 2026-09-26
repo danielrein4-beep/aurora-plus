@@ -1488,7 +1488,7 @@ export default function CatalogoPublico() {
               type="text"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por aroma, marca o estilo..."
+              placeholder="Buscar producto..."
               className="w-full pl-9 pr-7 py-1.5 rounded-full bg-neutral-100 border border-neutral-200/80 text-xs text-neutral-800 placeholder-neutral-400 focus:outline-none focus:bg-white focus:border-neutral-900 transition-all"
             />
             {busqueda && (

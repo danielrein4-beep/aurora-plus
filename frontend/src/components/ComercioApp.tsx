@@ -6346,7 +6346,9 @@ function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOri
       </button>
 
       {abierto && (
-        <div className="absolute right-0 mt-2 z-50 w-80 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
+        // En el teléfono la píldora queda a la izquierda: el cuadro se abre desde ahí y con el ancho de la
+        // pantalla (alineado a la derecha se salía por la izquierda y quedaba cortado).
+        <div className="absolute left-0 w-[calc(100vw-2rem)] max-h-[calc(100dvh-8rem)] overflow-y-auto sm:left-auto sm:right-0 sm:w-80 sm:max-h-none sm:overflow-visible mt-2 z-50 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
             <div>
               <p className="text-xs font-bold text-slate-900 dark:text-white">Fuente de la Tasa (USD → Bs)</p>
