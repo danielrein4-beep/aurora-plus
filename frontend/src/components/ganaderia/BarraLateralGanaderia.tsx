@@ -23,6 +23,8 @@ interface Props {
   setAltaAnimal: (valores: Partial<FormAltaAnimal> | null) => void;
   setAperturaSoporte: (actualizar: (n: number) => number) => void;
   setModalImportarHato: (abierto: boolean) => void;
+  /** Registro rápido del hato con potrero por animal (solo quien puede importar). */
+  abrirRegistroRapido?: () => void;
   setSidebarAbierto: (abierto: boolean) => void;
   setTab: (tab: TabGanaderia) => void;
 }
@@ -31,7 +33,7 @@ interface Props {
 export default function BarraLateralGanaderia({
   alertasSanitarias, animales, potreros, puedeImportarHato, sidebarAbierto, tab, nombreFinca, puedeVerAuditoria, sinLeerMercado, abrirMercado,
   abrirVaqueraRapida, abrirVentaAnimales, onSalir, setAltaAnimal, setAperturaSoporte,
-  setModalImportarHato, setSidebarAbierto, setTab,
+  setModalImportarHato, abrirRegistroRapido, setSidebarAbierto, setTab,
 }: Props) {
   return (
     <>
@@ -147,6 +149,16 @@ export default function BarraLateralGanaderia({
           <span className="text-slate-400"><IconMilk size={16} /></span>
           <span className="flex-1 text-left">Ordeño rápido</span>
         </button>
+        {abrirRegistroRapido && (
+          <button
+            type="button"
+            onClick={() => { abrirRegistroRapido(); setSidebarAbierto(false); }}
+            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          >
+            <span className="text-slate-400"><IconTag size={16} /></span>
+            <span className="flex-1 text-left">Registrar mi ganado</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => { setAltaAnimal({}); setSidebarAbierto(false); }}

@@ -4300,6 +4300,10 @@ export interface ResultadoImportacionHato {
   errores: Array<{ fila: number; campo: string | null; mensaje: string }>;
   porTipo: Record<string, number>;
   porRaza: Record<string, number>;
+  /** Animales por potrero ("Sin potrero" si no se indicó). */
+  porPotrero?: Record<string, number>;
+  /** Potreros que no existían y se crean con esta carga, solo con el nombre. */
+  potrerosNuevos?: string[];
 }
 
 /** confirmar=false: solo vista previa. confirmar=true: guarda todo o nada. */

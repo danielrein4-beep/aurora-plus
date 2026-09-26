@@ -15,13 +15,20 @@ interface Props {
   handleGuardarPotreroTrazado: (datos: { poligono: [number, number][]; hectareas: number }) => void;
   setModalRotar: (potrero: PotreroGanaderia | null) => void;
   setSubPotreros: (sub: SubPotreros) => void;
+  /** Potrero creado solo con nombre que se está ubicando en el mapa. */
+  potreroAUbicar?: PotreroGanaderia | null;
+  ubicarPotrero?: (potrero: PotreroGanaderia) => void;
+  cancelarUbicar?: () => void;
 }
 
 /** Potreros: mapa satelital y tabla con área, pasto, animales y estado de descanso. */
 export default function SeccionPotreros({
   animales, animalesActivos, notificar, potreros, subPotreros, abrirEditarPotrero,
   abrirNuevoPotrero, handleGuardarPotreroTrazado, setModalRotar, setSubPotreros,
+  potreroAUbicar, ubicarPotrero, cancelarUbicar,
 }: Props) {
+  const sinUbicar = (p: PotreroGanaderia) => !p.poligono || p.poligono.length < 3;
+  const cuantosSinUbicar = potreros.filter(sinUbicar).length;
   return (
     <div className="space-y-5 text-left">
       
@@ -33,6 +40,11 @@ export default function SeccionPotreros({
           <p className="text-xs text-slate-500 dark:text-white/40">
             Visualización satelital en alta resolución, rotación Voisin y registro de forrajes.
           </p>
+          {cuantosSinUbicar > 0 && (
+            <p className="text-xs font-semibold text-amber-700 mt-1">
+              {cuantosSinUbicar === 1 ? "1 potrero falta" : `${cuantosSinUbicar} potreros faltan`} por ubicar en el mapa. Búscalos en la lista y pulsa "Ubicar en el mapa".
+            </p>
+          )}
         </div>
 
         {/* Sub-selector: Mapa Satelital vs. Lista de Potreros */}
@@ -71,6 +83,8 @@ export default function SeccionPotreros({
           onCrearPotrero={abrirNuevoPotrero}
           onEditarPotrero={abrirEditarPotrero}
           onGuardarPotreroTrazado={handleGuardarPotreroTrazado}
+          potreroAUbicar={potreroAUbicar}
+          onCancelarUbicar={cancelarUbicar}
         />
       ) : (
         (() => {
@@ -127,6 +141,16 @@ export default function SeccionPotreros({
                               <div>
                                 <div className="font-semibold text-slate-900">{pot.nombre}</div>
                                 <div className="tabular-nums text-[10px] text-slate-400">{pot.codigo || `POT-${pot.id}`}</div>
+                                {sinUbicar(pot) && (
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Falta ubicar en el mapa</span>
+                                    {ubicarPotrero && (
+                                      <button type="button" onClick={() => ubicarPotrero(pot)} className="text-[10px] font-bold text-teal-700 underline cursor-pointer">
+                                        Ubicar en el mapa
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>

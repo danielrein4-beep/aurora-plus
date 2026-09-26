@@ -25,6 +25,7 @@ interface Props {
   setAnimalFichaId: (id: number | null) => void;
   setModalFichaAnimal: (animal: AnimalGanaderia | null) => void;
   setModalImportarHato: (abierto: boolean) => void;
+  abrirRegistroRapido?: () => void;
   setModalPesaje: (animal: AnimalGanaderia | null) => void;
   setSubInventario: (sub: SubInventario) => void;
   setSubSanidad: (sub: SubSanidad) => void;
@@ -39,7 +40,7 @@ export default function SeccionHato({
   alertasSanitarias, animales, animalesActivos, notificar, potreros, prenezActual,
   puedeImportarHato, subInventario, totalAnimales, abrirEditarAnimal, abrirVentaAnimales,
   exportarInventarioXLSX, setAltaAnimal, setAnimalFichaId, setModalFichaAnimal,
-  setModalImportarHato, setModalPesaje, setSubInventario, setSubSanidad, setTab,
+  setModalImportarHato, abrirRegistroRapido, setModalPesaje, setSubInventario, setSubSanidad, setTab,
 }: Props) {
   const [filtroCategoria, setFiltroCategoria] = useState<string>("TODOS");
   const [busquedaArete, setBusquedaArete] = useState<string>("");
@@ -182,6 +183,14 @@ export default function SeccionHato({
             <IconCoins size={13} />
             <span>Vender lote</span>
           </button>
+
+          {abrirRegistroRapido && (
+            <button
+              onClick={abrirRegistroRapido}
+              className="apple-glass-btn text-xs font-bold px-3.5 py-2 rounded-xl border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer flex items-center gap-1.5">
+              <span>Registrar ganado</span>
+            </button>
+          )}
 
           {puedeImportarHato && (
             <button

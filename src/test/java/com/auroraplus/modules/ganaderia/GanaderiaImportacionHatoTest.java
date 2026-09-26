@@ -70,19 +70,43 @@ class GanaderiaImportacionHatoTest {
     void unaFilaConErrorBloqueaTodaLaImportacion() {
         Long tenant = TENANT.incrementAndGet();
         FilaImportacion sinSexo = fila("X-2", null, null, null);
-        FilaImportacion potreroInexistente = fila("X-3", "HEMBRA", "VACA", null);
-        potreroInexistente.potrero = "La Lomita";
+        FilaImportacion potreroInvalido = fila("X-3", "HEMBRA", "VACA", null);
+        potreroInvalido.potrero = "P".repeat(101);
         FilaImportacion toroPrenado = fila("X-4", "MACHO", "TORO", null);
         toroPrenado.estadoReproductivo = "preñada";
 
         ResultadoImportacion r = importacionService.importar(tenant, List.of(
-            fila("X-1", "HEMBRA", "VACA", null), sinSexo, potreroInexistente, toroPrenado,
+            fila("X-1", "HEMBRA", "VACA", null), sinSexo, potreroInvalido, toroPrenado,
             fila("X-1", "HEMBRA", "VACA", null)), true);
 
         assertFalse(r.confirmado);
         List<Integer> filasConError = r.errores.stream().map(e -> e.fila).distinct().toList();
         assertEquals(List.of(3, 4, 5, 6), filasConError, "fila de Excel = índice + 2 (encabezado)");
         assertTrue(animalRepository.findByTenantId(tenant).isEmpty(), "todo o nada: no debe quedar medio hato cargado");
+    }
+
+    @Test
+    void unPotreroQueNoExisteSeCreaSoloConElNombre() {
+        Long tenant = TENANT.incrementAndGet();
+        FilaImportacion vaca = fila("N-1", "HEMBRA", "VACA", null);
+        vaca.potrero = "La Lomita";
+        FilaImportacion novilla = fila("N-2", "HEMBRA", "NOVILLA", null);
+        novilla.potrero = "la lomita"; // mismo potrero escrito distinto: no se duplica
+        FilaImportacion sinPotrero = fila("N-3", "MACHO", "TORO", null);
+
+        ResultadoImportacion vista = importacionService.importar(tenant, List.of(vaca, novilla, sinPotrero), false);
+        assertTrue(vista.errores.isEmpty(), () -> "errores inesperados: " + vista.errores.stream().map(e -> e.mensaje).toList());
+        assertEquals(List.of("La Lomita"), vista.potrerosNuevos);
+        assertEquals(Map.of("La Lomita", 2, "Sin potrero", 1), vista.porPotrero);
+
+        ResultadoImportacion r = importacionService.importar(tenant, List.of(vaca, novilla, sinPotrero), true);
+        assertTrue(r.confirmado);
+        var creados = potreroRepository.findByTenantId(tenant);
+        assertEquals(1, creados.size(), "se crea un solo potrero");
+        assertEquals("La Lomita", creados.get(0).getNombre());
+        long enLaLomita = animalRepository.findByTenantId(tenant).stream()
+            .filter(a -> a.getPotrero() != null && creados.get(0).getId().equals(a.getPotrero().getId())).count();
+        assertEquals(2, enLaLomita);
     }
 
     @Test

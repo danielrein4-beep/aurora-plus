@@ -25,6 +25,7 @@ import BitacoraAuditoria from "./BitacoraAuditoria";
 import PersonalRoute from "./PersonalRoute";
 import PersonalPage from "../pages/Personal";
 import ModalImportarHato from "./ModalImportarHato";
+import ModalRegistroRapidoHato from "./ModalRegistroRapidoHato";
 import TenantSoporteWidget from "./TenantSoporteWidget";
 import EngordeGanadero from "./EngordeGanadero";
 import SociedadesCeba from "./SociedadesCeba";
@@ -252,6 +253,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Modales
   const [altaAnimal, setAltaAnimal] = useState<Partial<FormAltaAnimal> | null>(null);
   const [modalImportarHato, setModalImportarHato] = useState(false);
+  // Registro rápido del hato (3 pasos, con potrero por animal). Usa la misma ruta que importar,
+  // así que solo lo abren quienes pueden importar; los demás siguen con el alta de uno en uno.
+  const [modalRegistroRapido, setModalRegistroRapido] = useState(false);
   // Última jornada de vacunación registrada: ofrece descargar su constancia PDF.
   const [ultimaVacunacion, setUltimaVacunacion] = useState<{ fecha: string; vacunaId: number; nombre: string; cantidad: number } | null>(null);
   const [prenezActual, setPrenezActual] = useState<PrenezActualGanaderia[]>([]);
@@ -421,8 +425,37 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     },
   });
 
+  // Potrero creado solo con nombre (al registrar el ganado) que se está dibujando en el mapa.
+  const [potreroAUbicar, setPotreroAUbicar] = useState<PotreroGanaderia | null>(null);
+  const ubicarPotrero = (potrero: PotreroGanaderia) => {
+    setPotreroAUbicar(potrero);
+    setSubPotreros("mapa");
+    notificar(`Marca en el mapa las esquinas de "${potrero.nombre}" o camina su borde con el GPS.`);
+  };
+
   // Manejador cuando el usuario traza un potrero en el mapa satelital
   const handleGuardarPotreroTrazado = (datos: { poligono: [number, number][]; hectareas: number }) => {
+    // Si se estaba ubicando un potrero existente, la forma se guarda en ese mismo potrero.
+    if (potreroAUbicar) {
+      const p = potreroAUbicar;
+      setPotreroAUbicar(null);
+      setPotreroEnModal({
+        editandoId: p.id,
+        form: {
+          codigo: p.codigo || "",
+          nombre: p.nombre,
+          areaHectareas: datos.hectareas,
+          capacidadAnimales: Number(p.capacidadAnimales) || Math.max(1, Math.round(datos.hectareas * 1.8)),
+          tipoPasto: p.tipoPasto || "",
+          color: p.color || "#10B981",
+          diasDescansoMinimo: Number(p.diasDescansoMinimo) || 28,
+          observaciones: p.observaciones || `Georreferenciado sobre imagen satelital (${datos.poligono.length} postes).`,
+          poligono: datos.poligono,
+        },
+      });
+      notificar(`"${p.nombre}" ubicado con ${datos.hectareas} ha. Revisa los datos y guarda.`);
+      return;
+    }
     setPotreroEnModal({
       editandoId: null,
       form: {
@@ -641,6 +674,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         setAltaAnimal={setAltaAnimal}
         setAperturaSoporte={setAperturaSoporte}
         setModalImportarHato={setModalImportarHato}
+        abrirRegistroRapido={puedeImportarHato ? () => setModalRegistroRapido(true) : undefined}
         setSidebarAbierto={setSidebarAbierto}
         setTab={setTab}
       />
@@ -708,6 +742,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             vacunas={vacunas}
             ventasLeche={ventasLeche}
             abrirNuevoPotrero={abrirNuevoPotrero}
+            abrirRegistroRapido={puedeImportarHato ? () => setModalRegistroRapido(true) : undefined}
             setAltaAnimal={setAltaAnimal}
             setModalAjusteTanque={setModalAjusteTanque}
             setModalRotar={setModalRotar}
@@ -734,6 +769,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             handleGuardarPotreroTrazado={handleGuardarPotreroTrazado}
             setModalRotar={setModalRotar}
             setSubPotreros={setSubPotreros}
+            potreroAUbicar={potreroAUbicar}
+            ubicarPotrero={ubicarPotrero}
+            cancelarUbicar={() => setPotreroAUbicar(null)}
           />
         )}
 
@@ -758,6 +796,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             setAnimalFichaId={setAnimalFichaId}
             setModalFichaAnimal={setModalFichaAnimal}
             setModalImportarHato={setModalImportarHato}
+            abrirRegistroRapido={puedeImportarHato ? () => setModalRegistroRapido(true) : undefined}
             setModalPesaje={setModalPesaje}
             setSubInventario={setSubInventario}
             setSubSanidad={setSubSanidad}
@@ -989,6 +1028,18 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
       <TenantSoporteWidget solicitudApertura={aperturaSoporte} soloConTicketActivo />
 
+      {modalRegistroRapido && (
+        <ModalRegistroRapidoHato
+          potreros={potreros}
+          onCerrar={() => setModalRegistroRapido(false)}
+          onGuardado={(cantidad) => {
+            setModalRegistroRapido(false);
+            notificar(`${cantidad} animales registrados en el hato.`);
+            cargarDatos();
+          }}
+        />
+      )}
+
       {modalImportarHato && (
         <ModalImportarHato
           onCerrar={() => setModalImportarHato(false)}
@@ -1011,6 +1062,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           onCreado={nuevo => { setAnimales(prev => [nuevo, ...prev]); if (nuevo.id > 0) setAnimalFichaId(nuevo.id); }}
           onEncolado={() => setPendientesOffline(contarPendientesGanaderia(tenantId))}
           onCerrar={() => setAltaAnimal(null)}
+          onPotreroCreado={p => setPotreros(prev => (prev.some(x => x.id === p.id) ? prev : [...prev, p]))}
         />
       )}
 

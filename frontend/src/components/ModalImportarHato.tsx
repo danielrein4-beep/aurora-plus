@@ -45,7 +45,7 @@ const INSTRUCCIONES: string[][] = [
   ["Sexo: MACHO o HEMBRA (también se acepta M, H o F)."],
   ["Tipo animal: hembras BECERRA, MAUTA, NOVILLA, VACA; machos BECERRO/TERNERO, MAUTE, NOVILLO, TORO. Si lo deja vacío se calcula por la edad."],
   ["Fechas: día/mes/año, por ejemplo 15/03/2021."],
-  ["Potrero: nombre exacto de un potrero ya creado en Mapa & Potreros. Si aún no los tiene, deje la columna vacía."],
+  ["Potrero: nombre del potrero donde está el animal. Si todavía no existe, se crea solo con el nombre y lo ubica en el mapa después desde Mapa & Potreros."],
   ["Arete madre / Arete padre: aretes de animales que vienen en este mismo archivo o que ya están en Aurora."],
   ["Estado reproductivo: VACIA, PREÑADA o EN_ESPERA. Estado productivo: CRIANDO, ORDEÑO o SECA."],
   ["Padrote de la preñez (solo preñadas): arete del toro si está en su hato, o el nombre del toro o la pajuela si es externo."],

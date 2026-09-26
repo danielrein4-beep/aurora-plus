@@ -72,7 +72,7 @@ public class GanaderiaImportacionService {
         public String fechaNacimiento;
         public String pesoActual;
         public String valorEstimado;
-        public String potrero;           // nombre del potrero ya creado en Aurora
+        public String potrero;           // nombre del potrero; si no existe se crea (solo con el nombre)
         public String lote;
         public String areteMadre;        // arete de la madre (en el archivo o ya en el hato)
         public String aretePadre;        // arete del padre (en el archivo o ya en el hato)
@@ -105,6 +105,10 @@ public class GanaderiaImportacionService {
         public List<ErrorFila> errores = new ArrayList<>();
         public Map<String, Integer> porTipo = new TreeMap<>();
         public Map<String, Integer> porRaza = new TreeMap<>();
+        /** Animales por potrero ("Sin potrero" si no se indicó). */
+        public Map<String, Integer> porPotrero = new TreeMap<>();
+        /** Potreros que no existían y se crean con esta carga (se ubican en el mapa después). */
+        public List<String> potrerosNuevos = new ArrayList<>();
     }
 
     /** Fila ya validada y normalizada, lista para persistir. */
@@ -121,6 +125,8 @@ public class GanaderiaImportacionService {
         BigDecimal pesoActual;
         BigDecimal valorEstimado;
         Potrero potrero;
+        /** Nombre de un potrero que todavía no existe: se crea al confirmar. */
+        String potreroNuevo;
         String lote;
         String areteMadre;
         String aretePadre;
@@ -220,6 +226,15 @@ public class GanaderiaImportacionService {
         for (FilaValida v : validas) {
             resultado.porTipo.merge(v.tipoAnimal != null ? v.tipoAnimal : "SIN TIPO", 1, Integer::sum);
             resultado.porRaza.merge(v.raza != null ? v.raza : "Sin raza", 1, Integer::sum);
+            if (v.potreroNuevo != null) {
+                // El mismo potrero escrito distinto ("La Lomita" / "la lomita") es uno solo: se usa
+                // el nombre de la primera fila que lo trae.
+                String canonico = resultado.potrerosNuevos.stream().filter(n -> clave(n).equals(clave(v.potreroNuevo))).findFirst().orElse(null);
+                if (canonico == null) resultado.potrerosNuevos.add(v.potreroNuevo);
+                else v.potreroNuevo = canonico;
+            }
+            String nombrePotrero = v.potrero != null ? v.potrero.getNombre() : v.potreroNuevo != null ? v.potreroNuevo : "Sin potrero";
+            resultado.porPotrero.merge(nombrePotrero, 1, Integer::sum);
             if ("PREÑADA".equals(v.estadoReproductivo)) resultado.preneces++;
             if (v.sociedad != null) resultado.animalesEnSociedad++;
         }
@@ -227,6 +242,18 @@ public class GanaderiaImportacionService {
         if (!resultado.errores.isEmpty() || !confirmar) {
             resultado.errores.sort(Comparator.comparingInt(e -> e.fila));
             return resultado;
+        }
+
+        // ── Crear los potreros nuevos (solo nombre; se dibujan en el mapa después) ──
+        for (String nombre : resultado.potrerosNuevos) {
+            Potrero p = new Potrero();
+            p.setTenantId(tenantId);
+            p.setNombre(nombre);
+            p.setEstado("ACTIVO");
+            potrerosPorNombre.put(clave(nombre), potreroRepository.save(p));
+        }
+        for (FilaValida v : validas) {
+            if (v.potrero == null && v.potreroNuevo != null) v.potrero = potrerosPorNombre.get(clave(v.potreroNuevo));
         }
 
         // ── Persistir: primero todos los animales, luego las relaciones entre ellos ──
@@ -392,9 +419,14 @@ public class GanaderiaImportacionService {
         String potrero = texto(f.potrero);
         if (potrero != null) {
             v.potrero = potreros.get(clave(potrero));
+            // Un potrero que no existe se crea solo con el nombre: en la finca se sabe dónde está
+            // cada animal mucho antes de tener el potrero dibujado en el mapa.
             if (v.potrero == null) {
-                errores.add(new ErrorFila(numero, "potrero",
-                    "El potrero '" + potrero + "' no existe. Créelo primero en Mapa & Potreros o deje la celda vacía"));
+                if (potrero.length() > 100) {
+                    errores.add(new ErrorFila(numero, "potrero", "El nombre del potrero es demasiado largo (máximo 100 caracteres)"));
+                } else {
+                    v.potreroNuevo = potrero;
+                }
             }
         }
 

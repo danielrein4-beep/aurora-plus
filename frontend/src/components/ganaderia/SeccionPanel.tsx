@@ -25,6 +25,8 @@ interface Props {
   ventasLeche: VentaLecheTanque[];
   abrirNuevoPotrero: () => void;
   setAltaAnimal: (valores: Partial<FormAltaAnimal> | null) => void;
+  /** Registro rápido del hato con potrero por animal (solo quien puede importar). */
+  abrirRegistroRapido?: () => void;
   setModalAjusteTanque: (abierto: boolean) => void;
   setModalRotar: (potrero: PotreroGanaderia | null) => void;
   setModalVentaLeche: (abierto: boolean) => void;
@@ -37,7 +39,7 @@ interface Props {
 export default function SeccionPanel({
   alertasSanitarias, animales, animalesActivos, monedasConfig, ordenos, potreros, precioLecheUSD,
   tanqueLeche, tasaBCV, tasaCOP, tenantId, totalAnimales, vacunas, ventasLeche, abrirNuevoPotrero,
-  setAltaAnimal, setModalAjusteTanque, setModalRotar, setModalVentaLeche, setOrdenoAbierto,
+  setAltaAnimal, abrirRegistroRapido, setModalAjusteTanque, setModalRotar, setModalVentaLeche, setOrdenoAbierto,
   setSubPotreros, setTab,
 }: Props) {
   // Ubicación real de la finca (backend). Antes se miraba una clave del navegador que es de las monedas.
@@ -181,23 +183,25 @@ export default function SeccionPanel({
                     )}
                   </div>
                   <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                    Dar de Alta Primer Animal
+                    {!tieneAnimales && abrirRegistroRapido ? "Registrar tu ganado" : "Dar de Alta Primer Animal"}
                   </h4>
                   <p className="text-[11px] text-slate-500">
                     {tieneAnimales
                       ? `${totalAnimales} cabezas activas en el hato.`
-                      : "Registra tu primer animal por nacimiento o compra con su arete."}
+                      : abrirRegistroRapido
+                        ? "Todos a la vez, con el potrero de cada uno. Los potreros los ubicas en el mapa después."
+                        : "Registra tu primer animal por nacimiento o compra con su arete."}
                   </p>
                 </div>
                 <button
-                  onClick={() => setAltaAnimal({})}
+                  onClick={() => (!tieneAnimales && abrirRegistroRapido ? abrirRegistroRapido() : setAltaAnimal({}))}
                   className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     tieneAnimales
                       ? "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
                       : "btn-cyber-neon text-white shadow-sm"
                   }`}
                 >
-                  {tieneAnimales ? "+ Nuevo Animal" : "+ Dar de Alta"}
+                  {tieneAnimales ? "+ Nuevo Animal" : abrirRegistroRapido ? "+ Registrar mi ganado" : "+ Dar de Alta"}
                 </button>
               </div>
             </div>

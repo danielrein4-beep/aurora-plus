@@ -21,6 +21,9 @@ interface Props {
     hectareas: number;
   }) => void;
   tenantId?: number;
+  /** Potrero ya creado (solo con nombre) que se está ubicando: el mapa abre en modo trazar. */
+  potreroAUbicar?: PotreroGanaderia | null;
+  onCancelarUbicar?: () => void;
 }
 
 export interface FincaConfig {
@@ -67,6 +70,8 @@ export default function GanaderiaMapa({
   onEditarPotrero,
   onGuardarPotreroTrazado,
   tenantId: propTenantId,
+  potreroAUbicar,
+  onCancelarUbicar,
 }: Props) {
   const { user } = useAuth();
   const effectiveTenantId = propTenantId || (user?.tenantId ? Number(user.tenantId) : 1);
@@ -111,6 +116,41 @@ export default function GanaderiaMapa({
   const [verticesTrazado, setVerticesTrazado] = useState<[number, number][]>([]);
 
   const hectareasTrazadas = calcularHectareasPoligono(verticesTrazado);
+
+  // Al pedir "Ubicar en el mapa" desde la lista, el mapa abre directo en modo trazar.
+  useEffect(() => {
+    if (!potreroAUbicar) return;
+    setVerticesTrazado([]);
+    setModoTrazar(true);
+  }, [potreroAUbicar?.id]);
+
+  // Caminar el borde del potrero con el teléfono: cada toque agrega un poste donde está la persona.
+  const [buscandoGps, setBuscandoGps] = useState(false);
+  const [avisoGps, setAvisoGps] = useState<string | null>(null);
+  const agregarPuntoGps = () => {
+    setAvisoGps(null);
+    if (!window.isSecureContext || !navigator.geolocation) {
+      setAvisoGps("El GPS del teléfono solo funciona cuando Aurora abre con https (en el servidor). Por ahora marca los puntos tocando el mapa.");
+      return;
+    }
+    setBuscandoGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setBuscandoGps(false);
+        const punto: [number, number] = [Number(pos.coords.latitude.toFixed(6)), Number(pos.coords.longitude.toFixed(6))];
+        setVerticesTrazado((prev) => [...prev, punto]);
+        mapInstanceRef.current?.flyTo(punto, Math.max(mapInstanceRef.current.getZoom(), 17), { duration: 0.6 });
+        if (pos.coords.accuracy > 25) setAvisoGps(`Punto agregado con precisión de ±${Math.round(pos.coords.accuracy)} m. Si puedes, espera unos segundos al aire libre.`);
+      },
+      (err) => {
+        setBuscandoGps(false);
+        setAvisoGps(err.code === err.PERMISSION_DENIED
+          ? "Aurora no tiene permiso para usar tu ubicación. Actívalo en los ajustes del navegador."
+          : "No se pudo leer el GPS. Intenta de nuevo al aire libre.");
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  };
 
   useEffect(() => {
     let activo = true;
@@ -670,6 +710,8 @@ export default function GanaderiaMapa({
   const handleCancelarTrazado = () => {
     setVerticesTrazado([]);
     setModoTrazar(false);
+    setAvisoGps(null);
+    onCancelarUbicar?.();
   };
 
   // Finalizar trazado y guardar potrero
@@ -890,7 +932,7 @@ export default function GanaderiaMapa({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
             <span className="font-['Outfit'] font-bold text-white text-sm">
-              Trazador de Potrero Activo
+              {potreroAUbicar ? `Ubicando: ${potreroAUbicar.nombre}` : "Trazador de Potrero Activo"}
             </span>
           </div>
 
@@ -898,7 +940,7 @@ export default function GanaderiaMapa({
 
           <div className="text-slate-300">
             {verticesTrazado.length === 0 ? (
-              <span>Haz clic en el mapa satelital para marcar el primer poste de la cerca.</span>
+              <span>Toca el mapa en cada esquina de la cerca, o camina el borde y usa "Punto donde estoy (GPS)".</span>
             ) : verticesTrazado.length < 3 ? (
               <span>
                 <strong>{verticesTrazado.length}</strong> {verticesTrazado.length === 1 ? "vértice" : "vértices"} marcados (mínimo 3 requeridos).
@@ -910,7 +952,13 @@ export default function GanaderiaMapa({
             )}
           </div>
 
-          <div className="flex items-center gap-2 ml-2">
+          <div className="flex flex-wrap items-center gap-2 ml-2">
+            <button
+              onClick={agregarPuntoGps}
+              disabled={buscandoGps}
+              className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer transition-all disabled:opacity-50">
+              {buscandoGps ? "Buscando GPS…" : "Punto donde estoy (GPS)"}
+            </button>
             {verticesTrazado.length > 0 && (
               <button
                 onClick={handleDeshacerVertice}
@@ -925,7 +973,13 @@ export default function GanaderiaMapa({
               className="px-3 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-black cursor-pointer shadow-md transition-all">
               Guardar Potrero ({hectareasTrazadas} ha)
             </button>
+            <button
+              onClick={handleCancelarTrazado}
+              className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-medium cursor-pointer transition-all">
+              Cancelar
+            </button>
           </div>
+          {avisoGps && <div className="w-full text-amber-300 text-[11px]">{avisoGps}</div>}
         </div>
       )}
 

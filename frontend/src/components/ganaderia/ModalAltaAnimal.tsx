@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { IconCart, IconCoins, IconSprout } from "../../Icons";
-import { crearAnimalGanaderia, type AnimalGanaderia, type PotreroGanaderia } from "../../api";
+import { crearAnimalGanaderia, crearPotreroGanaderia, type AnimalGanaderia, type PotreroGanaderia } from "../../api";
 import { encolarAccionGanaderia, esFalloDeConexion, generarClaveIdempotencia } from "../../offlineQueueGanaderia";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import { RAZAS_BOVINAS_COMUNES } from "./catalogos";
@@ -44,6 +44,8 @@ interface Props {
   /** Se guardó en la cola offline (sin señal): el padre refresca el contador de pendientes. */
   onEncolado: () => void;
   onCerrar: () => void;
+  /** Se creó un potrero desde el alta ("+ Nuevo potrero…"): el padre lo suma a su lista. */
+  onPotreroCreado?: (potrero: PotreroGanaderia) => void;
 }
 
 /**
@@ -51,8 +53,35 @@ interface Props {
  * abierto con raza, potrero y origen para dar de alta varios del mismo lote.
  */
 export default function ModalAltaAnimal({
-  animales, animalesActivos, potreros, valoresIniciales, tenantId, notificar, onCreado, onEncolado, onCerrar,
+  animales, animalesActivos, potreros: potrerosPadre, valoresIniciales, tenantId, notificar, onCreado, onEncolado, onCerrar, onPotreroCreado,
 }: Props) {
+  // Potreros creados desde este mismo formulario, antes de que la lista del padre se actualice.
+  const [potrerosNuevos, setPotrerosNuevos] = useState<PotreroGanaderia[]>([]);
+  const potreros = [...potrerosPadre, ...potrerosNuevos.filter(n => !potrerosPadre.some(p => p.id === n.id))];
+  const [creandoPotrero, setCreandoPotrero] = useState(false);
+
+  // "+ Nuevo potrero…": se crea solo con el nombre y se ubica en el mapa después (Mapa & Potreros).
+  const crearPotreroDesdeAlta = async () => {
+    const nombre = prompt("Nombre del nuevo potrero (lo ubicas en el mapa después):")?.trim();
+    if (!nombre) return;
+    const repetido = potreros.find(p => p.nombre.trim().toLowerCase() === nombre.toLowerCase());
+    if (repetido) {
+      setFormAnimal(prev => ({ ...prev, potreroId: repetido.id }));
+      return;
+    }
+    setCreandoPotrero(true);
+    try {
+      const nuevo = await crearPotreroGanaderia(tenantId, { nombre, estado: "ACTIVO" });
+      setPotrerosNuevos(prev => [...prev, nuevo]);
+      setFormAnimal(prev => ({ ...prev, potreroId: nuevo.id }));
+      onPotreroCreado?.(nuevo);
+      notificar(`Potrero "${nombre}" creado. Ubícalo en el mapa cuando puedas desde Mapa & Potreros.`);
+    } catch (e) {
+      notificar(`No se pudo crear el potrero: ${e instanceof Error ? e.message : "revisa la conexión"}`);
+    } finally {
+      setCreandoPotrero(false);
+    }
+  };
   const [formAnimal, setFormAnimal] = useState<FormAltaAnimal>(() => ({ ...altaVacia(potreros[0]?.id || 0), ...valoresIniciales }));
 
   // El formulario de Alta de Animal arranca con potreroId: 0 (sin potrero real
@@ -364,11 +393,16 @@ export default function ModalAltaAnimal({
               <label className="text-slate-400 block mb-1">Potrero Asignado</label>
               <select
                 value={formAnimal.potreroId}
-                onChange={e => setFormAnimal({ ...formAnimal, potreroId: Number(e.target.value) })}
+                disabled={creandoPotrero}
+                onChange={e => (e.target.value === "-1"
+                  ? crearPotreroDesdeAlta()
+                  : setFormAnimal({ ...formAnimal, potreroId: Number(e.target.value) }))}
                 className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
+                {potreros.length === 0 && <option value={0}>Sin potrero</option>}
                 {potreros.map(p => (
                   <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
+                <option value={-1}>+ Nuevo potrero…</option>
               </select>
             </div>
           </div>
