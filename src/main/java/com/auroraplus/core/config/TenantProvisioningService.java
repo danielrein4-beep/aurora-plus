@@ -163,6 +163,17 @@ public class TenantProvisioningService {
             }
         }
 
+        // Restaurante y Salud: Personal y asistencia, para que cada trabajador marque su entrada y su salida.
+        if ("horeca".equals(moduloBackend) || "salud".equals(moduloBackend)) {
+            for (String flag : List.of("personal", "asistencia")) {
+                ModuloTenant mt = new ModuloTenant();
+                mt.setTenantId(nuevoTenantId);
+                mt.setModuloNombre(flag);
+                mt.setActivo(true);
+                moduloTenantRepository.save(mt);
+            }
+        }
+
         // Ganadería incluye Personal y nómina de los obreros (directorio, jornadas y nómina).
         if ("ganaderia".equals(moduloBackend)) {
             for (String flag : List.of("personal", "asistencia", "nomina-avanzada")) {
@@ -227,7 +238,7 @@ public class TenantProvisioningService {
 
     private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia", "estetica");
 
-    private static final Set<String> VERTICALES_COMERCIO = Set.of("repuestos", "ferreteria", "moda", "tamanaco-comercial", "farmacia");
+    private static final Set<String> VERTICALES_COMERCIO = Set.of("comercio", "repuestos", "ferreteria", "moda", "tamanaco-comercial", "farmacia");
 
     public static final Set<String> TODOS_LOS_MODULOS = Set.of(
         "salud", "ganaderia", "horeca", "repuestos", "farmacia", "ferreteria", "moda", "minero", "tamanaco-comercial"

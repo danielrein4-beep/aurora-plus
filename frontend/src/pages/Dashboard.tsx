@@ -1,5 +1,6 @@
 import { obtenerCuentasCobro, combinarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
 import { descargarReciboPagoAurora } from "../utils/reciboAurora";
+import MiAsistencia from "../components/personal/MiAsistencia";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
@@ -976,6 +977,8 @@ export default function Dashboard() {
         {/* ── PESTAÑA 1: LAUNCHER & ENTORNO DE LA VERTICAL (MEDICLINIC PRO) ── */}
         {activeTab === "vertical" && (
           <div className="space-y-8">
+            {/* El trabajador vinculado a su usuario marca aquí su entrada y su salida (se oculta para el dueño). */}
+            <MiAsistencia compacto />
             
             {/* HERO LAUNCHER CARD — DISEÑO REDONDEADO Y ELEGANTE ESTILO APPLE LIQUID GLASS */}
             <div className="relative apple-glass rounded-[32px] p-6 sm:p-9 overflow-hidden shadow-2xl border border-teal-500/30 bg-gradient-to-br from-slate-900/95 via-[#0c1424]/95 to-slate-900/95 backdrop-blur-2xl">

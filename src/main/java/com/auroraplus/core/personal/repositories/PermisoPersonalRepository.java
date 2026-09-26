@@ -8,4 +8,6 @@ import java.util.Optional;
 @Repository
 public interface PermisoPersonalRepository extends JpaRepository<PermisoPersonal, Long> {
     Optional<PermisoPersonal> findByTenantIdAndUsuarioId(Long tenantId, Long usuarioId);
+
+    java.util.List<PermisoPersonal> findByTenantIdAndEmpleadoId(Long tenantId, Long empleadoId);
 }

@@ -5132,6 +5132,10 @@ export function listarEmpleadosPersonal(): Promise<EmpleadoPersonalApi[]> {
   return request("/api/personal/empleados");
 }
 
+export function crearEmpleadoPersonal(datos: { nombreCompleto: string; documentoIdentidad: string; fechaIngreso: string }): Promise<EmpleadoPersonalApi> {
+  return request("/api/personal/empleados", { method: "POST", body: JSON.stringify(datos) });
+}
+
 export interface EntradaDirectorioPersonalApi {
   id: number;
   nombreCompleto: string;
@@ -5266,6 +5270,42 @@ export function registrarSalidaPersonal(id: number, fechaHoraSalida: string): Pr
     method: "PATCH",
     body: JSON.stringify({ fechaHoraSalida }),
   });
+}
+
+/** Marcaje propio: el trabajador vinculado a este usuario (la hora la pone el servidor). */
+export interface EstadoMiAsistencia {
+  empleadoId: number;
+  nombre: string;
+  entradaAbierta: AsistenciaPersonalApi | null;
+  recientes: AsistenciaPersonalApi[];
+}
+
+export function obtenerMiAsistencia(): Promise<EstadoMiAsistencia> {
+  return request(`/api/personal/asistencia/mia`);
+}
+
+export function marcarMiEntrada(): Promise<AsistenciaPersonalApi> {
+  return request(`/api/personal/asistencia/mia/entrada`, { method: "POST" });
+}
+
+export function marcarMiSalida(): Promise<AsistenciaPersonalApi> {
+  return request(`/api/personal/asistencia/mia/salida`, { method: "POST" });
+}
+
+/** Usuario del negocio vinculado a un trabajador para que marque su asistencia (solo el dueño). */
+export interface AccesoTrabajador { usuarioId: number; username: string | null }
+
+export async function verAccesoTrabajador(empleadoId: number): Promise<AccesoTrabajador | null> {
+  const r = await request<AccesoTrabajador | undefined>(`/api/personal/accesos/empleado/${empleadoId}`);
+  return r ?? null;
+}
+
+export function vincularAccesoTrabajador(empleadoId: number, usuarioId: number): Promise<AccesoTrabajador> {
+  return request(`/api/personal/accesos/empleado/${empleadoId}`, { method: "PUT", body: JSON.stringify({ usuarioId }) });
+}
+
+export function quitarAccesoTrabajador(empleadoId: number): Promise<{ quitado: boolean }> {
+  return request(`/api/personal/accesos/empleado/${empleadoId}`, { method: "DELETE" });
 }
 
 export function listarMetasPersonal(): Promise<MetaPersonalApi[]> {

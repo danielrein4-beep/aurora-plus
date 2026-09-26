@@ -29,7 +29,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
               }`}
             />
             <span className="font-bold tracking-tight text-slate-900">{c.concepto}</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-mono font-light uppercase tracking-wide">
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-mono font-normal">
               {c.vigencia}
             </span>
           </div>
@@ -46,7 +46,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
         </div>
 
         <div className="text-right sm:pl-4 sm:border-l sm:border-[#1e293b] self-end sm:self-center">
-          <span className="text-[10px] text-slate-500 block sm:hidden font-light uppercase tracking-wide">Resultado:</span>
+          <span className="text-[10px] text-slate-500 block sm:hidden font-normal">Resultado:</span>
           <span
             className={`font-mono text-sm font-bold ${
               c.tipo === 'PERCEPCION' ? 'text-[#177E89]' : 'text-rose-600'
@@ -67,21 +67,21 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
         <div>
           <h4 className="font-bold tracking-tight text-slate-900 text-xs">{recibo.empleadoNombre}</h4>
-          <p className="text-[11px] text-slate-500 font-light uppercase tracking-wide">
+          <p className="text-[11px] text-slate-500 font-normal">
             {recibo.empleadoCargo} &bull; <span className="text-slate-700">{recibo.departamento}</span>
           </p>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <div className="text-right">
-            <span className="text-slate-500 block text-[10px] font-light uppercase tracking-wide">Días computados</span>
-            <span className="font-mono font-light uppercase tracking-wide text-slate-900">{recibo.diasTrabajados} días</span>
+            <span className="text-slate-500 block text-[10px] font-normal">Días computados</span>
+            <span className="font-mono font-normal text-slate-900">{recibo.diasTrabajados} días</span>
           </div>
           <div className="text-right">
-            <span className="text-slate-500 block text-[10px] font-light uppercase tracking-wide">Horas extras</span>
-            <span className="font-mono font-light uppercase tracking-wide text-slate-900">{recibo.horasExtrasTotal} hrs</span>
+            <span className="text-slate-500 block text-[10px] font-normal">Horas extras</span>
+            <span className="font-mono font-normal text-slate-900">{recibo.horasExtrasTotal} hrs</span>
           </div>
           <div className="text-right pl-3 border-l border-slate-200">
-            <span className="text-slate-500 block text-[10px] font-light uppercase tracking-wide">Neto a liquidar</span>
+            <span className="text-slate-500 block text-[10px] font-normal">Neto a liquidar</span>
             <span className="font-mono font-bold text-[#177E89] text-xs">
               {ocultarSueldo ? '••••••' : formatearMoneda(recibo.montoNetoPagar, recibo.moneda)}
             </span>
@@ -91,7 +91,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
 
       {/* Asignaciones / Percepciones */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px] font-light uppercase tracking-wider text-slate-500">
+        <div className="flex items-center justify-between text-[11px] font-normalr text-slate-500">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded bg-[#177E89]" />
             Percepciones y Asignaciones
@@ -108,7 +108,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
       {/* Deducciones */}
       {deducciones.length > 0 && (
         <div className="space-y-2 pt-2">
-          <div className="flex items-center justify-between text-[11px] font-light uppercase tracking-wider text-slate-500">
+          <div className="flex items-center justify-between text-[11px] font-normalr text-slate-500">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded bg-[#f87171]" />
               Deducciones y Retenciones
@@ -125,7 +125,7 @@ export const DetalleCalculoNomina: React.FC<DetalleCalculoNominaProps> = ({
 
       {/* Totalizador de Auditoría */}
       <div className="p-3 rounded-lg bg-white border border-slate-200 flex items-center justify-between text-xs">
-        <span className="text-slate-500 font-light uppercase tracking-wide">
+        <span className="text-slate-500 font-normal">
           Fórmula de liquidación: <span className="font-mono text-slate-500">Neto = Total Percepciones - Total Deducciones</span>
         </span>
         <span className="font-mono font-bold text-[#177E89]">

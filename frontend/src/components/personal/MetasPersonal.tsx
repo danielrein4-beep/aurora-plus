@@ -120,7 +120,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMensaje && (
-        <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-emerald-600 font-light uppercase tracking-wide flex items-center justify-between animate-fade-in">
+        <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-emerald-600 font-normal flex items-center justify-between animate-fade-in">
           <span>{toastMensaje}</span>
           <button onClick={() => setToastMensaje(null)} className="text-xs text-emerald-600 hover:underline" aria-label="Cerrar notificación">
             ✕
@@ -140,7 +140,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
               Política Ética Aurora Plus
             </span>
           </div>
-          <p className="text-slate-500 leading-relaxed font-light uppercase tracking-wide">
+          <p className="text-slate-500 leading-relaxed font-normal">
             Las metas y métricas del personal son herramientas formativas de excelencia clínica y operativa. Ningún algoritmo ni objetivo incumplido ejecuta sanciones automáticas, reducciones forzosas de honorarios ni despidos.
           </p>
         </div>
@@ -154,7 +154,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
       <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <label htmlFor="tipo-meta" className="text-xs text-slate-500 font-light uppercase tracking-wide">
+            <label htmlFor="tipo-meta" className="text-xs text-slate-500 font-normal">
               Tipo de Meta:
             </label>
             <select
@@ -170,7 +170,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <label htmlFor="depto-meta" className="text-xs text-slate-500 font-light uppercase tracking-wide">
+            <label htmlFor="depto-meta" className="text-xs text-slate-500 font-normal">
               Departamento:
             </label>
             <select
@@ -190,7 +190,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
 
         {puedeGestionar && <button
           onClick={() => setModalCrearAbierto(true)}
-          className="px-3.5 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-light uppercase tracking-wide text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+          className="px-3.5 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-normal text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
         >
           + Crear meta formativa
         </button>}
@@ -213,7 +213,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                   <div>
                     <div className="flex items-center gap-2">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-light uppercase tracking-wide border ${
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-normal border ${
                           esAutomatica
                             ? 'bg-[#38bdf8]/15 text-sky-600 border-[#38bdf8]/30'
                             : 'bg-slate-100 text-slate-700 border-slate-300'
@@ -229,7 +229,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                   </div>
 
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-light uppercase tracking-wide ${
+                    className={`text-xs px-2 py-0.5 rounded-full font-normal ${
                       meta.estado === 'COMPLETADA'
                         ? 'bg-[#10b981]/15 text-emerald-600'
                         : 'bg-[#fbbf24]/15 text-amber-600'
@@ -239,7 +239,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-500 leading-relaxed font-light uppercase tracking-wide">{meta.descripcion}</p>
+                <p className="text-xs text-slate-500 leading-relaxed font-normal">{meta.descripcion}</p>
               </div>
 
               <div className="space-y-2 pt-2 border-t border-slate-200">
@@ -303,7 +303,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Título del Objetivo:</label>
+                <label className="text-slate-500 block mb-1 font-normal">Título del Objetivo:</label>
                 <input
                   type="text"
                   value={nuevoTitulo}
@@ -314,7 +314,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
               </div>
 
               <div>
-                <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Descripción:</label>
+                <label className="text-slate-500 block mb-1 font-normal">Descripción:</label>
                 <textarea
                   rows={2}
                   value={nuevaDescripcion}
@@ -325,7 +325,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
               </div>
 
               <div>
-                <label htmlFor="meta-empleado" className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Empleado:</label>
+                <label htmlFor="meta-empleado" className="text-slate-500 block mb-1 font-normal">Empleado:</label>
                 <select id="meta-empleado" value={empleadoSeleccionado} onChange={(e) => setEmpleadoSeleccionado(e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#177E89]">
                   {empleados.map((empleado) => <option key={empleado.id} value={empleado.id}>{empleado.nombre} · {empleado.cargo}</option>)}
@@ -334,13 +334,13 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label htmlFor="meta-desde" className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Desde:</label>
+                  <label htmlFor="meta-desde" className="text-slate-500 block mb-1 font-normal">Desde:</label>
                   <input id="meta-desde" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
                   />
                 </div>
                 <div>
-                  <label htmlFor="meta-hasta" className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Hasta:</label>
+                  <label htmlFor="meta-hasta" className="text-slate-500 block mb-1 font-normal">Hasta:</label>
                   <input id="meta-hasta" type="date" value={fechaLimite} onChange={(e) => setFechaLimite(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
                   />
@@ -349,7 +349,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Meta a Alcanzar:</label>
+                  <label className="text-slate-500 block mb-1 font-normal">Meta a Alcanzar:</label>
                   <input
                     type="number"
                     value={nuevoValor}
@@ -358,7 +358,7 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Unidad:</label>
+                  <label className="text-slate-500 block mb-1 font-normal">Unidad:</label>
                   <input
                     type="text"
                     value={nuevaUnidad}
@@ -373,14 +373,14 @@ export const MetasPersonal: React.FC<MetasPersonalProps> = ({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setModalCrearAbierto(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 text-xs font-light uppercase tracking-wide text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+                className="px-4 py-2 rounded-lg bg-slate-100 text-xs font-normal text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCrearMeta}
                 disabled={guardando}
-                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-light uppercase tracking-wide text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-normal text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 {guardando ? 'Guardando…' : 'Crear meta formativa'}
               </button>

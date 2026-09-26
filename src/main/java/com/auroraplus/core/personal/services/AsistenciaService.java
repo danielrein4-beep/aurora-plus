@@ -47,6 +47,55 @@ public class AsistenciaService {
     public RegistroAsistencia registrarEntrada(Long tenantId, RegistroAsistencia registro) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
         accessService.exigirRol(tenantId, PUEDEN_REGISTRAR);
+        return guardarEntrada(tenantId, registro);
+    }
+
+    // ── Marcaje propio: el trabajador marca SU entrada y SU salida con su usuario ──
+    // La hora la pone el servidor (no el teléfono), así nadie puede adelantarla ni atrasarla, y el
+    // trabajador solo puede marcarse a sí mismo: el empleado sale del vínculo usuario-trabajador.
+
+    public record EstadoMiAsistencia(Long empleadoId, String nombre, RegistroAsistencia entradaAbierta,
+                                     List<RegistroAsistencia> recientes) {}
+
+    public EstadoMiAsistencia miEstado(Long tenantId) {
+        Long empleadoId = miEmpleadoId(tenantId);
+        var empleado = empleadoRepository.findByTenantIdAndId(tenantId, empleadoId)
+            .orElseThrow(() -> new RuntimeException("Tu ficha de trabajador ya no existe"));
+        var abierta = registroAsistenciaRepository
+            .findFirstByTenantIdAndEmpleadoIdAndFechaHoraSalidaIsNullOrderByFechaHoraEntradaDesc(tenantId, empleadoId).orElse(null);
+        var recientes = registroAsistenciaRepository.findByTenantIdAndEmpleadoId(tenantId, empleadoId).stream()
+            .sorted(java.util.Comparator.comparing(RegistroAsistencia::getFechaHoraEntrada).reversed())
+            .limit(10).toList();
+        return new EstadoMiAsistencia(empleadoId, empleado.getNombreCompleto(), abierta, recientes);
+    }
+
+    @Transactional
+    public RegistroAsistencia marcarMiEntrada(Long tenantId) {
+        RegistroAsistencia registro = new RegistroAsistencia();
+        registro.setEmpleadoId(miEmpleadoId(tenantId));
+        registro.setFechaHoraEntrada(java.time.LocalDateTime.now());
+        registro.setOrigen(RegistroAsistencia.Origen.APP);
+        return guardarEntrada(tenantId, registro);
+    }
+
+    @Transactional
+    public RegistroAsistencia marcarMiSalida(Long tenantId) {
+        Long empleadoId = miEmpleadoId(tenantId);
+        RegistroAsistencia abierta = registroAsistenciaRepository
+            .findFirstByTenantIdAndEmpleadoIdAndFechaHoraSalidaIsNullOrderByFechaHoraEntradaDesc(tenantId, empleadoId)
+            .orElseThrow(() -> new IllegalStateException("No tienes una entrada abierta. Marca primero tu entrada."));
+        return cerrarSalida(tenantId, abierta.getId(), java.time.LocalDateTime.now());
+    }
+
+    private Long miEmpleadoId(Long tenantId) {
+        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
+        return accessService.obtenerPermisoPersonalActual(tenantId)
+            .map(com.auroraplus.core.personal.entities.PermisoPersonal::getEmpleadoId)
+            .orElseThrow(() -> new IllegalStateException(
+                "Tu usuario no está vinculado a un trabajador. Pide al dueño que te dé acceso desde Personal."));
+    }
+
+    private RegistroAsistencia guardarEntrada(Long tenantId, RegistroAsistencia registro) {
         if (registro.getEmpleadoId() == null || registro.getFechaHoraEntrada() == null || registro.getOrigen() == null) {
             throw new IllegalArgumentException("Empleado, fecha de entrada y origen son obligatorios");
         }
@@ -89,6 +138,10 @@ public class AsistenciaService {
     public RegistroAsistencia registrarSalida(Long tenantId, Long registroId, java.time.LocalDateTime salida) {
         accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA);
         accessService.exigirRol(tenantId, PUEDEN_REGISTRAR);
+        return cerrarSalida(tenantId, registroId, salida);
+    }
+
+    private RegistroAsistencia cerrarSalida(Long tenantId, Long registroId, java.time.LocalDateTime salida) {
         RegistroAsistencia registro = registroAsistenciaRepository.findById(registroId)
             .filter(r -> r.getTenantId().equals(tenantId))
             .orElseThrow(() -> new RuntimeException("Registro de asistencia no encontrado"));

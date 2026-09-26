@@ -116,7 +116,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMensaje && (
-        <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-emerald-600 font-light uppercase tracking-wide flex items-center justify-between animate-fade-in">
+        <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-emerald-600 font-normal flex items-center justify-between animate-fade-in">
           <span>{toastMensaje}</span>
           <button onClick={() => setToastMensaje(null)} className="text-xs text-emerald-600 hover:underline" aria-label="Cerrar notificación">
             ✕
@@ -128,7 +128,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
       <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <label htmlFor="fecha-asistencia" className="text-xs text-slate-500 font-light uppercase tracking-wide">
+            <label htmlFor="fecha-asistencia" className="text-xs text-slate-500 font-normal">
               Fecha:
             </label>
             <input
@@ -141,7 +141,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <label htmlFor="depto-asistencia" className="text-xs text-slate-500 font-light uppercase tracking-wide">
+            <label htmlFor="depto-asistencia" className="text-xs text-slate-500 font-normal">
               {v.area}:
             </label>
             <select
@@ -161,7 +161,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
 
         {puedeRegistrar && <button
           onClick={() => setModalMarcajeAbierto(true)}
-          className="px-3.5 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-light uppercase tracking-wide text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+          className="px-3.5 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-normal text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
         >
           ⏱️ Registrar marcaje
         </button>}
@@ -173,11 +173,11 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
           <span className="font-bold tracking-tight text-slate-900">
             Marcaciones registradas el <span className="font-mono text-[#177E89]">{fechaFiltro}</span>
           </span>
-          <span className="text-slate-500 font-mono font-light uppercase tracking-wide">{filtradas.length} Registros</span>
+          <span className="text-slate-500 font-mono font-normal">{filtradas.length} Registros</span>
         </div>
 
         {filtradas.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-xs font-light uppercase tracking-wide">
+          <div className="p-8 text-center text-slate-500 text-xs font-normal">
             No se registran asistencias para esta fecha y {v.area.toLowerCase()}.
           </div>
         ) : (
@@ -200,14 +200,14 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                     <td className="py-3 px-4 font-bold tracking-tight text-slate-900">
                       {ast.empleadoNombre}
                     </td>
-                    <td className="py-3 px-4 text-slate-500 font-light uppercase tracking-wide">{v.nombreArea(ast.departamento)}</td>
+                    <td className="py-3 px-4 text-slate-500 font-normal">{v.nombreArea(ast.departamento)}</td>
                     <td className="py-3 px-4 font-mono text-slate-700">
                       {ast.horaEntradaProgramada} - {ast.horaSalidaProgramada}
                     </td>
                     <td className="py-3 px-4 font-mono text-[#177E89]">
                       {ast.horaEntradaReal || '--:--'} - {ast.horaSalidaReal || '--:--'}
                       {ast.minutosRetardo > 0 && (
-                        <span className="block text-[11px] text-amber-600 font-sans font-light uppercase tracking-wide">
+                        <span className="block text-[11px] text-amber-600 font-sans font-normal">
                           +{ast.minutosRetardo}m retardo
                         </span>
                       )}
@@ -222,7 +222,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                     </td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-light uppercase tracking-wide ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-normal ${
                           ast.estado === 'PRESENTE'
                             ? 'bg-[#10b981]/15 text-emerald-600'
                             : ast.estado === 'RETARDO'
@@ -233,13 +233,13 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                         {ast.estado}
                       </span>
                       {ast.justificacion && (
-                        <span className="block text-[11px] text-slate-500 italic mt-0.5 max-w-[200px] truncate font-light uppercase tracking-wide" title={ast.justificacion}>
+                        <span className="block text-[11px] text-slate-500 italic mt-0.5 max-w-[200px] truncate font-normal" title={ast.justificacion}>
                           {ast.justificacion}
                         </span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className="text-[11px] font-mono font-light uppercase tracking-wide px-2 py-0.5 rounded bg-white text-slate-500 border border-slate-200">
+                      <span className="text-[11px] font-mono font-normal px-2 py-0.5 rounded bg-white text-slate-500 border border-slate-200">
                         {getMetodoIcon(ast.metodoMarcaje)}
                       </span>
                     </td>
@@ -276,7 +276,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">{v.Persona}:</label>
+                <label className="text-slate-500 block mb-1 font-normal">{v.Persona}:</label>
                 <select
                   value={empleadoSeleccionado}
                   onChange={(e) => setEmpleadoSeleccionado(e.target.value)}
@@ -291,12 +291,12 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
               </div>
 
               <div>
-                <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Tipo de Marcación:</label>
+                <label className="text-slate-500 block mb-1 font-normal">Tipo de Marcación:</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setTipoMarcaje('ENTRADA')}
-                    className={`py-2 rounded-lg font-light uppercase tracking-wide border text-center transition-colors ${
+                    className={`py-2 rounded-lg font-normal border text-center transition-colors ${
                       tipoMarcaje === 'ENTRADA'
                         ? 'bg-[#177E89]/20 border-[#177E89] text-[#177E89]'
                         : 'bg-white border-slate-200 text-slate-500'
@@ -307,7 +307,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                   <button
                     type="button"
                     onClick={() => setTipoMarcaje('SALIDA')}
-                    className={`py-2 rounded-lg font-light uppercase tracking-wide border text-center transition-colors ${
+                    className={`py-2 rounded-lg font-normal border text-center transition-colors ${
                       tipoMarcaje === 'SALIDA'
                         ? 'bg-[#f87171]/20 border-[#f87171] text-rose-600'
                         : 'bg-white border-slate-200 text-slate-500'
@@ -320,7 +320,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Hora:</label>
+                  <label className="text-slate-500 block mb-1 font-normal">Hora:</label>
                   <input
                     type="time"
                     value={horaMarcaje}
@@ -329,7 +329,7 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-slate-500 block mb-1 font-light uppercase tracking-wide">Método:</label>
+                  <label className="text-slate-500 block mb-1 font-normal">Método:</label>
                   <select
                     value={metodoSeleccionado}
                     onChange={(e) => setMetodoSeleccionado(e.target.value as MetodoMarcaje)}
@@ -346,14 +346,14 @@ export const AsistenciaPersonal: React.FC<AsistenciaPersonalProps> = ({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setModalMarcajeAbierto(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 text-xs font-light uppercase tracking-wide text-slate-700 hover:bg-slate-200"
+                className="px-4 py-2 rounded-lg bg-slate-100 text-xs font-normal text-slate-700 hover:bg-slate-200"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleRegistrarMarcaje}
                 disabled={guardando}
-                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-light uppercase tracking-wide text-xs"
+                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-normal text-xs"
               >
                 {guardando ? 'Guardando…' : 'Confirmar registro'}
               </button>

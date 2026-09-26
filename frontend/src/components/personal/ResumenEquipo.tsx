@@ -1,257 +1,253 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Empleado, PeriodoNomina, RegistroAsistencia, AsignacionTurno, SeccionPersonal, formatearMoneda } from './types';
 import { EstadoNominaBadge } from './EstadoNominaBadge';
 import { useVocabularioPersonal } from './vocabulario';
+import { crearEmpleadoPersonal } from '../../api';
 
 interface ResumenEquipoProps {
   empleados: Empleado[];
   periodoActual: PeriodoNomina;
+  /** Marcajes de los últimos 30 días (de aquí se sacan los de hoy y los de la semana). */
   asistenciasHoy: RegistroAsistencia[];
   turnosHoy: AsignacionTurno[];
   onNavegarSeccion: (seccion: SeccionPersonal) => void;
   ocultarSueldo: boolean;
   nominaHabilitada: boolean;
+  /** Puede agregar trabajadores (dueño o RRHH). */
+  puedeAgregar?: boolean;
+  onEmpleadoCreado?: () => void;
 }
 
+const fechaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/**
+ * Panel para vigilar la empresa: quién está trabajando ahora, quién ya marcó y quién falta hoy,
+ * las horas de la semana y los horarios de hoy. Antes "Asistencia hoy" contaba los marcajes de
+ * los últimos 30 días y "En puesto" siempre salía en 0.
+ */
 export const ResumenEquipo: React.FC<ResumenEquipoProps> = ({
   empleados,
   periodoActual,
-  asistenciasHoy,
-  turnosHoy,
+  asistenciasHoy: asistencias,
+  turnosHoy: turnos,
   onNavegarSeccion,
   ocultarSueldo,
   nominaHabilitada,
+  puedeAgregar = false,
+  onEmpleadoCreado,
 }) => {
   const v = useVocabularioPersonal();
-  const activosCount = empleados.filter((e) => e.estado === 'ACTIVO').length;
-  const vacacionesCount = empleados.filter((e) => e.estado === 'DE_VACACIONES').length;
-  const presentesHoy = asistenciasHoy.filter((a) => a.estado === 'PRESENTE' || a.estado === 'RETARDO').length;
-  const retardoHoy = asistenciasHoy.filter((a) => a.estado === 'RETARDO').length;
-  
-  // Conteo por departamento
-  const porDepto = empleados.reduce<Record<string, number>>((acc, emp) => {
+  const hoy = fechaLocal(new Date());
+  const haceUnaSemana = fechaLocal(new Date(Date.now() - 6 * 86400000));
+
+  const activos = empleados.filter((e) => e.estado === 'ACTIVO');
+  const deHoy = asistencias.filter((a) => a.fecha === hoy);
+  const trabajandoAhora = deHoy.filter((a) => !a.horaSalidaReal);
+  const yaMarcaron = new Set(deHoy.map((a) => a.empleadoId));
+  const faltan = activos.filter((e) => !yaMarcaron.has(e.id));
+  const usanMarcaje = asistencias.length > 0;
+  const horasSemana = asistencias.filter((a) => a.fecha >= haceUnaSemana).reduce((s, a) => s + (a.horasTrabajadas || 0), 0);
+  const horariosDeHoy = turnos.filter((t) => t.fecha === hoy);
+
+  const porArea = empleados.reduce<Record<string, number>>((acc, emp) => {
     acc[emp.departamento] = (acc[emp.departamento] || 0) + 1;
     return acc;
   }, {});
 
+  if (empleados.length === 0) {
+    return <PrimerTrabajador puedeAgregar={puedeAgregar} onCreado={onEmpleadoCreado} />;
+  }
+
+  const Numero = ({ valor, texto, color, onClick }: { valor: number | string; texto: string; color: string; onClick?: () => void }) => (
+    <button type="button" onClick={onClick} className="text-left p-4 bg-white border border-slate-200 rounded-2xl hover:border-[#177E89]/50 transition-colors cursor-pointer">
+      <div className={`text-3xl font-bold ${color}`}>{valor}</div>
+      <div className="text-sm text-slate-600 mt-1">{texto}</div>
+    </button>
+  );
+
   return (
     <div className="space-y-6">
-      {/* Estado de las fuentes del módulo */}
-      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded bg-[#177E89]/15 text-[#177E89] font-mono font-light uppercase tracking-wide border border-[#177E89]/30">
-            EN LÍNEA
-          </span>
-          <span className="text-slate-500 font-light uppercase tracking-wide">
-            Datos de {v.tuNegocio}, según los permisos de tu usuario.
-          </span>
+      {puedeAgregar && (
+        <div className="flex justify-end">
+          <AgregarTrabajador onCreado={onEmpleadoCreado} />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#177E89] animate-pulse" />
-          <span className="text-slate-900 font-light uppercase tracking-wide font-mono">Personal & Nómina</span>
-        </div>
-      </div>
+      )}
 
-      {/* Tarjetas de Métricas Principales (Grid Responsive 360px+) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Equipo */}
-        <div
-          onClick={() => onNavegarSeccion('empleados')}
-          className="p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:border-[#177E89]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#177E89]"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('empleados')}
-        >
-          <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
-            <span>Total {v.Personas}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-mono text-[#177E89]">
-              {activosCount} Activos
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-900">
-              {empleados.length}
-            </span>
-            <span className="text-xs font-light uppercase tracking-wide text-slate-500">registrados</span>
-          </div>
-          <div className="mt-2 text-xs font-light uppercase tracking-wide text-slate-500 flex items-center gap-2">
-            <span className="text-[#177E89]">&bull;</span>
-            <span>{vacacionesCount} de vacaciones</span>
-          </div>
+      {/* Hoy */}
+      <section className="space-y-3">
+        <h3 className="text-base font-bold text-slate-900">Hoy en {v.tuNegocio}</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Numero valor={trabajandoAhora.length} texto="Trabajando ahora" color="text-[#177E89]" onClick={() => onNavegarSeccion('asistencia')} />
+          <Numero valor={yaMarcaron.size} texto="Ya marcaron hoy" color="text-slate-900" onClick={() => onNavegarSeccion('asistencia')} />
+          <Numero valor={usanMarcaje ? faltan.length : '—'} texto="Faltan por marcar" color={faltan.length > 0 && usanMarcaje ? 'text-amber-600' : 'text-slate-900'} onClick={() => onNavegarSeccion('asistencia')} />
+          <Numero valor={`${Math.round(horasSemana)} h`} texto="Trabajadas en 7 días" color="text-slate-900" onClick={() => onNavegarSeccion('asistencia')} />
         </div>
+        {!usanMarcaje && (
+          <p className="text-sm text-slate-500">
+            Todavía nadie ha marcado entrada. Puedes registrarla tú en Asistencia, o darle a cada {v.persona} acceso para que marque desde su teléfono (en su ficha).
+          </p>
+        )}
+      </section>
 
-        {/* Asistencia de Hoy */}
-        <div
-          onClick={() => onNavegarSeccion('asistencia')}
-          className="p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:border-[#177E89]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#177E89]"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('asistencia')}
-        >
-          <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
-            <span>Asistencia Hoy</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-mono text-sky-600">
-              {asistenciasHoy.length} Registros
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-900">
-              {presentesHoy}
-            </span>
-            <span className="text-xs font-light uppercase tracking-wide text-slate-500">en jornada</span>
-          </div>
-          <div className="mt-2 text-xs font-light uppercase tracking-wide text-slate-500 flex items-center gap-2">
-            {retardoHoy > 0 ? (
-              <span className="text-amber-600 font-light uppercase tracking-wide">{retardoHoy} con retardo registrado</span>
-            ) : asistenciasHoy.length > 0 ? (
-              <span className="text-[#177E89]">Sin retardos registrados</span>
-            ) : (
-              <span className="text-slate-500">Sin marcajes en el período consultado</span>
-            )}
-          </div>
-        </div>
-
-        {/* Turnos en Curso */}
-        <div
-          onClick={() => onNavegarSeccion('turnos')}
-          className="p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:border-[#177E89]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#177E89]"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('turnos')}
-        >
-          <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
-            <span>{v.coberturaTurnos}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-mono text-sky-600">
-              Jornada Activa
-            </span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-bold font-mono text-slate-900">
-              {turnosHoy.filter((t) => t.estado === 'EN_CURSO').length}
-            </span>
-            <span className="text-xs font-light uppercase tracking-wide text-slate-500">en puesto</span>
-          </div>
-          <div className="mt-2 text-xs font-light uppercase tracking-wide text-slate-500">
-            <span>{v.areasActivas}</span>
-          </div>
-        </div>
-
-        {/* Período de Nómina Actual */}
-        <div
-          onClick={() => onNavegarSeccion('nomina')}
-          className="p-4 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:border-[#177E89]/50 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#177E89]"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && onNavegarSeccion('nomina')}
-        >
-          <div className="flex items-center justify-between text-xs font-light uppercase tracking-wide text-slate-500 mb-1">
-            <span>Aurora Nómina</span>
-            {nominaHabilitada ? (
-              <EstadoNominaBadge estado={periodoActual.estado} />
-            ) : (
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#f59e0b]/15 text-amber-600 font-mono font-light uppercase tracking-wide border border-[#f59e0b]/30">
-                Desactivado
-              </span>
-            )}
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl sm:text-2xl font-bold font-mono text-[#177E89]">
-              {ocultarSueldo ? '••••••' : formatearMoneda(periodoActual.montoTotalNeto, periodoActual.monedaPrincipal)}
-            </span>
-            <span className="text-xs font-light uppercase tracking-wide text-slate-500">neto</span>
-          </div>
-          <div className="mt-2 text-[11px] font-light uppercase tracking-wide text-slate-500 truncate font-mono">
-            {periodoActual.nombre}
-          </div>
-        </div>
-      </div>
-
-      {/* Sección Doble: Distribución por Área y Turnos del Día */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Distribución de Personal */}
-        <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold tracking-tight text-slate-900">{v.distribucion}</h3>
-              <p className="text-xs font-light uppercase tracking-wide text-slate-500">{v.distribucionDetalle}</p>
+        {/* Quién está y quién falta */}
+        <section className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3">
+          <h3 className="text-base font-bold text-slate-900">Quién está trabajando</h3>
+          {trabajandoAhora.length === 0 ? (
+            <p className="text-sm text-slate-500">Nadie tiene una entrada abierta en este momento.</p>
+          ) : (
+            <ul className="space-y-2">
+              {trabajandoAhora.map((a) => (
+                <li key={a.id} className="flex justify-between text-sm">
+                  <span className="font-semibold text-slate-800">{a.empleadoNombre}</span>
+                  <span className="text-slate-500">desde las {a.horaEntradaReal}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {usanMarcaje && faltan.length > 0 && (
+            <div className="pt-3 border-t border-slate-100">
+              <div className="text-sm font-semibold text-amber-700 mb-1">No han marcado hoy</div>
+              <p className="text-sm text-slate-600">{faltan.slice(0, 8).map((e) => e.nombre).join(', ')}{faltan.length > 8 ? ` y ${faltan.length - 8} más` : ''}</p>
             </div>
-            <button
-              onClick={() => onNavegarSeccion('empleados')}
-              className="text-xs text-[#177E89] hover:underline font-light uppercase tracking-wide"
-            >
-              Ver todos &rarr;
+          )}
+        </section>
+
+        {/* Horarios de hoy */}
+        <section className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-900">{v.turnosTitulo}</h3>
+            <button onClick={() => onNavegarSeccion('turnos')} className="text-sm text-[#177E89] font-semibold hover:underline cursor-pointer">
+              {v.turnosAccion} →
             </button>
           </div>
+          {horariosDeHoy.length === 0 ? (
+            <p className="text-sm text-slate-500">No hay horarios asignados para hoy.</p>
+          ) : (
+            <ul className="space-y-2">
+              {horariosDeHoy.map((t) => (
+                <li key={t.id} className="flex justify-between text-sm">
+                  <span className="font-semibold text-slate-800">{t.empleadoNombre}</span>
+                  <span className="text-slate-500">{t.turnoNombre}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
 
-          <div className="space-y-3 pt-2">
-            {Object.entries(porDepto).map(([depto, count]) => {
-              const porcentaje = Math.round((count / empleados.length) * 100);
-              return (
-                <div key={depto} className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-700 font-light uppercase tracking-wide">{v.nombreArea(depto)}</span>
-                    <span className="font-mono text-slate-500">
-                      {count} ({porcentaje}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-white h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-[#177E89] h-full rounded-full transition-all duration-300"
-                      style={{ width: `${porcentaje}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Turnos en Curso Hoy */}
-        <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Equipo */}
+        <section className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold tracking-tight text-slate-900">{v.turnosTitulo}</h3>
-              <p className="text-xs font-light uppercase tracking-wide text-slate-500">{v.turnosDetalle}</p>
-            </div>
-            <button
-              onClick={() => onNavegarSeccion('turnos')}
-              className="text-xs text-[#177E89] hover:underline font-light uppercase tracking-wide"
-            >
-              {v.turnosAccion} &rarr;
+            <h3 className="text-base font-bold text-slate-900">{v.distribucion}</h3>
+            <button onClick={() => onNavegarSeccion('empleados')} className="text-sm text-[#177E89] font-semibold hover:underline cursor-pointer">
+              Ver {v.personas} →
             </button>
           </div>
-
-          <div className="space-y-2 pt-1 max-h-[260px] overflow-y-auto pr-1">
-            {turnosHoy.map((t) => (
-              <div
-                key={t.id}
-                className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between gap-3 text-xs"
-              >
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900">{t.empleadoNombre}</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-light uppercase tracking-wide">
-                      {v.nombreArea(t.departamento)}
-                    </span>
-                  </div>
-                  <p className="text-slate-500 text-[11px] font-light uppercase tracking-wide">{t.turnoNombre}</p>
+          <p className="text-sm text-slate-600">{activos.length} {activos.length === 1 ? v.persona : v.personas} activos de {empleados.length}.</p>
+          <div className="space-y-2">
+            {Object.entries(porArea).map(([area, cantidad]) => (
+              <div key={area} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-700">{v.nombreArea(area)}</span>
+                  <span className="text-slate-500">{cantidad}</span>
                 </div>
-
-                <div>
-                  {t.estado === 'EN_CURSO' ? (
-                    <span className="inline-flex items-center gap-1 text-[#177E89] font-light uppercase tracking-wide font-mono text-[11px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#177E89] animate-pulse" />
-                      En Servicio
-                    </span>
-                  ) : (
-                    <span className="text-slate-500 font-mono text-[11px] font-light uppercase tracking-wide">Programado</span>
-                  )}
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                  <div className="bg-[#177E89] h-full rounded-full" style={{ width: `${Math.round((cantidad / empleados.length) * 100)}%` }} />
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
+
+        {/* Pagos */}
+        {nominaHabilitada && (
+          <section className="p-5 bg-white border border-slate-200 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900">Último pago de nómina</h3>
+              <EstadoNominaBadge estado={periodoActual.estado} />
+            </div>
+            <div className="text-2xl font-bold text-[#177E89]">
+              {ocultarSueldo ? '••••••' : formatearMoneda(periodoActual.montoTotalNeto, periodoActual.monedaPrincipal)}
+            </div>
+            <p className="text-sm text-slate-500">{periodoActual.nombre}</p>
+            <button onClick={() => onNavegarSeccion('nomina')} className="text-sm text-[#177E89] font-semibold hover:underline cursor-pointer">
+              Ver nómina →
+            </button>
+          </section>
+        )}
       </div>
     </div>
+  );
+};
+
+/** Primer paso cuando todavía no hay nadie registrado. */
+const PrimerTrabajador: React.FC<{ puedeAgregar: boolean; onCreado?: () => void }> = ({ puedeAgregar, onCreado }) => {
+  const v = useVocabularioPersonal();
+  return (
+    <div className="p-8 bg-white border border-dashed border-slate-300 rounded-2xl text-center space-y-3">
+      <h3 className="text-lg font-bold text-slate-900">Agrega a tu primer {v.persona}</h3>
+      <p className="text-sm text-slate-600 max-w-md mx-auto">
+        Con tu equipo registrado vas a ver quién está trabajando, quién faltó, cuántas horas trabajó cada uno y lo que toca pagar.
+      </p>
+      {puedeAgregar ? <AgregarTrabajador onCreado={onCreado} grande /> : (
+        <p className="text-sm text-slate-500">Pide al dueño del negocio que registre al equipo.</p>
+      )}
+    </div>
+  );
+};
+
+/** Alta rápida: nombre, cédula y fecha de ingreso. */
+const AgregarTrabajador: React.FC<{ onCreado?: () => void; grande?: boolean }> = ({ onCreado, grande = false }) => {
+  const v = useVocabularioPersonal();
+  const [abierto, setAbierto] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [cedula, setCedula] = useState('');
+  const [ingreso, setIngreso] = useState(fechaLocal(new Date()));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState('');
+
+  const guardar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!nombre.trim() || !cedula.trim()) { setError('Escribe el nombre y la cédula.'); return; }
+    setGuardando(true);
+    try {
+      await crearEmpleadoPersonal({ nombreCompleto: nombre.trim(), documentoIdentidad: cedula.trim(), fechaIngreso: ingreso });
+      setNombre(''); setCedula(''); setAbierto(false);
+      onCreado?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (!abierto) {
+    return (
+      <button type="button" onClick={() => setAbierto(true)}
+        style={{ backgroundColor: '#0F766E', color: '#FFFFFF' }}
+        className={`${grande ? 'px-6 py-3 text-base' : 'px-4 py-2 text-sm'} rounded-xl font-bold cursor-pointer`}>
+        + Agregar {v.persona}
+      </button>
+    );
+  }
+  return (
+    <form onSubmit={guardar} className="w-full max-w-md mx-auto text-left p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+      <div className="text-sm font-bold text-slate-900">Nuevo {v.persona}</div>
+      <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre y apellido" className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm" autoFocus />
+      <input value={cedula} onChange={(e) => setCedula(e.target.value)} placeholder="Cédula (ej. V-12345678)" className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm" />
+      <label className="block text-xs text-slate-500">Fecha de ingreso
+        <input type="date" value={ingreso} onChange={(e) => setIngreso(e.target.value)} className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm" />
+      </label>
+      {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => setAbierto(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 cursor-pointer">Cancelar</button>
+        <button type="submit" disabled={guardando} style={{ backgroundColor: '#0F766E', color: '#FFFFFF' }} className="flex-1 py-2.5 rounded-xl text-sm font-bold cursor-pointer disabled:opacity-60">
+          {guardando ? 'Guardando…' : 'Guardar'}
+        </button>
+      </div>
+    </form>
   );
 };

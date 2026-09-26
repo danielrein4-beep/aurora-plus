@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Empleado, RegistroAsistencia, MetaPersonal, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { DetalleCalculoNomina } from './DetalleCalculoNomina';
 import { useVocabularioPersonal } from './vocabulario';
+import AccesoMarcaje from './AccesoMarcaje';
 
 interface PerfilEmpleadoProps {
   empleado: Empleado;
@@ -10,6 +11,8 @@ interface PerfilEmpleadoProps {
   recibosHistoricos: ReciboNominaEmpleado[];
   onCerrar: () => void;
   ocultarSueldo: boolean;
+  /** Solo el dueño: elegir con qué usuario marca este trabajador su entrada y salida. */
+  puedeDarAcceso?: boolean;
 }
 
 export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
@@ -19,6 +22,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
   recibosHistoricos,
   onCerrar,
   ocultarSueldo,
+  puedeDarAcceso = false,
 }) => {
   const v = useVocabularioPersonal();
   const [pestanaActiva, setPestanaActiva] = useState<'info' | 'asistencia' | 'metas' | 'recibos'>('info');
@@ -75,7 +79,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                   {empleado.codigoEmpleado}
                 </span>
               </div>
-              <p className="text-xs font-light uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-normal text-slate-500">
                 {empleado.cargo} &bull; <span className="text-slate-700">{v.nombreArea(empleado.departamento)}</span>
               </p>
             </div>
@@ -92,7 +96,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
         </div>
 
         {/* Pestañas de Navegación Interna */}
-        <div className="flex border-b border-slate-200 bg-white px-4 overflow-x-auto text-xs font-light uppercase tracking-wide text-slate-500">
+        <div className="flex border-b border-slate-200 bg-white px-4 overflow-x-auto text-xs font-normal text-slate-500">
           <button
             onClick={() => setPestanaActiva('info')}
             className={`py-3 px-3 border-b-2 transition-colors whitespace-nowrap ${
@@ -139,6 +143,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 text-xs sm:text-sm">
           {pestanaActiva === 'info' && (
             <div className="space-y-6">
+              {puedeDarAcceso && <AccesoMarcaje empleadoId={Number(empleado.id)} />}
               {/* Información Personal */}
               <div className="space-y-3">
                 <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
@@ -146,20 +151,20 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Documento de Identidad</span>
-                    <span className="font-mono text-slate-700 font-light uppercase tracking-wide">{empleado.identificacion}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Documento de Identidad</span>
+                    <span className="font-mono text-slate-700 font-normal">{empleado.identificacion}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Correo Electrónico</span>
-                    <span className="text-slate-700 font-light uppercase tracking-wide">{empleado.email}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Correo Electrónico</span>
+                    <span className="text-slate-700 font-normal">{empleado.email}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Teléfono de Contacto</span>
-                    <span className="font-mono text-slate-700 font-light uppercase tracking-wide">{empleado.telefono}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Teléfono de Contacto</span>
+                    <span className="font-mono text-slate-700 font-normal">{empleado.telefono}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Fecha de Ingreso</span>
-                    <span className="font-mono text-slate-700 font-light uppercase tracking-wide">{empleado.fechaIngreso}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Fecha de Ingreso</span>
+                    <span className="font-mono text-slate-700 font-normal">{empleado.fechaIngreso}</span>
                   </div>
                 </div>
               </div>
@@ -171,19 +176,19 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Tipo de Contrato</span>
-                    <span className="text-slate-700 font-light uppercase tracking-wide">{empleado.tipoContrato.replace(/_/g, ' ')}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Tipo de Contrato</span>
+                    <span className="text-slate-700 font-normal">{empleado.tipoContrato.replace(/_/g, ' ')}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Modalidad de Pago</span>
-                    <span className="text-slate-700 font-light uppercase tracking-wide">{empleado.modalidadPago}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Modalidad de Pago</span>
+                    <span className="text-slate-700 font-normal">{empleado.modalidadPago}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Turno Habitual</span>
-                    <span className="text-sky-600 font-light uppercase tracking-wide">{empleado.turnoAsignado}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Turno Habitual</span>
+                    <span className="text-sky-600 font-normal">{empleado.turnoAsignado}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Sueldo pactado</span>
+                    <span className="text-xs text-slate-500 block font-normal">Sueldo pactado</span>
                     <span className="font-mono text-[#177E89] font-bold text-sm sm:text-base">
                       {ocultarSueldo
                         ? '••••••'
@@ -191,12 +196,12 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Entidad bancaria</span>
-                    <span className="text-slate-700 font-light uppercase tracking-wide">{ocultarSueldo ? '••••••' : (empleado.bancoReferencial || 'No configurado')}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Entidad bancaria</span>
+                    <span className="text-slate-700 font-normal">{ocultarSueldo ? '••••••' : (empleado.bancoReferencial || 'No configurado')}</span>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-500 block font-light uppercase tracking-wide">Cuenta / Referencia</span>
-                    <span className="font-mono text-slate-700 font-light uppercase tracking-wide">{ocultarSueldo ? '••••••' : (empleado.cuentaReferencial || '••••')}</span>
+                    <span className="text-xs text-slate-500 block font-normal">Cuenta / Referencia</span>
+                    <span className="font-mono text-slate-700 font-normal">{ocultarSueldo ? '••••••' : (empleado.cuentaReferencial || '••••')}</span>
                   </div>
                 </div>
               </div>
@@ -209,7 +214,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 Historial reciente de marcaciones
               </h4>
               {asistenciasEmpleado.length === 0 ? (
-                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200 font-light uppercase tracking-wide">
+                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200 font-normal">
                   No hay registros de marcaje recientes para este {v.persona}.
                 </div>
               ) : (
@@ -222,19 +227,19 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-slate-700 font-bold">{a.fecha}</span>
-                          <span className="px-2 py-0.2 rounded text-[10px] font-light uppercase tracking-wide bg-slate-100 text-[#177E89]">
+                          <span className="px-2 py-0.2 rounded text-[10px] font-normal bg-slate-100 text-[#177E89]">
                             {a.estado}
                           </span>
                         </div>
-                        <p className="text-slate-500 font-light uppercase tracking-wide">
+                        <p className="text-slate-500 font-normal">
                           Programado: {a.horaEntradaProgramada} - {a.horaSalidaProgramada} | Real: {a.horaEntradaReal || '--'} - {a.horaSalidaReal || '--'}
                         </p>
                         {a.justificacion && (
-                          <p className="text-amber-600 text-[11px] italic font-light uppercase tracking-wide">Nota: {a.justificacion}</p>
+                          <p className="text-amber-600 text-[11px] italic font-normal">Nota: {a.justificacion}</p>
                         )}
                       </div>
                       <div className="text-right">
-                        <span className="font-mono font-light uppercase tracking-wide text-[#177E89]">
+                        <span className="font-mono font-normal text-[#177E89]">
                           {a.horasTrabajadas}h laboradas
                         </span>
                         {a.horasExtras > 0 && (
@@ -256,7 +261,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 Metas y Rendimiento No Punitivo
               </h4>
               {metasEmpleado.length === 0 ? (
-                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200 font-light uppercase tracking-wide">
+                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200 font-normal">
                   No hay metas asignadas a este colaborador en el ciclo actual.
                 </div>
               ) : (
@@ -271,7 +276,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                           <div className="flex items-center gap-2">
                             <span className="font-bold tracking-tight text-slate-900 text-sm">{m.titulo}</span>
                             <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-light uppercase tracking-wide ${
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-normal ${
                                 m.tipo === 'AUTOMATICA'
                                   ? 'bg-[#38bdf8]/15 text-sky-600 border border-[#38bdf8]/30'
                                   : 'bg-slate-100 text-slate-700 border border-slate-300'
@@ -280,7 +285,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                               [{m.tipo}]
                             </span>
                           </div>
-                          <p className="text-slate-500 text-xs mt-0.5 font-light uppercase tracking-wide">{m.descripcion}</p>
+                          <p className="text-slate-500 text-xs mt-0.5 font-normal">{m.descripcion}</p>
                         </div>
                         <span className="font-mono text-[#177E89] font-bold">
                           {m.progresoActual == null ? 'Sin seguimiento' : `${m.progresoActual} / ${m.metaValor} ${m.unidadMedida}`}
@@ -313,7 +318,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
                 Recibos de Quincena y Desglose de Fórmulas
               </h4>
               {recibosEmpleado.length === 0 ? (
-                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200 font-light uppercase tracking-wide">
+                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-slate-200 font-normal">
                   No se registran recibos calculados para este colaborador en el histórico.
                 </div>
               ) : (
@@ -335,7 +340,7 @@ export const PerfilEmpleado: React.FC<PerfilEmpleadoProps> = ({
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
           <button
             onClick={onCerrar}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs font-light uppercase tracking-wide text-slate-900 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-xs font-normal text-slate-900 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
           >
             Cerrar Ficha
           </button>
