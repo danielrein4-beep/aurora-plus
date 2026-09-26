@@ -28,6 +28,9 @@ WORKDIR /app
 # contenedor en vez de root.
 RUN useradd --system --create-home --uid 10001 aurora
 COPY --from=build --chown=aurora:aurora /app/target/*.jar app.jar
+# Carpeta de archivos subidos: el backend escribe en uploads/... relativo a /app.
+# Sin esto, /app es de root y "aurora" no podría crearla.
+RUN mkdir -p /app/uploads && chown aurora:aurora /app/uploads
 USER aurora
 
 EXPOSE 8080

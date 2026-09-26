@@ -44,3 +44,7 @@ build/
 ### Herramientas locales (JDK/Maven portables descargados para esta sesión) ###
 .tools/
 backend-dev.log
+
+# Datos del servidor: archivos subidos y respaldos de la base (nunca al repo)
+/uploads/
+/backups/

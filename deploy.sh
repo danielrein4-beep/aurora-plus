@@ -81,6 +81,13 @@ echo "==> Construyendo imágenes (backend + frontend)"
 docker compose "${PERFILES[@]}" build
 
 # --- 4. Levantar ------------------------------------------------------------
+# Carpeta de archivos subidos (volumen ./uploads del compose): si Docker la crea
+# sola queda de root y el backend (uid 10001, "aurora") no puede escribir en ella.
+mkdir -p uploads
+if [ "$(stat -c %u uploads)" != "10001" ]; then
+  chown 10001:10001 uploads 2>/dev/null || sudo chown 10001:10001 uploads
+fi
+
 echo "==> Levantando servicios"
 docker compose "${PERFILES[@]}" up -d --remove-orphans
 

@@ -96,6 +96,14 @@ services:
       # que un OOM mate el proceso y "restart: unless-stopped" lo reviva, en
       # vez de dejar la app viva pero atascada.
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError -Duser.timezone=America/Caracas}
+      # Zona horaria también por el sistema: si alguien redefine JAVA_TOOL_OPTIONS en
+      # .env sin -Duser.timezone, la JVM sigue en hora de Caracas (cierres, vencimientos, BCV).
+      TZ: America/Caracas
+    # Archivos que el backend guarda en disco (hoy: fotos de animales y módulos de
+    # Tamanaco). Carpeta real del host, para que no se borren al recrear el
+    # contenedor; deploy.sh la crea con dueño uid 10001 (usuario "aurora").
+    volumes:
+      - ./uploads:/app/uploads
     healthcheck:
       # Chequeo sin dependencias extra (la imagen JRE no trae curl): abre un
       # socket TCP contra el puerto de Tomcat desde bash.
@@ -181,8 +189,10 @@ services:
       DB_NAME: ${DB_NAME:-auroraplus_db}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      TZ: America/Caracas
     volumes:
       - ./backups:/backups
+      - ./uploads:/uploads:ro
       - ./docker/backup/backup.sh:/backup.sh:ro
     networks:
       - internal
