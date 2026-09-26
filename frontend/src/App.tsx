@@ -1,3 +1,5 @@
+import AvisosGlobales from "./components/AvisosGlobales";
+import AvisoSuscripcion from "./components/AvisoSuscripcion";
 import CatalogoPublico from "./pages/CatalogoPublico";
 import NotFound from "./pages/NotFound";
 import { obtenerDatosImpersonacion, salirDeImpersonacion } from "./api";
@@ -6,8 +8,9 @@ import SuperAdminPortal from "./components/SuperAdminPortal";
 import PortalPublicoBioanalista from "./pages/PortalPublicoBioanalista";
 import PortalLaboratorioPaciente from "./pages/PortalLaboratorioPaciente";
 import PortalOdontologiaPaciente from "./pages/PortalOdontologiaPaciente";
-import { BrowserRouter, Routes, Route, Outlet, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useNavigate, useParams, useLocation } from "react-router-dom";
 import TenantSoporteWidget from "./components/TenantSoporteWidget";
+import AvisoSinConexion from "./components/AvisoSinConexion";
 import MercadoGanaderoApp from "./components/mercado/MercadoGanaderoApp";
 import Layout from "./Layout";
 import Home from "./pages/Home";
@@ -23,6 +26,7 @@ import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import MediclinicApp from "./components/MediclinicApp";
 import VeterinariaApp from "./components/VeterinariaApp";
+import EsteticaApp from "./components/EsteticaApp";
 import RestauranteApp from "./components/RestauranteApp";
 import ComercioApp from "./components/ComercioApp";
 import GanaderiaApp from "./components/GanaderiaApp";
@@ -39,10 +43,14 @@ import { ThemeProvider } from "./context/ThemeContext";
 // Zona privada: el boton de soporte acompana al tenant en el panel general
 // y dentro de cada vertical, para que pueda abrir un ticket sin salir de ella.
 function ZonaPrivada() {
+  // Ganadería trae su propio botón de soporte (se abre desde su menú): sin esto salían dos
+  // burbujas "Soporte Aurora" una encima de la otra.
+  const { pathname } = useLocation();
   return (
     <>
       <Outlet />
-      <TenantSoporteWidget />
+      {!pathname.startsWith("/ganaderia") && <TenantSoporteWidget />}
+      {!pathname.startsWith("/ganaderia") && !pathname.startsWith("/restaurante") && <AvisoSinConexion />}
     </>
   );
 }
@@ -59,6 +67,11 @@ function MediclinicPage() {
 function VeterinariaPage() {
   const navigate = useNavigate();
   return <VeterinariaApp onSalir={() => navigate("/dashboard")} />;
+}
+
+function EsteticaPage() {
+  const navigate = useNavigate();
+  return <EsteticaApp onSalir={() => navigate("/dashboard")} />;
 }
 
 function RestaurantePage() {
@@ -154,6 +167,8 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <ImpersonacionBarraFlotante />
+          <AvisosGlobales />
+          <AvisoSuscripcion />
           <Routes>
             {/* Public site with shared layout */}
             <Route element={<Layout />}>
@@ -188,6 +203,7 @@ export default function App() {
               <Route path="/personal" element={<ProtectedRoute><PersonalRoute><AnimatedRoute><Personal /></AnimatedRoute></PersonalRoute></ProtectedRoute>} />
               <Route path="/mediclinic" element={<ProtectedRoute><AnimatedRoute><MediclinicPage /></AnimatedRoute></ProtectedRoute>} />
               <Route path="/veterinaria" element={<ProtectedRoute><AnimatedRoute><VeterinariaPage /></AnimatedRoute></ProtectedRoute>} />
+              <Route path="/estetica" element={<ProtectedRoute><AnimatedRoute><EsteticaPage /></AnimatedRoute></ProtectedRoute>} />
               <Route path="/restaurante" element={<ProtectedRoute><AnimatedRoute><RestaurantePage /></AnimatedRoute></ProtectedRoute>} />
               <Route path="/comercio"   element={<ProtectedRoute><AnimatedRoute><ComercioPage /></AnimatedRoute></ProtectedRoute>} />
               <Route path="/ganaderia"  element={<ProtectedRoute><AnimatedRoute><GanaderiaPage /></AnimatedRoute></ProtectedRoute>} />

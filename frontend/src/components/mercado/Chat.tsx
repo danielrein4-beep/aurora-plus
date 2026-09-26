@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import { useEffect, useRef, useState } from "react";
 import { listarMensajesMercado, enviarMensajeMercado, type MensajeMercado } from "../../api";
 import { CAJA, INPUT, BOTON, fechaCorta, mensajeError } from "./comun";
@@ -20,9 +21,12 @@ export default function Chat({ publicacionId, comprador, titulo, puedeEscribir, 
 
   useEffect(() => {
     let vigente = true;
+    let avisado = false; // se consulta cada 5 s: el aviso sale una sola vez, no en cada intento
     const cargar = () => listarMensajesMercado(publicacionId, comprador)
-      .then((m) => { if (vigente) setMensajes(m); })
-      .catch(() => {});
+      .then((m) => { if (vigente) { setMensajes(m); avisado = false; } })
+      .catch(() => {
+        if (vigente && !avisado) { avisado = true; avisar("No se pudieron cargar los mensajes. Se reintenta solo.", "error"); }
+      });
     cargar();
     const intervalo = setInterval(cargar, 5_000);
     return () => { vigente = false; clearInterval(intervalo); };

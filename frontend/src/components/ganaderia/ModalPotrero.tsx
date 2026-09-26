@@ -84,8 +84,8 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
             Agregar Potrero
@@ -98,7 +98,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
         </div>
 
         <form onSubmit={handleGuardarPotrero} className="space-y-4 text-xs">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Código *</label>
               <input
@@ -107,7 +107,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
                 placeholder="Ej. POT-05"
                 value={formPotrero.codigo}
                 onChange={e => setFormPotrero({ ...formPotrero, codigo: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums font-bold"
               />
             </div>
             <div>
@@ -123,7 +123,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Pasto Predominante</label>
               <input
@@ -160,7 +160,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Superficie (Hectáreas) *</label>
               <input
@@ -170,7 +170,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
                 required
                 value={formPotrero.areaHectareas}
                 onChange={e => setFormPotrero({ ...formPotrero, areaHectareas: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums"
               />
             </div>
             <div>
@@ -180,7 +180,7 @@ export default function ModalPotrero({ inicial, editandoId, potreros, tenantId, 
                 onFocus={e => e.target.select()}
                 value={formPotrero.capacidadAnimales}
                 onChange={e => setFormPotrero({ ...formPotrero, capacidadAnimales: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums"
               />
             </div>
           </div>

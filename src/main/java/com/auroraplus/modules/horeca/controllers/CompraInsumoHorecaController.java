@@ -1,5 +1,6 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.horeca.entities.CompraInsumoHoreca;
 import com.auroraplus.modules.horeca.repositories.CompraInsumoHorecaRepository;
 import com.auroraplus.modules.horeca.services.CompraInsumoHorecaService;
@@ -43,12 +44,14 @@ public class CompraInsumoHorecaController {
     // Sin tenantId acá, findAll() devolvía las compras de TODOS los tenants
     // mezcladas — mismo hallazgo que en el historial de cierres de caja.
     @GetMapping
-    public List<CompraInsumoHoreca> listar(@RequestParam Long tenantId) {
+    public List<CompraInsumoHoreca> listar() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return compraInsumoHorecaRepository.findByTenantIdOrderByFechaCompraDesc(tenantId);
     }
 
     @PostMapping
-    public ResponseEntity<CompraInsumoHoreca> registrar(@RequestParam Long tenantId, @RequestBody CompraRequest request) {
+    public ResponseEntity<CompraInsumoHoreca> registrar(@RequestBody CompraRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR");
         List<CompraInsumoHorecaService.ItemCompraInsumo> items = new ArrayList<>();
         for (ItemCompraRequest itemReq : request.items) {

@@ -84,6 +84,7 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
   const [diagnostico, setDiagnostico] = useState("");
   const [indicaciones, setIndicaciones] = useState("");
   const [recetas, setRecetas] = useState<RecetaGuardada[]>([]);
+  const [cargandoRecetas, setCargandoRecetas] = useState(true);
   const [alergiasAnamnesis, setAlergiasAnamnesis] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
@@ -134,11 +135,14 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
   };
 
   const cargarRecetas = async () => {
+    setCargandoRecetas(true);
     try {
       const res = await fetch(`/api/salud/odontologia/recetas?pacienteId=${paciente.id}`, { headers: authHeaders() });
       if (res.ok) setRecetas(await res.json());
     } catch {
       setRecetas([]);
+    } finally {
+      setCargandoRecetas(false);
     }
   };
 
@@ -165,7 +169,7 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
 
   const construirPdf = (medicamentos: RecipeItemData[], diag: string, indic: string, fecha: string): RecipeReportData => ({
     clinicaNombre: config?.clinicaNombre || "Clinica Odontologica",
-    doctorNombre: config?.doctorNombre || leerSesion()?.username || "Odontologo Tratante",
+    doctorNombre: config?.doctorNombre || "",
     especialidad: config?.especialidad || "Odontologia",
     matriculaMPPS: config?.matriculaMPPS,
     colegioMedicos: config?.colegioMedicos,
@@ -189,7 +193,15 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
 
   const [ultimaGuardada, setUltimaGuardada] = useState<RecipeReportData | null>(null);
 
+  // Una receta sin nombre, matrícula MPPS ni N° de Colegio no es válida: no se emite (antes salía "MPPS: N/A").
+  const faltanDatosLegales = (): boolean => {
+    if (config?.doctorNombre?.trim() && config?.matriculaMPPS?.trim() && config?.colegioMedicos?.trim()) return false;
+    setMensaje({ tipo: "error", texto: "Para emitir recetas, completa tu nombre, matrícula MPPS y N° del Colegio de Odontólogos en Configuración & Perfil." });
+    return true;
+  };
+
   const guardarEImprimir = async () => {
+    if (faltanDatosLegales()) return;
     if (items.length === 0) {
       setMensaje({ tipo: "error", texto: "Agrega al menos un medicamento a la receta." });
       return;
@@ -240,6 +252,7 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
   };
 
   const reimprimir = async (r: RecetaGuardada) => {
+    if (faltanDatosLegales()) return;
     const pdf = datosDeGuardada(r);
     recipeConQr(pdf, await obtenerQr()).save(nombreArchivo(pdf));
   };
@@ -327,8 +340,10 @@ export default function RecetasOdontologicas({ paciente, config }: RecetasOdonto
 
       <div className="p-5 rounded-3xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 space-y-3">
         <h4 className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">Recetas anteriores</h4>
-        {recetas.length === 0 ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400">Este paciente no tiene recetas odontologicas guardadas.</p>
+        {cargandoRecetas ? (
+          <p className="text-xs text-slate-400 dark:text-slate-500">Cargando recetas...</p>
+        ) : recetas.length === 0 ? (
+          <p className="text-xs text-slate-500 dark:text-slate-400">Aún no hay recetas de este paciente. La primera que guardes arriba aparecerá aquí.</p>
         ) : (
           <ul className="space-y-2">
             {recetas.map((r) => {

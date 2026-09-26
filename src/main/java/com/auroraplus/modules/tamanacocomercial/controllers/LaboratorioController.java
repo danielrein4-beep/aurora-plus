@@ -1,5 +1,6 @@
 package com.auroraplus.modules.tamanacocomercial.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.tamanacocomercial.dto.AnalisisLaboratorioDTO;
 import com.auroraplus.modules.tamanacocomercial.entities.AnalisisLaboratorio;
 import com.auroraplus.modules.tamanacocomercial.services.LaboratorioService;
@@ -23,7 +24,8 @@ public class LaboratorioController {
     private LaboratorioService laboratorioService;
 
     @PostMapping({"", "/guardar"})
-    public ResponseEntity<?> registrarAnalisis(@RequestParam Long tenantId, @RequestBody AnalisisLaboratorioDTO dto) {
+    public ResponseEntity<?> registrarAnalisis(@RequestBody AnalisisLaboratorioDTO dto) {
+        Long tenantId = TenantContext.getCurrentTenant();
         try {
             AnalisisLaboratorio guardado = laboratorioService.guardarAnalisis(tenantId, dto);
             return ResponseEntity.ok(guardado);
@@ -60,7 +62,8 @@ public class LaboratorioController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> actualizarAnalisis(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody AnalisisLaboratorioDTO dto) {
+    public ResponseEntity<?> actualizarAnalisis(@PathVariable Long id, @RequestBody AnalisisLaboratorioDTO dto) {
+        Long tenantId = TenantContext.getCurrentTenant();
         try {
             dto.setId(id);
             AnalisisLaboratorio actualizado = laboratorioService.guardarAnalisis(tenantId, dto);
@@ -71,7 +74,8 @@ public class LaboratorioController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> eliminarAnalisis(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<?> eliminarAnalisis(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         try {
             laboratorioService.eliminarAnalisis(tenantId, id);

@@ -8,8 +8,9 @@ import java.util.Set;
  * el panel nunca es la única barrera.
  *
  * - PROPIETARIO: todo, incluido gestionar el equipo y ver la auditoría global.
- * - SOPORTE: directorio en lectura, tickets, entrar como soporte a un negocio y
- *   gestionar los usuarios de un negocio.
+ * - SOPORTE: directorio en lectura, tickets, entrar como soporte a un negocio,
+ *   gestionar los usuarios de un negocio y verificar fincas del Mercado Ganadero
+ *   (cédulas y hierros: ni FINANZAS ni ANALISTA ven esos documentos).
  * - FINANZAS: directorio en lectura, cobros, cortesías, planes, suspensiones,
  *   finanzas del SaaS y comisiones.
  * - ANALISTA: solo lectura del directorio, métricas, actividad, inteligencia y Canal Endémico.
@@ -33,7 +34,8 @@ public final class PermisosSuperAdmin {
         if (ruta.startsWith("/equipo") || ruta.startsWith("/tenants/auditoria")) return false;
 
         // Lectura común a todo el equipo: directorio, analítica y vigilancia epidemiológica.
-        if (ruta.startsWith("/actividad") || ruta.startsWith("/canal-endemico") || ruta.startsWith("/inteligencia")) return lectura;
+        if (ruta.startsWith("/actividad") || ruta.startsWith("/canal-endemico") || ruta.startsWith("/inteligencia")
+                || ruta.startsWith("/verticales")) return lectura;
         if (lectura && (ruta.equals("/tenants") || ruta.equals("/tenants/stats") || ruta.equals("/tenants/analytics")
                 || ruta.matches("/tenants/\\d+(/modulos|/usuarios)?"))) {
             return true;
@@ -41,6 +43,7 @@ public final class PermisosSuperAdmin {
 
         return switch (rol) {
             case "SOPORTE" -> ruta.startsWith("/soporte")
+                || ruta.startsWith("/verificaciones-mercado")
                 || ruta.matches("/tenants/\\d+/impersonate")
                 || ruta.matches("/tenants/\\d+/usuarios(/\\d+/toggle-activo)?");
             case "FINANZAS" -> ruta.startsWith("/tenants/pagos")

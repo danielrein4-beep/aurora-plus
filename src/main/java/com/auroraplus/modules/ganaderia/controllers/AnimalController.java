@@ -6,11 +6,10 @@ import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.reportes.ExcelExportService;
 import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.MovimientoPotrero;
-import com.auroraplus.modules.ganaderia.entities.Potrero;
 import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.MovimientoPotreroRepository;
-import com.auroraplus.modules.ganaderia.repositories.PotreroRepository;
 import com.auroraplus.modules.ganaderia.services.AnimalQrService;
+import com.auroraplus.modules.ganaderia.services.GanaderiaAnimalService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaImportacionService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaMovimientoService;
 import com.auroraplus.modules.ganaderia.services.RentabilidadAnimalService;
@@ -21,7 +20,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,9 +47,6 @@ public class AnimalController {
     private ExcelExportService excelExportService;
 
     @Autowired
-    private PotreroRepository potreroRepository;
-
-    @Autowired
     private LicenciaTenantRepository licenciaTenantRepository;
 
     @Autowired
@@ -59,6 +54,9 @@ public class AnimalController {
 
     @Autowired
     private GanaderiaImportacionService importacionService;
+
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.GanaderiaAnimalService animalService;
 
     // ── P0: tenant NUNCA viene por query/body/header — siempre de TenantContext/JWT ──
 
@@ -70,24 +68,8 @@ public class AnimalController {
                 : animalRepository.findByTenantId(tenantId);
     }
 
-    public static class AltaAnimalRequest {
-        public String arete; // identificador único — puede ser el número de arete físico, chip o QR según tipoIdentificador
-        public String tipoIdentificador; // ARETE, CHIP o QR (por defecto ARETE)
-        public String nombre;
-        public String especie; // BOVINO, CAPRINO, OVINO, PORCINO... (por defecto BOVINO)
-        public String raza; // libre, se puede repetir entre animales
-        public String sexo; // MACHO o HEMBRA
-        public String tipoAnimal; // libre: TERNERO, NOVILLA, VACA, TORO... si no se indica, se sugiere automáticamente por edad/sexo
-        public LocalDate fechaNacimiento;
-        public BigDecimal pesoActual;
-        public BigDecimal valorEstimado; // opcional — valor de referencia contable para un animal que YA se tenía (no una compra real)
-        public Long potreroId;
-        public String lote; // Grupo de entrada conjunta o proveedor
-        public Long madreId; // opcional: vínculo con la madre para trazabilidad genealógica / nacimiento
-        public BigDecimal costoAdquisicion; // precio real de compra o costo inicial
-        public String estadoReproductivo; // VACIA, PREÑADA, EN_ESPERA
-        public String estadoProductivo; // CRIANDO, ORDEÑO, SECA
-    }
+    /** Mismo JSON que siempre; los campos están en {@link GanaderiaAnimalService.DatosAlta}. */
+    public static class AltaAnimalRequest extends GanaderiaAnimalService.DatosAlta {}
 
     /**
      * Alta directa de un animal (Nacimiento en finca, Compra o animal preexistente).
@@ -98,55 +80,7 @@ public class AnimalController {
     public ResponseEntity<Animal> altaDirecta(@RequestBody AltaAnimalRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        if (request.arete == null || request.arete.isBlank()) {
-            throw new RuntimeException("El identificador del animal (arete/chip/QR) es obligatorio — es como usted lo distingue de los demás");
-        }
-        // Unicidad de arete dentro del mismo tenant
-        if (animalRepository.findByAreteAndTenantId(request.arete, tenantId).isPresent()) {
-            throw new RuntimeException("Ya existe un animal registrado con el identificador '" + request.arete + "' — cada animal debe tener uno único");
-        }
-
-        Animal animal = new Animal();
-        animal.setTenantId(tenantId);
-        animal.setArete(request.arete);
-        animal.setTipoIdentificador(request.tipoIdentificador != null ? request.tipoIdentificador : "ARETE");
-        animal.setNombre(request.nombre);
-        animal.setEspecie(request.especie != null ? request.especie : "BOVINO");
-        animal.setRaza(request.raza);
-        animal.setSexo(request.sexo);
-        animal.setTipoAnimal(request.tipoAnimal);
-        animal.setFechaNacimiento(request.fechaNacimiento);
-        animal.setPesoActual(request.pesoActual);
-        animal.setLote(request.lote);
-        if (request.costoAdquisicion != null) {
-            animal.setCostoAdquisicion(request.costoAdquisicion);
-        } else {
-            animal.setCostoAdquisicion(request.valorEstimado);
-        }
-        if (request.estadoReproductivo != null && !request.estadoReproductivo.isBlank()) {
-            animal.setEstadoReproductivo(request.estadoReproductivo);
-        }
-        if (request.estadoProductivo != null && !request.estadoProductivo.isBlank()) {
-            animal.setEstadoProductivo(request.estadoProductivo);
-        }
-        animal.setEstado("ACTIVO");
-
-        if (request.madreId != null) {
-            animalRepository.findById(request.madreId)
-                .filter(m -> tenantId.equals(m.getTenantId()))
-                .ifPresent(animal::setMadre);
-        }
-
-        if (request.potreroId != null) {
-            Potrero potrero = potreroRepository.findById(request.potreroId)
-                .orElseThrow(() -> new RuntimeException("Potrero no encontrado: " + request.potreroId));
-            if (!potrero.getTenantId().equals(tenantId)) {
-                throw new RuntimeException("Violación de seguridad: Potrero no pertenece a este tenant");
-            }
-            animal.setPotrero(potrero);
-        }
-
-        Animal guardado = animalRepository.save(animal);
+        Animal guardado = animalService.alta(tenantId, request);
         auditoriaService.registrar(tenantId, "GANADERIA", "CREAR", "Animal", guardado.getId(),
             "Dio de alta el animal " + guardado.getArete() + (guardado.getPotrero() == null ? " sin potrero asignado" : " en el potrero " + guardado.getPotrero().getNombre()));
         return ResponseEntity.ok(guardado);
@@ -154,6 +88,22 @@ public class AnimalController {
 
     public static class ImportacionRequest {
         public List<GanaderiaImportacionService.FilaImportacion> filas;
+    }
+
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.HatoFotoService hatoFotoService;
+
+    /**
+     * Lee con IA la foto de una libreta o planilla del hato y devuelve una fila por animal para
+     * revisar en "Registrar mi ganado". No guarda nada: el guardado pasa por /importar.
+     */
+    @PostMapping(value = "/leer-foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<com.auroraplus.modules.ganaderia.services.HatoFotoService.FilaLeida>> leerFoto(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile foto) throws java.io.IOException {
+        AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
+        GanaderiaTenantAccess.requireTenant();
+        auditoriaService.omitirRegistroAutomatico();
+        return ResponseEntity.ok(hatoFotoService.leer(foto));
     }
 
     /**
@@ -251,18 +201,7 @@ public class AnimalController {
     public ResponseEntity<Animal> actualizar(@PathVariable Long id, @RequestBody Animal datos) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        Animal animal = animalRepository.findById(id)
-            .filter(a -> tenantId.equals(a.getTenantId()))
-            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (datos.getNombre() != null) animal.setNombre(datos.getNombre());
-        if (datos.getRaza() != null) animal.setRaza(datos.getRaza());
-        if (datos.getTipoAnimal() != null) animal.setTipoAnimal(datos.getTipoAnimal());
-        if (datos.getPesoActual() != null) animal.setPesoActual(datos.getPesoActual());
-        if (datos.getEstado() != null) animal.setEstado(datos.getEstado());
-        if (datos.getLote() != null) animal.setLote(datos.getLote());
-        if (datos.getEstadoReproductivo() != null) animal.setEstadoReproductivo(datos.getEstadoReproductivo());
-        if (datos.getEstadoProductivo() != null) animal.setEstadoProductivo(datos.getEstadoProductivo());
-        Animal guardado = animalRepository.save(animal);
+        Animal guardado = animalService.actualizar(tenantId, id, datos);
         auditoriaService.registrar(tenantId, "GANADERIA", "EDITAR", "Animal", guardado.getId(), "Actualizó la ficha del animal " + guardado.getArete());
         return ResponseEntity.ok(guardado);
     }

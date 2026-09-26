@@ -1,6 +1,7 @@
 package com.auroraplus.modules.repuestos.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.PresentacionRepuesto;
 import com.auroraplus.modules.repuestos.repositories.PresentacionRepuestoRepository;
 import com.auroraplus.modules.repuestos.services.RepuestoConversionService;
@@ -26,15 +27,17 @@ public class PresentacionRepuestoController {
     private PresentacionRepuestoRepository presentacionRepuestoRepository;
 
     @GetMapping("/repuesto/{repuestoId}")
-    public List<PresentacionRepuesto> listarPorRepuesto(@PathVariable Long repuestoId, @RequestParam Long tenantId) {
+    public List<PresentacionRepuesto> listarPorRepuesto(@PathVariable Long repuestoId) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return presentacionRepuestoRepository.findByRepuestoIdAndTenantId(repuestoId, tenantId);
     }
 
     @PostMapping
     public ResponseEntity<PresentacionRepuesto> registrar(
-            @RequestParam Long repuestoId, @RequestParam Long tenantId,
+            @RequestParam Long repuestoId,
             @RequestParam String nombrePresentacion, @RequestParam BigDecimal factorConversion,
             @RequestParam BigDecimal precioVenta) {
+        Long tenantId = TenantContext.getCurrentTenant();
         AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         PresentacionRepuesto presentacion = repuestoConversionService.registrarPresentacion(
             repuestoId, tenantId, nombrePresentacion, factorConversion, precioVenta);
@@ -42,12 +45,13 @@ public class PresentacionRepuestoController {
     }
 
     @PostMapping("/{presentacionId}/despachar")
-    public ResponseEntity<BigDecimal> despachar(@PathVariable Long presentacionId, @RequestParam Long tenantId,
+    public ResponseEntity<BigDecimal> despachar(@PathVariable Long presentacionId,
                                                  @RequestParam BigDecimal cantidad,
                                                  @RequestParam(required = false) String monedaPago,
                                                  @RequestParam(required = false) BigDecimal montoRecibido,
                                                  @RequestParam(required = false) String claveIdempotencia,
                                                  @RequestParam(required = false) Long clienteId) {
+        Long tenantId = TenantContext.getCurrentTenant();
         BigDecimal total = repuestoConversionService.despacharPorPresentacion(presentacionId, tenantId, cantidad, monedaPago, montoRecibido, claveIdempotencia, clienteId);
         return ResponseEntity.ok(total);
     }

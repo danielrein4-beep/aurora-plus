@@ -61,16 +61,7 @@ public class VacunaController {
     public ResponseEntity<Vacuna> crear(@RequestBody Vacuna vacuna) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        vacuna.setId(null);
-        if (vacuna.getNombre() == null || vacuna.getNombre().isBlank()) {
-            throw new IllegalArgumentException("La vacuna debe tener un nombre");
-        }
-        if (vacuna.getDiasRetiroLeche() == null || vacuna.getDiasRetiroLeche() < 0
-                || vacuna.getDiasRetiroCarne() == null || vacuna.getDiasRetiroCarne() < 0) {
-            throw new IllegalArgumentException("Los días de retiro no pueden ser negativos");
-        }
-        vacuna.setTenantId(tenantId);
-        return ResponseEntity.ok(vacunaRepository.save(vacuna));
+        return ResponseEntity.ok(ganaderiaSanidadService.crearVacuna(tenantId, vacuna));
     }
 
     public static class AplicacionRequest {
@@ -107,51 +98,8 @@ public class VacunaController {
     public ResponseEntity<List<AplicacionVacuna>> aplicarLote(@RequestBody AplicacionLoteRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        if (request.animalIds == null || request.animalIds.isEmpty()) {
-            throw new RuntimeException("Debe seleccionar al menos un animal para aplicar el tratamiento");
-        }
-        if (request.vacunaId == null) {
-            throw new RuntimeException("Debe seleccionar una vacuna válida del catálogo");
-        }
-
-        // 1. Verificación de la vacuna contra el tenant
-        Vacuna vacuna = vacunaRepository.findById(request.vacunaId)
-            .orElseThrow(() -> new RuntimeException("Vacuna no encontrada en el catálogo"));
-        if (vacuna.getTenantId() != null && !vacuna.getTenantId().equals(tenantId)) {
-            throw new RuntimeException("Violación de seguridad: La vacuna no pertenece a este tenant");
-        }
-
-        // 2. Verificación estricta de CADA animalId contra el tenantId
-        for (Long animalId : request.animalIds) {
-            com.auroraplus.modules.ganaderia.entities.Animal animal = animalRepository.findById(animalId)
-                .orElseThrow(() -> new RuntimeException("Animal con ID " + animalId + " no encontrado"));
-            if (!animal.getTenantId().equals(tenantId)) {
-                throw new RuntimeException("Violación de seguridad: El animal arete " + animal.getArete() 
-                    + " (ID " + animalId + ") no pertenece al tenant actual");
-            }
-        }
-
-        // 3. Aplicar fidedignamente con cálculo exacto de días de retiro
-        List<AplicacionVacuna> resultado = new java.util.ArrayList<>();
-        LocalDate fecha = request.fechaAplicacion != null ? request.fechaAplicacion : LocalDate.now();
-        BigDecimal costoPorAnimal = (request.costo != null && !request.animalIds.isEmpty())
-            ? request.costo.divide(BigDecimal.valueOf(request.animalIds.size()), 2, java.math.RoundingMode.HALF_UP)
-            : request.costo;
-
-        for (Long animalId : request.animalIds) {
-            AplicacionVacuna aplicacion = ganaderiaSanidadService.aplicarVacuna(
-                tenantId,
-                animalId,
-                request.vacunaId,
-                fecha,
-                request.lote,
-                request.veterinarioResponsable,
-                costoPorAnimal
-            );
-            resultado.add(aplicacion);
-        }
-
-        return ResponseEntity.ok(resultado);
+        return ResponseEntity.ok(ganaderiaSanidadService.aplicarVacunaLote(tenantId, request.animalIds, request.vacunaId,
+            request.fechaAplicacion, request.lote, request.veterinarioResponsable, request.costo));
     }
 
     @GetMapping("/animal/{animalId}")

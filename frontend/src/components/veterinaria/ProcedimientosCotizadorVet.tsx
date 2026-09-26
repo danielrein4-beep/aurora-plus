@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import React, { useState } from 'react';
 import { IconPrescription, IconCard, IconClose } from '../../Icons';
 import {
@@ -46,14 +47,14 @@ export default function ProcedimientosCotizadorVet({
       setProcForm({ nombre: '', descripcion: '', costo: 0, moneda: 'USD', duracionMinutos: 30 });
       onRecargar();
     } catch (err: any) {
-      alert('Error creando procedimiento: ' + err.message);
+      avisar('Error creando procedimiento: ' + err.message);
     }
   };
 
   const guardarCot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cotForm.mascotaId) {
-      alert('Seleccione una mascota');
+      avisar('Seleccione una mascota');
       return;
     }
     try {
@@ -61,7 +62,7 @@ export default function ProcedimientosCotizadorVet({
       setModalCot(false);
       onRecargar();
     } catch (err: any) {
-      alert('Error guardando cotización: ' + err.message);
+      avisar('Error guardando cotización: ' + err.message);
     }
   };
 

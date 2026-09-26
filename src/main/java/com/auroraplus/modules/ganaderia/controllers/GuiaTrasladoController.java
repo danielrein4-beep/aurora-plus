@@ -33,7 +33,8 @@ public class GuiaTrasladoController {
     private GuiaTrasladoPdfService guiaTrasladoPdfService;
 
     public static class GuiaRequest {
-        public String numeroGuia;
+        /** Número de la guía oficial del INSAI (opcional). */
+        public String numeroGuiaOficial;
         public LocalDate fecha;
         public String origen;
         public String destino;
@@ -57,11 +58,20 @@ public class GuiaTrasladoController {
         if (request.animalIds == null || request.animalIds.isEmpty()) {
             throw new RuntimeException("La guía debe incluir al menos un animal");
         }
+        if (request.destino == null || request.destino.isBlank()) {
+            throw new RuntimeException("Indique el destino del traslado");
+        }
 
         GuiaTraslado guia = new GuiaTraslado();
         guia.setTenantId(tenantId);
-        guia.setNumeroGuia(request.numeroGuia);
-        guia.setFecha(request.fecha != null ? request.fecha : LocalDate.now());
+        LocalDate dia = request.fecha != null ? request.fecha : LocalDate.now();
+        // Número interno de la nota: NM-aaaammdd-n, consecutivo del día en la finca.
+        String prefijo = "NM-" + dia.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE) + "-";
+        long delDia = guiaTrasladoRepository.findByTenantIdOrderByFechaDesc(tenantId).stream()
+            .filter(g -> g.getNumeroGuia() != null && g.getNumeroGuia().startsWith(prefijo)).count();
+        guia.setNumeroGuia(prefijo + (delDia + 1));
+        guia.setNumeroGuiaOficial(request.numeroGuiaOficial != null && !request.numeroGuiaOficial.isBlank() ? request.numeroGuiaOficial.trim() : null);
+        guia.setFecha(dia);
         guia.setOrigen(request.origen);
         guia.setDestino(request.destino);
         guia.setMotivo(request.motivo);
@@ -69,9 +79,13 @@ public class GuiaTrasladoController {
         guia.setPlacaVehiculo(request.placaVehiculo);
         guia.setResponsable(request.responsable);
 
-        for (Long animalId : request.animalIds) {
+        // Viajan animales del hato o recién vendidos (la nota acompaña la venta); nunca uno muerto o robado.
+        for (Long animalId : new java.util.LinkedHashSet<>(request.animalIds)) {
             Animal animal = animalRepository.findForUpdateByIdAndTenantId(animalId, tenantId)
                 .orElseThrow(() -> new RuntimeException("Animal no encontrado: " + animalId));
+            if ("MUERTO".equals(animal.getEstado()) || "ROBADO".equals(animal.getEstado())) {
+                throw new RuntimeException("El animal " + animal.getArete() + " está dado de baja y no puede movilizarse");
+            }
             DetalleGuiaTraslado detalle = new DetalleGuiaTraslado();
             detalle.setTenantId(tenantId);
             detalle.setAnimal(animal);
@@ -82,6 +96,7 @@ public class GuiaTrasladoController {
     }
 
     @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @Transactional(readOnly = true)
     public ResponseEntity<byte[]> pdf(@PathVariable Long id) throws Exception {
         Long tenantId = GanaderiaTenantAccess.requireTenant();
         GuiaTraslado guia = guiaTrasladoRepository.findById(id)
@@ -89,7 +104,7 @@ public class GuiaTrasladoController {
             .orElseThrow(() -> new RuntimeException("Guía no encontrada"));
         byte[] pdf = guiaTrasladoPdfService.generarGuiaPdf(guia);
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"guia-" + guia.getNumeroGuia() + ".pdf\"")
+            .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"nota-movilizacion-" + guia.getId() + ".pdf\"")
             .contentType(MediaType.APPLICATION_PDF)
             .body(pdf);
     }

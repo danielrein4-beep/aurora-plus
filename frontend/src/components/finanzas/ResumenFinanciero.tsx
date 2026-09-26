@@ -41,7 +41,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
             <h4 className="font-['Outfit'] text-sm sm:text-base font-bold text-slate-900 dark:text-white">
               Centro Financiero Diseñado para la Toma de Decisiones
             </h4>
-            <p className="text-xs text-slate-500 dark:text-white/60 mt-0.5 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-white/60 mt-0.5 leading-relaxed font-light uppercase tracking-wide">
               {dataMode === 'real'
                 ? 'Importes consolidados en la moneda base del negocio. Los movimientos conservan el contravalor registrado al momento exacto de la operación.'
                 : 'Los importes se presentan en su moneda real de origen (USD, VES y COP) con arqueos auditados en tiempo real.'}
@@ -51,7 +51,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
 
         <button
           onClick={onNavigateToDocuments}
-          className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl text-teal-600 dark:text-teal-300 border border-teal-500/30 hover:bg-teal-500/15 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5 shrink-0"
+          className="apple-glass-btn text-xs font-light uppercase tracking-wide px-4 py-2.5 rounded-xl text-teal-600 dark:text-teal-300 border border-teal-500/30 hover:bg-teal-500/15 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5 shrink-0"
         >
           <IconFileText size={14} />
           <span>Ver Documentos</span>
@@ -76,7 +76,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
             >
               <div>
                 <div className="flex items-start justify-between gap-2 mb-3">
-                  <span className="text-[11px] font-bold text-slate-400 dark:text-white/40 tracking-wider uppercase">
+                  <span className="text-[11px] font-light text-slate-400 dark:text-white/40 tracking-wide uppercase">
                     {kpi.title}
                   </span>
                   <QualityBadge state={kpi.state} explanation={kpi.stateExplanation} size="sm" />
@@ -100,7 +100,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
                   )}
                 </div>
 
-                <p className="text-xs text-slate-500 dark:text-white/50 mt-2.5 leading-snug">
+                <p className="text-xs text-slate-500 dark:text-white/50 mt-2.5 leading-snug font-light uppercase tracking-wide">
                   {kpi.subtitle}
                 </p>
               </div>
@@ -112,7 +112,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
                   </span>
                 )}
                 {kpi.detailsHint && (
-                  <span className="text-[11px] text-slate-400 dark:text-white/40 truncate max-w-[150px]" title={kpi.detailsHint}>
+                  <span className="text-[11px] text-slate-400 dark:text-white/40 truncate max-w-[150px] font-light uppercase tracking-wide" title={kpi.detailsHint}>
                     {kpi.detailsHint}
                   </span>
                 )}
@@ -133,12 +133,12 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
                   Disponibilidad en Caja y Cuentas (USD / VES / COP)
                 </h3>
               </div>
-              <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5 font-light uppercase tracking-wide">
                 Saldos en moneda real disponibles inmediatamente para pagos e imprevistos. Sin sumas heterogéneas.
               </p>
             </div>
 
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full self-start sm:self-auto font-bold">
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full self-start sm:self-auto font-light uppercase tracking-wide">
               Arqueos al día
             </span>
           </div>
@@ -151,7 +151,7 @@ export const ResumenFinanciero: React.FC<ResumenFinancieroProps> = ({
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-xs font-semibold text-slate-800 dark:text-white/90 truncate">
+                    <span className="text-xs font-light uppercase tracking-wide text-slate-800 dark:text-white/90 truncate">
                       {acc.accountName}
                     </span>
                     <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-md border ${

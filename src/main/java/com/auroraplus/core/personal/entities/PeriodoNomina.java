@@ -57,6 +57,13 @@ public class PeriodoNomina {
     @Column(nullable = false, columnDefinition = "bigint default 0")
     private Long version = 0L;
 
+    /** SEMANAL, QUINCENAL o MENSUAL: solo entran los trabajadores que cobran así. Null = todos. */
+    @Column(length = 12)
+    private String frecuencia;
+
+    public String getFrecuencia() { return frecuencia; }
+    public void setFrecuencia(String frecuencia) { this.frecuencia = frecuencia; }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }

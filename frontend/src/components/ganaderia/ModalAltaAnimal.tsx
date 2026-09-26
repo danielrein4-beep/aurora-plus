@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { IconCart, IconCoins, IconSprout } from "../../Icons";
-import { crearAnimalGanaderia, type AnimalGanaderia, type PotreroGanaderia } from "../../api";
+import { crearAnimalGanaderia, crearPotreroGanaderia, type AnimalGanaderia, type PotreroGanaderia } from "../../api";
+import { encolarAccionGanaderia, esFalloDeConexion, generarClaveIdempotencia } from "../../offlineQueueGanaderia";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
-import { RAZAS_BOVINAS_COMUNES } from "./catalogos";
+import SelectorRaza from "./SelectorRaza";
 import type { Notificar } from "./tipos";
 
 /** Formulario vacío de alta: nacimiento en finca, hembra, en el potrero indicado. */
@@ -16,8 +17,7 @@ export function altaVacia(potreroId: number) {
     sexo: "HEMBRA",
     tipoAnimal: "VACA",
     fechaNacimiento: fechaLocalISO(),
-    pesoActual: 380,
-    valorEstimado: 900,
+    pesoActual: 0,
     potreroId,
     lote: "",
     origen: "NACIMIENTO" as "NACIMIENTO" | "COMPRA",
@@ -41,7 +41,11 @@ interface Props {
   tenantId: number;
   notificar: Notificar;
   onCreado: (animal: AnimalGanaderia) => void;
+  /** Se guardó en la cola offline (sin señal): el padre refresca el contador de pendientes. */
+  onEncolado: () => void;
   onCerrar: () => void;
+  /** Se creó un potrero desde el alta ("+ Nuevo potrero…"): el padre lo suma a su lista. */
+  onPotreroCreado?: (potrero: PotreroGanaderia) => void;
 }
 
 /**
@@ -49,8 +53,35 @@ interface Props {
  * abierto con raza, potrero y origen para dar de alta varios del mismo lote.
  */
 export default function ModalAltaAnimal({
-  animales, animalesActivos, potreros, valoresIniciales, tenantId, notificar, onCreado, onCerrar,
+  animales, animalesActivos, potreros: potrerosPadre, valoresIniciales, tenantId, notificar, onCreado, onEncolado, onCerrar, onPotreroCreado,
 }: Props) {
+  // Potreros creados desde este mismo formulario, antes de que la lista del padre se actualice.
+  const [potrerosNuevos, setPotrerosNuevos] = useState<PotreroGanaderia[]>([]);
+  const potreros = [...potrerosPadre, ...potrerosNuevos.filter(n => !potrerosPadre.some(p => p.id === n.id))];
+  const [creandoPotrero, setCreandoPotrero] = useState(false);
+
+  // "+ Nuevo potrero…": se crea solo con el nombre y se ubica en el mapa después (Mapa & Potreros).
+  const crearPotreroDesdeAlta = async () => {
+    const nombre = prompt("Nombre del nuevo potrero (lo ubicas en el mapa después):")?.trim();
+    if (!nombre) return;
+    const repetido = potreros.find(p => p.nombre.trim().toLowerCase() === nombre.toLowerCase());
+    if (repetido) {
+      setFormAnimal(prev => ({ ...prev, potreroId: repetido.id }));
+      return;
+    }
+    setCreandoPotrero(true);
+    try {
+      const nuevo = await crearPotreroGanaderia(tenantId, { nombre, estado: "ACTIVO" });
+      setPotrerosNuevos(prev => [...prev, nuevo]);
+      setFormAnimal(prev => ({ ...prev, potreroId: nuevo.id }));
+      onPotreroCreado?.(nuevo);
+      notificar(`Potrero "${nombre}" creado. Ubícalo en el mapa cuando puedas desde Mapa & Potreros.`);
+    } catch (e) {
+      notificar(`No se pudo crear el potrero: ${e instanceof Error ? e.message : "revisa la conexión"}`);
+    } finally {
+      setCreandoPotrero(false);
+    }
+  };
   const [formAnimal, setFormAnimal] = useState<FormAltaAnimal>(() => ({ ...altaVacia(potreros[0]?.id || 0), ...valoresIniciales }));
 
   // El formulario de Alta de Animal arranca con potreroId: 0 (sin potrero real
@@ -73,8 +104,10 @@ export default function ModalAltaAnimal({
     e.preventDefault();
     if (!formAnimal.arete.trim()) return;
 
+    // Fuera del try: si no hay señal se reutiliza para guardarlo en la cola offline.
+    let payload: any = {};
     try {
-      const payload: any = {
+      payload = {
         arete: formAnimal.arete.trim(),
         tipoIdentificador: formAnimal.tipoIdentificador,
         nombre: formAnimal.nombre.trim() || undefined,
@@ -83,11 +116,11 @@ export default function ModalAltaAnimal({
         sexo: formAnimal.sexo,
         tipoAnimal: formAnimal.tipoAnimal,
         fechaNacimiento: formAnimal.fechaNacimiento,
-        pesoActual: Number(formAnimal.pesoActual) || 0,
+        pesoActual: Number(formAnimal.pesoActual) > 0 ? Number(formAnimal.pesoActual) : undefined,
         potreroId: formAnimal.potreroId ? Number(formAnimal.potreroId) : undefined,
         costoAdquisicion: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : undefined,
         madreId: (formAnimal.origen === "NACIMIENTO" && formAnimal.madreId) ? Number(formAnimal.madreId) : undefined,
-        valorEstimado: formAnimal.origen === "COMPRA" ? Number(formAnimal.costoCompra) : Number(formAnimal.valorEstimado),
+        valorEstimado: formAnimal.origen === "COMPRA" && Number(formAnimal.costoCompra) > 0 ? Number(formAnimal.costoCompra) : undefined,
         estadoReproductivo: formAnimal.sexo === "HEMBRA" ? formAnimal.estadoReproductivo : undefined,
         estadoProductivo: formAnimal.sexo === "HEMBRA" ? formAnimal.estadoProductivo : undefined,
       };
@@ -103,9 +136,26 @@ export default function ModalAltaAnimal({
       const nuevo = await crearAnimalGanaderia(tenantId, payload);
       onCreado(nuevo);
       notificar(`Animal arete ${nuevo.arete} (${formAnimal.origen === "COMPRA" ? "Compra" : "Nacimiento en Finca"}) registrado con éxito en el hato.`);
-    } catch {
-      notificar(`No se pudo registrar el animal arete ${formAnimal.arete} — revisa tu conexión e inténtalo de nuevo.`);
-      return;
+    } catch (err) {
+      if (!esFalloDeConexion(err)) {
+        notificar(`No se pudo registrar el animal arete ${formAnimal.arete}: ${err instanceof Error ? err.message : "inténtalo de nuevo"}`);
+        return;
+      }
+      // Sin señal (potrero, manga): queda en la cola y se guarda solo al volver la conexión.
+      const payloadOffline = { ...payload, arete: formAnimal.arete.trim() };
+      encolarAccionGanaderia(tenantId, {
+        tipo: "alta_animal",
+        id: generarClaveIdempotencia(),
+        claveIdempotencia: generarClaveIdempotencia(),
+        descripcion: `Alta de ${payloadOffline.arete}`,
+        creadaEn: Date.now(),
+        payload: payloadOffline,
+      });
+      onEncolado();
+      // Se muestra en el hato con un id provisional hasta que se sincronice.
+      onCreado({ ...(payloadOffline as unknown as AnimalGanaderia), id: -Date.now(), estado: "ACTIVO",
+        potrero: potreros.find(p => p.id === Number(formAnimal.potreroId)) });
+      notificar(`Sin señal: el alta de ${payloadOffline.arete} quedó guardada en el teléfono y se enviará al volver la conexión.`);
     }
 
     if (cerrarAlTerminar) {
@@ -119,8 +169,8 @@ export default function ModalAltaAnimal({
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
             Alta de Animal en el Hato
@@ -136,7 +186,7 @@ export default function ModalAltaAnimal({
           {/* Selector de Origen: Nacimiento vs Compra */}
           <div>
             <label className="text-slate-400 block mb-1.5 font-bold">Origen del Animal *</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid [&>*]:min-w-0 grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setFormAnimal({ ...formAnimal, origen: "NACIMIENTO", tipoAnimal: formAnimal.tipoAnimal === "VACA" ? "BECERRA" : formAnimal.tipoAnimal })}
@@ -171,7 +221,7 @@ export default function ModalAltaAnimal({
                 <IconSprout size={13} />
                 <span>Datos de Nacimiento & Trazabilidad Maternal</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid [&>*]:min-w-0 grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 block mb-1">Madre (Opcional - Genealogía)</label>
                   <select
@@ -192,7 +242,7 @@ export default function ModalAltaAnimal({
                     type="date"
                     value={formAnimal.fechaNacimiento}
                     onChange={e => setFormAnimal({ ...formAnimal, fechaNacimiento: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white tabular-nums text-xs"
                   />
                 </div>
               </div>
@@ -214,7 +264,7 @@ export default function ModalAltaAnimal({
                   className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 block mb-1">Precio de Compra (USD) *</label>
                   <input
@@ -226,7 +276,7 @@ export default function ModalAltaAnimal({
                     placeholder="Ej. 850"
                     value={formAnimal.costoCompra}
                     onChange={e => setFormAnimal({ ...formAnimal, costoCompra: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white tabular-nums text-xs"
                   />
                 </div>
                 <div>
@@ -235,14 +285,14 @@ export default function ModalAltaAnimal({
                     type="date"
                     value={formAnimal.fechaCompra}
                     onChange={e => setFormAnimal({ ...formAnimal, fechaCompra: e.target.value })}
-                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-mono text-xs"
+                    className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white tabular-nums text-xs"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Número de Arete / Chapeta *</label>
               <input
@@ -251,7 +301,7 @@ export default function ModalAltaAnimal({
                 placeholder="Ej. V-105"
                 value={formAnimal.arete}
                 onChange={e => setFormAnimal({ ...formAnimal, arete: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums font-bold"
               />
             </div>
             <div>
@@ -266,32 +316,14 @@ export default function ModalAltaAnimal({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Raza</label>
-              <input
-                type="text"
-                list="razas-bovinas-catalogo"
+              <SelectorRaza
                 value={formAnimal.raza}
-                onChange={e => setFormAnimal({ ...formAnimal, raza: e.target.value })}
-                onFocus={e => {
-                  // Vaciar al enfocar muestra el catálogo completo en el datalist
-                  // (el navegador solo sugiere lo que empieza igual al texto actual);
-                  // si el usuario se va sin escribir nada, se restaura el valor previo.
-                  e.target.dataset.prevRaza = formAnimal.raza;
-                  setFormAnimal(prev => ({ ...prev, raza: "" }));
-                }}
-                onBlur={e => {
-                  if (!formAnimal.raza.trim() && e.target.dataset.prevRaza) {
-                    setFormAnimal(prev => ({ ...prev, raza: e.target.dataset.prevRaza || "" }));
-                  }
-                }}
-                placeholder="Ej. Brahman, F1 Brahman x Gyr..."
+                onChange={raza => setFormAnimal(prev => ({ ...prev, raza }))}
                 className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
               />
-              <datalist id="razas-bovinas-catalogo">
-                {RAZAS_BOVINAS_COMUNES.map(r => <option key={r} value={r} />)}
-              </datalist>
             </div>
             <div>
               <label className="text-slate-400 block mb-1">Sexo</label>
@@ -328,7 +360,7 @@ export default function ModalAltaAnimal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Peso Inicial (kg)</label>
               <input
@@ -336,18 +368,23 @@ export default function ModalAltaAnimal({
                 onFocus={e => e.target.select()}
                 value={formAnimal.pesoActual || ""}
                 onChange={e => setFormAnimal({ ...formAnimal, pesoActual: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums"
               />
             </div>
             <div>
               <label className="text-slate-400 block mb-1">Potrero Asignado</label>
               <select
                 value={formAnimal.potreroId}
-                onChange={e => setFormAnimal({ ...formAnimal, potreroId: Number(e.target.value) })}
+                disabled={creandoPotrero}
+                onChange={e => (e.target.value === "-1"
+                  ? crearPotreroDesdeAlta()
+                  : setFormAnimal({ ...formAnimal, potreroId: Number(e.target.value) }))}
                 className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white">
+                {potreros.length === 0 && <option value={0}>Sin potrero</option>}
                 {potreros.map(p => (
                   <option key={p.id} value={p.id}>{p.nombre}</option>
                 ))}
+                <option value={-1}>+ Nuevo potrero…</option>
               </select>
             </div>
           </div>
@@ -368,7 +405,7 @@ export default function ModalAltaAnimal({
 
           {/* Estados Reproductivo & Productivo — solo aplican a hembras */}
           {formAnimal.sexo === "HEMBRA" && (
-            <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+            <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
               <div>
                 <label className="text-slate-400 block mb-1">Estado Reproductivo</label>
                 <select
@@ -394,23 +431,23 @@ export default function ModalAltaAnimal({
             </div>
           )}
 
-          <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+          <div className="pt-3 border-t border-white/10 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => onCerrar()}
-              className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+              className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
               Cancelar
             </button>
             <button
               type="button"
               onClick={(e) => handleGuardarAnimal(e, true)}
-              className="apple-glass-btn text-slate-700 dark:text-white font-bold px-5 py-2 rounded-xl cursor-pointer border border-emerald-500/30">
+              className="w-full sm:w-auto apple-glass-btn text-slate-700 dark:text-white font-bold px-5 py-2.5 sm:py-2 rounded-xl cursor-pointer border border-emerald-500/30">
               Guardar y Cerrar
             </button>
             <button
               type="submit"
               title="Deja el formulario abierto, listo para dar de alta el siguiente animal del mismo lote/compra"
-              className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
+              className="w-full sm:w-auto btn-cyber-neon text-white font-bold px-6 py-2.5 sm:py-2 rounded-xl cursor-pointer">
               Guardar y Agregar Otro
             </button>
           </div>

@@ -1,5 +1,6 @@
 package com.auroraplus.modules.logistica.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.logistica.entities.RutaTransporte;
 import com.auroraplus.modules.logistica.services.LogisticaService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +17,11 @@ public class LogisticaController {
 
     @PostMapping("/registrar")
     public ResponseEntity<RutaTransporte> registrarFlete(
-            @RequestParam Long tenantId,
             @RequestParam String origen,
             @RequestParam String destino,
             @RequestParam String placaVehiculo,
             @RequestParam BigDecimal costoFlete) {
+        Long tenantId = TenantContext.getCurrentTenant();
 
         RutaTransporte ruta = logisticaService.registrarFlete(tenantId, origen, destino, placaVehiculo, costoFlete);
         return ResponseEntity.ok(ruta);

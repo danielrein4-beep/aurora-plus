@@ -1,6 +1,7 @@
+import { avisar } from "../avisos";
 import { contarSinLeerMercado } from "../api";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 
 import {
@@ -12,15 +13,19 @@ import {
   type TableroAlertasGanaderia, type VacunaGanaderia, type AlertaSanitariaGanaderia,
   type TanqueLeche, type VentaLecheTanque, type GastoGanaderia, type VentaGanaderiaResumen,
   listarPrenezActualGanaderia, type PrenezActualGanaderia, descargarConstanciaVacunacionPdf,
-  tasaVigente, actualizarTasa,
+  tasaVigente, actualizarTasa, crearAnimalGanaderia, registrarBajaGanaderia,
+  leerPreferencia, guardarPreferencia,
 } from "../api";
 
-import { AuroraGradientDef, IconCheckCircle, IconClose, IconDownload } from "../Icons";
+import { AuroraGradientDef, IconCheckCircle, IconClose, IconCow, IconDownload, IconWarning } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { contarPendientesGanaderia, procesarColaGanaderia } from "../offlineQueueGanaderia";
 
 import BitacoraAuditoria from "./BitacoraAuditoria";
+import PersonalRoute from "./PersonalRoute";
+import PersonalPage from "../pages/Personal";
 import ModalImportarHato from "./ModalImportarHato";
+import ModalRegistroRapidoHato from "./ModalRegistroRapidoHato";
 import TenantSoporteWidget from "./TenantSoporteWidget";
 import EngordeGanadero from "./EngordeGanadero";
 import SociedadesCeba from "./SociedadesCeba";
@@ -29,6 +34,8 @@ import { abrirPdf, fechaLocalISO } from "./ReportesCampoGanaderia";
 import ModalVentaAnimales, { type ModoVenta } from "./ganaderia/ModalVentaAnimales";
 import ModalJornadaOrdeno, { vacasDeOrdeno } from "./ganaderia/ModalJornadaOrdeno";
 import ModalVacunacion, { type VacunacionAplicada } from "./ganaderia/ModalVacunacion";
+import ModalBaja from "./ganaderia/ModalBaja";
+import ModalGuiaMovilizacion from "./ganaderia/ModalGuiaMovilizacion";
 import ModalReproduccion from "./ganaderia/ModalReproduccion";
 import ModalCelo from "./ganaderia/ModalCelo";
 import ModalMastitis from "./ganaderia/ModalMastitis";
@@ -50,12 +57,14 @@ import SeccionProduccion from "./ganaderia/SeccionProduccion";
 import SeccionEventos from "./ganaderia/SeccionEventos";
 import SeccionFinanzas from "./ganaderia/SeccionFinanzas";
 import SeccionPotreros from "./ganaderia/SeccionPotreros";
+import SeccionAlimentacion from "./ganaderia/SeccionAlimentacion";
 import SeccionPanel from "./ganaderia/SeccionPanel";
 import SeccionHato from "./ganaderia/SeccionHato";
 import SeccionSanidad from "./ganaderia/SeccionSanidad";
 import BarraLateralGanaderia from "./ganaderia/BarraLateralGanaderia";
 import BarraSuperiorGanaderia from "./ganaderia/BarraSuperiorGanaderia";
 import type { TabGanaderia, SubPotreros, SubInventario, SubSanidad } from "./ganaderia/tipos";
+import { tonoAviso } from "./ganaderia/formato";
 
 interface Props {
   onSalir: () => void;
@@ -63,31 +72,6 @@ interface Props {
   // salta directo a su ficha en Sanidad & Trazabilidad en vez del Panel General.
   deepLinkAnimalId?: number;
 }
-
-// Datos de demostración de alto realismo para cuando el backend está sin datos o en carga
-const DEMO_POTREROS: PotreroGanaderia[] = [
-  { id: 101, tenantId: 1, codigo: "POT-01", nombre: "Potrero 1 - El Roble", areaHectareas: 14.5, capacidadAnimales: 25, tipoPasto: "Brachiaria decumbens", color: "#10B981", diasDescansoMinimo: 28, estado: "ACTIVO", ordenRotacion: 1, observaciones: "Cerca viva de matarratón, agua de morichal." },
-  { id: 102, tenantId: 1, codigo: "POT-02", nombre: "Potrero 2 - Los Samanes", areaHectareas: 18.0, capacidadAnimales: 32, tipoPasto: "Guinea Mombaza", color: "#F59E0B", diasDescansoMinimo: 35, estado: "EN_DESCANSO", ordenRotacion: 2, fechaInicioDescanso: "2026-09-01", observaciones: "Sombra natural abundante, descanso de 10 días." },
-  { id: 103, tenantId: 1, codigo: "POT-03", nombre: "Potrero 3 - La Vega", areaHectareas: 12.0, capacidadAnimales: 20, tipoPasto: "Estrella Africana", color: "#3B82F6", diasDescansoMinimo: 24, estado: "EN_DESCANSO", ordenRotacion: 3, fechaInicioDescanso: "2026-09-05", observaciones: "Borde de río, drenaje rápido." },
-  { id: 104, tenantId: 1, codigo: "POT-04", nombre: "Potrero 4 - Maternidad", areaHectareas: 6.5, capacidadAnimales: 10, tipoPasto: "Pasto Mulato II", color: "#8B5CF6", diasDescansoMinimo: 21, estado: "ACTIVO", ordenRotacion: 4, observaciones: "Junto a la vaquera para monitoreo 24/7." }
-];
-
-const DEMO_ANIMALES: AnimalGanaderia[] = [
-  { id: 201, tenantId: 1, arete: "V-042", nombre: "Mariposa", especie: "BOVINO", raza: "Gyr Lechero", sexo: "HEMBRA", tipoAnimal: "VACA", fechaNacimiento: "2021-04-12", pesoActual: 465, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1200, lote: "Lote Entrada Marzo 2026" },
-  { id: 202, tenantId: 1, arete: "V-089", nombre: "Lucero", especie: "BOVINO", raza: "Jersey", sexo: "HEMBRA", tipoAnimal: "VACA", fechaNacimiento: "2022-01-20", pesoActual: 420, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1350, lote: "Lote Entrada Marzo 2026" },
-  { id: 203, tenantId: 1, arete: "T-015", nombre: "Diamante", especie: "BOVINO", raza: "Brahman Blanco", sexo: "MACHO", tipoAnimal: "TORO", fechaNacimiento: "2020-08-15", pesoActual: 820, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 2800, lote: "Compra Feria San Cristóbal" },
-  { id: 204, tenantId: 1, arete: "N-104", nombre: "Esperanza", especie: "BOVINO", raza: "F1 Girolando", sexo: "HEMBRA", tipoAnimal: "NOVILLA", fechaNacimiento: "2024-03-10", pesoActual: 330, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 850, lote: "Lote Entrada Marzo 2026" },
-  { id: 205, tenantId: 1, arete: "C-205", nombre: "Relámpago", especie: "BOVINO", raza: "Gyr x Holstein", sexo: "MACHO", tipoAnimal: "TERNERO", fechaNacimiento: "2026-06-02", pesoActual: 98, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 400, lote: "Nacimientos Finca 2026" },
-  { id: 206, tenantId: 1, arete: "M-112", nombre: "Bandera", especie: "BOVINO", raza: "Carora", sexo: "HEMBRA", tipoAnimal: "MAUTA", fechaNacimiento: "2025-02-14", pesoActual: 240, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 650, lote: "Compra Feria San Cristóbal" },
-  { id: 207, tenantId: 1, arete: "NV-08", nombre: "Barcino", especie: "BOVINO", raza: "Brahman Rojo", sexo: "MACHO", tipoAnimal: "NOVILLO", fechaNacimiento: "2023-11-05", pesoActual: 510, estado: "ACTIVO", potrero: DEMO_POTREROS[0], valorEstimado: 1100, lote: "Lote Entrada Marzo 2026" },
-  { id: 208, tenantId: 1, arete: "B-031", nombre: "Canela", especie: "BOVINO", raza: "Senepol", sexo: "HEMBRA", tipoAnimal: "BECERRA", fechaNacimiento: "2026-05-18", pesoActual: 85, estado: "ACTIVO", potrero: DEMO_POTREROS[3], valorEstimado: 380, lote: "Nacimientos Finca 2026" },
-];
-
-const DEMO_ORDENOS: RegistroOrdenoGanaderia[] = [
-  { id: 301, tenantId: 1, animal: DEMO_ANIMALES[0], fecha: "2026-09-11", turno: "MANANA", cantidadLitros: 14.5, precioVentaLitro: 0.55, montoVenta: 7.97, porcentajeGrasa: 3.8, porcentajeProteina: 3.2 },
-  { id: 302, tenantId: 1, animal: DEMO_ANIMALES[1], fecha: "2026-09-11", turno: "MANANA", cantidadLitros: 16.2, precioVentaLitro: 0.55, montoVenta: 8.91, porcentajeGrasa: 4.4, porcentajeProteina: 3.5 },
-  { id: 303, tenantId: 1, animal: DEMO_ANIMALES[0], fecha: "2026-09-10", turno: "TARDE", cantidadLitros: 9.8, precioVentaLitro: 0.55, montoVenta: 5.39, porcentajeGrasa: 3.9, porcentajeProteina: 3.1 },
-];
 
 const DEFAULT_VACUNAS_CATALOGO: VacunaGanaderia[] = [
   { id: 1, tenantId: 1, nombre: "Aftosa Bivalente (A+O)", diasParaRefuerzo: 180, diasRetiroLeche: 0, diasRetiroCarne: 0 },
@@ -104,19 +88,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Tasas de cambio multi-moneda (configurables a mano y persistidas)
   const [tasaBCV, setTasaBCV] = useState<number>(() => {
     try {
-      const g = localStorage.getItem("aurora_ganaderia_tasa_bcv");
-      return g ? Number(g) || 43.50 : 43.50;
+      const g = localStorage.getItem(`aurora_ganaderia_tasa_bcv_${tenantId}`);
+      return g ? Number(g) || 0 : 0;
     } catch {
-      return 43.50;
+      return 0;
     }
   });
 
   const [tasaCOP, setTasaCOP] = useState<number>(() => {
     try {
-      const g = localStorage.getItem("aurora_ganaderia_tasa_cop");
-      return g ? Number(g) || 4150.0 : 4150.0;
+      const g = localStorage.getItem(`aurora_ganaderia_tasa_cop_${tenantId}`);
+      return g ? Number(g) || 0 : 0;
     } catch {
-      return 4150.0;
+      return 0;
     }
   });
 
@@ -136,21 +120,32 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     return { USD: true, VES: true, COP: true };
   });
 
+  // Precio de la leche y monedas activas se guardan en el servidor (preferencia "ganaderia_config"):
+  // antes vivían solo en este navegador y otro equipo de la finca arrancaba con precio 0.
+  type ConfigFinca = { precioLecheUSD?: number; VES?: boolean; COP?: boolean };
+  const configFincaRef = useRef<ConfigFinca>({});
+  const persistirConfigFinca = (cambios: ConfigFinca) => {
+    configFincaRef.current = { ...configFincaRef.current, ...cambios };
+    guardarPreferencia("ganaderia_config", configFincaRef.current).catch((e) =>
+      notificar(`El ajuste quedó solo en este equipo: ${e instanceof Error ? e.message : "revise la conexión"}`));
+  };
+
   const guardarMonedasConfig = (ves: boolean, cop: boolean) => {
     const conf = { USD: true, VES: ves, COP: cop };
     setMonedasConfig(conf);
     try {
       localStorage.setItem(`aurora_finca_config_${tenantId}`, JSON.stringify(conf));
     } catch {}
+    persistirConfigFinca({ VES: ves, COP: cop });
   };
 
   // Precio de leche centralizado editable por tenant
   const [precioLecheUSD, setPrecioLecheUSD] = useState<number>(() => {
     try {
       const p = localStorage.getItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`);
-      return p ? Number(p) || 0.55 : 0.55;
+      return p ? Number(p) || 0 : 0;
     } catch {
-      return 0.55;
+      return 0;
     }
   });
   const [modalEditarPrecioLeche, setModalEditarPrecioLeche] = useState(false);
@@ -160,11 +155,37 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     try {
       localStorage.setItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`, String(nuevoPrecio));
     } catch {}
+    persistirConfigFinca({ precioLecheUSD: nuevoPrecio });
     setModalEditarPrecioLeche(false);
     notificar(`Precio de la leche actualizado a $${nuevoPrecio.toFixed(2)} USD / Litro`);
   };
 
   const [modalEditarTasas, setModalEditarTasas] = useState(false);
+
+  useEffect(() => {
+    leerPreferencia<ConfigFinca>("ganaderia_config")
+      .then((delServidor) => {
+        if (delServidor) {
+          configFincaRef.current = delServidor;
+          if (typeof delServidor.precioLecheUSD === "number") {
+            setPrecioLecheUSD(delServidor.precioLecheUSD);
+            try { localStorage.setItem(`aurora_ganaderia_precio_leche_usd_${tenantId}`, String(delServidor.precioLecheUSD)); } catch {}
+          }
+          if (delServidor.VES !== undefined || delServidor.COP !== undefined) {
+            const conf = { USD: true, VES: delServidor.VES !== false, COP: delServidor.COP !== false };
+            setMonedasConfig(conf);
+            try { localStorage.setItem(`aurora_finca_config_${tenantId}`, JSON.stringify(conf)); } catch {}
+          }
+        } else if (user?.rol === "DUENO_ADMIN" || user?.rol === "ADMINISTRADOR_FINCA") {
+          // Primera vez: lo que ya estaba configurado en este navegador sube al servidor.
+          if (precioLecheUSD > 0 || !monedasConfig.VES || !monedasConfig.COP) {
+            persistirConfigFinca({ precioLecheUSD, VES: monedasConfig.VES, COP: monedasConfig.COP });
+          }
+        }
+      })
+      .catch(() => notificar("No se pudo cargar el precio de la leche desde el servidor; se usa el de este equipo."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   const guardarTasas = (nuevaBcv: number, nuevaCop: number, vesActivo?: boolean, copActivo?: boolean) => {
     setTasaBCV(nuevaBcv);
@@ -173,8 +194,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       guardarMonedasConfig(vesActivo, copActivo);
     }
     try {
-      localStorage.setItem("aurora_ganaderia_tasa_bcv", String(nuevaBcv));
-      localStorage.setItem("aurora_ganaderia_tasa_cop", String(nuevaCop));
+      localStorage.setItem(`aurora_ganaderia_tasa_bcv_${tenantId}`, String(nuevaBcv));
+      localStorage.setItem(`aurora_ganaderia_tasa_cop_${tenantId}`, String(nuevaCop));
     } catch {}
     setModalEditarTasas(false);
     // El motor financiero (caja, despachos, ventas) usa las tasas del backend:
@@ -232,6 +253,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   // Modales
   const [altaAnimal, setAltaAnimal] = useState<Partial<FormAltaAnimal> | null>(null);
   const [modalImportarHato, setModalImportarHato] = useState(false);
+  // Registro rápido del hato (3 pasos, con potrero por animal). Usa la misma ruta que importar,
+  // así que solo lo abren quienes pueden importar; los demás siguen con el alta de uno en uno.
+  const [modalRegistroRapido, setModalRegistroRapido] = useState(false);
   // Última jornada de vacunación registrada: ofrece descargar su constancia PDF.
   const [ultimaVacunacion, setUltimaVacunacion] = useState<{ fecha: string; vacunaId: number; nombre: string; cantidad: number } | null>(null);
   const [prenezActual, setPrenezActual] = useState<PrenezActualGanaderia[]>([]);
@@ -244,6 +268,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   const [pendientesOffline, setPendientesOffline] = useState(0);
   const [sincronizandoOffline, setSincronizandoOffline] = useState(false);
   const [vacunaAbierta, setVacunaAbierta] = useState<{ animalId?: number } | null>(null);
+  const [bajaAbierta, setBajaAbierta] = useState<{ animalId?: number } | null>(null);
+  const [guiaAbierta, setGuiaAbierta] = useState<{ animalIds?: number[] } | null>(null);
   const [reproAbierta, setReproAbierta] = useState<{ tipo?: string; resultado?: string } | null>(null);
   const [celoAbierto, setCeloAbierto] = useState(false);
   const [mastitisAbierta, setMastitisAbierta] = useState(false);
@@ -260,7 +286,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
   const notificar = (msg: string) => {
     setNotificacion(msg);
-    setTimeout(() => setNotificacion(null), 3500);
+    // Un error se lee con más calma que un "listo".
+    setTimeout(() => setNotificacion(actual => (actual === msg ? null : actual)), tonoAviso(msg) === "exito" ? 3500 : 6500);
   };
 
   // Cargar datos iniciales desde el backend
@@ -294,6 +321,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
   }, [deepLinkAnimalId, animales]);
 
   const cargarDatos = async () => {
+    const noCargo: string[] = [];
     try {
       const [resAnimales, resPotreros, resVacunas, resAlertas, resPrenez] = await Promise.allSettled([
         listarAnimalesGanaderia(),
@@ -306,6 +334,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       if (resPrenez.status === "fulfilled") {
         setPrenezActual(resPrenez.value ?? []);
       }
+      if (resAnimales.status === "rejected") noCargo.push("el hato");
+      if (resPotreros.status === "rejected") noCargo.push("los potreros");
+      if (resVacunas.status === "rejected") noCargo.push("las vacunas");
+      if (resAlertas.status === "rejected") noCargo.push("las alertas");
 
       // Tasas: la vigente del backend es la que usa caja; si existe, es la que se muestra.
       const [tVes, tCop] = await Promise.allSettled([tasaVigente(tenantId, "USD", "VES"), tasaVigente(tenantId, "USD", "COP")]);
@@ -325,22 +357,22 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         setAlertas(resAlertas.value);
       }
 
-      const hoy = new Date().toISOString().slice(0, 10);
-      const hace30d = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const hoy = fechaLocalISO();
+      const hace30d = fechaLocalISO(new Date(Date.now() - 30 * 86400000));
       try {
         const repOrdeno = await obtenerReporteOrdenoGanaderia(tenantId, hace30d, hoy);
         setOrdenos(repOrdeno?.registros ?? []);
-      } catch {}
+      } catch { noCargo.push("los ordeños"); }
 
       // Cargar estado del tanque de leche y ventas históricas
       try {
         const tanque = await obtenerStockTanqueLeche(tenantId);
         setTanqueLeche(tanque);
-      } catch {}
+      } catch { noCargo.push("el tanque de leche"); }
       try {
         const ventas = await obtenerVentasLecheTanque(tenantId);
         setVentasLeche(ventas ?? []);
-      } catch {}
+      } catch { noCargo.push("las ventas de leche"); }
 
       // Cargar gastos operativos y ventas de animales
       try {
@@ -354,9 +386,15 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         if (resVentasAnimales.status === "fulfilled" && resVentasAnimales.value) {
           setVentasAnimales(resVentasAnimales.value ?? []);
         }
-      } catch {}
+        if (resGastos.status === "rejected") noCargo.push("los gastos");
+        if (resVentasAnimales.status === "rejected") noCargo.push("las ventas de animales");
+      } catch { noCargo.push("los gastos"); }
     } catch (err) {
       console.warn("No se pudo cargar la información real de Ganadería desde el backend:", err);
+      noCargo.push("los datos de la finca");
+    }
+    if (noCargo.length > 0 && (typeof navigator === "undefined" || navigator.onLine)) {
+      avisar(`No se pudo cargar ${noCargo.join(", ")}. Lo que ves puede estar incompleto; revisa la conexión.`, "error");
     }
   };
 
@@ -387,8 +425,37 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     },
   });
 
+  // Potrero creado solo con nombre (al registrar el ganado) que se está dibujando en el mapa.
+  const [potreroAUbicar, setPotreroAUbicar] = useState<PotreroGanaderia | null>(null);
+  const ubicarPotrero = (potrero: PotreroGanaderia) => {
+    setPotreroAUbicar(potrero);
+    setSubPotreros("mapa");
+    notificar(`Marca en el mapa las esquinas de "${potrero.nombre}" o camina su borde con el GPS.`);
+  };
+
   // Manejador cuando el usuario traza un potrero en el mapa satelital
   const handleGuardarPotreroTrazado = (datos: { poligono: [number, number][]; hectareas: number }) => {
+    // Si se estaba ubicando un potrero existente, la forma se guarda en ese mismo potrero.
+    if (potreroAUbicar) {
+      const p = potreroAUbicar;
+      setPotreroAUbicar(null);
+      setPotreroEnModal({
+        editandoId: p.id,
+        form: {
+          codigo: p.codigo || "",
+          nombre: p.nombre,
+          areaHectareas: datos.hectareas,
+          capacidadAnimales: Number(p.capacidadAnimales) || Math.max(1, Math.round(datos.hectareas * 1.8)),
+          tipoPasto: p.tipoPasto || "",
+          color: p.color || "#10B981",
+          diasDescansoMinimo: Number(p.diasDescansoMinimo) || 28,
+          observaciones: p.observaciones || `Georreferenciado sobre imagen satelital (${datos.poligono.length} postes).`,
+          poligono: datos.poligono,
+        },
+      });
+      notificar(`"${p.nombre}" ubicado con ${datos.hectareas} ha. Revisa los datos y guarda.`);
+      return;
+    }
     setPotreroEnModal({
       editandoId: null,
       form: {
@@ -451,66 +518,121 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     alGuardarJornada([nuevoReg], litrosAlTanque);
 
   // Sincronizacion de operaciones de campo realizadas offline (manga/potreros)
+  const sincronizandoRef = useRef(false);
   const handleSincronizarManual = async () => {
-    if (sincronizandoOffline) return;
+    // El candado va en una ref: dos avisos seguidos (volver la señal y abrir la app) llegan antes
+    // de que el estado se actualice y enviarían la cola dos veces a la vez.
+    if (sincronizandoRef.current) return;
+    sincronizandoRef.current = true;
     setSincronizandoOffline(true);
     try {
       const res = await procesarColaGanaderia(tenantId, {
         registrar_peso: async (acc) => {
-          await registrarPesoGanaderia(tenantId, acc.payload.animalId, acc.payload.peso);
+          // Con el día en que se pesó sin señal y la clave de la cola: un reintento no duplica el pesaje.
+          await registrarPesoGanaderia(tenantId, acc.payload.animalId, acc.payload.peso, fechaLocalISO(new Date(acc.creadaEn)), acc.claveIdempotencia);
         },
         rotar_potrero: async (acc) => {
-          await rotarPotreroGanaderia(acc.payload.potreroOrigenId, tenantId, acc.payload.potreroDestinoId);
+          // Con la clave de la cola: si el servidor ya la hizo antes de cortarse la señal, no rota dos veces.
+          await rotarPotreroGanaderia(acc.payload.potreroOrigenId, tenantId, acc.payload.potreroDestinoId, acc.payload.animalIds, acc.claveIdempotencia);
         },
         registrar_ordeno: async (acc) => {
+          // Si el servidor ya lo guardó y se cortó la señal, el reintento choca con "Ya existe un ordeño"
+          // para ese turno: cuenta como sincronizado, no como error (y no se suma dos veces al tanque).
+          try {
           await registrarOrdenoGanaderia(tenantId, {
             animalId: acc.payload.animalId,
             cantidadLitros: acc.payload.litros,
             turno: acc.payload.sesion,
-            fecha: new Date().toISOString().slice(0, 10),
-            precioVentaLitro: 0.5,
+            // El día en que se ordeñó sin señal, no el día en que se sincroniza; y el precio configurado, nunca uno fijo.
+            fecha: fechaLocalISO(new Date(acc.creadaEn)),
+            precioVentaLitro: precioLecheUSD > 0 ? precioLecheUSD : undefined,
           });
+          } catch (e) {
+            if (!(e instanceof Error && e.message.includes("Ya existe un ordeño"))) throw e;
+          }
         },
         aplicar_vacuna: async (acc) => {
           await aplicarVacunaGanaderia(tenantId, {
             animalId: acc.payload.animalId || 0,
             vacunaId: acc.payload.vacunaId,
-            fechaAplicacion: new Date(acc.creadaEn).toISOString().slice(0, 10),
+            fechaAplicacion: fechaLocalISO(new Date(acc.creadaEn)),
           });
-        }
+        },
+        // Si la señal se cortó después de que el servidor guardó, el reintento choca con lo ya
+        // guardado: eso cuenta como sincronizado, no como error.
+        alta_animal: async (acc) => {
+          try {
+            await crearAnimalGanaderia(tenantId, acc.payload as unknown as Parameters<typeof crearAnimalGanaderia>[1]);
+          } catch (e) {
+            if (!(e instanceof Error && e.message.includes("Ya existe un animal registrado"))) throw e;
+          }
+        },
+        registrar_baja: async (acc) => {
+          try {
+            await registrarBajaGanaderia({ animalId: acc.payload.animalId, fecha: acc.payload.fecha, motivo: acc.payload.motivo, observaciones: acc.payload.observaciones });
+          } catch (e) {
+            if (!(e instanceof Error && e.message.includes("ya no está activo"))) throw e;
+          }
+        },
       });
 
       setPendientesOffline(res.quedanPendientes);
-      if (res.sincronizadas.length > 0) {
-        notificar(`Sincronizacion completada: ${res.sincronizadas.length} registros de campo sincronizados.`);
+      if (res.sincronizadas.some(a => a.tipo === "alta_animal" || a.tipo === "registrar_baja")) {
+        cargarDatos(); // los animales creados sin señal toman su id real
+      }
+      if (res.fallidasDefinitivo.length > 0) {
+        // Antes se descartaban sin avisar: el usuario debe saber qué no quedó guardado.
+        notificar(`No se pudieron guardar ${res.fallidasDefinitivo.length} registro(s) hechos sin señal: `
+          + res.fallidasDefinitivo.map(f => `${f.accion.descripcion} (${f.mensaje})`).join("; "));
+      } else if (res.sincronizadas.length > 0) {
+        notificar(`Sincronización completada: ${res.sincronizadas.length} registro(s) de campo guardados.`);
       }
     } catch {
-      notificar("No se pudo completar la sincronizacion en este momento.");
+      notificar("No se pudo completar la sincronización en este momento.");
     } finally {
+      sincronizandoRef.current = false;
       setSincronizandoOffline(false);
     }
   };
 
+  // Siempre la versión más reciente de la sincronización (con el precio de la leche y el estado
+  // actuales), para que los avisos del navegador no llamen a una copia vieja.
+  const sincronizarRef = useRef(handleSincronizarManual);
+  sincronizarRef.current = handleSincronizarManual;
+
   useEffect(() => {
     setPendientesOffline(contarPendientesGanaderia(tenantId));
+    // Solo con el evento "online" no basta: si la app se abre ya con señal y con registros
+    // pendientes, o el teléfono no avisa el cambio (pasa en iPhone), la cola se quedaba quieta
+    // hasta tocar "Sincronizar". Se intenta al abrir, al volver a la app y cada 30 segundos.
+    const intentar = () => {
+      if (navigator.onLine && contarPendientesGanaderia(tenantId) > 0) sincronizarRef.current();
+    };
     const handleOnline = () => {
       setEstaOnline(true);
-      handleSincronizarManual();
+      sincronizarRef.current();
     };
     const handleOffline = () => setEstaOnline(false);
+    const alVolverALaApp = () => { if (document.visibilityState === "visible") intentar(); };
 
+    intentar();
+    const intervalo = setInterval(intentar, 30_000);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    document.addEventListener("visibilitychange", alVolverALaApp);
     return () => {
+      clearInterval(intervalo);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", alVolverALaApp);
     };
   }, [tenantId]);
 
   // Vacunación aplicada: queda lista la constancia y se recargan las alertas de retiro.
   const alAplicarVacuna = (aplicacion: VacunacionAplicada) => {
     setUltimaVacunacion(aplicacion);
-    obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias).catch(() => {});
+    obtenerAlertasSanitariasGanaderia(tenantId).then(setAlertasSanitarias)
+      .catch(() => { if (navigator.onLine) avisar("No se pudieron cargar las alertas sanitarias (retiro de leche y carne).", "error"); });
   };
 
   // Exportar matriz a XLSX
@@ -531,7 +653,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Inventario Hato");
     XLSX.writeFile(wb, "Inventario_Hato_Aurora.xlsx");
-    notificar("Reporte XLSX exportado correctamente.");
+    notificar("Excel del inventario descargado.");
   };
 
   return (
@@ -540,8 +662,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
       {/* Notificación Flotante */}
       {notificacion && (
-        <div className="fixed top-5 right-5 z-[2100] apple-glass px-5 py-3 rounded-2xl border border-emerald-500/50 shadow-2xl text-emerald-600 dark:text-emerald-300 text-xs font-bold flex items-center gap-3 animate-fade-in">
-          <IconCheckCircle size={18} />
+        <div
+          role={tonoAviso(notificacion) === "error" ? "alert" : "status"}
+          className={`fixed top-5 right-5 z-[2100] max-w-md px-5 py-3 rounded-2xl border shadow-lg text-xs font-semibold flex items-start gap-3 animate-fade-in ${
+            tonoAviso(notificacion) === "error"
+              ? "bg-rose-50 border-rose-200 text-rose-800"
+              : tonoAviso(notificacion) === "aviso"
+                ? "bg-amber-50 border-amber-200 text-amber-800"
+                : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          }`}
+        >
+          <span className="flex-shrink-0 mt-px">
+            {tonoAviso(notificacion) === "exito" ? <IconCheckCircle size={18} /> : <IconWarning size={18} />}
+          </span>
           <span>{notificacion}</span>
         </div>
       )}
@@ -564,6 +697,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
         setAltaAnimal={setAltaAnimal}
         setAperturaSoporte={setAperturaSoporte}
         setModalImportarHato={setModalImportarHato}
+        abrirRegistroRapido={puedeImportarHato ? () => setModalRegistroRapido(true) : undefined}
         setSidebarAbierto={setSidebarAbierto}
         setTab={setTab}
       />
@@ -574,6 +708,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       {/* ── TOPBAR: SINCRONIZACIÓN, MONEDAS, LECHE, FISCAL Y TEMA ── */}
       <BarraSuperiorGanaderia
         estaOnline={estaOnline}
+        nombreFinca={user?.empresa || "Mi Finca"}
         monedasConfig={monedasConfig}
         pendientesOffline={pendientesOffline}
         precioLecheUSD={precioLecheUSD}
@@ -594,6 +729,26 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             PESTAÑA 1: PANEL GENERAL (RESUMEN EJECUTIVO & CLIMA)
         ───────────────────────────────────────────────────────────── */}
         {tab === "resumen" && (
+          <>
+          <button
+            type="button"
+            onClick={() => navigate("/mercado")}
+            className="w-full mb-5 flex flex-wrap sm:flex-nowrap items-center gap-4 p-4 sm:p-5 rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 via-emerald-50 to-white hover:border-teal-300 hover:shadow-sm text-left cursor-pointer transition"
+          >
+            <span className="w-11 h-11 rounded-xl bg-teal-700 text-[#ffffff] flex items-center justify-center flex-shrink-0"><IconCow size={22} /></span>
+            <span className="flex-1 min-w-[12rem]">
+              <span className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+                Mercado ganadero
+                {sinLeerMercado > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-rose-500 text-[#ffffff] text-[11px] font-bold">
+                    {sinLeerMercado} {sinLeerMercado === 1 ? "mensaje nuevo" : "mensajes nuevos"}
+                  </span>
+                )}
+              </span>
+              <span className="block text-sm text-slate-600">Publica tus animales y compra ganado directo a otras fincas de Aurora.</span>
+            </span>
+            <span className="px-4 py-2 rounded-xl bg-teal-700 text-[#ffffff] text-sm font-semibold">Entrar al mercado</span>
+          </button>
           <SeccionPanel
             alertasSanitarias={alertasSanitarias}
             animales={animales}
@@ -610,6 +765,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             vacunas={vacunas}
             ventasLeche={ventasLeche}
             abrirNuevoPotrero={abrirNuevoPotrero}
+            abrirRegistroRapido={puedeImportarHato ? () => setModalRegistroRapido(true) : undefined}
             setAltaAnimal={setAltaAnimal}
             setModalAjusteTanque={setModalAjusteTanque}
             setModalRotar={setModalRotar}
@@ -618,6 +774,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             setSubPotreros={setSubPotreros}
             setTab={setTab}
           />
+          </>
         )}
 
         {/* ─────────────────────────────────────────────────────────────
@@ -635,6 +792,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             handleGuardarPotreroTrazado={handleGuardarPotreroTrazado}
             setModalRotar={setModalRotar}
             setSubPotreros={setSubPotreros}
+            potreroAUbicar={potreroAUbicar}
+            ubicarPotrero={ubicarPotrero}
+            cancelarUbicar={() => setPotreroAUbicar(null)}
           />
         )}
 
@@ -659,6 +819,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             setAnimalFichaId={setAnimalFichaId}
             setModalFichaAnimal={setModalFichaAnimal}
             setModalImportarHato={setModalImportarHato}
+            abrirRegistroRapido={puedeImportarHato ? () => setModalRegistroRapido(true) : undefined}
             setModalPesaje={setModalPesaje}
             setSubInventario={setSubInventario}
             setSubSanidad={setSubSanidad}
@@ -687,6 +848,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             setAnimalFichaId={setAnimalFichaId}
             setSubSanidad={setSubSanidad}
             setVacunaAbierta={setVacunaAbierta}
+            setBajaAbierta={setBajaAbierta}
           />
         )}
 
@@ -709,6 +871,8 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             setSubInventario={setSubInventario}
             setTab={setTab}
             setVacunaAbierta={setVacunaAbierta}
+            setBajaAbierta={setBajaAbierta}
+            setGuiaAbierta={setGuiaAbierta}
           />
         )}
 
@@ -747,6 +911,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             ordenos={ordenos}
             potreros={potreros}
             precioLecheUSD={precioLecheUSD}
+            puedeVerMargen={puedeImportarHato}
             tasaBCV={tasaBCV}
             tasaCOP={tasaCOP}
             vacunas={vacunas}
@@ -768,6 +933,15 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           />
         )}
 
+        {tab === "alimentacion" && (
+          <SeccionAlimentacion
+            potreros={potreros}
+            animales={animales}
+            puedeComprar={puedeImportarHato}
+            notificar={notificar}
+          />
+        )}
+
         {tab === "sociedades" && (
           <SociedadesCeba
             animales={animales}
@@ -775,6 +949,13 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             notificar={notificar}
             onCambio={cargarDatos}
           />
+        )}
+
+        {/* Obreros de la finca: directorio, jornadas y nómina (módulo Personal compartido). */}
+        {tab === "personal" && (
+          <PersonalRoute embebido>
+            <PersonalPage embedded rubro="ganaderia" />
+          </PersonalRoute>
         )}
 
         {tab === "auditoria" && user?.rol === "DUENO_ADMIN" && (
@@ -870,6 +1051,19 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
 
       <TenantSoporteWidget solicitudApertura={aperturaSoporte} soloConTicketActivo />
 
+      {modalRegistroRapido && (
+        <ModalRegistroRapidoHato
+          potreros={potreros}
+          onCerrar={() => setModalRegistroRapido(false)}
+          onUsarExcel={() => { setModalRegistroRapido(false); setModalImportarHato(true); }}
+          onGuardado={(cantidad) => {
+            setModalRegistroRapido(false);
+            notificar(`${cantidad} animales registrados en el hato.`);
+            cargarDatos();
+          }}
+        />
+      )}
+
       {modalImportarHato && (
         <ModalImportarHato
           onCerrar={() => setModalImportarHato(false)}
@@ -889,8 +1083,10 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           valoresIniciales={altaAnimal}
           tenantId={tenantId}
           notificar={notificar}
-          onCreado={nuevo => { setAnimales(prev => [nuevo, ...prev]); setAnimalFichaId(nuevo.id); }}
+          onCreado={nuevo => { setAnimales(prev => [nuevo, ...prev]); if (nuevo.id > 0) setAnimalFichaId(nuevo.id); }}
+          onEncolado={() => setPendientesOffline(contarPendientesGanaderia(tenantId))}
           onCerrar={() => setAltaAnimal(null)}
+          onPotreroCreado={p => setPotreros(prev => (prev.some(x => x.id === p.id) ? prev : [...prev, p]))}
         />
       )}
 
@@ -964,6 +1160,28 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
       )}
 
       {/* MODAL: VACUNACIÓN & TRATAMIENTOS SANITARIOS */}
+      {guiaAbierta && (
+        <ModalGuiaMovilizacion
+          animales={animales}
+          animalIdsIniciales={guiaAbierta.animalIds}
+          nombreFinca={user?.empresa || "Mi Finca"}
+          notificar={notificar}
+          onCerrar={() => setGuiaAbierta(null)}
+        />
+      )}
+
+      {bajaAbierta && (
+        <ModalBaja
+          animalesActivos={animalesActivos}
+          animalIdInicial={bajaAbierta.animalId}
+          notificar={notificar}
+          onRegistrada={(id, estado) => setAnimales(prev => prev.map(a => a.id === id ? { ...a, estado, potrero: undefined } : a))}
+          onEncolado={() => setPendientesOffline(contarPendientesGanaderia(tenantId))}
+          tenantId={tenantId}
+          onCerrar={() => setBajaAbierta(null)}
+        />
+      )}
+
       {vacunaAbierta && (
         <ModalVacunacion
           animales={animales}
@@ -1021,6 +1239,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           tenantId={tenantId}
           notificar={notificar}
           onVendidos={ids => setAnimales(prev => prev.map(a => ids.includes(a.id) ? { ...a, estado: "VENDIDO", potrero: undefined } : a))}
+          onHacerGuia={ids => { setVentaAbierta(null); setGuiaAbierta({ animalIds: ids }); }}
           onCerrar={() => setVentaAbierta(null)}
         />
       )}
@@ -1049,6 +1268,7 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
           tasaCOP={tasaCOP}
           monedasConfig={monedasConfig}
           tenantId={tenantId}
+          lotes={[...new Set(animales.filter(a => a.estado === "ACTIVO" || !a.estado).map(a => (a.lote || "").trim()).filter(Boolean))].sort()}
           notificar={notificar}
           onRegistrado={g => setGastos(prev => [g, ...prev])}
           onCerrar={() => setGastoAbierto(false)}

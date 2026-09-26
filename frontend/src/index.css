@@ -270,6 +270,28 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Alto de pantalla en el iPhone: 100vh cuenta también el espacio de las barras de Safari, así
+   que en las vistas con alto fijo y desplazamiento interno (Ganadería, Comercio, Restaurante,
+   Mediclinic, SuperAdmin) el principio o el final quedaba escondido detrás de las barras al
+   desplazarse rápido. 100dvh es la parte realmente visible y se ajusta cuando las barras
+   aparecen o se esconden. El 100vh queda de respaldo para navegadores viejos. */
+.h-screen {
+  height: 100vh;
+  height: 100dvh;
+}
+.max-h-screen {
+  max-height: 100vh;
+  max-height: 100dvh;
+}
+
+/* En el iPhone, Safari hace zoom al tocar un campo con letra de menos de 16px y la pantalla
+   queda corrida hacia un lado. En teléfono los campos usan 16px para que no pase. */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Force Light Surfaces & Contrast */
 body {
   background-color: #F5F5F7 !important;
@@ -493,6 +515,215 @@ body {
   color: #FFFFFF !important;
 }
 
+/* Superficies oscuras a propósito fuera del Mercado (portada: sección petróleo y tarjetas con
+   foto) y botones o etiquetas de marca con fondo sólido: ahí el texto blanco tiene que seguir
+   blanco. Sin esto la regla de arriba lo volvía gris oscuro sobre fondo oscuro, ilegible. */
+.superficie-oscura .text-white,
+.superficie-oscura .text-white\/90,
+.superficie-oscura .text-white\/85,
+.bg-\[\#177E89\].text-white,
+.bg-\[\#0D3B3D\].text-white {
+  color: #FFFFFF !important;
+}
+.superficie-oscura .text-white\/80,
+.superficie-oscura .text-white\/70 {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+.superficie-oscura .text-white\/65,
+.superficie-oscura .text-white\/60,
+.superficie-oscura .text-white\/55,
+.superficie-oscura .text-white\/50 {
+  color: rgba(255, 255, 255, 0.68) !important;
+}
+
+
+/* Botones y etiquetas de color sólido (turquesa, verde, azul, rojo...) llevan letra blanca a
+   propósito. La regla de arriba que oscurece .text-white los dejaba con letra negra sobre fondo
+   oscuro (p. ej. "Registrar Compra" en Inventario). Los grises y el negro no se incluyen: esa
+   misma regla los vuelve blancos. */
+.bg-teal-500.text-white,
+.bg-teal-500 .text-white,
+.bg-teal-600.text-white,
+.bg-teal-600 .text-white,
+.bg-teal-700.text-white,
+.bg-teal-700 .text-white,
+.bg-teal-800.text-white,
+.bg-teal-800 .text-white,
+.bg-teal-900.text-white,
+.bg-teal-900 .text-white,
+.bg-cyan-500.text-white,
+.bg-cyan-500 .text-white,
+.bg-cyan-600.text-white,
+.bg-cyan-600 .text-white,
+.bg-cyan-700.text-white,
+.bg-cyan-700 .text-white,
+.bg-cyan-800.text-white,
+.bg-cyan-800 .text-white,
+.bg-cyan-900.text-white,
+.bg-cyan-900 .text-white,
+.bg-emerald-500.text-white,
+.bg-emerald-500 .text-white,
+.bg-emerald-600.text-white,
+.bg-emerald-600 .text-white,
+.bg-emerald-700.text-white,
+.bg-emerald-700 .text-white,
+.bg-emerald-800.text-white,
+.bg-emerald-800 .text-white,
+.bg-emerald-900.text-white,
+.bg-emerald-900 .text-white,
+.bg-green-500.text-white,
+.bg-green-500 .text-white,
+.bg-green-600.text-white,
+.bg-green-600 .text-white,
+.bg-green-700.text-white,
+.bg-green-700 .text-white,
+.bg-green-800.text-white,
+.bg-green-800 .text-white,
+.bg-green-900.text-white,
+.bg-green-900 .text-white,
+.bg-lime-500.text-white,
+.bg-lime-500 .text-white,
+.bg-lime-600.text-white,
+.bg-lime-600 .text-white,
+.bg-lime-700.text-white,
+.bg-lime-700 .text-white,
+.bg-lime-800.text-white,
+.bg-lime-800 .text-white,
+.bg-lime-900.text-white,
+.bg-lime-900 .text-white,
+.bg-sky-500.text-white,
+.bg-sky-500 .text-white,
+.bg-sky-600.text-white,
+.bg-sky-600 .text-white,
+.bg-sky-700.text-white,
+.bg-sky-700 .text-white,
+.bg-sky-800.text-white,
+.bg-sky-800 .text-white,
+.bg-sky-900.text-white,
+.bg-sky-900 .text-white,
+.bg-blue-500.text-white,
+.bg-blue-500 .text-white,
+.bg-blue-600.text-white,
+.bg-blue-600 .text-white,
+.bg-blue-700.text-white,
+.bg-blue-700 .text-white,
+.bg-blue-800.text-white,
+.bg-blue-800 .text-white,
+.bg-blue-900.text-white,
+.bg-blue-900 .text-white,
+.bg-indigo-500.text-white,
+.bg-indigo-500 .text-white,
+.bg-indigo-600.text-white,
+.bg-indigo-600 .text-white,
+.bg-indigo-700.text-white,
+.bg-indigo-700 .text-white,
+.bg-indigo-800.text-white,
+.bg-indigo-800 .text-white,
+.bg-indigo-900.text-white,
+.bg-indigo-900 .text-white,
+.bg-violet-500.text-white,
+.bg-violet-500 .text-white,
+.bg-violet-600.text-white,
+.bg-violet-600 .text-white,
+.bg-violet-700.text-white,
+.bg-violet-700 .text-white,
+.bg-violet-800.text-white,
+.bg-violet-800 .text-white,
+.bg-violet-900.text-white,
+.bg-violet-900 .text-white,
+.bg-purple-500.text-white,
+.bg-purple-500 .text-white,
+.bg-purple-600.text-white,
+.bg-purple-600 .text-white,
+.bg-purple-700.text-white,
+.bg-purple-700 .text-white,
+.bg-purple-800.text-white,
+.bg-purple-800 .text-white,
+.bg-purple-900.text-white,
+.bg-purple-900 .text-white,
+.bg-fuchsia-500.text-white,
+.bg-fuchsia-500 .text-white,
+.bg-fuchsia-600.text-white,
+.bg-fuchsia-600 .text-white,
+.bg-fuchsia-700.text-white,
+.bg-fuchsia-700 .text-white,
+.bg-fuchsia-800.text-white,
+.bg-fuchsia-800 .text-white,
+.bg-fuchsia-900.text-white,
+.bg-fuchsia-900 .text-white,
+.bg-pink-500.text-white,
+.bg-pink-500 .text-white,
+.bg-pink-600.text-white,
+.bg-pink-600 .text-white,
+.bg-pink-700.text-white,
+.bg-pink-700 .text-white,
+.bg-pink-800.text-white,
+.bg-pink-800 .text-white,
+.bg-pink-900.text-white,
+.bg-pink-900 .text-white,
+.bg-rose-500.text-white,
+.bg-rose-500 .text-white,
+.bg-rose-600.text-white,
+.bg-rose-600 .text-white,
+.bg-rose-700.text-white,
+.bg-rose-700 .text-white,
+.bg-rose-800.text-white,
+.bg-rose-800 .text-white,
+.bg-rose-900.text-white,
+.bg-rose-900 .text-white,
+.bg-red-500.text-white,
+.bg-red-500 .text-white,
+.bg-red-600.text-white,
+.bg-red-600 .text-white,
+.bg-red-700.text-white,
+.bg-red-700 .text-white,
+.bg-red-800.text-white,
+.bg-red-800 .text-white,
+.bg-red-900.text-white,
+.bg-red-900 .text-white,
+.bg-orange-500.text-white,
+.bg-orange-500 .text-white,
+.bg-orange-600.text-white,
+.bg-orange-600 .text-white,
+.bg-orange-700.text-white,
+.bg-orange-700 .text-white,
+.bg-orange-800.text-white,
+.bg-orange-800 .text-white,
+.bg-orange-900.text-white,
+.bg-orange-900 .text-white,
+.bg-amber-500.text-white,
+.bg-amber-500 .text-white,
+.bg-amber-600.text-white,
+.bg-amber-600 .text-white,
+.bg-amber-700.text-white,
+.bg-amber-700 .text-white,
+.bg-amber-800.text-white,
+.bg-amber-800 .text-white,
+.bg-amber-900.text-white,
+.bg-amber-900 .text-white {
+  color: #FFFFFF !important;
+}
+
+/* En la paleta de la marca teal-500 es el turquesa OSCURO (#177E89), no el claro de Tailwind:
+   los botones pensados con letra negra sobre turquesa claro quedaban ilegibles. */
+.bg-teal-500.text-slate-950,
+.bg-teal-500.text-slate-900,
+.bg-teal-500.text-black,
+.bg-teal-600.text-slate-950,
+.bg-teal-600.text-slate-900,
+.bg-teal-600.text-black,
+.bg-teal-700.text-slate-950,
+.bg-teal-700.text-slate-900,
+.bg-teal-700.text-black,
+.bg-teal-800.text-slate-950,
+.bg-teal-800.text-slate-900,
+.bg-teal-800.text-black,
+.bg-teal-900.text-slate-950,
+.bg-teal-900.text-slate-900,
+.bg-teal-900.text-black {
+  color: #FFFFFF !important;
+}
+
 /* El Mercado Ganadero sí se diseñó con superficies oscuras (cabecera, portada,
    categorías, botones): ahí el texto blanco va sobre fondo oscuro a propósito,
    así que se exceptúa de la neutralización de arriba. */
@@ -559,4 +790,20 @@ input:focus, select:focus, textarea:focus {
    así que no hace falta mantenerlo fijado. */
 .animate-page-enter {
   animation: pageEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Avisos (AvisosGlobales): entran subiendo y apareciendo de a poco, y salen bajando y
+   desvaneciéndose, sin cortes bruscos. */
+@keyframes aviso-entrar {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes aviso-salir {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+.aviso-entrar { animation: aviso-entrar 340ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.aviso-salir { animation: aviso-salir 240ms ease-in both; }
+@media (prefers-reduced-motion: reduce) {
+  .aviso-entrar, .aviso-salir { animation-duration: 1ms; }
 }

@@ -31,10 +31,9 @@ public class CobroVeterinariaController {
 
     @PostMapping
     public ResponseEntity<CobroConsultaVet> procesarCobro(
-            @RequestParam(required = false) Long tenantId,
             @RequestBody CobroVeterinariaService.CobroRequest req) {
 
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }

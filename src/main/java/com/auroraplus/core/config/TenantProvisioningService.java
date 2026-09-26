@@ -46,12 +46,20 @@ public class TenantProvisioningService {
         public String emailContacto;
         public String telefonoContacto;
         public Integer mesesVigencia;
+        /** Si viene, manda sobre mesesVigencia: la prueba gratuita del registro público se mide en días. */
+        public Integer diasVigencia;
+        // Registro público: constancia de Términos y plan elegido en la web.
+        public String terminosVersion;
+        public String terminosIp;
+        public String planSolicitado;
         public String monedaBase;
         public String usuarioInicial;
         public String nombreUsuarioInicial;
         public String passwordInicial;
         public Boolean accesoTotal;
         public Integer limiteUsuarios;
+        /** Solo el alta desde el superadmin lo enciende; el registro de autoservicio nunca. */
+        public boolean permiteCambioVertical;
     }
 
     @Transactional
@@ -95,7 +103,9 @@ public class TenantProvisioningService {
         licencia.setModuloPrincipal(request.moduloPrincipal);
         licencia.setTipoLicencia(request.tipoLicencia);
         licencia.setActiva(true);
-        licencia.setFechaVencimientoPago(LocalDate.now().plusMonths(meses));
+        licencia.setFechaVencimientoPago(request.diasVigencia != null
+            ? LocalDate.now().plusDays(request.diasVigencia)
+            : LocalDate.now().plusMonths(meses));
         licencia.setEmailContacto(request.emailContacto);
         licencia.setTelefonoContacto(request.telefonoContacto);
         licencia.setFechaAlta(LocalDate.now());
@@ -105,6 +115,7 @@ public class TenantProvisioningService {
         if (request.limiteUsuarios != null && request.limiteUsuarios > 0) {
             licencia.setLimiteUsuarios(request.limiteUsuarios);
         }
+        licencia.setPermiteCambioVertical(request.permiteCambioVertical);
         // El catálogo público (CatalogoPublicoController) solo resuelve tiendas por
         // slug — nunca por tenantId numérico, para no permitir enumeración
         // secuencial (IDOR). Sin esto, cada tenant nuevo nacía con slugCatalogo nulo
@@ -114,6 +125,13 @@ public class TenantProvisioningService {
         // ya serializa las altas de tenant, así la verificación de unicidad no tiene
         // condición de carrera entre altas simultáneas.
         licencia.setSlugCatalogo(generarSlugUnico(request.nombreEmpresa, nuevoTenantId));
+
+        if (request.terminosVersion != null) {
+            licencia.setTerminosAceptadosEn(java.time.LocalDateTime.now());
+            licencia.setTerminosVersion(request.terminosVersion);
+            licencia.setTerminosIp(request.terminosIp);
+        }
+        licencia.setPlanSolicitado(request.planSolicitado);
 
         LicenciaTenant guardada = licenciaTenantRepository.save(licencia);
 
@@ -137,6 +155,28 @@ public class TenantProvisioningService {
         // Comercio incluye Gestion de Personal (directorio, turnos, asistencia y metas) desde el alta.
         if (VERTICALES_COMERCIO.contains(moduloBackend)) {
             for (String flag : List.of("personal", "asistencia", "metas")) {
+                ModuloTenant mt = new ModuloTenant();
+                mt.setTenantId(nuevoTenantId);
+                mt.setModuloNombre(flag);
+                mt.setActivo(true);
+                moduloTenantRepository.save(mt);
+            }
+        }
+
+        // Restaurante y Salud: Personal y asistencia, para que cada trabajador marque su entrada y su salida.
+        if ("horeca".equals(moduloBackend) || "salud".equals(moduloBackend)) {
+            for (String flag : List.of("personal", "asistencia")) {
+                ModuloTenant mt = new ModuloTenant();
+                mt.setTenantId(nuevoTenantId);
+                mt.setModuloNombre(flag);
+                mt.setActivo(true);
+                moduloTenantRepository.save(mt);
+            }
+        }
+
+        // Ganadería incluye Personal y nómina de los obreros (directorio, jornadas y nómina).
+        if ("ganaderia".equals(moduloBackend)) {
+            for (String flag : List.of("personal", "asistencia", "nomina-avanzada")) {
                 ModuloTenant mt = new ModuloTenant();
                 mt.setTenantId(nuevoTenantId);
                 mt.setModuloNombre(flag);
@@ -196,9 +236,9 @@ public class TenantProvisioningService {
         return base + "-" + tenantId;
     }
 
-    private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia");
+    private static final Set<String> VARIANTES_DE_SALUD = Set.of("odontologia", "estetica");
 
-    private static final Set<String> VERTICALES_COMERCIO = Set.of("repuestos", "ferreteria", "moda", "tamanaco-comercial", "farmacia");
+    private static final Set<String> VERTICALES_COMERCIO = Set.of("comercio", "repuestos", "ferreteria", "moda", "tamanaco-comercial", "farmacia");
 
     public static final Set<String> TODOS_LOS_MODULOS = Set.of(
         "salud", "ganaderia", "horeca", "repuestos", "farmacia", "ferreteria", "moda", "minero", "tamanaco-comercial"

@@ -15,9 +15,10 @@ public interface PagoSuscripcionTenantRepository extends JpaRepository<PagoSuscr
     List<PagoSuscripcionTenant> findAllByOrderByFechaPagoDesc();
     List<PagoSuscripcionTenant> findByTenantIdOrderByFechaPagoDesc(Long tenantId);
 
-    @Query("SELECT COALESCE(SUM(p.monto), 0) FROM PagoSuscripcionTenant p WHERE p.estado = 'CONFIRMADO' AND p.fechaPago >= :desde")
+    // Solo dólares: antes sumaba bolívares y pesos como si fueran dólares e inflaba los ingresos.
+    @Query("SELECT COALESCE(SUM(p.monto), 0) FROM PagoSuscripcionTenant p WHERE p.estado = 'CONFIRMADO' AND p.moneda IN ('USD', 'USDT') AND p.fechaPago >= :desde")
     BigDecimal sumarIngresosDesde(@Param("desde") LocalDateTime desde);
 
-    @Query("SELECT COALESCE(SUM(p.monto), 0) FROM PagoSuscripcionTenant p WHERE p.estado = 'CONFIRMADO' AND p.fechaPago >= :desde AND p.fechaPago <= :hasta")
+    @Query("SELECT COALESCE(SUM(p.monto), 0) FROM PagoSuscripcionTenant p WHERE p.estado = 'CONFIRMADO' AND p.moneda IN ('USD', 'USDT') AND p.fechaPago >= :desde AND p.fechaPago <= :hasta")
     BigDecimal sumarIngresosRango(@Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 }

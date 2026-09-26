@@ -32,7 +32,8 @@ public class InventarioController {
     }
 
     @PostMapping("/productos")
-    public ResponseEntity<?> crearProducto(@RequestParam Long tenantId, @RequestBody ProductoComercial producto) {
+    public ResponseEntity<?> crearProducto(@RequestBody ProductoComercial producto) {
+        Long tenantId = TenantContext.getCurrentTenant();
         if (producto.getNombre() == null || producto.getNombre().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "El nombre del producto es obligatorio"));
         }
@@ -75,7 +76,8 @@ public class InventarioController {
     }
 
     @PostMapping("/movimientos")
-    public ResponseEntity<?> registrarMovimiento(@RequestParam Long tenantId, @RequestBody MovimientoStock movimiento) {
+    public ResponseEntity<?> registrarMovimiento(@RequestBody MovimientoStock movimiento) {
+        Long tenantId = TenantContext.getCurrentTenant();
         if (movimiento.getProducto() == null || movimiento.getProducto().getId() == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Producto es obligatorio"));
         }

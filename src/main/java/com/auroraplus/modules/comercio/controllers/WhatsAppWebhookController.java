@@ -34,6 +34,10 @@ public class WhatsAppWebhookController {
 
     private volatile boolean avisoSinSecreto;
 
+    /** Solo para probar en local sin la app de Meta: acepta eventos sin firma. Nunca en el servidor. */
+    @org.springframework.beans.factory.annotation.Value("${WHATSAPP_PERMITIR_SIN_FIRMA:false}")
+    private boolean permitirSinFirma;
+
     private boolean firmaValida(String cuerpo, String firma) {
         try {
             javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
@@ -90,10 +94,15 @@ public class WhatsAppWebhookController {
             if (firma == null || !firmaValida(payloadJson, firma)) {
                 return ResponseEntity.status(401).body("Firma inválida");
             }
-        } else if (!avisoSinSecreto) {
-            avisoSinSecreto = true;
-            org.slf4j.LoggerFactory.getLogger(WhatsAppWebhookController.class)
-                .warn("WHATSAPP_APP_SECRET no está configurado: el webhook de WhatsApp acepta eventos sin verificar su firma.");
+        } else if (!permitirSinFirma) {
+            // Sin el secreto no hay forma de saber si el evento viene de Meta: se rechaza en vez de
+            // aceptarlo (antes solo quedaba un aviso en el log y el bot respondía a cualquiera).
+            if (!avisoSinSecreto) {
+                avisoSinSecreto = true;
+                org.slf4j.LoggerFactory.getLogger(WhatsAppWebhookController.class)
+                    .error("WHATSAPP_APP_SECRET no está configurado: se rechazan los eventos del webhook de WhatsApp.");
+            }
+            return ResponseEntity.status(503).body("WhatsApp no está configurado en este servidor");
         }
 
         try {

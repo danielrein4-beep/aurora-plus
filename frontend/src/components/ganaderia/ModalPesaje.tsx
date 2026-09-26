@@ -24,8 +24,11 @@ export default function ModalPesaje({ animal, tenantId, notificar, onPesado, onE
   // Manejador: Registrar pesaje con soporte offline y balanza digital
   const handleGuardarPesaje = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Misma clave en el primer intento y en la cola: si el servidor guardó y la señal se cortó
+    // antes de la respuesta, el reenvío no duplica el pesaje.
+    const claveIdempotencia = generarClaveIdempotencia();
     try {
-      await registrarPesoGanaderia(tenantId, animal.id, Number(pesoNuevo));
+      await registrarPesoGanaderia(tenantId, animal.id, Number(pesoNuevo), undefined, claveIdempotencia);
       const resGdp = await obtenerGdpGanaderia(animal.id).catch(() => null);
       if (resGdp) setGdpData(resGdp);
       onPesado(Number(pesoNuevo));
@@ -38,7 +41,7 @@ export default function ModalPesaje({ animal, tenantId, notificar, onPesado, onE
         encolarAccionGanaderia(tenantId, {
           tipo: "registrar_peso",
           id: generarClaveIdempotencia(),
-          claveIdempotencia: generarClaveIdempotencia(),
+          claveIdempotencia,
           descripcion: `Pesaje ${animal.nombre || animal.arete}: ${pesoNuevo} kg`,
           creadaEn: Date.now(),
           payload: {
@@ -74,8 +77,8 @@ export default function ModalPesaje({ animal, tenantId, notificar, onPesado, onE
         pesoAnterior={animal.pesoActual}
       />
 
-      <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-        <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
+      <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+        <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-md w-full border border-emerald-500/30 text-left space-y-4">
           <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
             Pesaje: {animal.nombre || animal.arete}
           </h3>

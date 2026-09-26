@@ -70,7 +70,7 @@ export default function ModalCalibrarTanque({ tanqueLeche, tenantId, notificar, 
               min="100"
               defaultValue={tanqueLeche?.capacidadLitros ?? 2000}
               required
-              className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
+              className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white tabular-nums text-sm focus:border-sky-500 focus:outline-none"
             />
           </div>
 
@@ -83,12 +83,12 @@ export default function ModalCalibrarTanque({ tanqueLeche, tenantId, notificar, 
               step="0.1"
               defaultValue={tanqueLeche?.temperaturaCelsius ?? 4.0}
               required
-              className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-sm focus:border-sky-500 focus:outline-none"
+              className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white tabular-nums text-sm focus:border-sky-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="text-[11px] font-bold text-sky-400 block mb-1">Stock Actual Calibrado (Litros)</label>
+            <label className="text-[11px] font-bold text-sky-400 block mb-1">Litros medidos con la vara</label>
             <input
               name="stock"
               type="number"
@@ -97,7 +97,7 @@ export default function ModalCalibrarTanque({ tanqueLeche, tenantId, notificar, 
               min="0"
               defaultValue={tanqueLeche?.stockActualLitros ?? 0}
               required
-              className="w-full p-2.5 rounded-xl bg-slate-800 border border-sky-500/40 text-sky-300 font-mono text-sm font-bold focus:border-sky-400 focus:outline-none"
+              className="w-full p-2.5 rounded-xl bg-slate-800 border border-sky-500/40 text-sky-300 tabular-nums text-sm font-bold focus:border-sky-400 focus:outline-none"
             />
             <p className="text-[10px] text-slate-400 mt-1">Útil tras aforar la regla o realizar limpieza técnica del tanque.</p>
           </div>

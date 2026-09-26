@@ -26,7 +26,8 @@ public class ProveedorHorecaController {
     }
 
     @PostMapping
-    public ResponseEntity<ProveedorHoreca> crear(@RequestParam Long tenantId, @RequestBody ProveedorHoreca proveedor) {
+    public ResponseEntity<ProveedorHoreca> crear(@RequestBody ProveedorHoreca proveedor) {
+        Long tenantId = TenantContext.getCurrentTenant();
         proveedor.setTenantId(tenantId);
         return ResponseEntity.ok(proveedorHorecaRepository.save(proveedor));
     }

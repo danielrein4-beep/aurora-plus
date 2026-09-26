@@ -37,6 +37,10 @@ public class GastoGanaderia {
     @Column(nullable = false)
     private LocalDate fecha;
 
+    /** Lote al que va el gasto (sal, alimento, desparasitante...); null = todo el hato. */
+    @Column(length = 120)
+    private String lote;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getTenantId() { return tenantId; }
@@ -49,4 +53,6 @@ public class GastoGanaderia {
     public void setMonto(BigDecimal monto) { this.monto = monto; }
     public LocalDate getFecha() { return fecha; }
     public void setFecha(LocalDate fecha) { this.fecha = fecha; }
+    public String getLote() { return lote; }
+    public void setLote(String lote) { this.lote = lote; }
 }

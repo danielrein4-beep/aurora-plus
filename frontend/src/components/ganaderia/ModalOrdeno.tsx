@@ -4,6 +4,7 @@ import { registrarOrdenoGanaderia, type AnimalGanaderia, type RegistroOrdenoGana
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import type { MonedasConfig } from "./tipos";
 import type { Notificar } from "./tipos";
+import { num } from "./formato";
 
 interface Props {
   animales: AnimalGanaderia[];
@@ -27,10 +28,10 @@ export default function ModalOrdeno({
   const [formOrdeno, setFormOrdeno] = useState({
     animalId: animalesActivos[0]?.id ?? 0,
     turno: "MANANA",
-    cantidadLitros: 12.5,
+    cantidadLitros: 0,
     precioVentaLitro: precioLecheUSD,
-    porcentajeGrasa: 3.8,
-    porcentajeProteina: 3.2,
+    // Sin análisis de laboratorio no se inventa la grasa: vacío = no medido.
+    porcentajeGrasa: 0,
     destino: "TANQUE" as "TANQUE" | "VENTA_DIRECTA",
   });
 
@@ -46,8 +47,7 @@ export default function ModalOrdeno({
         turno: formOrdeno.turno,
         cantidadLitros: Number(formOrdeno.cantidadLitros),
         precioVentaLitro: Number(formOrdeno.precioVentaLitro),
-        porcentajeGrasa: Number(formOrdeno.porcentajeGrasa),
-        porcentajeProteina: Number(formOrdeno.porcentajeProteina),
+        porcentajeGrasa: formOrdeno.porcentajeGrasa > 0 ? Number(formOrdeno.porcentajeGrasa) : undefined,
         destino: formOrdeno.destino,
       });
       onRegistrado(nuevoReg, formOrdeno.destino === "TANQUE" ? Number(formOrdeno.cantidadLitros) : 0);
@@ -62,8 +62,8 @@ export default function ModalOrdeno({
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-sky-500/30 text-left space-y-4">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-md w-full border border-sky-500/30 text-left space-y-4">
         <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
           Registrar Ordeño
         </h3>
@@ -81,7 +81,7 @@ export default function ModalOrdeno({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Turno</label>
               <select
@@ -99,21 +99,24 @@ export default function ModalOrdeno({
                 onFocus={e => e.target.select()}
                 step="0.1"
                 required
-                value={formOrdeno.cantidadLitros}
+                min="0.1"
+                placeholder="Ej. 12,5"
+                value={formOrdeno.cantidadLitros || ""}
                 onChange={e => setFormOrdeno({ ...formOrdeno, cantidadLitros: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-sky-400 font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-sky-400 tabular-nums font-bold"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">% Grasa</label>
               <input
                 type="number"
                 onFocus={e => e.target.select()}
                 step="0.1"
-                value={formOrdeno.porcentajeGrasa}
+                placeholder="Opcional"
+                value={formOrdeno.porcentajeGrasa || ""}
                 onChange={e => setFormOrdeno({ ...formOrdeno, porcentajeGrasa: Number(e.target.value) })}
                 className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
               />
@@ -126,14 +129,14 @@ export default function ModalOrdeno({
                 step="0.01"
                 value={formOrdeno.precioVentaLitro}
                 onChange={e => setFormOrdeno({ ...formOrdeno, precioVentaLitro: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-emerald-400 font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-emerald-400 tabular-nums font-bold"
               />
             </div>
           </div>
 
           <div>
             <label className="text-slate-400 block mb-1">Destino de la Leche *</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid [&>*]:min-w-0 grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setFormOrdeno({ ...formOrdeno, destino: "TANQUE" })}
@@ -142,7 +145,7 @@ export default function ModalOrdeno({
                     ? "bg-sky-500/20 border-sky-400 text-sky-400 shadow-md shadow-sky-500/20"
                     : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
                 }`}>
-                <span className="inline-flex items-center gap-1.5"><IconMilk size={13} /> Al Tanque (Stock)</span>
+                <span className="inline-flex items-center gap-1.5"><IconMilk size={13} /> Al tanque</span>
               </button>
               <button
                 type="button"
@@ -164,10 +167,10 @@ export default function ModalOrdeno({
 
           <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
             <span className="text-slate-400 font-medium">Liquidación estimada:</span>
-            <span className="font-mono font-bold text-emerald-400">
-              ${(formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro).toFixed(2)} USD
-              {monedasConfig.VES && ` • Bs. ${((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaBCV).toFixed(2)}`}
-              {monedasConfig.COP && ` • COP $${Math.round((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaCOP).toLocaleString()}`}
+            <span className="tabular-nums font-bold text-emerald-400">
+              ${num((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro), 2)} USD
+              {monedasConfig.VES && ` • Bs. ${num(((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaBCV), 2)}`}
+              {monedasConfig.COP && ` • COP $${num(Math.round((formOrdeno.cantidadLitros * formOrdeno.precioVentaLitro) * tasaCOP), 0)}`}
             </span>
           </div>
 

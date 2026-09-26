@@ -288,6 +288,9 @@ export function generarPdfCierreCaja(data: CierreCajaData) {
 // ══════════════════════════════════════════════════════════════════════════
 // 2. CONSTRUCCIÓN DE PDF: INFORME MÉDICO / HISTORIA CLÍNICA
 // ══════════════════════════════════════════════════════════════════════════
+/** En documentos de odontólogo el colegio es el de Odontólogos, no el de Médicos. */
+const etiquetaColegio = (especialidad?: string) => (/odont/i.test(especialidad || "") ? "Col. Odontólogos" : "Col. Médicos");
+
 export function construirDocInformeConsulta(data: ConsultaReportData): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -313,7 +316,7 @@ export function construirDocInformeConsulta(data: ConsultaReportData): jsPDF {
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.text(`Dr(a). ${data.doctorNombre || "Médico Especialista"} — ${data.especialidad || "Medicina General"}`, textoX, 18);
-  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | Col. Médicos: ${data.colegioMedicos || "N/A"}`, textoX, 24);
+  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | ${etiquetaColegio(data.especialidad)}: ${data.colegioMedicos || "N/A"}`, textoX, 24);
 
   doc.setFont("helvetica", "bold");
   doc.text(`EXPEDIENTE: ${data.paciente.expediente}`, pageWidth - 14, 18, { align: "right" });
@@ -1639,7 +1642,7 @@ export function construirDocRecipeMedico(data: RecipeReportData): jsPDF {
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "normal");
   doc.text(`Dr(a). ${data.doctorNombre || "Médico Tratante"} — ${data.especialidad || "Medicina General"}`, textoX, 16);
-  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | Col. Médicos: ${data.colegioMedicos || "N/A"}`, textoX, 21);
+  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | ${etiquetaColegio(data.especialidad)}: ${data.colegioMedicos || "N/A"}`, textoX, 21);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
@@ -1812,7 +1815,7 @@ export function construirDocRecipeMedico(data: RecipeReportData): jsPDF {
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   doc.text(`${data.especialidad || "Medicina General"}`, xFirma + 30, yFirma + 8.5, { align: "center" });
-  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | Col. Médicos: ${data.colegioMedicos || "N/A"}`, xFirma + 30, yFirma + 12.5, { align: "center" });
+  doc.text(`MPPS: ${data.matriculaMPPS || "N/A"} | ${etiquetaColegio(data.especialidad)}: ${data.colegioMedicos || "N/A"}`, xFirma + 30, yFirma + 12.5, { align: "center" });
 
   // Cuadro de Sello Húmedo
   doc.setDrawColor(203, 213, 225);

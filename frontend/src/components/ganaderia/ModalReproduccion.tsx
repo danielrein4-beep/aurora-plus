@@ -21,7 +21,7 @@ export default function ModalReproduccion({ animalesActivos, valoresIniciales, t
     fecha: fechaLocalISO(),
     resultado: "PREÑADA_CONFIRMADA",
     fechaProbableParto: fechaLocalISO(new Date(Date.now() + 180 * 86400000)),
-    sementalReferenciaExterna: "Pajuela Toro Don Juan (IA)",
+    sementalReferenciaExterna: "",
     ...valoresIniciales,
   });
 
@@ -46,8 +46,8 @@ export default function ModalReproduccion({ animalesActivos, valoresIniciales, t
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/30 text-left space-y-4">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-md w-full border border-purple-500/30 text-left space-y-4">
         <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
           Registro Reproductivo
         </h3>
@@ -80,6 +80,7 @@ export default function ModalReproduccion({ animalesActivos, valoresIniciales, t
             <label className="text-slate-400 block mb-1">Semental / Pajuela de IA</label>
             <input
               type="text"
+              placeholder="Ej. Toro Tamarindo o pajuela Gyr lechero"
               value={formRepro.sementalReferenciaExterna}
               onChange={e => setFormRepro({ ...formRepro, sementalReferenciaExterna: e.target.value })}
               className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white"
@@ -92,7 +93,7 @@ export default function ModalReproduccion({ animalesActivos, valoresIniciales, t
               type="date"
               value={formRepro.fechaProbableParto}
               onChange={e => setFormRepro({ ...formRepro, fechaProbableParto: e.target.value })}
-              className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white font-mono"
+              className="w-full p-2.5 rounded-xl bg-white/5 border border-white/15 text-slate-900 dark:text-white tabular-nums"
             />
           </div>
 

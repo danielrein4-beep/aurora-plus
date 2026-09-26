@@ -1,5 +1,6 @@
 package com.auroraplus.core.notificaciones.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.notificaciones.entities.AlertaAdmin;
 import com.auroraplus.core.notificaciones.repositories.AlertaAdminRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,14 +18,16 @@ public class AlertaAdminController {
     private AlertaAdminRepository alertaAdminRepository;
 
     @GetMapping
-    public List<AlertaAdmin> listar(@RequestParam Long tenantId, @RequestParam(required = false, defaultValue = "false") boolean soloNoLeidas) {
+    public List<AlertaAdmin> listar(@RequestParam(required = false, defaultValue = "false") boolean soloNoLeidas) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return soloNoLeidas
             ? alertaAdminRepository.findByTenantIdAndLeidaFalseOrderByFechaCreacionDesc(tenantId)
             : alertaAdminRepository.findByTenantIdOrderByFechaCreacionDesc(tenantId);
     }
 
     @PatchMapping("/{id}/marcar-leida")
-    public ResponseEntity<AlertaAdmin> marcarLeida(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<AlertaAdmin> marcarLeida(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         AlertaAdmin alerta = alertaAdminRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Alerta no encontrada"));
         if (!alerta.getTenantId().equals(tenantId)) {

@@ -48,8 +48,13 @@ public class GanaderiaAlimentacionService {
         BigDecimal stockAnterior = insumo.getStockActual();
         BigDecimal stockNuevo = stockAnterior.add(cantidad);
         insumo.setStockActual(stockNuevo);
-        if (costoTotal != null && cantidad.compareTo(BigDecimal.ZERO) > 0) {
-            insumo.setCostoUnitario(costoTotal.divide(cantidad, 2, java.math.RoundingMode.HALF_UP));
+        if (costoTotal != null && costoTotal.signum() > 0) {
+            // Costo promedio: lo que queda en el depósito a su costo más lo comprado ahora, así una
+            // ración de sal vieja no se valora al precio de la última compra.
+            BigDecimal existente = stockAnterior.signum() > 0 && insumo.getCostoUnitario() != null
+                ? stockAnterior.multiply(insumo.getCostoUnitario()) : BigDecimal.ZERO;
+            BigDecimal base = stockAnterior.signum() > 0 ? stockNuevo : cantidad;
+            insumo.setCostoUnitario(existente.add(costoTotal).divide(base, 2, java.math.RoundingMode.HALF_UP));
         }
         insumoAlimentacionRepository.save(insumo);
 

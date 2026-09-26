@@ -466,8 +466,8 @@ class SeguridadYCalculoRegresionTest {
         motorNominaService.calcularPeriodo(tenantId, periodo.getId());
 
         NominaEmpleado nomina = nominaEmpleadoRepository.findByTenantIdAndPeriodoId(tenantId, periodo.getId()).get(0);
-        assertEquals(0, new BigDecimal("350.00").compareTo(nomina.getTotalAsignaciones()), "300 de sueldo + 50 de bono");
-        assertEquals(0, new BigDecimal("350.00").compareTo(nomina.getNetoAPagar()));
+        assertEquals(0, new BigDecimal("200.00").compareTo(nomina.getTotalAsignaciones()), "150 de sueldo (quincena de 300 mensual) + 50 de bono");
+        assertEquals(0, new BigDecimal("200.00").compareTo(nomina.getNetoAPagar()));
 
         List<DetalleNomina> detalles = detalleNominaRepository.findByTenantIdAndNominaEmpleadoId(tenantId, nomina.getId());
         assertTrue(detalles.stream().anyMatch(d -> bono.getId().equals(d.getConceptoId())), "Debe existir una línea del concepto BONO_PROD, no ignorado");
@@ -510,9 +510,10 @@ class SeguridadYCalculoRegresionTest {
         NominaEmpleado nomina = nominaEmpleadoRepository.findByTenantIdAndPeriodoId(tenantId, periodo.getId()).get(0);
         // Bruto = 100 (sueldo) + 100 (bono) = 200. Deducción 10% DEBE ser 20 (sobre el bruto ya
         // con el bono), no 10 (si calculara solo sobre el sueldo base antes del bono).
-        assertEquals(0, new BigDecimal("200.00").compareTo(nomina.getTotalAsignaciones()));
-        assertEquals(0, new BigDecimal("20.00").compareTo(nomina.getTotalDeducciones()));
-        assertEquals(0, new BigDecimal("180.00").compareTo(nomina.getNetoAPagar()));
+        // 50 de sueldo (quincena de 100 mensual) + 100 de bono = 150; 10 % de deducción = 15.
+        assertEquals(0, new BigDecimal("150.00").compareTo(nomina.getTotalAsignaciones()));
+        assertEquals(0, new BigDecimal("15.00").compareTo(nomina.getTotalDeducciones()));
+        assertEquals(0, new BigDecimal("135.00").compareTo(nomina.getNetoAPagar()));
     }
 
     @Test

@@ -51,7 +51,9 @@ abstract class SaludIntegrationTestBase {
             "emailContacto", "contacto@" + nombreEmpresa.toLowerCase().replaceAll("[^a-z0-9]", "") + ".test",
             "telefonoContacto", "0414-0000000",
             "username", "medico-" + UUID.randomUUID() + "@test.com",
-            "password", "clave123"
+            "password", "clave123",
+            // Desde el commit cdf218e el registro exige aceptar los términos.
+            "aceptaTerminos", true
         );
         ResponseEntity<JsonNode> resp = rest.postForEntity(url("/api/auth/registro-negocio"), body, JsonNode.class);
         Assertions.assertEquals(HttpStatus.OK, resp.getStatusCode(), "El registro de la clínica debe responder 200: " + resp.getBody());

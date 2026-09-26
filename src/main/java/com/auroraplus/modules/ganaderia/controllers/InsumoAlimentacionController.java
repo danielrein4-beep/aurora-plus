@@ -6,6 +6,7 @@ import com.auroraplus.modules.ganaderia.entities.MovimientoInsumo;
 import com.auroraplus.modules.ganaderia.entities.RegistroConsumo;
 import com.auroraplus.modules.ganaderia.repositories.InsumoAlimentacionRepository;
 import com.auroraplus.modules.ganaderia.repositories.MovimientoInsumoRepository;
+import com.auroraplus.modules.ganaderia.repositories.RegistroConsumoRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaAlimentacionService;
 import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,9 @@ public class InsumoAlimentacionController {
 
     @Autowired
     private GanaderiaAlimentacionService ganaderiaAlimentacionService;
+
+    @Autowired
+    private RegistroConsumoRepository registroConsumoRepository;
 
     @GetMapping("/insumos")
     public List<InsumoAlimentacion> listarInsumos() {
@@ -76,6 +80,14 @@ public class InsumoAlimentacionController {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
         return ResponseEntity.ok(ganaderiaAlimentacionService.registrarConsumo(tenantId, request.insumoId, request.potreroId, request.fecha, request.cantidad));
+    }
+
+    /** Raciones dadas en los potreros en los últimos días (por defecto 90). */
+    @GetMapping("/consumos")
+    public List<RegistroConsumo> listarConsumos(@RequestParam(required = false) Integer dias) {
+        int rango = dias == null || dias <= 0 ? 90 : Math.min(dias, 730);
+        return registroConsumoRepository.findByTenantIdAndFechaGreaterThanEqualOrderByFechaDescIdDesc(
+            GanaderiaTenantAccess.requireTenant(), LocalDate.now().minusDays(rango));
     }
 
     @GetMapping("/insumos/{insumoId}/movimientos")

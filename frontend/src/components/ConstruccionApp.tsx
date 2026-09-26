@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -17,6 +18,7 @@ import {
   IconCalendar,
   IconUsers,
   IconTruck,
+  AuroraGradientDef,
 } from '../Icons';
 import {
   type ProyectoConstruccionApi,
@@ -418,23 +420,25 @@ export default function ConstruccionApp({ onSalir }: Props) {
   }, [proyectos, valuaciones, partidas, insumos, despachos]);
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col font-sans selection:bg-amber-500/30 selection:text-amber-200">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-amber-500/30 selection:text-amber-900">
+      {/* Sin esto los íconos con trazo en degradado (IconChart, IconBox...) quedaban invisibles */}
+      <AuroraGradientDef />
       {/* BARRA SUPERIOR INSTITUCIONAL */}
-      <header className="border-b border-slate-800 bg-[#0d1322]/90 backdrop-blur sticky top-0 z-30 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <header className="border-b border-slate-200 bg-white/90 backdrop-blur sticky top-0 z-30 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/5">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600 shadow-lg shadow-amber-500/5">
             <IconConstruction size={22} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-bold text-base tracking-tight text-white leading-none">
+              <h1 className="font-bold text-base tracking-tight text-slate-900 leading-none">
                 Control de Obras Civiles & Inspección Pro
               </h1>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 border border-amber-500/25">
                 Norma COVENIN
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Gestión Contractual, Partidas Presupuestarias, Valuaciones y Logística
             </p>
           </div>
@@ -443,15 +447,15 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {/* SELECTOR DE PROYECTO ACTIVO */}
         <div className="flex items-center gap-2">
           {proyectos.length > 0 && (
-            <div className="flex items-center gap-2 bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-1.5 shadow-sm">
-              <span className="text-[11px] font-semibold text-slate-400">Obra:</span>
+            <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-sm">
+              <span className="text-[11px] font-semibold text-slate-500">Obra:</span>
               <select
                 value={proyectoSeleccionadoId ?? ''}
                 onChange={(e) => setProyectoSeleccionadoId(Number(e.target.value))}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer max-w-[220px] truncate"
+                className="bg-transparent text-xs font-semibold text-slate-900 focus:outline-none cursor-pointer max-w-[220px] truncate"
               >
                 {proyectos.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                  <option key={p.id} value={p.id} className="bg-white text-slate-900">
                     {p.codigo} - {p.nombre}
                   </option>
                 ))}
@@ -465,7 +469,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
               if (proyectoSeleccionadoId) recargarSubrecursosProyecto(proyectoSeleccionadoId);
             }}
             title="Recargar datos desde el servidor"
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
           >
             <IconRefresh size={16} />
           </button>
@@ -473,7 +477,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
           {onSalir && (
             <button
               onClick={onSalir}
-              className="px-3 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium transition cursor-pointer"
+              className="px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs font-medium transition cursor-pointer"
             >
               Volver
             </button>
@@ -483,40 +487,42 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MENSAJES DE ESTADO */}
       {mensajeExito && (
-        <div className="bg-emerald-500/10 border-b border-emerald-500/25 text-emerald-300 px-4 py-2.5 text-xs font-medium flex items-center gap-2">
-          <IconCheckCircle size={16} className="text-emerald-400 shrink-0" />
+        <div className="bg-emerald-500/10 border-b border-emerald-500/25 text-emerald-700 px-4 py-2.5 text-xs font-medium flex items-center gap-2">
+          <IconCheckCircle size={16} className="text-emerald-600 shrink-0" />
           <span>{mensajeExito}</span>
         </div>
       )}
 
       {errorGlobal && (
-        <div className="bg-red-500/10 border-b border-red-500/25 text-red-300 px-4 py-2.5 text-xs font-medium flex items-center justify-between gap-2">
+        <div className="bg-red-500/10 border-b border-red-500/25 text-red-700 px-4 py-2.5 text-xs font-medium flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <IconWarning size={16} className="text-red-400 shrink-0" />
+            <IconWarning size={16} className="text-red-600 shrink-0" />
             <span>{errorGlobal}</span>
           </div>
           <button
             onClick={() => setErrorGlobal(null)}
-            className="text-slate-400 hover:text-white cursor-pointer"
+            className="text-slate-500 hover:text-slate-900 cursor-pointer"
           >
             <IconClose size={14} />
           </button>
         </div>
       )}
 
-      {/* NAVEGACIÓN PRINCIPAL INSTITUCIONAL */}
-      <nav className="border-b border-slate-800/80 bg-[#0d1322]/50 px-4 flex items-center gap-1 overflow-x-auto">
+      {/* Menú lateral en escritorio, como el resto de las verticales; en teléfono queda como
+          una barra que se desliza de lado. Antes eran 11 pestañas horizontales. */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+      <nav className="border-b lg:border-b-0 lg:border-r border-slate-200 bg-[#fcfdfd] px-4 lg:px-3 lg:py-4 flex lg:flex-col items-center lg:items-stretch gap-1 overflow-x-auto lg:overflow-y-auto lg:w-60 flex-shrink-0 lg:sticky lg:top-[69px] lg:h-[calc(100vh-69px)]">
         {([
-          { id: 'resumen', label: 'Resumen Ejecutivo', icon: IconChart },
+          { id: 'resumen', label: 'Vista General', icon: IconChart },
           { id: 'proyectos', label: 'Proyectos & Contratos', icon: IconConstruction, count: proyectos.length },
           { id: 'presupuesto', label: 'Capítulos & Partidas', icon: IconFileText, count: partidas.length },
           { id: 'valuaciones', label: 'Valuaciones de Obra', icon: IconCheckCircle, count: valuaciones.length },
           { id: 'insumos', label: 'Insumos & Stock', icon: IconBox, count: insumos.length },
           { id: 'logistica', label: 'Logística & Despachos', icon: IconTruck, count: despachos.length },
           { id: 'maquinaria', label: 'Maquinaria & Equipos', icon: IconWrench, count: maquinarias.length },
-          { id: 'riesgos', label: 'Matriz Riesgos & SST', icon: IconWarning, count: riesgos.length },
-          { id: 'bim', label: 'BIM & Planos (RFIs)', icon: IconFileText, count: documentosBim.length + rfis.length },
-          { id: 'bitacora', label: 'Libro Diario / Bitácora', icon: IconCalendar, count: bitacora.length },
+          { id: 'riesgos', label: 'Riesgos y Seguridad', icon: IconWarning, count: riesgos.length },
+          { id: 'bim', label: 'Planos y Consultas', icon: IconFileText, count: documentosBim.length + rfis.length },
+          { id: 'bitacora', label: 'Bitácora de Obra', icon: IconCalendar, count: bitacora.length },
           { id: 'cuadrillas', label: 'Cuadrillas & Frentes', icon: IconUsers, count: cuadrillas.length },
         ] as NavItemConstruccion[]).map((item) => {
           const Icon = item.icon;
@@ -526,21 +532,21 @@ export default function ConstruccionApp({ onSalir }: Props) {
               key={item.id}
               onClick={() => setTabActiva(item.id)}
               className={
-                'flex items-center gap-2 px-3.5 py-3 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap cursor-pointer ' +
+                'flex items-center gap-2 px-3.5 py-3 lg:py-2.5 lg:rounded-md text-xs font-semibold border-b-2 lg:border-b-0 lg:border-l-2 transition-colors whitespace-nowrap cursor-pointer ' +
                 (activa
-                  ? 'border-amber-400 text-amber-300 bg-amber-500/5'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700')
+                  ? 'sidebar-glare sidebar-glare--active border-teal-700 text-teal-900 bg-teal-50/80'
+                  : 'sidebar-glare border-transparent text-slate-800 hover:bg-slate-100/70 hover:text-slate-900')
               }
             >
               <Icon size={16} />
               <span>{item.label}</span>
               {typeof item.count === 'number' && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-mono">
                   {item.count}
                 </span>
               )}
               {item.badge && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold uppercase">
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 border border-sky-500/20 font-bold uppercase">
                   {item.badge}
                 </span>
               )}
@@ -550,59 +556,59 @@ export default function ConstruccionApp({ onSalir }: Props) {
       </nav>
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+      <main className="flex-1 min-w-0 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-6">
         {/* VISTA 1: RESUMEN EJECUTIVO */}
         {tabActiva === 'resumen' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+              <div className="bg-white border border-slate-200 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-slate-500 text-xs mb-2">
                   <span>Presupuesto Contratado Total</span>
-                  <IconConstruction size={18} className="text-amber-400" />
+                  <IconConstruction size={18} className="text-amber-600" />
                 </div>
-                <div className="text-xl font-bold font-mono text-white">
+                <div className="text-xl font-bold font-mono text-slate-900">
                   Bs. {formatVE(resumenCalculos.totalPresupuesto)}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-1">
+                <div className="text-[11px] text-slate-500 mt-1">
                   En {proyectos.length} proyecto(s) registrados
                 </div>
               </div>
 
-              <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+              <div className="bg-white border border-slate-200 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-slate-500 text-xs mb-2">
                   <span>Valuaciones Aprobadas / Cobradas</span>
-                  <IconCheckCircle size={18} className="text-emerald-400" />
+                  <IconCheckCircle size={18} className="text-emerald-600" />
                 </div>
-                <div className="text-xl font-bold font-mono text-emerald-300">
+                <div className="text-xl font-bold font-mono text-emerald-700">
                   Bs. {formatVE(resumenCalculos.totalValuacionesAprobadas)}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-1">
+                <div className="text-[11px] text-slate-500 mt-1">
                   Avance financiero auditado
                 </div>
               </div>
 
-              <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+              <div className="bg-white border border-slate-200 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-slate-500 text-xs mb-2">
                   <span>Partidas de Obra Activas</span>
-                  <IconFileText size={18} className="text-sky-400" />
+                  <IconFileText size={18} className="text-sky-600" />
                 </div>
-                <div className="text-xl font-bold font-mono text-white">
+                <div className="text-xl font-bold font-mono text-slate-900">
                   {resumenCalculos.totalPartidas}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-1">
+                <div className="text-[11px] text-slate-500 mt-1">
                   {resumenCalculos.partidasEjecutadas} con ejecución física reportada
                 </div>
               </div>
 
-              <div className="bg-[#101726] border border-slate-800 p-4 rounded-2xl">
-                <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+              <div className="bg-white border border-slate-200 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-slate-500 text-xs mb-2">
                   <span>Logística en Tránsito</span>
-                  <IconTruck size={18} className="text-amber-400" />
+                  <IconTruck size={18} className="text-amber-600" />
                 </div>
-                <div className="text-xl font-bold font-mono text-white">
+                <div className="text-xl font-bold font-mono text-slate-900">
                   {resumenCalculos.despachosEnTransito}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-1">
+                <div className="text-[11px] text-slate-500 mt-1">
                   De {resumenCalculos.despachosTotales} despachos registrados
                 </div>
               </div>
@@ -610,34 +616,34 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
             {/* DETALLE DEL PROYECTO SELECCIONADO */}
             {proyectoActivo ? (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl p-5 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700">
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-amber-600 border border-slate-300">
                         {proyectoActivo.codigo}
                       </span>
-                      <h2 className="text-base font-bold text-white">{proyectoActivo.nombre}</h2>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
+                      <h2 className="text-base font-bold text-slate-900">{proyectoActivo.nombre}</h2>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 font-semibold">
                         {proyectoActivo.estado}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Cliente: <strong className="text-slate-200">{proyectoActivo.cliente}</strong> &bull; Ubicación: {proyectoActivo.ubicacion || 'No especificada'}
+                    <p className="text-xs text-slate-500 mt-1">
+                      Cliente: <strong className="text-slate-800">{proyectoActivo.cliente}</strong> &bull; Ubicación: {proyectoActivo.ubicacion || 'No especificada'}
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-slate-400">Presupuesto del Contrato</div>
-                    <div className="text-lg font-bold font-mono text-white">
+                    <div className="text-xs text-slate-500">Presupuesto del Contrato</div>
+                    <div className="text-lg font-bold font-mono text-slate-900">
                       Bs. {formatVE(proyectoActivo.montoPresupuestoTotal)}
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/60">
-                    <div className="text-slate-400 text-[11px]">Ingeniero Residente</div>
-                    <div className="font-semibold text-slate-200 mt-0.5">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500 text-[11px]">Ingeniero Residente</div>
+                    <div className="font-semibold text-slate-800 mt-0.5">
                       {proyectoActivo.ingenieroResidente || 'Sin asignar'}
                     </div>
                     <div className="text-[10px] text-slate-500 font-mono">
@@ -645,25 +651,25 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/60">
-                    <div className="text-slate-400 text-[11px]">Anticipo Contractual</div>
-                    <div className="font-semibold text-slate-200 mt-0.5 font-mono">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500 text-[11px]">Anticipo Contractual</div>
+                    <div className="font-semibold text-slate-800 mt-0.5 font-mono">
                       {formatVE(proyectoActivo.porcentajeAnticipo)}%
                     </div>
                     <div className="text-[10px] text-slate-500">Amortizable en valuaciones</div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/60">
-                    <div className="text-slate-400 text-[11px]">Retención de Garantía</div>
-                    <div className="font-semibold text-slate-200 mt-0.5 font-mono">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500 text-[11px]">Retención de Garantía</div>
+                    <div className="font-semibold text-slate-800 mt-0.5 font-mono">
                       {formatVE(proyectoActivo.porcentajeRetencionGarantia)}%
                     </div>
                     <div className="text-[10px] text-slate-500">Fiel cumplimiento</div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/60">
-                    <div className="text-slate-400 text-[11px]">Período de Obra</div>
-                    <div className="font-semibold text-slate-200 mt-0.5 font-mono">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-slate-500 text-[11px]">Período de Obra</div>
+                    <div className="font-semibold text-slate-800 mt-0.5 font-mono">
                       {proyectoActivo.fechaInicio || 'Inicio s/d'}
                     </div>
                     <div className="text-[10px] text-slate-500">
@@ -673,9 +679,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </div>
               </div>
             ) : (
-              <div className="bg-[#101726] border border-dashed border-slate-800 rounded-2xl p-8 text-center">
+              <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-8 text-center">
                 <IconConstruction size={36} className="text-slate-600 mx-auto mb-3" />
-                <h3 className="text-sm font-semibold text-slate-300">No hay proyectos registrados</h3>
+                <h3 className="text-sm font-semibold text-slate-700">No hay proyectos registrados</h3>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                   Crea tu primer proyecto u obra civil para iniciar el cómputo métrico y valuaciones.
                 </p>
@@ -698,8 +704,8 @@ export default function ConstruccionApp({ onSalir }: Props) {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold text-white">Proyectos y Obras Civiles</h2>
-                <p className="text-xs text-slate-400">
+                <h2 className="text-base font-bold text-slate-900">Proyectos y Obras Civiles</h2>
+                <p className="text-xs text-slate-500">
                   Expediente de contratos, ingenieros colegiados y especificaciones económicas
                 </p>
               </div>
@@ -715,8 +721,8 @@ export default function ConstruccionApp({ onSalir }: Props) {
             </div>
 
             {proyectos.length === 0 ? (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
-                No hay proyectos registrados en este tenant.
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500 text-xs">
+                Todavía no tienes proyectos registrados.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -724,56 +730,56 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   <div
                     key={proy.id}
                     className={
-                      'bg-[#101726] border rounded-2xl p-4 space-y-3 transition-all ' +
+                      'bg-white border rounded-2xl p-4 space-y-3 transition-all ' +
                       (proy.id === proyectoSeleccionadoId
                         ? 'border-amber-500/50 shadow-lg shadow-amber-500/5'
-                        : 'border-slate-800 hover:border-slate-700')
+                        : 'border-slate-200 hover:border-slate-300')
                     }
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-mono font-bold text-amber-400 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                          <span className="text-[11px] font-mono font-bold text-amber-600 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
                             {proy.codigo}
                           </span>
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                             {proy.estado}
                           </span>
                         </div>
-                        <h3 className="font-bold text-sm text-white mt-1.5">{proy.nombre}</h3>
-                        <p className="text-xs text-slate-400">Cliente: {proy.cliente}</p>
+                        <h3 className="font-bold text-sm text-slate-900 mt-1.5">{proy.nombre}</h3>
+                        <p className="text-xs text-slate-500">Cliente: {proy.cliente}</p>
                       </div>
                       <div className="text-right">
                         <div className="text-[10px] text-slate-500 uppercase font-semibold">Presupuesto</div>
-                        <div className="font-mono text-sm font-bold text-white">
+                        <div className="font-mono text-sm font-bold text-slate-900">
                           Bs. {formatVE(proy.montoPresupuestoTotal)}
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-xs grid grid-cols-2 gap-2 text-slate-400 bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/40">
+                    <div className="text-xs grid grid-cols-2 gap-2 text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                       <div>
                         <span className="text-[10px] text-slate-500 block">Residente</span>
-                        <span className="text-slate-200 font-medium truncate block">
+                        <span className="text-slate-800 font-medium truncate block">
                           {proy.ingenieroResidente || 'No asignado'}
                         </span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-500 block">Carnet CIV</span>
-                        <span className="text-slate-200 font-mono block">
+                        <span className="text-slate-800 font-mono block">
                           {proy.civResidente || 'N/A'}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs">
                       <button
                         onClick={() => setProyectoSeleccionadoId(proy.id!)}
                         className={
                           'px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ' +
                           (proy.id === proyectoSeleccionadoId
                             ? 'bg-amber-500 text-slate-950'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300')
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700')
                         }
                       >
                         {proy.id === proyectoSeleccionadoId ? 'Obra Activa' : 'Seleccionar'}
@@ -785,7 +791,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                             setProyectoEditando(proy);
                             setModalProyectoAbierto(true);
                           }}
-                          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 cursor-pointer"
                           title="Editar especificaciones del proyecto"
                         >
                           <IconEdit size={14} />
@@ -802,7 +808,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                               }
                             }
                           }}
-                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-600 cursor-pointer"
                           title="Eliminar proyecto"
                         >
                           <IconTrash size={14} />
@@ -820,22 +826,22 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {tabActiva === 'presupuesto' && (
           <div className="space-y-4">
             {!proyectoActivo ? (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500 text-xs">
                 Selecciona o crea un proyecto para ver y gestionar sus partidas.
               </div>
             ) : (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-bold text-white">Presupuesto y Partidas COVENIN</h2>
-                    <p className="text-xs text-slate-400">
-                      Obra activa: <strong className="text-amber-300">{proyectoActivo.nombre}</strong> &bull; {capitulos.length} capítulo(s) &bull; {partidas.length} partida(s)
+                    <h2 className="text-base font-bold text-slate-900">Presupuesto y Partidas COVENIN</h2>
+                    <p className="text-xs text-slate-500">
+                      Obra activa: <strong className="text-amber-700">{proyectoActivo.nombre}</strong> &bull; {capitulos.length} capítulo(s) &bull; {partidas.length} partida(s)
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setModalCapituloAbierto(true)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition cursor-pointer border border-slate-700"
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs transition cursor-pointer border border-slate-300"
                     >
                       + Nuevo Capítulo
                     </button>
@@ -852,18 +858,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </div>
 
                 {partidas.length === 0 ? (
-                  <div className="bg-[#101726] border border-dashed border-slate-800 rounded-2xl p-8 text-center">
+                  <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-8 text-center">
                     <IconFileText size={36} className="text-slate-600 mx-auto mb-3" />
-                    <h3 className="text-sm font-semibold text-slate-300">Sin partidas presupuestadas</h3>
+                    <h3 className="text-sm font-semibold text-slate-700">Sin partidas presupuestadas</h3>
                     <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                       Agrega partidas con su código COVENIN, cómputo métrico y precio unitario para iniciar el presupuesto.
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden">
+                  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+                        <thead className="bg-white text-slate-500 font-semibold border-b border-slate-200">
                           <tr>
                             <th className="py-3 px-3">Código COVENIN</th>
                             <th className="py-3 px-3">Descripción de la Partida</th>
@@ -875,7 +881,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                             <th className="py-3 px-2 text-center">Acciones</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/60 font-sans">
+                        <tbody className="divide-y divide-slate-200 font-sans">
                           {partidas.map((part) => {
                             const cant = Number(part.cantidadPresupuestada) || 0;
                             const pu = Number(part.precioUnitario) || 0;
@@ -883,26 +889,26 @@ export default function ConstruccionApp({ onSalir }: Props) {
                             const ejec = Number(part.cantidadEjecutadaAcumulada) || 0;
 
                             return (
-                              <tr key={part.id} className="hover:bg-slate-900/40 transition-colors">
-                                <td className="py-3 px-3 font-mono font-bold text-amber-400 whitespace-nowrap">
+                              <tr key={part.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="py-3 px-3 font-mono font-bold text-amber-600 whitespace-nowrap">
                                   {part.codigoCovenin || part.codigoPartida}
                                 </td>
-                                <td className="py-3 px-3 text-slate-200 font-medium max-w-xs">
+                                <td className="py-3 px-3 text-slate-800 font-medium max-w-xs">
                                   {part.descripcion}
                                 </td>
-                                <td className="py-3 px-2 text-center font-mono text-slate-400">
+                                <td className="py-3 px-2 text-center font-mono text-slate-500">
                                   {part.unidad}
                                 </td>
-                                <td className="py-3 px-3 text-right font-mono text-white">
+                                <td className="py-3 px-3 text-right font-mono text-slate-900">
                                   {formatVE(cant)}
                                 </td>
-                                <td className="py-3 px-3 text-right font-mono text-slate-300">
+                                <td className="py-3 px-3 text-right font-mono text-slate-700">
                                   {formatVE(pu)}
                                 </td>
-                                <td className="py-3 px-3 text-right font-mono font-bold text-emerald-400">
+                                <td className="py-3 px-3 text-right font-mono font-bold text-emerald-600">
                                   {formatVE(total)}
                                 </td>
-                                <td className="py-3 px-3 text-right font-mono text-slate-400">
+                                <td className="py-3 px-3 text-right font-mono text-slate-500">
                                   {formatVE(ejec)}
                                 </td>
                                 <td className="py-3 px-2 text-center whitespace-nowrap">
@@ -911,7 +917,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                       setPartidaEditando(part);
                                       setModalPartidaAbierto(true);
                                     }}
-                                    className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white cursor-pointer mr-1"
+                                    className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-900 cursor-pointer mr-1"
                                     title="Editar partida"
                                   >
                                     <IconEdit size={14} />
@@ -928,7 +934,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                         }
                                       }
                                     }}
-                                    className="p-1.5 hover:bg-red-500/10 rounded text-slate-400 hover:text-red-400 cursor-pointer"
+                                    className="p-1.5 hover:bg-red-500/10 rounded text-slate-500 hover:text-red-600 cursor-pointer"
                                     title="Eliminar partida"
                                   >
                                     <IconTrash size={14} />
@@ -951,15 +957,15 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {tabActiva === 'valuaciones' && (
           <div className="space-y-4">
             {!proyectoActivo ? (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500 text-xs">
                 Selecciona un proyecto para emitir y consultar valuaciones de obra.
               </div>
             ) : (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-bold text-white">Valuaciones de Obra Ejecutada</h2>
-                    <p className="text-xs text-slate-400">
+                    <h2 className="text-base font-bold text-slate-900">Valuaciones de Obra Ejecutada</h2>
+                    <p className="text-xs text-slate-500">
                       Cortes de obra auditados con cálculo automático de anticipo, retenciones de ley e IVA
                     </p>
                   </div>
@@ -972,9 +978,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </div>
 
                 {valuaciones.length === 0 ? (
-                  <div className="bg-[#101726] border border-dashed border-slate-800 rounded-2xl p-8 text-center">
+                  <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-8 text-center">
                     <IconCheckCircle size={36} className="text-slate-600 mx-auto mb-3" />
-                    <h3 className="text-sm font-semibold text-slate-300">No hay valuaciones registradas</h3>
+                    <h3 className="text-sm font-semibold text-slate-700">No hay valuaciones registradas</h3>
                     <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                       Registra los cortes periódicos de ejecución para certificar cantidades y cobros.
                     </p>
@@ -993,65 +999,65 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       return (
                         <div
                           key={val.id}
-                          className="bg-[#101726] border border-slate-800 rounded-2xl p-4 space-y-3"
+                          className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3"
                         >
-                          <div className="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+                          <div className="flex items-start justify-between gap-2 border-b border-slate-200 pb-2.5">
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                                <span className="text-xs font-mono font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
                                   Valuación N° {val.numeroValuacion}
                                 </span>
                                 <span
                                   className={
                                     'text-[10px] font-bold uppercase px-2 py-0.5 rounded ' +
                                     (val.estado === 'APROBADA' || val.estado === 'COBRADA'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                                       : val.estado === 'RECHAZADA'
-                                      ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                                      : 'bg-amber-500/10 text-amber-300 border border-amber-500/20')
+                                      ? 'bg-red-500/10 text-red-600 border border-red-500/20'
+                                      : 'bg-amber-500/10 text-amber-700 border border-amber-500/20')
                                   }
                                 >
                                   {val.estado}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-slate-400 mt-1 font-mono">
+                              <p className="text-[11px] text-slate-500 mt-1 font-mono">
                                 Período: {val.periodoDesde} &rarr; {val.periodoHasta}
                               </p>
                             </div>
                             <div className="text-right">
                               <span className="text-[10px] text-slate-500 uppercase font-semibold">Neto a Cobrar</span>
-                              <div className="font-mono text-base font-bold text-emerald-400">
+                              <div className="font-mono text-base font-bold text-emerald-600">
                                 Bs. {formatVE(neto)}
                               </div>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60 font-mono">
+                          <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono">
                             <div>
-                              <span className="text-slate-400 font-sans block">Monto Bruto:</span>
-                              <span className="text-slate-200">Bs. {formatVE(bruto)}</span>
+                              <span className="text-slate-500 font-sans block">Monto Bruto:</span>
+                              <span className="text-slate-800">Bs. {formatVE(bruto)}</span>
                             </div>
                             <div>
-                              <span className="text-slate-400 font-sans block">Amort. Anticipo:</span>
-                              <span className="text-amber-300">- Bs. {formatVE(amort)}</span>
+                              <span className="text-slate-500 font-sans block">Amort. Anticipo:</span>
+                              <span className="text-amber-700">- Bs. {formatVE(amort)}</span>
                             </div>
                             <div>
-                              <span className="text-slate-400 font-sans block">Ret. Garantía:</span>
-                              <span className="text-slate-300">- Bs. {formatVE(retFiel)}</span>
+                              <span className="text-slate-500 font-sans block">Ret. Garantía:</span>
+                              <span className="text-slate-700">- Bs. {formatVE(retFiel)}</span>
                             </div>
                             <div>
-                              <span className="text-slate-400 font-sans block">Ret. Laboral:</span>
-                              <span className="text-slate-300">- Bs. {formatVE(retLab)}</span>
+                              <span className="text-slate-500 font-sans block">Ret. Laboral:</span>
+                              <span className="text-slate-700">- Bs. {formatVE(retLab)}</span>
                             </div>
                           </div>
 
                           {val.observaciones && (
-                            <p className="text-xs text-slate-400 italic">
+                            <p className="text-xs text-slate-500 italic">
                               &ldquo;{val.observaciones}&rdquo;
                             </p>
                           )}
 
-                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
                             {val.estado === 'BORRADOR' && (
                               <button
                                 onClick={async () => {
@@ -1063,7 +1069,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                     setErrorGlobal(e.message || 'Error cambiando estado');
                                   }
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-semibold cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 border border-sky-500/30 text-xs font-semibold cursor-pointer"
                               >
                                 Presentar a Inspección
                               </button>
@@ -1080,7 +1086,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                     setErrorGlobal(e.message || 'Error cambiando estado');
                                   }
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 text-xs font-semibold cursor-pointer"
                               >
                                 Aprobar Valuación
                               </button>
@@ -1101,8 +1107,8 @@ export default function ConstruccionApp({ onSalir }: Props) {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-white">Insumos, Materiales y Equipos</h2>
-                <p className="text-xs text-slate-400">
+                <h2 className="text-base font-bold text-slate-900">Insumos, Materiales y Equipos</h2>
+                <p className="text-xs text-slate-500">
                   Control de inventario en sitio con descuento atómico concurrente e idempotencia
                 </p>
               </div>
@@ -1115,14 +1121,14 @@ export default function ConstruccionApp({ onSalir }: Props) {
             </div>
 
             {insumos.length === 0 ? (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
-                No hay insumos registrados en este tenant.
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500 text-xs">
+                Todavía no tienes insumos registrados.
               </div>
             ) : (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800">
+                    <thead className="bg-white text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
                         <th className="py-3 px-3">Código</th>
                         <th className="py-3 px-3">Descripción del Material</th>
@@ -1134,42 +1140,42 @@ export default function ConstruccionApp({ onSalir }: Props) {
                         <th className="py-3 px-3 text-center">Acciones</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-sans">
+                    <tbody className="divide-y divide-slate-200 font-sans">
                       {insumos.map((ins) => {
                         const actual = Number(ins.stockActual) || 0;
                         const min = Number(ins.stockMinimo) || 0;
                         const bajoStock = actual <= min;
 
                         return (
-                          <tr key={ins.id} className="hover:bg-slate-900/40 transition-colors">
-                            <td className="py-3 px-3 font-mono font-bold text-amber-400 whitespace-nowrap">
+                          <tr key={ins.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-3 px-3 font-mono font-bold text-amber-600 whitespace-nowrap">
                               {ins.codigo}
                             </td>
-                            <td className="py-3 px-3 text-slate-200 font-medium">
+                            <td className="py-3 px-3 text-slate-800 font-medium">
                               {ins.nombre}
                               {ins.proveedor && (
-                                <span className="text-[10px] text-slate-400 block font-normal">
+                                <span className="text-[10px] text-slate-500 block font-normal">
                                   Prov: {ins.proveedor}
                                 </span>
                               )}
                             </td>
                             <td className="py-3 px-2 text-center">
-                              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
                                 {ins.tipo}
                               </span>
                             </td>
-                            <td className="py-3 px-2 text-center font-mono text-slate-400">
+                            <td className="py-3 px-2 text-center font-mono text-slate-500">
                               {ins.unidad}
                             </td>
-                            <td className="py-3 px-3 text-right font-mono text-slate-300">
+                            <td className="py-3 px-3 text-right font-mono text-slate-700">
                               {formatVE(ins.costoUnitario)}
                             </td>
                             <td className="py-3 px-3 text-right font-mono font-bold">
-                              <span className={bajoStock ? 'text-red-400' : 'text-emerald-400'}>
+                              <span className={bajoStock ? 'text-red-600' : 'text-emerald-600'}>
                                 {formatVE(actual)}
                               </span>
                             </td>
-                            <td className="py-3 px-3 text-right font-mono text-slate-400">
+                            <td className="py-3 px-3 text-right font-mono text-slate-500">
                               {formatVE(min)}
                             </td>
                             <td className="py-3 px-3 text-center">
@@ -1178,7 +1184,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                   setInsumoConsumo(ins);
                                   setModalConsumoAbierto(true);
                                 }}
-                                className="px-2.5 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[11px] font-semibold transition cursor-pointer"
+                                className="px-2.5 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 border border-amber-500/30 text-[11px] font-semibold transition cursor-pointer"
                               >
                                 Descontar Consumo
                               </button>
@@ -1198,15 +1204,15 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {tabActiva === 'logistica' && (
           <div className="space-y-4">
             {!proyectoActivo ? (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500 text-xs">
                 Selecciona un proyecto para gestionar sus guías de despacho y recepción en obra.
               </div>
             ) : (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-bold text-white">Logística & Despachos de Suministros</h2>
-                    <p className="text-xs text-slate-400">
+                    <h2 className="text-base font-bold text-slate-900">Logística & Despachos de Suministros</h2>
+                    <p className="text-xs text-slate-500">
                       Trazabilidad de transporte de carga pesada, control de pesaje y ensayos de cono de Abrams
                     </p>
                   </div>
@@ -1219,9 +1225,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </div>
 
                 {despachos.length === 0 ? (
-                  <div className="bg-[#101726] border border-dashed border-slate-800 rounded-2xl p-8 text-center">
+                  <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-8 text-center">
                     <IconTruck size={36} className="text-slate-600 mx-auto mb-3" />
-                    <h3 className="text-sm font-semibold text-slate-300">Sin despachos registrados en esta obra</h3>
+                    <h3 className="text-sm font-semibold text-slate-700">Sin despachos registrados en esta obra</h3>
                     <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                       Registra camiones mixer de concreto premezclado, gandolas de acero o agregados de cantera.
                     </p>
@@ -1232,86 +1238,86 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       return (
                         <div
                           key={desp.id}
-                          className="bg-[#101726] border border-slate-800 rounded-2xl p-4 space-y-3"
+                          className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3"
                         >
-                          <div className="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+                          <div className="flex items-start justify-between gap-2 border-b border-slate-200 pb-2.5">
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                                <span className="text-xs font-mono font-bold text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
                                   {desp.guiaNumero}
                                 </span>
                                 <span
                                   className={
                                     'text-[10px] font-bold uppercase px-2 py-0.5 rounded ' +
                                     (desp.estado === 'RECIBIDO'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                                       : desp.estado === 'RECHAZADO'
-                                      ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                      ? 'bg-red-500/10 text-red-600 border border-red-500/20'
                                       : desp.estado === 'DESCARGANDO'
-                                      ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
-                                      : 'bg-amber-500/10 text-amber-300 border border-amber-500/20')
+                                      ? 'bg-sky-500/10 text-sky-600 border border-sky-500/20'
+                                      : 'bg-amber-500/10 text-amber-700 border border-amber-500/20')
                                   }
                                 >
                                   {desp.estado}
                                 </span>
                               </div>
-                              <h3 className="text-sm font-bold text-white mt-1">
+                              <h3 className="text-sm font-bold text-slate-900 mt-1">
                                 {desp.tipoMaterial.replace(/_/g, ' ')}
                               </h3>
                             </div>
                             <div className="text-right">
                               <span className="text-[10px] text-slate-500 uppercase font-semibold">Cantidad</span>
-                              <div className="font-mono text-base font-bold text-white">
+                              <div className="font-mono text-base font-bold text-slate-900">
                                 {formatVE(desp.cantidad)} {desp.unidadMedida}
                               </div>
                             </div>
                           </div>
 
-                          <div className="text-xs space-y-1.5 text-slate-300">
+                          <div className="text-xs space-y-1.5 text-slate-700">
                             <div className="flex justify-between">
                               <span className="text-slate-500">Ruta:</span>
-                              <span className="font-medium text-slate-200">
+                              <span className="font-medium text-slate-800">
                                 {desp.origen} &rarr; {desp.destinoFrente}
                               </span>
                             </div>
                             {desp.unidadTransporte && (
                               <div className="flex justify-between">
                                 <span className="text-slate-500">Unidad de Transporte:</span>
-                                <span className="font-mono text-slate-200">{desp.unidadTransporte}</span>
+                                <span className="font-mono text-slate-800">{desp.unidadTransporte}</span>
                               </div>
                             )}
                             {desp.chofer && (
                               <div className="flex justify-between">
                                 <span className="text-slate-500">Conductor:</span>
-                                <span className="text-slate-200">{desp.chofer}</span>
+                                <span className="text-slate-800">{desp.chofer}</span>
                               </div>
                             )}
                           </div>
 
                           {(desp.pesoNetoKg != null || desp.slumpConoPulgadas != null) && (
-                            <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60 font-mono">
+                            <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono">
                               {desp.pesoNetoKg != null && (
                                 <div>
                                   <span className="text-slate-500 font-sans block">Peso Neto Báscula:</span>
-                                  <span className="text-slate-200">{formatVE(desp.pesoNetoKg)} kg</span>
+                                  <span className="text-slate-800">{formatVE(desp.pesoNetoKg)} kg</span>
                                 </div>
                               )}
                               {desp.slumpConoPulgadas != null && (
                                 <div>
                                   <span className="text-slate-500 font-sans block">Ensayo Asentamiento:</span>
-                                  <span className="text-amber-300">{formatVE(desp.slumpConoPulgadas)}&quot; (Pulgadas)</span>
+                                  <span className="text-amber-700">{formatVE(desp.slumpConoPulgadas)}&quot; (Pulgadas)</span>
                                 </div>
                               )}
                             </div>
                           )}
 
                           {desp.observaciones && (
-                            <p className="text-xs text-slate-400 italic">
+                            <p className="text-xs text-slate-500 italic">
                               &ldquo;{desp.observaciones}&rdquo;
                             </p>
                           )}
 
-                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
                             {desp.estado === 'EN_TRANSITO' && (
                               <button
                                 onClick={async () => {
@@ -1323,7 +1329,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                     setErrorGlobal(e.message || 'Error actualizando despacho');
                                   }
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-semibold cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 border border-sky-500/30 text-xs font-semibold cursor-pointer"
                               >
                                 Llegó a Báscula
                               </button>
@@ -1340,7 +1346,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                     setErrorGlobal(e.message || 'Error actualizando despacho');
                                   }
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 border border-amber-500/30 text-xs font-semibold cursor-pointer"
                               >
                                 Iniciar Descarga
                               </button>
@@ -1357,7 +1363,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                     setErrorGlobal(e.message || 'Error actualizando despacho');
                                   }
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 text-xs font-semibold cursor-pointer"
                               >
                                 Certificar Recepción
                               </button>
@@ -1378,20 +1384,20 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {/* VISTA 7: MAQUINARIA Y EQUIPOS DE OBRA */}
         {tabActiva === 'maquinaria' && (
           <div className="space-y-6">
-            <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shadow-lg shadow-amber-500/5">
                     <IconWrench size={24} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="font-bold text-lg text-white">Parque de Maquinaria & Equipos de Construcción</h2>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                      <h2 className="font-bold text-lg text-slate-900">Parque de Maquinaria & Equipos de Construcción</h2>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 border border-amber-500/25">
                         Horómetros & Mantenimiento
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       Control operativo de equipos pesados, control de intervalos de servicio preventivo y costo horario
                     </p>
                   </div>
@@ -1409,28 +1415,28 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
               {/* TARJETAS DE RESUMEN DE MAQUINARIA */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Equipos en Obra</div>
-                  <div className="text-2xl font-black text-amber-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Equipos en Obra</div>
+                  <div className="text-2xl font-black text-amber-600 mt-1">
                     {maquinarias.length}
                     <span className="text-xs font-normal text-slate-500 ml-1.5">unidades</span>
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Operativos</div>
-                  <div className="text-2xl font-black text-emerald-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Operativos</div>
+                  <div className="text-2xl font-black text-emerald-600 mt-1">
                     {maquinarias.filter((m) => m.estado === 'OPERATIVO').length}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">En Mantenimiento</div>
-                  <div className="text-2xl font-black text-rose-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">En Mantenimiento</div>
+                  <div className="text-2xl font-black text-rose-600 mt-1">
                     {maquinarias.filter((m) => m.estado === 'EN_MANTENIMIENTO' || (Number(m.horometroActual) >= Number(m.horometroUltimoMantenimiento || 0) + Number(m.intervaloMantenimientoHoras || 250))).length}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Horas Acumuladas</div>
-                  <div className="text-2xl font-black text-sky-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Horas Acumuladas</div>
+                  <div className="text-2xl font-black text-sky-600 mt-1">
                     {formatVE(maquinarias.reduce((acc, m) => acc + (Number(m.horometroActual) || 0), 0))}
                     <span className="text-xs font-normal text-slate-500 ml-1.5">hrs</span>
                   </div>
@@ -1439,18 +1445,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
             </div>
 
             {/* FILTROS Y TABLA DE MAQUINARIA */}
-            <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <div className="p-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl">
+              <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 overflow-x-auto text-xs">
-                  <span className="text-slate-400 font-semibold px-2">Tipo de Equipo:</span>
+                  <span className="text-slate-500 font-semibold px-2">Tipo de Equipo:</span>
                   {['TODOS', 'PESADA', 'TRANSPORTE', 'LIVIANA', 'ELEVACION', 'GENERACION'].map((t) => (
                     <button
                       key={t}
                       onClick={() => setFiltroTipoMaq(t)}
                       className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
                         filtroTipoMaq === t
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                          ? 'bg-amber-500/20 text-amber-700 border border-amber-500/30'
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                       }`}
                     >
                       {t}
@@ -1461,7 +1467,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                  <thead className="bg-white text-slate-500 uppercase tracking-wider border-b border-slate-200 font-semibold">
                     <tr>
                       <th className="p-4">Código & Equipo</th>
                       <th className="p-4">Tipo & Marca / Modelo</th>
@@ -1473,7 +1479,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       <th className="p-4 text-right">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-slate-200">
                     {maquinarias
                       .filter((m) => filtroTipoMaq === 'TODOS' || m.tipo === filtroTipoMaq)
                       .map((maq) => {
@@ -1481,43 +1487,43 @@ export default function ConstruccionApp({ onSalir }: Props) {
                         const actual = Number(maq.horometroActual || 0);
                         const alertaMant = proxMant > 0 && actual >= proxMant - 25;
                         return (
-                          <tr key={maq.id} className="hover:bg-slate-800/30 transition">
+                          <tr key={maq.id} className="hover:bg-slate-50 transition">
                             <td className="p-4">
-                              <div className="font-bold text-white text-sm">{maq.codigo}</div>
-                              <div className="text-slate-400 text-[11px]">{maq.nombre}</div>
+                              <div className="font-bold text-slate-900 text-sm">{maq.codigo}</div>
+                              <div className="text-slate-500 text-[11px]">{maq.nombre}</div>
                             </td>
                             <td className="p-4">
-                              <span className="text-amber-300 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              <span className="text-amber-700 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                                 {maq.tipo}
                               </span>
-                              <div className="text-slate-400 text-[11px] mt-1">{maq.marca} {maq.modelo}</div>
+                              <div className="text-slate-500 text-[11px] mt-1">{maq.marca} {maq.modelo}</div>
                             </td>
-                            <td className="p-4 text-slate-300 font-mono text-[11px]">
+                            <td className="p-4 text-slate-700 font-mono text-[11px]">
                               {maq.placa || maq.serialChasis || 'S/N'}
                             </td>
-                            <td className="p-4 text-right font-mono font-bold text-sky-400 text-sm">
+                            <td className="p-4 text-right font-mono font-bold text-sky-600 text-sm">
                               {formatVE(maq.horometroActual)} hrs
                             </td>
                             <td className="p-4 text-right">
                               <span className={`font-mono font-semibold px-2 py-0.5 rounded text-[11px] ${
                                 alertaMant
-                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse'
-                                  : 'text-slate-300 bg-slate-800'
+                                  ? 'bg-rose-500/20 text-rose-700 border border-rose-500/30 animate-pulse'
+                                  : 'text-slate-700 bg-slate-100'
                               }`}>
                                 {proxMant > 0 ? `${formatVE(proxMant)} hrs` : 'N/A'}
                               </span>
                             </td>
-                            <td className="p-4 text-slate-300 font-medium">
+                            <td className="p-4 text-slate-700 font-medium">
                               {maq.operadorResponsable || <span className="text-slate-500 italic">Sin operador</span>}
                             </td>
                             <td className="p-4">
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                   maq.estado === 'OPERATIVO'
-                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
                                     : maq.estado === 'EN_MANTENIMIENTO'
-                                    ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-                                    : 'bg-slate-700 text-slate-300 border-slate-600'
+                                    ? 'bg-rose-500/15 text-rose-700 border-rose-500/30'
+                                    : 'bg-slate-200 text-slate-700 border-slate-300'
                                 }`}
                               >
                                 {maq.estado}
@@ -1532,7 +1538,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                     setNuevoOperadorInput(maq.operadorResponsable || '');
                                   }}
                                   title="Actualizar horómetro"
-                                  className="px-2 py-1 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border border-sky-500/30 text-[11px] font-semibold cursor-pointer"
+                                  className="px-2 py-1 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-700 border border-sky-500/30 text-[11px] font-semibold cursor-pointer"
                                 >
                                   Horómetro
                                 </button>
@@ -1551,7 +1557,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                     }
                                   }}
                                   title="Gestionar mantenimientos"
-                                  className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
+                                  className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-700 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
                                 >
                                   Mantenimientos
                                 </button>
@@ -1578,20 +1584,20 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {/* VISTA 8: MATRIZ DE RIESGOS Y SST / IPERC */}
         {tabActiva === 'riesgos' && (
           <div className="space-y-6">
-            <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shadow-lg shadow-rose-500/5">
+                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-600 shadow-lg shadow-rose-500/5">
                     <IconWarning size={24} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="font-bold text-lg text-white">Matriz IPERC & Seguridad Laboral (SST)</h2>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/25">
+                      <h2 className="font-bold text-lg text-slate-900">Matriz IPERC & Seguridad Laboral (SST)</h2>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500/15 text-rose-700 border border-rose-500/25">
                         Norma COVENIN 2260 / 4004
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       Identificación de Peligros, Evaluación de Riesgos y Medidas de Control Operativo en frentes de obra
                     </p>
                   </div>
@@ -1609,27 +1615,27 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
               {/* TARJETAS DE RESUMEN DE RIESGOS */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Riesgos Identificados</div>
-                  <div className="text-2xl font-black text-white mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Riesgos Identificados</div>
+                  <div className="text-2xl font-black text-slate-900 mt-1">
                     {riesgos.length}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Riesgos Críticos (P×S ≥ 15)</div>
-                  <div className="text-2xl font-black text-rose-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Riesgos Críticos (P×S ≥ 15)</div>
+                  <div className="text-2xl font-black text-rose-600 mt-1">
                     {riesgos.filter((r) => r.nivelRiesgo === 'CRITICO').length}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">En Mitigación Activa</div>
-                  <div className="text-2xl font-black text-amber-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">En Mitigación Activa</div>
+                  <div className="text-2xl font-black text-amber-600 mt-1">
                     {riesgos.filter((r) => r.estado === 'EN_MITIGACION').length}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Controlados / Residuales</div>
-                  <div className="text-2xl font-black text-emerald-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Controlados / Residuales</div>
+                  <div className="text-2xl font-black text-emerald-600 mt-1">
                     {riesgos.filter((r) => r.estado === 'CONTROLADO' || r.estado === 'RESIDUAL_ACEPTABLE').length}
                   </div>
                 </div>
@@ -1637,18 +1643,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
             </div>
 
             {/* TABLA MATRIZ IPERC */}
-            <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <div className="p-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl">
+              <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 overflow-x-auto text-xs">
-                  <span className="text-slate-400 font-semibold px-2">Severidad:</span>
+                  <span className="text-slate-500 font-semibold px-2">Severidad:</span>
                   {['TODOS', 'CRITICO', 'ALTO', 'MEDIO', 'BAJO'].map((lvl) => (
                     <button
                       key={lvl}
                       onClick={() => setFiltroNivelRiesgo(lvl)}
                       className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
                         filtroNivelRiesgo === lvl
-                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                          ? 'bg-rose-500/20 text-rose-700 border border-rose-500/30'
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                       }`}
                     >
                       {lvl}
@@ -1659,7 +1665,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                  <thead className="bg-white text-slate-500 uppercase tracking-wider border-b border-slate-200 font-semibold">
                     <tr>
                       <th className="p-4">Código & Frente</th>
                       <th className="p-4">Peligro Identificado</th>
@@ -1674,30 +1680,30 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       <th className="p-4 text-right">Acción</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-slate-200">
                     {riesgos
                       .filter((r) => filtroNivelRiesgo === 'TODOS' || r.nivelRiesgo === filtroNivelRiesgo)
                       .map((rsg) => (
-                        <tr key={rsg.id} className="hover:bg-slate-800/30 transition">
+                        <tr key={rsg.id} className="hover:bg-slate-50 transition">
                           <td className="p-4">
-                            <div className="font-bold text-white text-sm">{rsg.codigo}</div>
-                            <div className="text-slate-400 text-[11px]">{rsg.procesoFrente}</div>
+                            <div className="font-bold text-slate-900 text-sm">{rsg.codigo}</div>
+                            <div className="text-slate-500 text-[11px]">{rsg.procesoFrente}</div>
                           </td>
-                          <td className="p-4 font-semibold text-slate-200 max-w-[180px]">
+                          <td className="p-4 font-semibold text-slate-800 max-w-[180px]">
                             {rsg.peligro}
                           </td>
-                          <td className="p-4 text-slate-300 text-[11px] max-w-[200px]">
+                          <td className="p-4 text-slate-700 text-[11px] max-w-[200px]">
                             {rsg.riesgoConsecuencia}
                           </td>
                           <td className="p-4">
-                            <span className="text-slate-300 font-medium bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                            <span className="text-slate-700 font-medium bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
                               {rsg.categoria}
                             </span>
                           </td>
-                          <td className="p-4 text-center font-bold text-slate-300">{rsg.probabilidad}</td>
-                          <td className="p-4 text-center font-bold text-slate-300">{rsg.severidad}</td>
+                          <td className="p-4 text-center font-bold text-slate-700">{rsg.probabilidad}</td>
+                          <td className="p-4 text-center font-bold text-slate-700">{rsg.severidad}</td>
                           <td className="p-4 text-center">
-                            <span className="font-black text-sm text-white bg-slate-800 px-2 py-0.5 rounded border border-slate-700 font-mono">
+                            <span className="font-black text-sm text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 font-mono">
                               {rsg.probabilidad * rsg.severidad}
                             </span>
                           </td>
@@ -1705,28 +1711,28 @@ export default function ConstruccionApp({ onSalir }: Props) {
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                 rsg.nivelRiesgo === 'CRITICO'
-                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse'
+                                  ? 'bg-rose-500/20 text-rose-700 border-rose-500/40 animate-pulse'
                                   : rsg.nivelRiesgo === 'ALTO'
-                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                  ? 'bg-amber-500/20 text-amber-700 border-amber-500/30'
                                   : rsg.nivelRiesgo === 'MEDIO'
-                                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                  ? 'bg-sky-500/20 text-sky-700 border-sky-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-700 border-emerald-500/30'
                               }`}
                             >
                               {rsg.nivelRiesgo}
                             </span>
                           </td>
-                          <td className="p-4 text-slate-300 text-[11px] max-w-[220px]">
+                          <td className="p-4 text-slate-700 text-[11px] max-w-[220px]">
                             {rsg.medidasControl}
                           </td>
                           <td className="p-4">
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                 rsg.estado === 'CONTROLADO' || rsg.estado === 'RESIDUAL_ACEPTABLE'
-                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                  ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
                                   : rsg.estado === 'EN_MITIGACION'
-                                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                  ? 'bg-amber-500/15 text-amber-700 border-amber-500/30'
+                                  : 'bg-rose-500/15 text-rose-700 border-rose-500/30'
                               }`}
                             >
                               {rsg.estado}
@@ -1739,7 +1745,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                 setNuevoEstadoRiesgo(rsg.estado === 'IDENTIFICADO' ? 'EN_MITIGACION' : 'CONTROLADO');
                                 setMedidasAdicionalesInput('');
                               }}
-                              className="px-2.5 py-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 text-[11px] font-semibold cursor-pointer"
+                              className="px-2.5 py-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-700 border border-rose-500/30 text-[11px] font-semibold cursor-pointer"
                             >
                               Mitigar
                             </button>
@@ -1764,33 +1770,33 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {/* VISTA 9: GESTIÓN DOCUMENTAL BIM Y CONTROL DE RFIS */}
         {tabActiva === 'bim' && (
           <div className="space-y-6">
-            <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shadow-lg shadow-sky-500/5">
+                  <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 shadow-lg shadow-sky-500/5">
                     <IconFileText size={24} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="font-bold text-lg text-white">Modelos BIM, Planos Técnicos & RFIs</h2>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/25">
+                      <h2 className="font-bold text-lg text-slate-900">Modelos BIM, Planos Técnicos & RFIs</h2>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-500/15 text-sky-700 border border-sky-500/25">
                         Gestión Técnica de Proyecto
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       Control de planos (IFC, RVT, DWG, PDF) y solicitudes formales de información de obra (RFIs)
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex items-center">
+                  <div className="bg-white border border-slate-200 p-1 rounded-xl flex items-center">
                     <button
                       onClick={() => setSubtabBim('modelos')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                         subtabBim === 'modelos'
                           ? 'bg-sky-500 text-slate-950 shadow-md'
-                          : 'text-slate-400 hover:text-white'
+                          : 'text-slate-500 hover:text-slate-900'
                       }`}
                     >
                       Planos & Modelos ({documentosBim.length})
@@ -1800,7 +1806,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                         subtabBim === 'rfis'
                           ? 'bg-sky-500 text-slate-950 shadow-md'
-                          : 'text-slate-400 hover:text-white'
+                          : 'text-slate-500 hover:text-slate-900'
                       }`}
                     >
                       Control de RFIs ({rfis.length})
@@ -1832,18 +1838,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
             {/* SUBTAB: MODELOS Y PLANOS */}
             {subtabBim === 'modelos' && (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-                <div className="p-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl">
+                <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2 overflow-x-auto text-xs">
-                    <span className="text-slate-400 font-semibold px-2">Disciplina:</span>
+                    <span className="text-slate-500 font-semibold px-2">Disciplina:</span>
                     {['TODAS', 'ARQUITECTURA', 'ESTRUCTURAS', 'INSTALACIONES_SANITARIAS', 'INSTALACIONES_ELECTRICAS', 'COORDINACION_GENERAL'].map((d) => (
                       <button
                         key={d}
                         onClick={() => setFiltroDisciplinaBim(d)}
                         className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
                           filtroDisciplinaBim === d
-                            ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                            ? 'bg-sky-500/20 text-sky-700 border border-sky-500/30'
+                            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                         }`}
                       >
                         {d.replace(/_/g, ' ')}
@@ -1854,7 +1860,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                    <thead className="bg-white text-slate-500 uppercase tracking-wider border-b border-slate-200 font-semibold">
                       <tr>
                         <th className="p-4">Código & Título</th>
                         <th className="p-4">Disciplina</th>
@@ -1866,42 +1872,42 @@ export default function ConstruccionApp({ onSalir }: Props) {
                         <th className="p-4 text-right">Acción</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-slate-200">
                       {documentosBim
                         .filter((d) => filtroDisciplinaBim === 'TODAS' || d.disciplina === filtroDisciplinaBim)
                         .map((doc) => (
-                          <tr key={doc.id} className="hover:bg-slate-800/30 transition">
+                          <tr key={doc.id} className="hover:bg-slate-50 transition">
                             <td className="p-4">
-                              <div className="font-bold text-white text-sm">{doc.codigo}</div>
-                              <div className="text-slate-400 text-[11px]">{doc.titulo}</div>
+                              <div className="font-bold text-slate-900 text-sm">{doc.codigo}</div>
+                              <div className="text-slate-500 text-[11px]">{doc.titulo}</div>
                             </td>
                             <td className="p-4">
-                              <span className="text-sky-300 font-medium bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+                              <span className="text-sky-700 font-medium bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
                                 {doc.disciplina.replace(/_/g, ' ')}
                               </span>
                             </td>
                             <td className="p-4 text-center">
-                              <span className="font-mono font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              <span className="font-mono font-bold text-amber-700 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                                 {doc.formato}
                               </span>
                             </td>
-                            <td className="p-4 text-center font-mono text-slate-300 font-semibold">
+                            <td className="p-4 text-center font-mono text-slate-700 font-semibold">
                               {doc.version}
                             </td>
-                            <td className="p-4 text-slate-300 font-medium">
+                            <td className="p-4 text-slate-700 font-medium">
                               {doc.autorProyectista || 'Ing. Proyectista'}
                             </td>
-                            <td className="p-4 text-right font-mono text-slate-300">
+                            <td className="p-4 text-right font-mono text-slate-700">
                               {doc.pesoMb ? `${formatVE(doc.pesoMb)} MB` : '-'}
                             </td>
                             <td className="p-4">
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                   doc.estadoRevision === 'APROBADO_PARA_CONSTRUCCION'
-                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
                                     : doc.estadoRevision === 'EN_REVISION'
-                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                    : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                    ? 'bg-amber-500/15 text-amber-700 border-amber-500/30'
+                                    : 'bg-rose-500/15 text-rose-700 border-rose-500/30'
                                 }`}
                               >
                                 {doc.estadoRevision.replace(/_/g, ' ')}
@@ -1919,7 +1925,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                       setErrorGlobal(e.message);
                                     }
                                   }}
-                                  className="px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold cursor-pointer"
+                                  className="px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-700 border border-emerald-500/30 text-[11px] font-semibold cursor-pointer"
                                 >
                                   Aprobar
                                 </button>
@@ -1942,10 +1948,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
             {/* SUBTAB: CONTROL DE RFIS */}
             {subtabBim === 'rfis' && (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                    <thead className="bg-white text-slate-500 uppercase tracking-wider border-b border-slate-200 font-semibold">
                       <tr>
                         <th className="p-4">N° RFI & Asunto</th>
                         <th className="p-4">Disciplina</th>
@@ -1957,38 +1963,38 @@ export default function ConstruccionApp({ onSalir }: Props) {
                         <th className="p-4 text-right">Acción</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-slate-200">
                       {rfis.map((rfi) => (
-                        <tr key={rfi.id} className="hover:bg-slate-800/30 transition">
+                        <tr key={rfi.id} className="hover:bg-slate-50 transition">
                           <td className="p-4">
-                            <div className="font-bold text-amber-400 font-mono text-sm">{rfi.numeroRfi}</div>
-                            <div className="text-white font-semibold text-[11px]">{rfi.asunto}</div>
+                            <div className="font-bold text-amber-600 font-mono text-sm">{rfi.numeroRfi}</div>
+                            <div className="text-slate-900 font-semibold text-[11px]">{rfi.asunto}</div>
                           </td>
                           <td className="p-4">
-                            <span className="text-sky-300 font-medium bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+                            <span className="text-sky-700 font-medium bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
                               {rfi.disciplina}
                             </span>
                           </td>
-                          <td className="p-4 text-slate-300 font-medium">{rfi.solicitante}</td>
-                          <td className="p-4 text-slate-300 text-[11px] max-w-[220px]">
+                          <td className="p-4 text-slate-700 font-medium">{rfi.solicitante}</td>
+                          <td className="p-4 text-slate-700 text-[11px] max-w-[220px]">
                             {rfi.preguntaConsulta}
                           </td>
                           <td className="p-4 text-[11px] max-w-[220px]">
                             {rfi.respuestaOficial ? (
-                              <span className="text-emerald-300">{rfi.respuestaOficial}</span>
+                              <span className="text-emerald-700">{rfi.respuestaOficial}</span>
                             ) : (
                               <span className="text-slate-500 italic">Pendiente de respuesta</span>
                             )}
                           </td>
-                          <td className="p-4 font-mono text-slate-300">{rfi.fechaLimite || '-'}</td>
+                          <td className="p-4 font-mono text-slate-700">{rfi.fechaLimite || '-'}</td>
                           <td className="p-4">
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                 rfi.estado === 'RESPONDIDO' || rfi.estado === 'CERRADO'
-                                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                  ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
                                   : rfi.estado === 'EN_EVALUACION'
-                                  ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                  : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                                  ? 'bg-amber-500/15 text-amber-700 border-amber-500/30'
+                                  : 'bg-sky-500/15 text-sky-700 border-sky-500/30'
                               }`}
                             >
                               {rfi.estado}
@@ -2005,7 +2011,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                     estado: 'RESPONDIDO'
                                   });
                                 }}
-                                className="px-2.5 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
+                                className="px-2.5 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-700 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
                               >
                                 Responder
                               </button>
@@ -2031,15 +2037,15 @@ export default function ConstruccionApp({ onSalir }: Props) {
 {tabActiva === 'bitacora' && (
           <div className="space-y-4">
             {!proyectoActivo ? (
-              <div className="bg-[#101726] border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-xs">
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500 text-xs">
                 Selecciona un proyecto para ver y registrar el diario de obra.
               </div>
             ) : (
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-bold text-white">Libro Diario de Obra (Bitácora)</h2>
-                    <p className="text-xs text-slate-400">
+                    <h2 className="text-base font-bold text-slate-900">Libro Diario de Obra (Bitácora)</h2>
+                    <p className="text-xs text-slate-500">
                       Registro cronológico legal de actividades, clima, personal y novedades técnicas
                     </p>
                   </div>
@@ -2052,9 +2058,9 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </div>
 
                 {bitacora.length === 0 ? (
-                  <div className="bg-[#101726] border border-dashed border-slate-800 rounded-2xl p-8 text-center">
+                  <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-8 text-center">
                     <IconCalendar size={36} className="text-slate-600 mx-auto mb-3" />
-                    <h3 className="text-sm font-semibold text-slate-300">Sin asientos en el libro diario</h3>
+                    <h3 className="text-sm font-semibold text-slate-700">Sin asientos en el libro diario</h3>
                     <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                       Registra el primer día de trabajo para documentar el progreso en sitio.
                     </p>
@@ -2064,43 +2070,43 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     {bitacora.map((asiento) => (
                       <div
                         key={asiento.id}
-                        className="bg-[#101726] border border-slate-800 rounded-2xl p-4 space-y-3"
+                        className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3"
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-white bg-slate-800 px-2.5 py-1 rounded">
+                            <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded">
                               {asiento.fecha}
                             </span>
-                            <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold uppercase">
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/20 font-semibold uppercase">
                               Clima: {asiento.clima || asiento.condicionClimatica || 'SOLEADO'}
                             </span>
-                            <span className="text-[11px] text-slate-400">
-                              Personal activo: <strong className="text-slate-200">{asiento.personalActivo ?? 0} operarios</strong>
+                            <span className="text-[11px] text-slate-500">
+                              Personal activo: <strong className="text-slate-800">{asiento.personalActivo ?? 0} operarios</strong>
                             </span>
                           </div>
                           {asiento.elaboradoPor && (
-                            <span className="text-[11px] text-slate-400">
-                              Por: <strong className="text-slate-200">{asiento.elaboradoPor}</strong>
+                            <span className="text-[11px] text-slate-500">
+                              Por: <strong className="text-slate-800">{asiento.elaboradoPor}</strong>
                             </span>
                           )}
                         </div>
 
-                        <div className="text-xs text-slate-200 space-y-2">
+                        <div className="text-xs text-slate-800 space-y-2">
                           <div>
                             <span className="text-[10px] text-slate-500 uppercase font-bold block mb-0.5">
                               Actividades Ejecutadas
                             </span>
-                            <p className="text-slate-200 leading-relaxed whitespace-pre-line">
+                            <p className="text-slate-800 leading-relaxed whitespace-pre-line">
                               {asiento.actividadesEjecutadas || asiento.actividadesRealizadas}
                             </p>
                           </div>
 
                           {(asiento.observacionesEIncidentes || asiento.incidentesRetrasos) && (
                             <div className="bg-amber-500/5 border border-amber-500/20 p-2.5 rounded-xl">
-                              <span className="text-[10px] text-amber-400 uppercase font-bold block mb-0.5">
+                              <span className="text-[10px] text-amber-600 uppercase font-bold block mb-0.5">
                                 Observaciones / Incidentes
                               </span>
-                              <p className="text-amber-200 text-xs">
+                              <p className="text-amber-700 text-xs">
                                 {asiento.observacionesEIncidentes || asiento.incidentesRetrasos}
                               </p>
                             </div>
@@ -2119,20 +2125,20 @@ export default function ConstruccionApp({ onSalir }: Props) {
         {tabActiva === 'cuadrillas' && (
           <div className="space-y-6">
             {/* ENCABEZADO Y ACCIONES */}
-            <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 shadow-lg shadow-amber-500/5">
                     <IconUsers size={24} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="font-bold text-lg text-white">Planificación de Cuadrillas & Frentes Operativos</h2>
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                      <h2 className="font-bold text-lg text-slate-900">Planificación de Cuadrillas & Frentes Operativos</h2>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 border border-amber-500/25">
                         Rendimiento de Mano de Obra
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       Control del personal civil distribuido por frentes de trabajo y vinculación a partidas COVENIN
                     </p>
                   </div>
@@ -2150,28 +2156,28 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
               {/* TARJETAS DE MÉTRICAS DE PERSONAL */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Cuadrillas Activas</div>
-                  <div className="text-2xl font-black text-amber-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Cuadrillas Activas</div>
+                  <div className="text-2xl font-black text-amber-600 mt-1">
                     {cuadrillas.filter((c) => c.estado === 'ACTIVA').length}
                     <span className="text-xs font-normal text-slate-500 ml-1.5">/ {cuadrillas.length} tot.</span>
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Oficiales & Maestros</div>
-                  <div className="text-2xl font-black text-sky-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Oficiales & Maestros</div>
+                  <div className="text-2xl font-black text-sky-600 mt-1">
                     {cuadrillas.reduce((acc, c) => acc + (Number(c.cantidadOficiales) || 0), 0)}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ayudantes & Obreros</div>
-                  <div className="text-2xl font-black text-slate-200 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ayudantes & Obreros</div>
+                  <div className="text-2xl font-black text-slate-800 mt-1">
                     {cuadrillas.reduce((acc, c) => acc + (Number(c.cantidadAyudantes) || 0), 0)}
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Dotación Total</div>
-                  <div className="text-2xl font-black text-emerald-400 mt-1">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Dotación Total</div>
+                  <div className="text-2xl font-black text-emerald-600 mt-1">
                     {cuadrillas.reduce((acc, c) => acc + (Number(c.cantidadTotalPersonal) || (Number(c.cantidadOficiales) || 0) + (Number(c.cantidadAyudantes) || 0)), 0)}
                     <span className="text-xs font-normal text-slate-500 ml-1.5">obreros</span>
                   </div>
@@ -2180,17 +2186,17 @@ export default function ConstruccionApp({ onSalir }: Props) {
             </div>
 
             {/* BARRA DE FILTROS */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#101726]/70 border border-slate-800 rounded-xl p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white/70 border border-slate-200 rounded-xl p-3">
               <div className="flex items-center gap-2 overflow-x-auto text-xs">
-                <span className="text-slate-400 font-semibold px-2">Especialidad:</span>
+                <span className="text-slate-500 font-semibold px-2">Especialidad:</span>
                 {['TODAS', 'CONCRETO_Y_ENCOFRADO', 'ACERO_Y_CABILLAS', 'ALBANILERIA', 'MOVIMIENTO_TIERRAS', 'INSTALACIONES_ELECTRICAS', 'INSTALACIONES_SANITARIAS', 'ACABADOS_Y_PINTURA', 'SOLDADURA_ESTRUCTURAL', 'GENERAL'].map((esp) => (
                   <button
                     key={esp}
                     onClick={() => setFiltroEspecialidadCuadrilla(esp)}
                     className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer whitespace-nowrap ${
                       filtroEspecialidadCuadrilla === esp
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        ? 'bg-amber-500/20 text-amber-700 border border-amber-500/30'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                     }`}
                   >
                     {esp.replace(/_/g, ' ')}
@@ -2200,10 +2206,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
             </div>
 
             {/* TABLA DE CUADRILLAS */}
-            <div className="bg-[#101726] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/80 text-slate-400 uppercase tracking-wider border-b border-slate-800 font-semibold">
+                  <thead className="bg-white text-slate-500 uppercase tracking-wider border-b border-slate-200 font-semibold">
                     <tr>
                       <th className="p-4">Código & Cuadrilla</th>
                       <th className="p-4">Frente de Trabajo</th>
@@ -2217,45 +2223,45 @@ export default function ConstruccionApp({ onSalir }: Props) {
                       <th className="p-4 text-right">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-slate-200">
                     {cuadrillas
                       .filter((c) => filtroEspecialidadCuadrilla === 'TODAS' || c.especialidad === filtroEspecialidadCuadrilla)
                       .map((cuad) => {
                         const partidaAsoc = partidas.find((p) => p.id === cuad.partidaId);
                         return (
-                          <tr key={cuad.id} className="hover:bg-slate-800/30 transition">
+                          <tr key={cuad.id} className="hover:bg-slate-50 transition">
                             <td className="p-4">
-                              <div className="font-bold text-white text-sm">{cuad.codigo}</div>
-                              <div className="text-slate-400 text-[11px]">{cuad.nombre}</div>
+                              <div className="font-bold text-slate-900 text-sm">{cuad.codigo}</div>
+                              <div className="text-slate-500 text-[11px]">{cuad.nombre}</div>
                             </td>
                             <td className="p-4">
-                              <span className="font-semibold text-sky-300 bg-sky-500/10 px-2.5 py-1 rounded-md border border-sky-500/20">
+                              <span className="font-semibold text-sky-700 bg-sky-500/10 px-2.5 py-1 rounded-md border border-sky-500/20">
                                 {cuad.frenteTrabajo}
                               </span>
                             </td>
                             <td className="p-4">
-                              <span className="text-slate-300 font-medium bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60">
+                              <span className="text-slate-700 font-medium bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
                                 {cuad.especialidad.replace(/_/g, ' ')}
                               </span>
                             </td>
-                            <td className="p-4 text-slate-300 font-medium">
+                            <td className="p-4 text-slate-700 font-medium">
                               {cuad.capatazResponsable || cuad.capatazLider}
                             </td>
-                            <td className="p-4 text-center font-bold text-sky-400">
+                            <td className="p-4 text-center font-bold text-sky-600">
                               {cuad.cantidadOficiales}
                             </td>
-                            <td className="p-4 text-center font-bold text-slate-300">
+                            <td className="p-4 text-center font-bold text-slate-700">
                               {cuad.cantidadAyudantes}
                             </td>
                             <td className="p-4 text-center">
-                              <span className="font-black text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                              <span className="font-black text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                                 {cuad.cantidadTotalPersonal || cuad.cantidadOficiales + cuad.cantidadAyudantes}
                               </span>
                             </td>
-                            <td className="p-4 max-w-[200px] truncate text-slate-400 text-[11px]">
+                            <td className="p-4 max-w-[200px] truncate text-slate-500 text-[11px]">
                               {partidaAsoc ? (
-                                <span title={partidaAsoc.descripcion} className="text-slate-300">
-                                  <strong className="text-amber-400">{partidaAsoc.codigoCovenin}</strong> - {partidaAsoc.descripcion}
+                                <span title={partidaAsoc.descripcion} className="text-slate-700">
+                                  <strong className="text-amber-600">{partidaAsoc.codigoCovenin}</strong> - {partidaAsoc.descripcion}
                                 </span>
                               ) : (
                                 <span className="text-slate-500 italic">General de Obra</span>
@@ -2265,12 +2271,12 @@ export default function ConstruccionApp({ onSalir }: Props) {
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                                   cuad.estado === 'ACTIVA'
-                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                    ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30'
                                     : cuad.estado === 'EN_STANDBY'
-                                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                    ? 'bg-amber-500/15 text-amber-700 border-amber-500/30'
                                     : cuad.estado === 'REASIGNADA'
-                                    ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-                                    : 'bg-slate-700 text-slate-300 border-slate-600'
+                                    ? 'bg-sky-500/15 text-sky-700 border-sky-500/30'
+                                    : 'bg-slate-200 text-slate-700 border-slate-300'
                                 }`}
                               >
                                 {cuad.estado}
@@ -2290,7 +2296,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                       }
                                     }}
                                     title="Activar cuadrilla"
-                                    className="px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold cursor-pointer"
+                                    className="px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-700 border border-emerald-500/30 text-[11px] font-semibold cursor-pointer"
                                   >
                                     Activar
                                   </button>
@@ -2307,7 +2313,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                       }
                                     }}
                                     title="Poner en Standby"
-                                    className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
+                                    className="px-2 py-1 rounded bg-amber-600/20 hover:bg-amber-600/40 text-amber-700 border border-amber-500/30 text-[11px] font-semibold cursor-pointer"
                                   >
                                     Standby
                                   </button>
@@ -2326,7 +2332,7 @@ export default function ConstruccionApp({ onSalir }: Props) {
                                       }
                                     }}
                                     title="Finalizar cuadrilla"
-                                    className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600 text-[11px] font-semibold cursor-pointer"
+                                    className="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-800 border border-slate-300 text-[11px] font-semibold cursor-pointer"
                                   >
                                     Finalizar
                                   </button>
@@ -2350,18 +2356,19 @@ export default function ConstruccionApp({ onSalir }: Props) {
           </div>
         )}
       </main>
+      </div>
 
       {/* MODAL 1: CREAR / EDITAR PROYECTO */}
       {modalProyectoAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">
                 {proyectoEditando ? 'Editar Proyecto de Obra' : 'Nuevo Proyecto de Obra'}
               </h3>
               <button
                 onClick={() => setModalProyectoAbierto(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -2397,117 +2404,117 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalProyectoAbierto(false);
                   recargarProyectosEInsumos();
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando proyecto');
+                  avisar(err.message || 'Error guardando proyecto');
                 }
               }}
               className="space-y-3 text-xs"
             >
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Código *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Código *</label>
                   <input
                     name="codigo"
                     required
                     defaultValue={proyectoEditando?.codigo || ''}
                     placeholder="OBRA-2026-01"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-slate-400 block mb-1 font-semibold">Nombre de la Obra *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Nombre de la Obra *</label>
                   <input
                     name="nombre"
                     required
                     defaultValue={proyectoEditando?.nombre || ''}
                     placeholder="Construcción Módulo Industrial"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Cliente / Contratante *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Cliente / Contratante *</label>
                   <input
                     name="cliente"
                     required
                     defaultValue={proyectoEditando?.cliente || ''}
                     placeholder="Corporación Minera"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Ubicación</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Ubicación</label>
                   <input
                     name="ubicacion"
                     defaultValue={proyectoEditando?.ubicacion || ''}
                     placeholder="Zona Industrial, Galpón 4"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Ingeniero Residente</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Ingeniero Residente</label>
                   <input
                     name="ingenieroResidente"
                     defaultValue={proyectoEditando?.ingenieroResidente || ''}
                     placeholder="Ing. Carlos Pérez"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Carnet CIV</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Carnet CIV</label>
                   <input
                     name="civResidente"
                     defaultValue={proyectoEditando?.civResidente || ''}
                     placeholder="CIV-189.420"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Presupuesto (Bs.)</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Presupuesto (Bs.)</label>
                   <input
                     name="montoPresupuestoTotal"
                     type="number"
                     step="0.01"
                     defaultValue={proyectoEditando?.montoPresupuestoTotal ?? ''}
                     placeholder="50000.00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">% Anticipo</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">% Anticipo</label>
                   <input
                     name="porcentajeAnticipo"
                     type="number"
                     step="0.01"
                     defaultValue={proyectoEditando?.porcentajeAnticipo ?? 20}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">% Ret. Garantía</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">% Ret. Garantía</label>
                   <input
                     name="porcentajeRetencionGarantia"
                     type="number"
                     step="0.01"
                     defaultValue={proyectoEditando?.porcentajeRetencionGarantia ?? 10}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Estado</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Estado</label>
                 <select
                   name="estado"
                   defaultValue={proyectoEditando?.estado || 'EN_EJECUCION'}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 >
                   <option value="EN_EJECUCION">EN_EJECUCION</option>
                   <option value="PARALIZADA">PARALIZADA</option>
@@ -2515,11 +2522,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </select>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalProyectoAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -2537,13 +2544,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL 2: CREAR CAPÍTULO */}
       {modalCapituloAbierto && proyectoActivo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Nuevo Capítulo Presupuestario</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Nuevo Capítulo Presupuestario</h3>
               <button
                 onClick={() => setModalCapituloAbierto(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -2566,47 +2573,47 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalCapituloAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error creando capítulo');
+                  avisar(err.message || 'Error creando capítulo');
                 }
               }}
               className="space-y-3 text-xs"
             >
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Código *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Código *</label>
                   <input
                     name="codigo"
                     required
                     placeholder="1.0"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-slate-400 block mb-1 font-semibold">Nombre del Capítulo *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Nombre del Capítulo *</label>
                   <input
                     name="nombre"
                     required
                     placeholder="Obras Preliminares"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Orden correlativo</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Orden correlativo</label>
                 <input
                   name="orden"
                   type="number"
                   defaultValue={capitulos.length + 1}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalCapituloAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -2624,15 +2631,15 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL 3: CREAR / EDITAR PARTIDA */}
       {modalPartidaAbierto && proyectoActivo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">
                 {partidaEditando ? 'Editar Partida' : 'Nueva Partida de Obra'}
               </h3>
               <button
                 onClick={() => setModalPartidaAbierto(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -2640,8 +2647,8 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
             {/* Buscador de catálogo COVENIN asistido */}
             {!partidaEditando && (
-              <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 space-y-2">
-                <div className="text-[11px] font-semibold text-amber-400 flex items-center gap-1.5">
+              <div className="bg-white p-3 rounded-2xl border border-slate-200 space-y-2">
+                <div className="text-[11px] font-semibold text-amber-600 flex items-center gap-1.5">
                   <IconSearch size={14} />
                   <span>Buscador del Catálogo Oficial COVENIN</span>
                 </div>
@@ -2650,13 +2657,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   value={busquedaCovenin}
                   onChange={(e) => setBusquedaCovenin(e.target.value)}
                   placeholder="Ej: concreto, tubería, acero..."
-                  className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white"
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-300 text-xs text-slate-900"
                 />
                 {buscandoCovenin && (
-                  <span className="text-[10px] text-slate-400">Buscando en catálogo...</span>
+                  <span className="text-[10px] text-slate-500">Buscando en catálogo...</span>
                 )}
                 {catalogoCovenin.length > 0 && (
-                  <div className="max-h-28 overflow-y-auto divide-y divide-slate-800 border border-slate-800 rounded-xl bg-slate-950">
+                  <div className="max-h-28 overflow-y-auto divide-y divide-slate-200 border border-slate-200 rounded-xl bg-slate-100">
                     {catalogoCovenin.map((item) => (
                       <div
                         key={item.id}
@@ -2670,10 +2677,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
                           setCatalogoCovenin([]);
                           setBusquedaCovenin('');
                         }}
-                        className="p-2 hover:bg-slate-900 cursor-pointer text-[11px]"
+                        className="p-2 hover:bg-slate-50 cursor-pointer text-[11px]"
                       >
-                        <span className="font-mono text-amber-400 font-bold mr-2">{item.codigoCovenin}</span>
-                        <span className="text-slate-200">{item.descripcion}</span>
+                        <span className="font-mono text-amber-600 font-bold mr-2">{item.codigoCovenin}</span>
+                        <span className="text-slate-800">{item.descripcion}</span>
                       </div>
                     ))}
                   </div>
@@ -2710,28 +2717,28 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalPartidaAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando partida');
+                  avisar(err.message || 'Error guardando partida');
                 }
               }}
               className="space-y-3 text-xs"
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Código COVENIN *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Código COVENIN *</label>
                   <input
                     name="codigoCovenin"
                     required
                     defaultValue={partidaEditando?.codigoCovenin || partidaEditando?.codigoPartida || ''}
                     placeholder="E-311.100"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Capítulo</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Capítulo</label>
                   <select
                     name="capituloId"
                     defaultValue={partidaEditando?.capituloId ?? ''}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   >
                     <option value="">(Sin capítulo)</option>
                     {capitulos.map((c) => (
@@ -2744,30 +2751,30 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Descripción de la Partida *</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Descripción de la Partida *</label>
                 <textarea
                   name="descripcion"
                   required
                   rows={3}
                   defaultValue={partidaEditando?.descripcion || ''}
                   placeholder="Vaciado de concreto en zapatas..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Unidad *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Unidad *</label>
                   <input
                     name="unidad"
                     required
                     defaultValue={partidaEditando?.unidad || 'm3'}
                     placeholder="m3, m2, kg..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Cómputo / Cantidad *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Cómputo / Cantidad *</label>
                   <input
                     name="cantidadPresupuestada"
                     type="number"
@@ -2775,11 +2782,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     required
                     defaultValue={partidaEditando?.cantidadPresupuestada ?? ''}
                     placeholder="25.00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">P.U. (Bs.) *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">P.U. (Bs.) *</label>
                   <input
                     name="precioUnitario"
                     type="number"
@@ -2787,28 +2794,28 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     required
                     defaultValue={partidaEditando?.precioUnitario ?? ''}
                     placeholder="120.50"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Rendimiento Diario Estimado</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Rendimiento Diario Estimado</label>
                 <input
                   name="rendimientoDiario"
                   type="number"
                   step="0.01"
                   defaultValue={partidaEditando?.rendimientoDiario ?? ''}
                   placeholder="10.00"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalPartidaAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -2826,13 +2833,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL 4: CREAR VALUACIÓN */}
       {modalValuacionAbierto && proyectoActivo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Nueva Valuación de Obra</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Nueva Valuación de Obra</h3>
               <button
                 onClick={() => setModalValuacionAbierto(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -2880,84 +2887,84 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalValuacionAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error registrando valuación');
+                  avisar(err.message || 'Error registrando valuación');
                 }
               }}
               className="space-y-3 text-xs"
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">N° Valuación *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">N° Valuación *</label>
                   <input
                     name="numeroValuacion"
                     type="number"
                     required
                     defaultValue={valuaciones.length + 1}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Monto Bruto Ejecutado (Bs.) *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Monto Bruto Ejecutado (Bs.) *</label>
                   <input
                     name="montoBruto"
                     type="number"
                     step="0.01"
                     required
                     placeholder="15000.00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Período Desde *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Período Desde *</label>
                   <input
                     name="periodoDesde"
                     type="date"
                     required
                     defaultValue={new Date().toISOString().split('T')[0]}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Período Hasta *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Período Hasta *</label>
                   <input
                     name="periodoHasta"
                     type="date"
                     required
                     defaultValue={new Date().toISOString().split('T')[0]}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Fecha Emisión *</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Fecha Emisión *</label>
                 <input
                   name="fechaEmision"
                   type="date"
                   required
                   defaultValue={new Date().toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Observaciones</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Observaciones</label>
                 <textarea
                   name="observaciones"
                   rows={2}
                   placeholder="Corte de obra quincenal correspondiente a fundaciones..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalValuacionAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -2975,13 +2982,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL 5: REGISTRAR INSUMO */}
       {modalInsumoAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Nuevo Insumo de Construcción</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Nuevo Insumo de Construcción</h3>
               <button
                 onClick={() => setModalInsumoAbierto(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -3010,26 +3017,26 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalInsumoAbierto(false);
                   recargarProyectosEInsumos();
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando insumo');
+                  avisar(err.message || 'Error guardando insumo');
                 }
               }}
               className="space-y-3 text-xs"
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Código *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Código *</label>
                   <input
                     name="codigo"
                     required
                     placeholder="MAT-CEM-01"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Tipo *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Tipo *</label>
                   <select
                     name="tipo"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   >
                     <option value="MATERIAL">MATERIAL</option>
                     <option value="EQUIPO">EQUIPO</option>
@@ -3039,74 +3046,74 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Nombre del Insumo *</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Nombre del Insumo *</label>
                 <input
                   name="nombre"
                   required
                   placeholder="Cemento Portland Tipo I (Saco 42.5 kg)"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Unidad *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Unidad *</label>
                   <input
                     name="unidad"
                     required
                     placeholder="saco, kg, m3"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Stock Inicial *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Stock Inicial *</label>
                   <input
                     name="stockActual"
                     type="number"
                     step="0.01"
                     required
                     placeholder="100.00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Stock Mínimo</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Stock Mínimo</label>
                   <input
                     name="stockMinimo"
                     type="number"
                     step="0.01"
                     defaultValue="10.00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Costo Unitario (Bs.)</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Costo Unitario (Bs.)</label>
                   <input
                     name="costoUnitario"
                     type="number"
                     step="0.01"
                     placeholder="250.00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Proveedor</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Proveedor</label>
                   <input
                     name="proveedor"
                     placeholder="Cemex / Distribuidora"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalInsumoAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -3124,25 +3131,25 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL 6: DESCONTAR CONSUMO (CON IDEMPOTENCIA REAL) */}
       {modalConsumoAbierto && insumoConsumo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h3 className="font-bold text-sm text-white">Descontar Consumo en Obra</h3>
-                <p className="text-[11px] text-amber-400 font-mono mt-0.5">{insumoConsumo.nombre}</p>
+                <h3 className="font-bold text-sm text-slate-900">Descontar Consumo en Obra</h3>
+                <p className="text-[11px] text-amber-600 font-mono mt-0.5">{insumoConsumo.nombre}</p>
               </div>
               <button
                 onClick={() => setModalConsumoAbierto(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
             </div>
 
-            <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
-              <div className="flex justify-between text-slate-400">
+            <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs space-y-1">
+              <div className="flex justify-between text-slate-500">
                 <span>Stock Disponible:</span>
-                <span className="font-bold font-mono text-emerald-400">
+                <span className="font-bold font-mono text-emerald-600">
                   {formatVE(insumoConsumo.stockActual)} {insumoConsumo.unidad}
                 </span>
               </div>
@@ -3156,11 +3163,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 const cant = Number(fd.get('cantidad'));
 
                 if (!cant || cant <= 0) {
-                  alert('La cantidad a consumir debe ser mayor a 0');
+                  avisar('La cantidad a consumir debe ser mayor a 0');
                   return;
                 }
                 if (cant > (Number(insumoConsumo.stockActual) || 0)) {
-                  alert('La cantidad supera el stock disponible');
+                  avisar('La cantidad supera el stock disponible');
                   return;
                 }
 
@@ -3171,13 +3178,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalConsumoAbierto(false);
                   recargarProyectosEInsumos();
                 } catch (err: any) {
-                  alert(err.message || 'Error procesando consumo');
+                  avisar(err.message || 'Error procesando consumo');
                 }
               }}
               className="space-y-3 text-xs"
             >
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">
+                <label className="text-slate-500 block mb-1 font-semibold">
                   Cantidad a Descontar ({insumoConsumo.unidad}) *
                 </label>
                 <input
@@ -3186,15 +3193,15 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   step="0.01"
                   required
                   placeholder="10.00"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono text-sm"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalConsumoAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -3212,13 +3219,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL 7: REGISTRAR DESPACHO / GUÍA */}
       {modalDespachoAbierto && proyectoActivo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Registrar Guía de Despacho</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Registrar Guía de Despacho</h3>
               <button
                 onClick={() => setModalDespachoAbierto(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -3256,26 +3263,26 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalDespachoAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando guía de despacho');
+                  avisar(err.message || 'Error guardando guía de despacho');
                 }
               }}
               className="space-y-3 text-xs"
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">N° Guía / Remisión *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">N° Guía / Remisión *</label>
                   <input
                     name="guiaNumero"
                     required
                     placeholder="GUIA-MIX-2026-001"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Tipo de Material *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Tipo de Material *</label>
                   <select
                     name="tipoMaterial"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   >
                     <option value="CONCRETO_PREMEZCLADO">CONCRETO PREMEZCLADO</option>
                     <option value="ACERO_CABILLAS">ACERO / CABILLAS</option>
@@ -3288,117 +3295,117 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Origen / Proveedor *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Origen / Proveedor *</label>
                   <input
                     name="origen"
                     required
                     placeholder="Planta Mezcladora Central"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Destino / Frente de Obra *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Destino / Frente de Obra *</label>
                   <input
                     name="destinoFrente"
                     required
                     placeholder="Losa Nivel +3.50"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Unidad de Transporte</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Unidad de Transporte</label>
                   <input
                     name="unidadTransporte"
                     placeholder="Mixer Mack #12 (Placa A92BJ2K)"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Chofer</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Chofer</label>
                   <input
                     name="chofer"
                     placeholder="Carlos Benítez"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Cantidad *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Cantidad *</label>
                   <input
                     name="cantidad"
                     type="number"
                     step="0.01"
                     required
                     placeholder="8.00"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Unidad *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Unidad *</label>
                   <input
                     name="unidadMedida"
                     required
                     defaultValue="m3"
                     placeholder="m3, ton, kg"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Asentamiento (Slump)</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Asentamiento (Slump)</label>
                   <input
                     name="slumpConoPulgadas"
                     type="number"
                     step="0.1"
                     placeholder="5.5 (pulgadas)"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Peso Bruto (kg)</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Peso Bruto (kg)</label>
                   <input
                     name="pesoBrutoKg"
                     type="number"
                     step="0.01"
                     placeholder="38000"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Peso Tara (kg)</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Peso Tara (kg)</label>
                   <input
                     name="pesoTaraKg"
                     type="number"
                     step="0.01"
                     placeholder="13000"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Peso Neto (kg)</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Peso Neto (kg)</label>
                   <input
                     name="pesoNetoKg"
                     type="number"
                     step="0.01"
                     placeholder="25000"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Asociar con Insumo (Opcional)</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Asociar con Insumo (Opcional)</label>
                   <select
                     name="insumoId"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   >
                     <option value="">(Ninguno)</option>
                     {insumos.map((i) => (
@@ -3409,10 +3416,10 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Estado Inicial</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Estado Inicial</label>
                   <select
                     name="estado"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   >
                     <option value="EN_TRANSITO">EN TRANSITO</option>
                     <option value="EN_BASCULA">EN BASCULA</option>
@@ -3423,20 +3430,20 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Observaciones</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Observaciones</label>
                 <textarea
                   name="observaciones"
                   rows={2}
                   placeholder="Muestra tomada para ensayo de compresión cilíndrica a 7 y 28 días..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalDespachoAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -3454,13 +3461,13 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL 8: REGISTRAR ASIENTO EN BITÁCORA */}
       {modalBitacoraAbierto && proyectoActivo && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Nuevo Asiento en Libro Diario</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Nuevo Asiento en Libro Diario</h3>
               <button
                 onClick={() => setModalBitacoraAbierto(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -3489,27 +3496,27 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   setModalBitacoraAbierto(false);
                   recargarSubrecursosProyecto(proyectoActivo.id!);
                 } catch (err: any) {
-                  alert(err.message || 'Error guardando en bitácora');
+                  avisar(err.message || 'Error guardando en bitácora');
                 }
               }}
               className="space-y-3 text-xs"
             >
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Fecha *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Fecha *</label>
                   <input
                     name="fecha"
                     type="date"
                     required
                     defaultValue={new Date().toISOString().split('T')[0]}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Condición Clima *</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Condición Clima *</label>
                   <select
                     name="clima"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                   >
                     <option value="SOLEADO">SOLEADO</option>
                     <option value="NUBLADO">NUBLADO</option>
@@ -3518,18 +3525,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-semibold">Operarios en Sitio</label>
+                  <label className="text-slate-500 block mb-1 font-semibold">Operarios en Sitio</label>
                   <input
                     name="personalActivo"
                     type="number"
                     defaultValue="10"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">
+                <label className="text-slate-500 block mb-1 font-semibold">
                   Actividades Ejecutadas en la Jornada *
                 </label>
                 <textarea
@@ -3537,37 +3544,37 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   required
                   rows={3}
                   placeholder="Se realizó el encofrado y armado de acero en zapatas Z-1 a Z-4..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">
+                <label className="text-slate-500 block mb-1 font-semibold">
                   Observaciones, Incidentes o Novedades
                 </label>
                 <textarea
                   name="observacionesEIncidentes"
                   rows={2}
                   placeholder="Retraso de 40 min por lluvia al mediodía..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1 font-semibold">Elaborado Por</label>
+                <label className="text-slate-500 block mb-1 font-semibold">Elaborado Por</label>
                 <input
                   name="elaboradoPor"
                   defaultValue={proyectoActivo.ingenieroResidente || user?.nombre || ''}
                   placeholder="Ing. Residente"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalBitacoraAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -3585,18 +3592,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
     
       {/* MODAL: ASIGNAR NUEVA CUADRILLA */}
       {modalCuadrillaAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-600 flex items-center justify-center">
                   <IconUsers size={18} />
                 </div>
-                <h3 className="font-bold text-base text-white">Asignar Nueva Cuadrilla de Obra</h3>
+                <h3 className="font-bold text-base text-slate-900">Asignar Nueva Cuadrilla de Obra</h3>
               </div>
               <button
                 onClick={() => setModalCuadrillaAbierto(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -3651,22 +3658,22 @@ export default function ConstruccionApp({ onSalir }: Props) {
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Código *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Código *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. CD-ENC-01"
                     value={formCuadrilla.codigo}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, codigo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Especialidad *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Especialidad *</label>
                   <select
                     value={formCuadrilla.especialidad}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, especialidad: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   >
                     <option value="CONCRETO_Y_ENCOFRADO">Concreto & Encofrado</option>
                     <option value="ACERO_Y_CABILLAS">Acero & Cabillas</option>
@@ -3682,68 +3689,68 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Nombre de la Cuadrilla *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Nombre de la Cuadrilla *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej. Cuadrilla Encofrado Losa Nivel 2"
                   value={formCuadrilla.nombre}
                   onChange={(e) => setFormCuadrilla({ ...formCuadrilla, nombre: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Frente de Trabajo *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Frente de Trabajo *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Sector B - Losa 2"
                     value={formCuadrilla.frenteTrabajo}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, frenteTrabajo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Capataz / Responsable *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Capataz / Responsable *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. José Castillo"
                     value={formCuadrilla.capatazResponsable}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, capatazResponsable: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Oficiales *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Oficiales *</label>
                   <input
                     type="number"
                     min="1"
                     required
                     value={formCuadrilla.cantidadOficiales}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, cantidadOficiales: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-sky-400 focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold text-sky-600 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Ayudantes *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Ayudantes *</label>
                   <input
                     type="number"
                     min="0"
                     required
                     value={formCuadrilla.cantidadAyudantes}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, cantidadAyudantes: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-slate-300 focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-bold text-slate-700 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Total Personal</label>
-                  <div className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-emerald-400 font-black text-sm flex items-center justify-center">
+                  <label className="block text-slate-500 mb-1 font-semibold">Total Personal</label>
+                  <div className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2 text-emerald-600 font-black text-sm flex items-center justify-center">
                     {(Number(formCuadrilla.cantidadOficiales) || 0) + (Number(formCuadrilla.cantidadAyudantes) || 0)}
                   </div>
                 </div>
@@ -3751,21 +3758,21 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Fecha de Inicio *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Fecha de Inicio *</label>
                   <input
                     type="date"
                     required
                     value={formCuadrilla.fechaInicio}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, fechaInicio: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Partida COVENIN Vinculada</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Partida COVENIN Vinculada</label>
                   <select
                     value={formCuadrilla.partidaId}
                     onChange={(e) => setFormCuadrilla({ ...formCuadrilla, partidaId: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none text-xs"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none text-xs"
                   >
                     <option value="">General de Obra (Sin vinculación directa)</option>
                     {partidas.map((p) => (
@@ -3778,21 +3785,21 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Observaciones</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Observaciones</label>
                 <textarea
                   rows={2}
                   placeholder="Turno, herramientas asignadas, requerimientos de EPP..."
                   value={formCuadrilla.observaciones}
                   onChange={(e) => setFormCuadrilla({ ...formCuadrilla, observaciones: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalCuadrillaAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -3811,18 +3818,18 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL: REGISTRAR NUEVA MAQUINARIA */}
       {modalMaquinariaAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-600 flex items-center justify-center">
                   <IconWrench size={18} />
                 </div>
-                <h3 className="font-bold text-base text-white">Registrar Equipo / Maquinaria en Obra</h3>
+                <h3 className="font-bold text-base text-slate-900">Registrar Equipo / Maquinaria en Obra</h3>
               </div>
               <button
                 onClick={() => setModalMaquinariaAbierto(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
+                className="text-slate-500 hover:text-slate-900 p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
                 <IconClose size={18} />
               </button>
@@ -3864,22 +3871,22 @@ export default function ConstruccionApp({ onSalir }: Props) {
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Código *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Código *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. RET-01"
                     value={formNuevaMaquinaria.codigo}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, codigo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Tipo de Equipo *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Tipo de Equipo *</label>
                   <select
                     value={formNuevaMaquinaria.tipo}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, tipo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   >
                     <option value="PESADA">Pesada (Excavadora / Retro)</option>
                     <option value="TRANSPORTE">Transporte (Volqueta / Batea)</option>
@@ -3891,90 +3898,90 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Nombre / Descripción del Equipo *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Nombre / Descripción del Equipo *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej. Retroexcavadora sobre orugas 20T"
                   value={formNuevaMaquinaria.nombre}
                   onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, nombre: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Marca</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Marca</label>
                   <input
                     type="text"
                     placeholder="Ej. Caterpillar"
                     value={formNuevaMaquinaria.marca}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, marca: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Modelo</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Modelo</label>
                   <input
                     type="text"
                     placeholder="Ej. 320D"
                     value={formNuevaMaquinaria.modelo}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, modelo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Horómetro Inicial</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Horómetro Inicial</label>
                   <input
                     type="number"
                     step="0.1"
                     value={formNuevaMaquinaria.horometroActual}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, horometroActual: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Intervalo Mant. (hrs)</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Intervalo Mant. (hrs)</label>
                   <input
                     type="number"
                     value={formNuevaMaquinaria.intervaloMantenimientoHoras}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, intervaloMantenimientoHoras: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono focus:border-amber-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Operador Responsable</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Operador Responsable</label>
                   <input
                     type="text"
                     placeholder="Ej. Carlos Mendoza"
                     value={formNuevaMaquinaria.operadorResponsable}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, operadorResponsable: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Placa / Serial Chasis</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Placa / Serial Chasis</label>
                   <input
                     type="text"
                     placeholder="Ej. A12BC3D"
                     value={formNuevaMaquinaria.placa}
                     onChange={(e) => setFormNuevaMaquinaria({ ...formNuevaMaquinaria, placa: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none font-mono"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none font-mono"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalMaquinariaAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -3992,11 +3999,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL: ACTUALIZAR HOROMETRO */}
       {modalHorometroTarget && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Actualizar Horómetro: {modalHorometroTarget.codigo}</h3>
-              <button onClick={() => setModalHorometroTarget(null)} className="text-slate-400 hover:text-white p-1">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Actualizar Horómetro: {modalHorometroTarget.codigo}</h3>
+              <button onClick={() => setModalHorometroTarget(null)} className="text-slate-500 hover:text-slate-900 p-1">
                 <IconClose size={18} />
               </button>
             </div>
@@ -4020,30 +4027,30 @@ export default function ConstruccionApp({ onSalir }: Props) {
               className="space-y-4 text-xs"
             >
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Horómetro Actual (Horas) *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Horómetro Actual (Horas) *</label>
                 <input
                   type="number"
                   step="0.1"
                   required
                   value={nuevoHorometroInput}
                   onChange={(e) => setNuevoHorometroInput(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-base font-bold text-sky-400 focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono text-base font-bold text-sky-600 focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Operador</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Operador</label>
                 <input
                   type="text"
                   value={nuevoOperadorInput}
                   onChange={(e) => setNuevoOperadorInput(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
               </div>
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalHorometroTarget(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700"
                 >
                   Cancelar
                 </button>
@@ -4061,24 +4068,24 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL: MANTENIMIENTOS DE MAQUINARIA */}
       {modalMantTarget && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h3 className="font-bold text-base text-white">Mantenimientos: {modalMantTarget.codigo} - {modalMantTarget.nombre}</h3>
-                <p className="text-xs text-slate-400">Horómetro: {formatVE(modalMantTarget.horometroActual)} hrs</p>
+                <h3 className="font-bold text-base text-slate-900">Mantenimientos: {modalMantTarget.codigo} - {modalMantTarget.nombre}</h3>
+                <p className="text-xs text-slate-500">Horómetro: {formatVE(modalMantTarget.horometroActual)} hrs</p>
               </div>
-              <button onClick={() => setModalMantTarget(null)} className="text-slate-400 hover:text-white p-1">
+              <button onClick={() => setModalMantTarget(null)} className="text-slate-500 hover:text-slate-900 p-1">
                 <IconClose size={18} />
               </button>
             </div>
 
             <div className="flex justify-between items-center">
-              <h4 className="font-semibold text-xs text-slate-300">Historial Registrado ({historialMantenimientos.length})</h4>
+              <h4 className="font-semibold text-xs text-slate-700">Historial Registrado ({historialMantenimientos.length})</h4>
               <button
                 type="button"
                 onClick={() => setMostrarFormMant(!mostrarFormMant)}
-                className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-700 border border-amber-500/30 text-xs font-semibold cursor-pointer"
               >
                 {mostrarFormMant ? 'Ver Historial' : '+ Registrar Mantenimiento'}
               </button>
@@ -4110,15 +4117,15 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     setErrorGlobal(err.message);
                   }
                 }}
-                className="space-y-3 text-xs bg-slate-900/80 p-4 rounded-xl border border-slate-800"
+                className="space-y-3 text-xs bg-white p-4 rounded-xl border border-slate-200"
               >
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">Tipo de Servicio *</label>
+                    <label className="block text-slate-500 mb-1">Tipo de Servicio *</label>
                     <select
                       value={formMant.tipo}
                       onChange={(e) => setFormMant({ ...formMant, tipo: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
                     >
                       <option value="PREVENTIVO">Preventivo (Filtros / Aceites)</option>
                       <option value="CORRECTIVO">Correctivo (Reparación)</option>
@@ -4127,50 +4134,50 @@ export default function ConstruccionApp({ onSalir }: Props) {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Fecha de Intervención *</label>
+                    <label className="block text-slate-500 mb-1">Fecha de Intervención *</label>
                     <input
                       type="date"
                       required
                       value={formMant.fechaMantenimiento}
                       onChange={(e) => setFormMant({ ...formMant, fechaMantenimiento: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 mb-1">Horómetro al Momento</label>
+                    <label className="block text-slate-500 mb-1">Horómetro al Momento</label>
                     <input
                       type="number"
                       step="0.1"
                       value={formMant.horometroEnMantenimiento || modalMantTarget.horometroActual}
                       onChange={(e) => setFormMant({ ...formMant, horometroEnMantenimiento: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Mecánico o Taller Especializado</label>
+                  <label className="block text-slate-500 mb-1">Mecánico o Taller Especializado</label>
                   <input
                     type="text"
                     placeholder="Ej. Taller Central Diesel / Mecánico Pedro Ruiz"
                     value={formMant.mecanicoOTaller}
                     onChange={(e) => setFormMant({ ...formMant, mecanicoOTaller: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 mb-1">Descripción del Trabajo Realizado *</label>
+                  <label className="block text-slate-500 mb-1">Descripción del Trabajo Realizado *</label>
                   <textarea
                     rows={2}
                     required
                     placeholder="Cambio de filtro de aire, combustible, aceite 15W40, engrase general..."
                     value={formMant.descripcionTrabajo}
                     onChange={(e) => setFormMant({ ...formMant, descripcionTrabajo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
                   />
                 </div>
 
@@ -4186,11 +4193,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto text-xs">
                 {historialMantenimientos.map((h) => (
-                  <div key={h.id} className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <div key={h.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-amber-300">{h.tipo} - {h.fechaMantenimiento}</span>
+                      <span className="font-bold text-amber-700">{h.tipo} - {h.fechaMantenimiento}</span>
                     </div>
-                    <p className="text-slate-300">{h.descripcionTrabajo}</p>
+                    <p className="text-slate-700">{h.descripcionTrabajo}</p>
                     <div className="text-[11px] text-slate-500 flex items-center gap-3">
                       <span>Horómetro: {formatVE(h.horometroEnMantenimiento)} hrs</span>
                       {h.mecanicoOTaller && <span>Taller: {h.mecanicoOTaller}</span>}
@@ -4208,16 +4215,16 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL: REGISTRAR NUEVO RIESGO SST */}
       {modalRiesgoAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-600 flex items-center justify-center">
                   <IconWarning size={18} />
                 </div>
-                <h3 className="font-bold text-base text-white">Nueva Evaluación de Riesgo IPERC (SST)</h3>
+                <h3 className="font-bold text-base text-slate-900">Nueva Evaluación de Riesgo IPERC (SST)</h3>
               </div>
-              <button onClick={() => setModalRiesgoAbierto(false)} className="text-slate-400 hover:text-white p-1">
+              <button onClick={() => setModalRiesgoAbierto(false)} className="text-slate-500 hover:text-slate-900 p-1">
                 <IconClose size={18} />
               </button>
             </div>
@@ -4257,22 +4264,22 @@ export default function ConstruccionApp({ onSalir }: Props) {
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Código *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Código *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. RSG-ALT-01"
                     value={formNuevoRiesgo.codigo}
                     onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, codigo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-rose-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono focus:border-rose-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Categoría *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Categoría *</label>
                   <select
                     value={formNuevoRiesgo.categoria}
                     onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, categoria: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none"
                   >
                     <option value="ALTURA">Trabajo en Altura</option>
                     <option value="ELECTRICO">Riesgo Eléctrico</option>
@@ -4286,90 +4293,90 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Proceso o Frente de Obra *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Proceso o Frente de Obra *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej. Vaciado de Losas - Nivel 4"
                   value={formNuevoRiesgo.procesoFrente}
                   onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, procesoFrente: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Peligro Identificado *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Peligro Identificado *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Borde desprotegido sin barandas"
                     value={formNuevoRiesgo.peligro}
                     onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, peligro: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Riesgo / Consecuencia *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Riesgo / Consecuencia *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Caída a distinto nivel / Traumatismo"
                     value={formNuevoRiesgo.riesgoConsecuencia}
                     onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, riesgoConsecuencia: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Probabilidad (1-5)</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Probabilidad (1-5)</label>
                   <input
                     type="number"
                     min="1"
                     max="5"
                     value={formNuevoRiesgo.probabilidad}
                     onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, probabilidad: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-bold"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 text-center font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Severidad (1-5)</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Severidad (1-5)</label>
                   <input
                     type="number"
                     min="1"
                     max="5"
                     value={formNuevoRiesgo.severidad}
                     onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, severidad: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-bold"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 text-center font-bold"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Evaluación P×S</label>
-                  <div className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-center font-black text-rose-400 font-mono text-sm">
+                  <label className="block text-slate-500 mb-1 font-semibold">Evaluación P×S</label>
+                  <div className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2 text-center font-black text-rose-600 font-mono text-sm">
                     {Number(formNuevoRiesgo.probabilidad) * Number(formNuevoRiesgo.severidad)}
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Medidas de Control Propuestas *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Medidas de Control Propuestas *</label>
                 <textarea
                   rows={2}
                   required
                   placeholder="Instalación de líneas de vida, uso obligatorio de arnés con doble cabo y barandillas perimetrales..."
                   value={formNuevoRiesgo.medidasControl}
                   onChange={(e) => setFormNuevoRiesgo({ ...formNuevoRiesgo, medidasControl: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-rose-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalRiesgoAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700"
                 >
                   Cancelar
                 </button>
@@ -4387,11 +4394,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL: MITIGAR RIESGO */}
       {modalMitigarTarget && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Gestionar Riesgo: {modalMitigarTarget.codigo}</h3>
-              <button onClick={() => setModalMitigarTarget(null)} className="text-slate-400 hover:text-white p-1">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Gestionar Riesgo: {modalMitigarTarget.codigo}</h3>
+              <button onClick={() => setModalMitigarTarget(null)} className="text-slate-500 hover:text-slate-900 p-1">
                 <IconClose size={18} />
               </button>
             </div>
@@ -4415,11 +4422,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
               className="space-y-4 text-xs"
             >
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Nuevo Estado *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Nuevo Estado *</label>
                 <select
                   value={nuevoEstadoRiesgo}
                   onChange={(e) => setNuevoEstadoRiesgo(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
                 >
                   <option value="EN_MITIGACION">En Mitigación Activa</option>
                   <option value="CONTROLADO">Controlado / Mitigado</option>
@@ -4427,20 +4434,20 @@ export default function ConstruccionApp({ onSalir }: Props) {
                 </select>
               </div>
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Medidas Adicionales Aplicadas</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Medidas Adicionales Aplicadas</label>
                 <textarea
                   rows={3}
                   placeholder="Detallar inspección de seguridad, charlas de 5 min, verificación de arneses..."
                   value={medidasAdicionalesInput}
                   onChange={(e) => setMedidasAdicionalesInput(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900"
                 />
               </div>
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalMitigarTarget(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700"
                 >
                   Cancelar
                 </button>
@@ -4458,11 +4465,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL: SUBIR DOCUMENTO BIM O PLANO */}
       {modalBimAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Registrar Plano Técnico o Modelo BIM</h3>
-              <button onClick={() => setModalBimAbierto(false)} className="text-slate-400 hover:text-white p-1">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Registrar Plano Técnico o Modelo BIM</h3>
+              <button onClick={() => setModalBimAbierto(false)} className="text-slate-500 hover:text-slate-900 p-1">
                 <IconClose size={18} />
               </button>
             </div>
@@ -4501,22 +4508,22 @@ export default function ConstruccionApp({ onSalir }: Props) {
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Código del Plano *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Código del Plano *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. PLN-EST-001"
                     value={formNuevoBim.codigo}
                     onChange={(e) => setFormNuevoBim({ ...formNuevoBim, codigo: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono focus:border-sky-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Formato *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Formato *</label>
                   <select
                     value={formNuevoBim.formato}
                     onChange={(e) => setFormNuevoBim({ ...formNuevoBim, formato: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-sky-500 focus:outline-none"
                   >
                     <option value="IFC">IFC (Modelo BIM Abierto)</option>
                     <option value="RVT_REVIT">Revit (.RVT)</option>
@@ -4528,24 +4535,24 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Título del Documento / Plano *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Título del Documento / Plano *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej. Planta Estructural Vigas y Losas Nivel +3.00"
                   value={formNuevoBim.titulo}
                   onChange={(e) => setFormNuevoBim({ ...formNuevoBim, titulo: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-sky-500 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Disciplina *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Disciplina *</label>
                   <select
                     value={formNuevoBim.disciplina}
                     onChange={(e) => setFormNuevoBim({ ...formNuevoBim, disciplina: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-sky-500 focus:outline-none"
                   >
                     <option value="ESTRUCTURAS">Estructuras</option>
                     <option value="ARQUITECTURA">Arquitectura</option>
@@ -4556,47 +4563,47 @@ export default function ConstruccionApp({ onSalir }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Versión *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Versión *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Rev-B / v1.2"
                     value={formNuevoBim.version}
                     onChange={(e) => setFormNuevoBim({ ...formNuevoBim, version: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono focus:border-sky-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Autor Proyectista</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Autor Proyectista</label>
                   <input
                     type="text"
                     placeholder="Ej. Ing. Calculista"
                     value={formNuevoBim.autorProyectista}
                     onChange={(e) => setFormNuevoBim({ ...formNuevoBim, autorProyectista: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-sky-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-sky-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Peso (MB)</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Peso (MB)</label>
                   <input
                     type="number"
                     step="0.1"
                     placeholder="Ej. 18.5"
                     value={formNuevoBim.pesoMb}
                     onChange={(e) => setFormNuevoBim({ ...formNuevoBim, pesoMb: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-sky-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono focus:border-sky-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalBimAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700"
                 >
                   Cancelar
                 </button>
@@ -4614,11 +4621,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL: EMITIR NUEVO RFI */}
       {modalRfiAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Emitir Consulta Técnica (RFI)</h3>
-              <button onClick={() => setModalRfiAbierto(false)} className="text-slate-400 hover:text-white p-1">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Emitir Consulta Técnica (RFI)</h3>
+              <button onClick={() => setModalRfiAbierto(false)} className="text-slate-500 hover:text-slate-900 p-1">
                 <IconClose size={18} />
               </button>
             </div>
@@ -4655,22 +4662,22 @@ export default function ConstruccionApp({ onSalir }: Props) {
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Número RFI *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Número RFI *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. RFI-EST-001"
                     value={formNuevoRfi.numeroRfi}
                     onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, numeroRfi: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-mono focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Disciplina *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Disciplina *</label>
                   <select
                     value={formNuevoRfi.disciplina}
                     onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, disciplina: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   >
                     <option value="ESTRUCTURAS">Estructuras</option>
                     <option value="ARQUITECTURA">Arquitectura</option>
@@ -4681,57 +4688,57 @@ export default function ConstruccionApp({ onSalir }: Props) {
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Asunto de la Consulta *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Asunto de la Consulta *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej. Interferencia de tubería sanitaria en viga de carga Eje 4"
                   value={formNuevoRfi.asunto}
                   onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, asunto: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Pregunta / Consulta Técnica *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Pregunta / Consulta Técnica *</label>
                 <textarea
                   rows={2}
                   required
                   placeholder="Describa con precisión la discrepancia o duda de plano..."
                   value={formNuevoRfi.preguntaConsulta}
                   onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, preguntaConsulta: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Solicitante (Ing. Residente) *</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Solicitante (Ing. Residente) *</label>
                   <input
                     type="text"
                     required
                     placeholder="Ej. Ing. Juan Pérez"
                     value={formNuevoRfi.solicitante}
                     onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, solicitante: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Fecha Límite Requerida</label>
+                  <label className="block text-slate-500 mb-1 font-semibold">Fecha Límite Requerida</label>
                   <input
                     type="date"
                     value={formNuevoRfi.fechaLimite}
                     onChange={(e) => setFormNuevoRfi({ ...formNuevoRfi, fechaLimite: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalRfiAbierto(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700"
                 >
                   Cancelar
                 </button>
@@ -4749,11 +4756,11 @@ export default function ConstruccionApp({ onSalir }: Props) {
 
       {/* MODAL: RESPONDER RFI */}
       {modalResponderRfiTarget && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#101726] border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-base text-white">Responder RFI: {modalResponderRfiTarget.numeroRfi}</h3>
-              <button onClick={() => setModalResponderRfiTarget(null)} className="text-slate-400 hover:text-white p-1">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-slate-900">Responder RFI: {modalResponderRfiTarget.numeroRfi}</h3>
+              <button onClick={() => setModalResponderRfiTarget(null)} className="text-slate-500 hover:text-slate-900 p-1">
                 <IconClose size={18} />
               </button>
             </div>
@@ -4777,49 +4784,49 @@ export default function ConstruccionApp({ onSalir }: Props) {
               }}
               className="space-y-4 text-xs"
             >
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-slate-400 text-[11px] block font-semibold">Consulta planteada:</span>
-                <p className="text-slate-200 mt-1">{modalResponderRfiTarget.preguntaConsulta}</p>
+              <div className="p-3 rounded-xl bg-white border border-slate-200">
+                <span className="text-slate-500 text-[11px] block font-semibold">Consulta planteada:</span>
+                <p className="text-slate-800 mt-1">{modalResponderRfiTarget.preguntaConsulta}</p>
               </div>
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Respuesta Oficial del Proyectista *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Respuesta Oficial del Proyectista *</label>
                 <textarea
                   rows={3}
                   required
                   placeholder="Detallar solución estructural aprobada o remitir a plano aclaratorio..."
                   value={formRespuestaRfi.respuestaOficial}
                   onChange={(e) => setFormRespuestaRfi({ ...formRespuestaRfi, respuestaOficial: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Profesional Responsable *</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Profesional Responsable *</label>
                 <input
                   type="text"
                   required
                   placeholder="Ej. Ing. Proyectista Estructural"
                   value={formRespuestaRfi.responsableRespuesta}
                   onChange={(e) => setFormRespuestaRfi({ ...formRespuestaRfi, responsableRespuesta: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Estado de la Consulta</label>
+                <label className="block text-slate-500 mb-1 font-semibold">Estado de la Consulta</label>
                 <select
                   value={formRespuestaRfi.estado}
                   onChange={(e) => setFormRespuestaRfi({ ...formRespuestaRfi, estado: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:border-amber-500 focus:outline-none"
                 >
                   <option value="RESPONDIDO">Respondido (Conforme para ejecutar)</option>
                   <option value="CERRADO">Cerrado Definitivo</option>
                   <option value="EN_EVALUACION">En Evaluación Adicional</option>
                 </select>
               </div>
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setModalResponderRfiTarget(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700"
                 >
                   Cancelar
                 </button>

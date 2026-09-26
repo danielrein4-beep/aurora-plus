@@ -39,6 +39,9 @@ public class LicenciaService {
 
     static {
         NIVEL_REQUERIDO_POR_MODULO.put("super-admin", null); // sin restricción de licencia (lo gestiona el propio super-admin)
+        // Un negocio vencido tiene que poder ver su suscripción, reportar su pago y hablar con soporte.
+        NIVEL_REQUERIDO_POR_MODULO.put("suscripcion", null);
+        NIVEL_REQUERIDO_POR_MODULO.put("tenant", null);
         NIVEL_REQUERIDO_POR_MODULO.put("horeca", LicenciaTenant.TipoLicencia.COMERCIAL);
         NIVEL_REQUERIDO_POR_MODULO.put("repuestos", LicenciaTenant.TipoLicencia.COMERCIAL);
         // Farmacia, Ferretería y Comercio comparten el mismo motor que Repuestos
@@ -66,6 +69,8 @@ public class LicenciaService {
         "horeca", "repuestos", "farmacia", "ferreteria", "comercio", "ganaderia", "salud", "tamanaco-comercial"
     );
 
+    private static final Set<String> FAMILIA_RETAIL = Set.of("comercio", "repuestos", "ferreteria", "farmacia", "moda");
+
     public static class ResultadoValidacion {
         public final boolean permitido;
         public final int codigoHttp;
@@ -90,6 +95,28 @@ public class LicenciaService {
      * Valida la licencia del tenant para acceder al módulo indicado por la
      * ruta (ej: "/api/minero/..." -> módulo "minero").
      */
+    /**
+     * Días que el negocio sigue trabajando después de la fecha de vencimiento, para que un pago
+     * que se retrasa un par de días no le corte la operación de golpe. El Hub se lo avisa.
+     */
+    public static final int DIAS_GRACIA = 3;
+
+    /**
+     * Si el cliente ya reportó su pago y el equipo de Aurora todavía no lo verifica, no se le corta
+     * el servicio por vencimiento: la demora es nuestra. El reporte cuenta por este máximo de días
+     * para que un reporte olvidado no deje acceso abierto para siempre.
+     */
+    public static final int DIAS_MAX_ESPERA_VERIFICACION = 15;
+    public static final java.util.List<String> ESTADOS_PAGO_PENDIENTE = java.util.List.of("ABIERTO", "EN_ATENCION", "EN_PROCESO");
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.auroraplus.core.soporte.repositories.SaasSoporteTicketRepository soporteTicketRepository;
+
+    public boolean tienePagoReportadoPendiente(Long tenantId) {
+        return soporteTicketRepository.existsByTenantIdAndCategoriaAndEstadoInAndFechaCreacionAfter(
+            tenantId, "PAGO", ESTADOS_PAGO_PENDIENTE, java.time.LocalDateTime.now().minusDays(DIAS_MAX_ESPERA_VERIFICACION));
+    }
+
     public ResultadoValidacion validarAcceso(Long tenantId, String pathModulo) {
         LicenciaTenant.TipoLicencia nivelRequerido = NIVEL_REQUERIDO_POR_MODULO.getOrDefault(pathModulo, LicenciaTenant.TipoLicencia.BASICA);
         if (nivelRequerido == null) {
@@ -109,9 +136,16 @@ public class LicenciaService {
                 "La licencia de este tenant está desactivada. Regularice su suscripción para continuar.");
         }
 
-        if (licencia.getFechaVencimientoPago() != null && licencia.getFechaVencimientoPago().isBefore(LocalDate.now())) {
+        if (licencia.getFechaVencimientoPago() != null && licencia.getFechaVencimientoPago().plusDays(DIAS_GRACIA).isBefore(LocalDate.now())
+                && !tienePagoReportadoPendiente(tenantId)) {
             return ResultadoValidacion.bloqueado(402,
-                "La licencia de este tenant venció el " + licencia.getFechaVencimientoPago() + ". Renueve el pago para reactivar el acceso.");
+                "Tu plan venció el " + licencia.getFechaVencimientoPago() + ". Reporta tu pago desde Aurora Hub > Facturación & Pagos para reactivar el acceso.");
+        }
+
+        // Cuenta de verificacion creada por el superadmin: recorre todas las verticales sin
+        // depender del plan ni de los modulos contratados (sigue sujeta a activa y vencimiento).
+        if (licencia.isPermiteCambioVertical()) {
+            return ResultadoValidacion.ok();
         }
 
         if (licencia.getTipoLicencia().ordinal() < nivelRequerido.ordinal()) {
@@ -124,11 +158,16 @@ public class LicenciaService {
             boolean habilitado = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, pathModulo)
                 .map(ModuloTenant::isActivo)
                 .orElse(false);
+            // Comercio, Repuestos, Ferretería, Farmacia y Moda son el mismo motor retail: el POS,
+            // el inventario y las estadísticas de Comercio viven en /api/repuestos. Antes solo se
+            // aceptaba en un sentido (/api/comercio con módulo repuestos), así que un negocio que se
+            // registraba como "comercio" recibía 403 en todo /api/repuestos y se quedaba sin POS.
+            if (!habilitado && FAMILIA_RETAIL.contains(pathModulo)) {
+                habilitado = FAMILIA_RETAIL.stream().anyMatch(m -> moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, m)
+                        .map(ModuloTenant::isActivo).orElse(false));
+            }
             if (!habilitado && "comercio".equals(pathModulo)) {
-                habilitado = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "ferreteria").map(ModuloTenant::isActivo).orElse(false)
-                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "repuestos").map(ModuloTenant::isActivo).orElse(false)
-                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "moda").map(ModuloTenant::isActivo).orElse(false)
-                        || moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "tamanaco-comercial").map(ModuloTenant::isActivo).orElse(false);
+                habilitado = moduloTenantRepository.findByTenantIdAndModuloNombre(tenantId, "tamanaco-comercial").map(ModuloTenant::isActivo).orElse(false);
             }
             if (!habilitado) {
                 return ResultadoValidacion.bloqueado(403,

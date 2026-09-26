@@ -3,8 +3,8 @@ import { useNavigate, Navigate } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
   AuroraGradientDef, IconLock,
-  IconRestaurant, IconPrescription, IconHardware, IconClinic,
-  IconVet, IconTooth, IconFarm, IconBank,
+  IconRestaurant, IconHardware, IconClinic,
+  IconTooth, IconFarm,
 } from "../Icons";
 import { useAuth } from "../context/AuthContext";
 import { solicitarRecuperacionClave } from "../api";
@@ -27,18 +27,18 @@ interface RubroNegocioItem {
 
 const RUBROS_REGISTRO: RubroNegocioItem[] = [
   { id: "restaurante", label: "Restaurante & Cafetería", sub: "Comandas, KDS, mesas y delivery", Icon: IconRestaurant, modulo: "horeca", ruta: "/restaurante", nombreDefault: "Mi Restaurante" },
-  { id: "farmacia", label: "Farmacia & Droguería", sub: "Medicamentos, lotes y mostrador", Icon: IconPrescription, modulo: "salud", ruta: "/comercio", nombreDefault: "Mi Farmacia", proximamente: true },
   // modulo:"repuestos" (no "comercio") a propósito: el backend gatea /api/repuestos/*
   // por el segmento de URL (ver LicenciaInterceptor), así que el módulo contratado
   // real DEBE ser "repuestos" para que el tenant pueda usar esos endpoints. "comercio"
   // solo existe como `industria`/user.industry, para la identidad unificada en la UI.
-  { id: "comercio", label: "Comercio", sub: "POS mostrador, código de barras e inventario", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Negocio" },
+  { id: "comercio", label: "Comercio", sub: "Tienda, ferretería, repuestos o farmacia", Icon: IconHardware, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Negocio" },
   { id: "clinica", label: "Clínica & Consultorios", sub: "Historias clínicas y citas", Icon: IconClinic, modulo: "salud", ruta: "/mediclinic", nombreDefault: "Mi Consultorio" },
-  { id: "veterinaria", label: "Veterinaria & Mascotas", sub: "Fichas, vacunas y petshop", Icon: IconVet, modulo: "salud", ruta: "/veterinaria", nombreDefault: "Mi Veterinaria", proximamente: true },
   { id: "odontologia", label: "Odontología", sub: "Historia clínica y odontograma FDI", Icon: IconTooth, modulo: "odontologia", ruta: "/mediclinic", nombreDefault: "Mi Consultorio Dental" },
   { id: "finca", label: "Finca & Ganadería", sub: "Potreros, vacunas y animales", Icon: IconFarm, modulo: "ganaderia", ruta: "/dashboard", nombreDefault: "Mi Finca" },
-  { id: "otro", label: "Otro Rubro Comercial", sub: "ERP y suite administrativa", Icon: IconBank, modulo: "repuestos", ruta: "/comercio", nombreDefault: "Mi Empresa" },
 ];
+
+/** Cambiarla cuando se modifiquen /terminos o /privacidad: el servidor guarda qué versión aceptó cada negocio. */
+const VERSION_TERMINOS = "2026-09-24";
 
 export default function Auth() {
   const authClicksRef = useRef<number>(0);
@@ -83,6 +83,11 @@ export default function Auth() {
       remember: true,
       terms: false,
     };
+  });
+  // Si llegó desde "Comenzar con Básico" / "Quiero Aurora Full", se muestra y se guarda como referencia.
+  const [planElegido] = useState<"basico" | "full" | null>(() => {
+    const p = new URLSearchParams(window.location.search).get("plan");
+    return p === "basico" || p === "full" ? p : null;
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [enviando, setEnviando] = useState(false);
@@ -138,6 +143,9 @@ export default function Auth() {
           telefonoContacto: form.telefono.trim(),
           username: form.email,
           password: form.password,
+          aceptaTerminos: form.terms,
+          versionTerminos: VERSION_TERMINOS,
+          planSolicitado: planElegido || undefined,
           metodoPagoPreferido: "Pago Móvil / Efectivo",
         });
 
@@ -160,8 +168,9 @@ export default function Auth() {
             const u = JSON.parse(rawU);
             if (u.industry === "restaurante") rutaDestino = "/restaurante";
             else if (u.industry === "ferreteria" || u.industry === "repuestos" || u.industry === "retail" || u.industry === "comercio" || u.industry === "farmacia") rutaDestino = "/comercio";
-            else if (u.industry === "clinica") rutaDestino = "/mediclinic";
+            else if (u.industry === "clinica" || u.industry === "odontologia") rutaDestino = "/mediclinic";
             else if (u.industry === "veterinaria") rutaDestino = "/veterinaria";
+            else if (u.industry === "estetica") rutaDestino = "/estetica";
           }
         } catch {}
 
@@ -286,6 +295,12 @@ export default function Auth() {
               </h2>
               {/* Barra de acento aurora estilo futurista */}
               <div className="h-1 w-20 bg-[#177E89] rounded-full mt-2" />
+              {mode === "register" && (
+                <p className="mt-3 text-sm text-white/60">
+                  {planElegido ? <>Elegiste <strong className="text-white">{planElegido === "full" ? "Aurora Full" : "Aurora Básico"}</strong>. </> : null}
+                  Empiezas con 15 días gratis y acceso completo; no te pedimos datos de pago.
+                </p>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -339,7 +354,7 @@ export default function Auth() {
                     <label className="block text-white/50 text-[11px] font-medium uppercase tracking-wider mb-2">
                       ¿De qué se trata tu negocio?
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {RUBROS_REGISTRO.map((r) => {
                         const sel = form.industry === r.id;
                         return (
@@ -488,26 +503,21 @@ export default function Auth() {
             <div className="apple-glass rounded-2xl p-6 sm:p-7 relative overflow-hidden border border-white/10 shadow-2xl">
               <div className="line-aurora absolute top-0 left-0 right-0" />
               
-              <p className="text-sm sm:text-base text-white/80 leading-relaxed italic mb-4 font-light">
-                "El bolívar se mueve de la mañana a la tarde y tu caja lo refleja al instante — tú fijas la tasa, no una hoja de cálculo desactualizada."
-              </p>
+              <p className="text-base font-semibold text-white mb-1">Tu prueba de 15 días incluye</p>
+              <p className="text-sm text-white/60 leading-relaxed">Todo el sistema de tu rubro, con tus propios datos. Si decides quedarte, no pierdes nada de lo que registraste.</p>
 
-              <div className="text-xs font-mono text-teal-400 font-semibold tracking-wider">
-                // Aurora Engine Core
-              </div>
-
-              <div className="mt-6 pt-5 border-t border-white/10 space-y-2 text-xs text-white/50">
+              <div className="mt-5 pt-5 border-t border-white/10 space-y-2.5 text-sm text-white/70">
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>5 rubros especializados — Clínicas, Odontología, Restaurantes, Comercio y Ganadería</span>
+                  <span>Caja, inventario y reportes conectados desde el primer día</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>Multi-moneda en vivo (USD · VES · COP)</span>
+                  <span>Dólares, bolívares y pesos con la tasa del día</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                  <span>Cobros que no se duplican aunque se caiga la conexión</span>
+                  <span>Soporte por WhatsApp con el equipo de Aurora</span>
                 </div>
               </div>
             </div>

@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import { useEffect, useState } from "react";
 import {
   publicarEnMercado, listarAnimalesGanaderia, obtenerMiPuestoMercado,
@@ -47,10 +48,13 @@ export default function Publicar({ conCondiciones, onListo, onCancelar }: {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listarAnimalesGanaderia("ACTIVO").then(setAnimales).catch(() => setAnimales([]));
+    listarAnimalesGanaderia("ACTIVO").then(setAnimales).catch(() => {
+      setAnimales([]);
+      avisar("No se pudieron cargar tus animales. Revisa la conexión y recarga.", "error");
+    });
     obtenerMiPuestoMercado()
       .then((m) => setPublicados(new Set(m.publicaciones.filter((p) => p.estado === "ACTIVA" && p.arete).map((p) => p.arete as string))))
-      .catch(() => {});
+      .catch(() => avisar("No se pudo saber qué animales ya tienes publicados; el sistema igual impide publicarlos dos veces.", "error"));
   }, []);
 
   const animal = animales?.find((a) => a.id === (modoLote ? loteIds[0] : animalId));

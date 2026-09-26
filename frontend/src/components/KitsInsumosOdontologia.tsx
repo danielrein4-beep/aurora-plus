@@ -372,7 +372,7 @@ export default function KitsInsumosOdontologia() {
             <span className="block text-slate-500 dark:text-slate-400 mb-1">Stock minimo</span>
             <input type="number" min="0" step="0.01" className={inputCls} value={nuevoInsumo.stockMinimo} onChange={(e) => setNuevoInsumo({ ...nuevoInsumo, stockMinimo: e.target.value })} />
           </label>
-          <button type="submit" disabled={!nuevoInsumo.nombre.trim()} className="p-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold disabled:opacity-50">
+          <button type="submit" disabled={!nuevoInsumo.nombre.trim()} className="p-2 rounded-xl bg-[#0F172A] dark:bg-white text-[#FFFFFF] dark:text-slate-900 font-bold disabled:opacity-50">
             Agregar
           </button>
         </form>

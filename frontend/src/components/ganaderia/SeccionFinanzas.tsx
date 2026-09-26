@@ -1,9 +1,11 @@
 import * as XLSX from "xlsx";
 import { IconFileText, IconCalendar, IconChart, IconMilk, IconCow, IconTag, IconScale, IconCoins } from "../../Icons";
 import type { PotreroGanaderia, RegistroOrdenoGanaderia, VacunaGanaderia, VentaLecheTanque, GastoGanaderia, VentaGanaderiaResumen } from "../../api";
-import ReportesCampoGanaderia from "../ReportesCampoGanaderia";
+import ReportesCampoGanaderia, { fechaLocalISO } from "../ReportesCampoGanaderia";
 import { CATEGORIAS_GASTO_GANADERIA } from "./catalogos";
 import type { MonedasConfig, Notificar, TabGanaderia, SubPotreros } from "./tipos";
+import { num, verFecha } from "./formato";
+import MargenGanadero from "./MargenGanadero";
 
 interface Props {
   gastos: GastoGanaderia[];
@@ -12,6 +14,8 @@ interface Props {
   ordenos: RegistroOrdenoGanaderia[];
   potreros: PotreroGanaderia[];
   precioLecheUSD: number;
+  /** Dueño o administrador: el margen reparte la nómina, no lo ve el resto del personal. */
+  puedeVerMargen: boolean;
   tasaBCV: number;
   tasaCOP: number;
   vacunas: VacunaGanaderia[];
@@ -25,7 +29,7 @@ interface Props {
 
 /** Finanzas del hato: ingresos por leche y ventas de animales, gastos operativos y rentabilidad. */
 export default function SeccionFinanzas({
-  gastos, monedasConfig, notificar, ordenos, potreros, precioLecheUSD, tasaBCV, tasaCOP, vacunas,
+  gastos, monedasConfig, notificar, ordenos, potreros, precioLecheUSD, puedeVerMargen, tasaBCV, tasaCOP, vacunas,
   ventasAnimales, ventasLeche, exportarInventarioXLSX, setGastoAbierto, setSubPotreros, setTab,
 }: Props) {
   // Helper para calcular semana ISO (YYYY-Www)
@@ -55,7 +59,7 @@ export default function SeccionFinanzas({
     return { weekKey, year, weekNo, rangoTexto, mondayTime: monday.getTime() };
   };
 
-  const hoyInfo = getISOWeekInfo(new Date().toISOString().slice(0, 10));
+  const hoyInfo = getISOWeekInfo(fechaLocalISO());
   const semanaActualKey = hoyInfo?.weekKey ?? "2026-W37";
 
   const listaGastos = gastos;
@@ -166,14 +170,11 @@ export default function SeccionFinanzas({
       {/* Encabezado Principal de la Pestaña */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider mb-2">
-            <span>Módulo Financiero & Operativo</span>
-          </div>
           <h3 className="font-['Outfit'] font-black text-2xl sm:text-3xl text-slate-900 dark:text-white">
-            Centro Financiero & Reportes
+            Finanzas y Reportes
           </h3>
           <p className="text-xs text-slate-500 dark:text-white/50 max-w-2xl">
-            Flujo de caja semanal del hato (Semanas ISO), balance de ingresos por ventas de leche y ganado vs gastos operativos, y exportaciones oficiales.
+            Caja semanal del hato: ingresos por leche y ganado frente a los gastos, y los reportes en PDF y Excel.
           </p>
         </div>
 
@@ -190,7 +191,7 @@ export default function SeccionFinanzas({
             className="apple-glass px-4 py-2.5 rounded-xl border border-white/20 text-slate-700 dark:text-white text-xs font-bold hover:bg-white/10 cursor-pointer flex items-center gap-1.5"
           >
             <IconChart size={15} />
-            <span>Exportar XLSX</span>
+            <span>Exportar a Excel</span>
           </button>
         </div>
       </div>
@@ -205,28 +206,28 @@ export default function SeccionFinanzas({
             <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
               <IconChart size={13} /> Ingresos Semanales
             </span>
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <span className="text-[10px] tabular-nums font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               {semActual.weekKey}
             </span>
           </div>
           <div className="font-['Outfit'] font-black text-3xl text-emerald-400">
-            ${semActual.ingresosTotales.toFixed(2)} <span className="text-sm font-normal text-slate-400">USD</span>
+            ${num(semActual.ingresosTotales, 2)} <span className="text-sm font-normal text-slate-400">USD</span>
           </div>
           <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="inline-flex items-center gap-1"><IconMilk size={11} /> Leche: ${semActual.ingresosLeche.toFixed(2)}</span>
+            <span className="inline-flex items-center gap-1"><IconMilk size={11} /> Leche: ${num(semActual.ingresosLeche, 2)}</span>
             <span>•</span>
-            <span className="inline-flex items-center gap-1"><IconCow size={11} /> Ganado: ${semActual.ingresosAnimales.toFixed(2)}</span>
+            <span className="inline-flex items-center gap-1"><IconCow size={11} /> Ganado: ${num(semActual.ingresosAnimales, 2)}</span>
           </div>
           {(monedasConfig.VES || monedasConfig.COP) && (
             <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
               {monedasConfig.VES && (
-                <div className="font-mono text-emerald-300">
-                  Bs. {(semActual.ingresosTotales * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div className="tabular-nums text-emerald-300">
+                  Bs. {num((semActual.ingresosTotales * tasaBCV), 2)}
                 </div>
               )}
               {monedasConfig.COP && (
-                <div className="font-mono text-sky-300">
-                  COP ${Math.round(semActual.ingresosTotales * tasaCOP).toLocaleString()}
+                <div className="tabular-nums text-sky-300">
+                  COP ${num(Math.round(semActual.ingresosTotales * tasaCOP), 0)}
                 </div>
               )}
             </div>
@@ -244,7 +245,7 @@ export default function SeccionFinanzas({
             </span>
           </div>
           <div className="font-['Outfit'] font-black text-3xl text-rose-400">
-            ${semActual.gastosTotales.toFixed(2)} <span className="text-sm font-normal text-slate-400">USD</span>
+            ${num(semActual.gastosTotales, 2)} <span className="text-sm font-normal text-slate-400">USD</span>
           </div>
           <div className="text-[11px] text-slate-400">
             Egresos de caja en insumos, mano de obra y mantenimiento
@@ -252,13 +253,13 @@ export default function SeccionFinanzas({
           {(monedasConfig.VES || monedasConfig.COP) && (
             <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
               {monedasConfig.VES && (
-                <div className="font-mono text-rose-300">
-                  Bs. {(semActual.gastosTotales * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div className="tabular-nums text-rose-300">
+                  Bs. {num((semActual.gastosTotales * tasaBCV), 2)}
                 </div>
               )}
               {monedasConfig.COP && (
-                <div className="font-mono text-sky-300">
-                  COP ${Math.round(semActual.gastosTotales * tasaCOP).toLocaleString()}
+                <div className="tabular-nums text-sky-300">
+                  COP ${num(Math.round(semActual.gastosTotales * tasaCOP), 0)}
                 </div>
               )}
             </div>
@@ -282,7 +283,7 @@ export default function SeccionFinanzas({
             </span>
           </div>
           <div className={`font-['Outfit'] font-black text-3xl ${semActual.neto >= 0 ? "text-sky-400" : "text-amber-400"}`}>
-            {semActual.neto >= 0 ? `+$${semActual.neto.toFixed(2)}` : `-$${Math.abs(semActual.neto).toFixed(2)}`} <span className="text-sm font-normal text-slate-400">USD</span>
+            {semActual.neto >= 0 ? `+$${num(semActual.neto, 2)}` : `-$${num(Math.abs(semActual.neto), 2)}`} <span className="text-sm font-normal text-slate-400">USD</span>
           </div>
           <div className="text-[11px] text-slate-400">
             {semActual.rangoTexto}
@@ -290,19 +291,21 @@ export default function SeccionFinanzas({
           {(monedasConfig.VES || monedasConfig.COP) && (
             <div className="pt-2 border-t border-white/10 text-[11px] text-slate-300 flex flex-col gap-0.5">
               {monedasConfig.VES && (
-                <div className="font-mono text-slate-200">
-                  Bs. {(semActual.neto * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div className="tabular-nums text-slate-200">
+                  Bs. {num((semActual.neto * tasaBCV), 2)}
                 </div>
               )}
               {monedasConfig.COP && (
-                <div className="font-mono text-sky-300">
-                  COP ${Math.round(semActual.neto * tasaCOP).toLocaleString()}
+                <div className="tabular-nums text-sky-300">
+                  COP ${num(Math.round(semActual.neto * tasaCOP), 0)}
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
+
+      {puedeVerMargen && <MargenGanadero notificar={notificar} />}
 
       {/* Sección 1: Gastos Operativos Recientes */}
       <div className="space-y-3 pt-2">
@@ -349,7 +352,7 @@ export default function SeccionFinanzas({
                   const cat = CATEGORIAS_GASTO_GANADERIA.find(c => c.id === g.categoria);
                   return (
                     <tr key={g.id} className="hover:bg-white/5 transition-colors">
-                      <td className="p-4 font-mono">{g.fecha}</td>
+                      <td className="p-4 tabular-nums">{verFecha(g.fecha)}</td>
                       <td className="p-4">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${cat?.colorBadge || "text-slate-300 bg-white/10 border-white/20"}`}>
                           {cat ? <cat.icon size={12} /> : <IconTag size={12} />}
@@ -357,15 +360,15 @@ export default function SeccionFinanzas({
                         </span>
                       </td>
                       <td className="p-4 text-slate-800 dark:text-white/90 font-medium max-w-sm truncate">{g.descripcion}</td>
-                      <td className="p-4 font-mono font-bold text-rose-400">${Number(g.monto).toFixed(2)}</td>
+                      <td className="p-4 tabular-nums font-bold text-rose-400">${Number(g.monto).toFixed(2)}</td>
                       {monedasConfig.VES && (
-                        <td className="p-4 text-right font-mono text-slate-400">
-                          Bs. {(Number(g.monto) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <td className="p-4 text-right tabular-nums text-slate-400">
+                          Bs. {num((Number(g.monto) * tasaBCV), 2)}
                         </td>
                       )}
                       {monedasConfig.COP && (
-                        <td className="p-4 text-right font-mono text-sky-400/80">
-                          COP ${Math.round(Number(g.monto) * tasaCOP).toLocaleString()}
+                        <td className="p-4 text-right tabular-nums text-sky-400/80">
+                          COP ${num(Math.round(Number(g.monto) * tasaCOP), 0)}
                         </td>
                       )}
                     </tr>
@@ -394,7 +397,7 @@ export default function SeccionFinanzas({
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white/50 border-b border-slate-200/80 dark:border-white/10">
               <tr>
-                <th className="p-4">Semana ISO</th>
+                <th className="p-4">Semana</th>
                 <th className="p-4">Venta Leche</th>
                 <th className="p-4">Venta Ganado</th>
                 <th className="p-4">Total Ingresos</th>
@@ -408,7 +411,7 @@ export default function SeccionFinanzas({
                 <tr key={s.weekKey} className={`hover:bg-white/5 transition-colors ${s.esSemanaActual ? "bg-emerald-500/[0.04]" : ""}`}>
                   <td className="p-4">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">{s.weekKey}</span>
+                      <span className="tabular-nums font-bold text-slate-900 dark:text-white">{s.weekKey}</span>
                       {s.esSemanaActual && (
                         <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                           Semana Actual
@@ -417,29 +420,29 @@ export default function SeccionFinanzas({
                     </div>
                     <span className="text-[10px] text-slate-400 block">{s.rangoTexto}</span>
                   </td>
-                  <td className="p-4 font-mono text-sky-400">${s.ingresosLeche.toFixed(2)}</td>
-                  <td className="p-4 font-mono text-emerald-400">${s.ingresosAnimales.toFixed(2)}</td>
-                  <td className="p-4 font-mono font-bold text-slate-900 dark:text-white">${s.ingresosTotales.toFixed(2)}</td>
-                  <td className="p-4 font-mono font-bold text-rose-400">${s.gastosTotales.toFixed(2)}</td>
+                  <td className="p-4 tabular-nums text-sky-400">${num(s.ingresosLeche, 2)}</td>
+                  <td className="p-4 tabular-nums text-emerald-400">${num(s.ingresosAnimales, 2)}</td>
+                  <td className="p-4 tabular-nums font-bold text-slate-900 dark:text-white">${num(s.ingresosTotales, 2)}</td>
+                  <td className="p-4 tabular-nums font-bold text-rose-400">${num(s.gastosTotales, 2)}</td>
                   <td className="p-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-xl font-mono font-black text-xs ${
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-xl tabular-nums font-black text-xs ${
                       s.neto >= 0
                         ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                         : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
                     }`}>
-                      {s.neto >= 0 ? `+$${s.neto.toFixed(2)}` : `-$${Math.abs(s.neto).toFixed(2)}`}
+                      {s.neto >= 0 ? `+$${num(s.neto, 2)}` : `-$${num(Math.abs(s.neto), 2)}`}
                     </span>
                   </td>
                   {(monedasConfig.VES || monedasConfig.COP) && (
-                    <td className="p-4 text-right font-mono text-xs">
+                    <td className="p-4 text-right tabular-nums text-xs">
                       {monedasConfig.VES && (
                         <div className={s.neto >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                          Bs. {(s.neto * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          Bs. {num((s.neto * tasaBCV), 2)}
                         </div>
                       )}
                       {monedasConfig.COP && (
                         <div className="text-[10px] text-slate-400">
-                          COP ${Math.round(s.neto * tasaCOP).toLocaleString()}
+                          COP ${num(Math.round(s.neto * tasaCOP), 0)}
                         </div>
                       )}
                     </td>
@@ -471,7 +474,7 @@ export default function SeccionFinanzas({
             <div className="space-y-2 text-xs">
               <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={exportarInventarioXLSX}>
                 <span>Inventario de Animales</span>
-                <span className="text-emerald-400 font-bold">XLSX</span>
+                <span className="text-emerald-400 font-bold">Excel</span>
               </div>
               <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando informe de movimientos de potrero...")}>
                 <span>Historial de Movimientos</span>
@@ -479,7 +482,7 @@ export default function SeccionFinanzas({
               </div>
               <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando distribución reproductiva...")}>
                 <span>Reproductores & Vientres</span>
-                <span className="text-emerald-400 font-bold">XLSX</span>
+                <span className="text-emerald-400 font-bold">Excel</span>
               </div>
             </div>
           </div>
@@ -517,11 +520,11 @@ export default function SeccionFinanzas({
               </div>
               <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Generando registro de descansos...")}>
                 <span>Días de Descanso Acumulados</span>
-                <span className="text-emerald-400 font-bold">XLSX</span>
+                <span className="text-emerald-400 font-bold">Excel</span>
               </div>
               <div className="p-2 rounded-xl hover:bg-white/5 cursor-pointer flex justify-between" onClick={() => notificar("Calculando carga animal global...")}>
                 <span>Carga Animal por Hectárea</span>
-                <span className="text-emerald-400 font-bold">XLSX</span>
+                <span className="text-emerald-400 font-bold">Excel</span>
               </div>
             </div>
           </div>

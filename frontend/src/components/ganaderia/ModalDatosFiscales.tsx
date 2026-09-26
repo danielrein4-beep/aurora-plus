@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import { useEffect, useState } from "react";
 import { IconFileText } from "../../Icons";
 import { obtenerDatosFiscalesNegocio, actualizarDatosFiscalesNegocio } from "../../api";
@@ -16,7 +17,7 @@ export default function ModalDatosFiscales({ notificar, onCerrar }: Props) {
   useEffect(() => {
     obtenerDatosFiscalesNegocio().then(d => setFormDatosFiscales({
       rif: d.rif || "", razonSocial: d.razonSocial || "", domicilioFiscal: d.domicilioFiscal || "",
-    })).catch(() => {});
+    })).catch(() => avisar("No se pudieron cargar tus datos fiscales. Si guardas así, podrías borrar lo que ya tenías. Cierra y vuelve a abrir.", "error"));
   }, []);
 
   return (
@@ -70,7 +71,7 @@ export default function ModalDatosFiscales({ notificar, onCerrar }: Props) {
               value={formDatosFiscales.rif}
               onChange={e => setFormDatosFiscales({ ...formDatosFiscales, rif: e.target.value })}
               placeholder="Ej. J-12345678-9"
-              className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono focus:border-purple-500 focus:outline-none"
+              className="w-full p-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white tabular-nums focus:border-purple-500 focus:outline-none"
             />
           </div>
           <div>

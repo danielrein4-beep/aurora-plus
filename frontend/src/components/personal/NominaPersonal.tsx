@@ -1,8 +1,10 @@
+import { avisar } from "../../avisos";
 import React, { useState, useEffect, useRef } from 'react';
 import { PeriodoNomina, ReciboNominaEmpleado, formatearMoneda } from './types';
 import { EstadoNominaBadge } from './EstadoNominaBadge';
 import { DetalleCalculoNomina } from './DetalleCalculoNomina';
 import { IconWarning } from '../../Icons';
+import { useVocabularioPersonal } from './vocabulario';
 
 interface NominaPersonalProps {
   periodos: PeriodoNomina[];
@@ -19,6 +21,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
   onToggleNominaHabilitada,
   onActualizarPeriodos,
 }) => {
+  const v = useVocabularioPersonal();
   const accionesNominaConectadas = false;
   const [periodos, setPeriodos] = useState<PeriodoNomina[]>(initialPeriodos);
   const [periodoActivo, setPeriodoActivo] = useState<PeriodoNomina>(initialPeriodos[0]);
@@ -117,7 +120,7 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
     }
 
     if (!motivoAjuste.trim()) {
-      alert('Debe indicar una justificación de auditoría válida.');
+      avisar('Debe indicar una justificación de auditoría válida.');
       return;
     }
 
@@ -152,47 +155,47 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMensaje && (
-        <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-[#34d399] font-medium flex items-center justify-between animate-fade-in">
+        <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-emerald-600 font-normal flex items-center justify-between animate-fade-in">
           <span>{toastMensaje}</span>
-          <button onClick={() => setToastMensaje(null)} className="text-xs text-[#34d399] hover:underline" aria-label="Cerrar notificación">
+          <button onClick={() => setToastMensaje(null)} className="text-xs text-emerald-600 hover:underline" aria-label="Cerrar notificación">
             ✕
           </button>
         </div>
       )}
 
       {/* Banner Prominente: Módulo Opcional y Desactivado por Defecto */}
-      <div className="p-4 bg-[#131c2e] border-2 border-[#1e2d48] rounded-2xl space-y-3">
+      <div className="p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded bg-[#f59e0b]/15 text-[#fbbf24] font-mono text-[11px] font-bold border border-[#f59e0b]/30">
+              <span className="px-2 py-0.5 rounded bg-[#f59e0b]/15 text-amber-600 font-mono text-[11px] font-bold border border-[#f59e0b]/30">
                 MÓDULO OPCIONAL
               </span>
-              <span className="px-2 py-0.5 rounded bg-[#1e293b] text-[#94a3b8] font-mono text-[11px]">
+              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-mono text-[11px]">
                 {nominaHabilitada ? 'ACTIVO' : 'DESACTIVADO'}
               </span>
             </div>
-            <h3 className="text-base font-bold text-[#f8fafc]">
+            <h3 className="text-base font-bold tracking-tight text-slate-900">
               Aurora Nómina: Liquidación Referencial & Control Interno
             </h3>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#94a3b8]">Estado del módulo:</span>
-            <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1e293b] text-[#cbd5e1] border border-[#334155]">
+            <span className="text-xs text-slate-500 font-normal">Estado del módulo:</span>
+            <span className="px-3 py-1.5 rounded-lg text-xs font-normal bg-slate-100 text-slate-700 border border-slate-300">
               Se administra desde la configuración del negocio
             </span>
           </div>
         </div>
 
-        <p className="text-xs text-[#94a3b8] leading-relaxed border-t border-[#1e293b] pt-2">
-          <strong className="text-[#cbd5e1]">Aviso de Cumplimiento:</strong> Este módulo es un sistema de cálculo interno referencial y control gerencial de percepciones y deducciones. No sustituye ni simula sistemas tributarios oficiales ni ejecuta pasarelas directas con entidades gubernamentales.
+        <p className="text-xs text-slate-500 leading-relaxed border-t border-slate-200 pt-2 font-normal">
+          <strong className="text-slate-700">Aviso de Cumplimiento:</strong> Este módulo es un sistema de cálculo interno referencial y control gerencial de percepciones y deducciones. No sustituye ni simula sistemas tributarios oficiales ni ejecuta pasarelas directas con entidades gubernamentales.
         </p>
       </div>
 
       {/* Alerta si el módulo está desactivado */}
       {!nominaHabilitada && (
-        <div className="p-4 bg-[#0b111e] border border-[#f59e0b]/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#fbbf24]">
+        <div className="p-4 bg-white border border-[#f59e0b]/30 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-600">
           <div className="flex items-center gap-2">
             <IconWarning size={14} />
             <span>
@@ -205,12 +208,12 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
       {/* Selector de Períodos y Resumen Financiero */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Lista de Períodos */}
-        <div className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl space-y-3">
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-xs text-[#94a3b8] uppercase tracking-wider">
+            <h4 className="font-bold text-xs text-slate-500 uppercase tracking-wider">
               Períodos de Nómina
             </h4>
-            <span className="font-mono text-xs text-[#177E89]">{periodos.length} Ciclos</span>
+            <span className="font-mono text-xs text-[#177E89] font-normal">{periodos.length} Ciclos</span>
           </div>
 
           <div className="space-y-2">
@@ -222,19 +225,19 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                   onClick={() => setPeriodoActivo(p)}
                   className={`p-3 rounded-xl border cursor-pointer transition-all ${
                     esSeleccionado
-                      ? 'bg-[#1a2438] border-[#177E89] text-[#f8fafc]'
-                      : 'bg-[#0f172a] border-[#1e293b] text-[#cbd5e1] hover:border-[#177E89]/40'
+                      ? 'bg-[#1a2438] border-[#177E89] text-slate-900'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-[#177E89]/40'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="font-mono text-xs font-semibold text-[#177E89]">
+                    <span className="font-mono text-xs font-bold text-[#177E89]">
                       {p.codigoPeriodo}
                     </span>
                     <EstadoNominaBadge estado={p.estado} />
                   </div>
-                  <h5 className="font-medium text-xs text-[#f8fafc]">{p.nombre}</h5>
-                  <div className="flex items-center justify-between text-[11px] text-[#94a3b8] mt-2 font-mono">
-                    <span>{p.totalEmpleados} colaboradores</span>
+                  <h5 className="font-bold tracking-tight text-xs text-slate-900">{p.nombre}</h5>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 font-mono font-normal">
+                    <span>{p.totalEmpleados} {v.personas}</span>
                     <span className="text-[#177E89] font-bold">
                       {ocultarSueldo ? '••••••' : formatearMoneda(p.montoTotalNeto, p.monedaPrincipal)}
                     </span>
@@ -246,14 +249,14 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
         </div>
 
         {/* Panel del Período Seleccionado */}
-        <div className="lg:col-span-2 p-5 bg-[#131c2e] border border-[#1e2d48] rounded-xl space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#1e2d48]">
+        <div className="lg:col-span-2 p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="font-bold text-base text-[#f8fafc]">{periodoActivo.nombre}</h4>
+                <h4 className="font-bold tracking-tight text-base text-slate-900">{periodoActivo.nombre}</h4>
                 <EstadoNominaBadge estado={periodoActivo.estado} />
               </div>
-              <p className="text-xs text-[#94a3b8] font-mono mt-0.5">
+              <p className="text-xs text-slate-500 font-mono mt-0.5 font-normal">
                 Vigencia: {periodoActivo.fechaInicio} al {periodoActivo.fechaFin} | Pago estimado: {periodoActivo.fechaTentativaPago}
               </p>
             </div>
@@ -264,10 +267,10 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 <button
                   disabled={!nominaHabilitada}
                   onClick={() => setModalRevisionAbierto(true)}
-                  className={`px-3.5 py-2 rounded-lg font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white ${
+                  className={`px-3.5 py-2 rounded-lg font-normal text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white ${
                     nominaHabilitada
                       ? 'bg-[#177E89] hover:bg-[#28b8a6] text-black cursor-pointer'
-                      : 'bg-[#1e293b] text-[#64748b] border border-[#334155] cursor-not-allowed opacity-60'
+                      : 'bg-slate-100 text-slate-500 border border-slate-300 cursor-not-allowed opacity-60'
                   }`}
                   title={!nominaHabilitada ? 'Habilite el módulo de nómina para autorizar revisiones' : ''}
                 >
@@ -275,16 +278,16 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[#34d399] font-mono bg-[#10b981]/15 px-2 py-1 rounded border border-[#10b981]/30">
+                  <span className="text-[11px] text-emerald-600 font-mono font-normal bg-[#10b981]/15 px-2 py-1 rounded border border-[#10b981]/30">
                     Nómina bloqueada
                   </span>
                   <button
                     disabled={!nominaHabilitada}
                     onClick={() => setModalAjusteAbierto(true)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-normal border ${
                       nominaHabilitada
-                        ? 'bg-[#1e293b] hover:bg-[#334155] text-[#cbd5e1] border-[#334155] cursor-pointer'
-                        : 'bg-[#1e293b] text-[#64748b] border-[#334155] cursor-not-allowed opacity-60'
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300 cursor-pointer'
+                        : 'bg-slate-100 text-slate-500 border-slate-300 cursor-not-allowed opacity-60'
                     }`}
                   >
                     Ajustar / Reversar
@@ -296,20 +299,20 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
 
           {/* Totales de Liquidación */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3 bg-[#0f172a] rounded-xl border border-[#1e293b]">
-              <span className="text-xs text-[#64748b] block">Total Percepciones Brutas</span>
-              <span className="font-mono text-sm sm:text-base font-bold text-[#f8fafc]">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <span className="text-xs text-slate-500 block font-normal">Total Percepciones Brutas</span>
+              <span className="font-mono text-sm sm:text-base font-bold text-slate-900">
                 {ocultarSueldo ? '••••••' : formatearMoneda(periodoActivo.montoTotalBruto, periodoActivo.monedaPrincipal)}
               </span>
             </div>
-            <div className="p-3 bg-[#0f172a] rounded-xl border border-[#1e293b]">
-              <span className="text-xs text-[#64748b] block">Total Deducciones</span>
-              <span className="font-mono text-sm sm:text-base font-bold text-[#f87171]">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <span className="text-xs text-slate-500 block font-normal">Total Deducciones</span>
+              <span className="font-mono text-sm sm:text-base font-bold text-rose-600">
                 {ocultarSueldo ? '••••••' : `-${formatearMoneda(periodoActivo.montoTotalDeducciones, periodoActivo.monedaPrincipal)}`}
               </span>
             </div>
-            <div className="p-3 bg-[#0f172a] rounded-xl border border-[#1e293b]">
-              <span className="text-xs text-[#64748b] block">Monto Neto a Desembolsar</span>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <span className="text-xs text-slate-500 block font-normal">Monto Neto a Desembolsar</span>
               <span className="font-mono text-sm sm:text-base font-bold text-[#177E89]">
                 {ocultarSueldo ? '••••••' : formatearMoneda(periodoActivo.montoTotalNeto, periodoActivo.monedaPrincipal)}
               </span>
@@ -319,10 +322,10 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
           {/* Recibos Desglosados por Empleado */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h5 className="font-semibold text-xs uppercase tracking-wider text-[#94a3b8]">
+              <h5 className="font-bold text-xs uppercase tracking-wider text-slate-500">
                 Recibos de Pago Individuales ({periodoActivo.recibos.length})
               </h5>
-              <span className="text-xs text-[#64748b]">Clic para inspeccionar fórmula</span>
+              <span className="text-xs text-slate-500 font-normal">Clic para inspeccionar fórmula</span>
             </div>
 
             <div className="space-y-2">
@@ -330,16 +333,16 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 <div
                   key={recibo.id}
                   onClick={() => setReciboDetalle(recibo)}
-                  className="p-3 bg-[#0f172a] border border-[#1e293b] rounded-xl flex items-center justify-between gap-3 text-xs cursor-pointer hover:border-[#177E89]/50 transition-colors"
+                  className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs cursor-pointer hover:border-[#177E89]/50 transition-colors"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[#f8fafc] text-sm">{recibo.empleadoNombre}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1e293b] text-[#94a3b8]">
-                        {recibo.departamento}
+                      <span className="font-bold tracking-tight text-slate-900 text-sm">{recibo.empleadoNombre}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-normal">
+                        {v.nombreArea(recibo.departamento)}
                       </span>
                     </div>
-                    <p className="text-[#64748b] text-xs">{recibo.empleadoCargo}</p>
+                    <p className="text-slate-500 text-xs font-normal">{recibo.empleadoCargo}</p>
                   </div>
 
                   <div className="flex items-center gap-4">
@@ -347,11 +350,11 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                       <span className="font-mono font-bold text-[#177E89] text-sm block">
                         {ocultarSueldo ? '••••••' : formatearMoneda(recibo.montoNetoPagar, recibo.moneda)}
                       </span>
-                      <span className="text-[10px] text-[#94a3b8]">
+                      <span className="text-[10px] text-slate-500 font-normal">
                         {recibo.conceptosDesglosados.length} conceptos
                       </span>
                     </div>
-                    <span className="text-[#177E89] font-mono">Ver</span>
+                    <span className="text-[#177E89] font-mono font-normal">Ver</span>
                   </div>
                 </div>
               ))}
@@ -360,19 +363,19 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
 
           {/* Historial de Auditoría / Ajustes */}
           {periodoActivo.historialAjustes.length > 0 && (
-            <div className="p-4 bg-[#0b111e] rounded-xl border border-[#1e293b] space-y-2 text-xs">
-              <h5 className="font-semibold text-[#94a3b8] uppercase tracking-wider text-[11px]">
+            <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2 text-xs">
+              <h5 className="font-bold text-slate-500 uppercase tracking-wider text-[11px]">
                 Bitácora de Auditoría del Período
               </h5>
-              <div className="divide-y divide-[#1e293b]">
+              <div className="divide-y divide-slate-200">
                 {periodoActivo.historialAjustes.map((h) => (
                   <div key={h.id} className="py-2 space-y-0.5">
                     <div className="flex items-center justify-between font-mono text-[11px]">
-                      <span className="text-[#177E89] font-semibold">{h.tipoAccion}</span>
-                      <span className="text-[#64748b]">{h.fecha}</span>
+                      <span className="text-[#177E89] font-normal">{h.tipoAccion}</span>
+                      <span className="text-slate-500">{h.fecha}</span>
                     </div>
-                    <p className="text-[#cbd5e1]">{h.motivoJustificado}</p>
-                    <span className="text-[10px] text-[#94a3b8]">Registrado por: {h.autor}</span>
+                    <p className="text-slate-700 font-normal">{h.motivoJustificado}</p>
+                    <span className="text-[10px] text-slate-500 font-normal">Registrado por: {h.autor}</span>
                   </div>
                 ))}
               </div>
@@ -384,23 +387,23 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
       {/* Modal de Detalle de Fórmulas y Cálculos de un Recibo */}
       {reciboDetalle && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-desglose-recibo-titulo"
         >
-          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-2xl rounded-2xl p-6 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[#1e2d48]">
+          <div className="bg-slate-50 border border-slate-200 w-full max-w-2xl rounded-2xl p-6 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h3 id="modal-desglose-recibo-titulo" className="text-base font-bold text-[#f8fafc]">
+                <h3 id="modal-desglose-recibo-titulo" className="text-base font-bold tracking-tight text-slate-900">
                   Inspección analítica de recibo
                 </h3>
-                <p className="text-xs text-[#94a3b8]">Desglose de bases de cálculo y reglas aplicadas</p>
+                <p className="text-xs text-slate-500 font-normal">Desglose de bases de cálculo y reglas aplicadas</p>
               </div>
               <button
                 ref={btnCerrarDesgloseRef}
                 onClick={() => setReciboDetalle(null)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
+                className="text-slate-500 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar desglose"
               >
                 ✕
@@ -409,10 +412,10 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
 
             <DetalleCalculoNomina recibo={reciboDetalle} ocultarSueldo={ocultarSueldo} />
 
-            <div className="flex justify-end pt-3 border-t border-[#1e2d48]">
+            <div className="flex justify-end pt-3 border-t border-slate-200">
               <button
                 onClick={() => setReciboDetalle(null)}
-                className="px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] text-xs text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Cerrar Desglose
               </button>
@@ -424,55 +427,55 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
       {/* Modal de Pre-Revisión antes de Aprobación */}
       {accionesNominaConectadas && modalRevisionAbierto && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-revision-nomina-titulo"
         >
-          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-xl rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-[#1e2d48]">
+          <div className="bg-slate-50 border border-slate-200 w-full max-w-xl rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h3 id="modal-revision-nomina-titulo" className="text-base font-bold text-[#f8fafc]">
+                <h3 id="modal-revision-nomina-titulo" className="text-base font-bold tracking-tight text-slate-900">
                   Pantalla de Revisión Previa de Nómina
                 </h3>
-                <span className="text-xs text-[#fbbf24] font-medium">
+                <span className="text-xs text-amber-600 font-normal">
                   Validación obligatoria antes de congelar período
                 </span>
               </div>
               <button
                 ref={btnCerrarRevisionRef}
                 onClick={() => setModalRevisionAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
+                className="text-slate-500 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar revisión"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-[#cbd5e1]">
-              <p className="leading-relaxed">
+            <div className="space-y-3 text-xs text-slate-700">
+              <p className="leading-relaxed font-normal">
                 Está a punto de aprobar el período{' '}
-                <strong className="text-[#f8fafc]">{periodoActivo.nombre}</strong>. Una vez aprobado, el período pasará a estado inmutable y no admitirá modificaciones directas.
+                <strong className="text-slate-900">{periodoActivo.nombre}</strong>. Una vez aprobado, el período pasará a estado inmutable y no admitirá modificaciones directas.
               </p>
 
-              <div className="p-4 bg-[#0f172a] rounded-xl border border-[#1e293b] space-y-2 font-mono">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 font-mono">
                 <div className="flex justify-between">
-                  <span className="text-[#94a3b8]">Colaboradores a liquidar:</span>
-                  <span className="text-[#f8fafc] font-bold">{periodoActivo.recibos.length}</span>
+                  <span className="text-slate-500 font-normal">{v.Personas} a liquidar:</span>
+                  <span className="text-slate-900 font-bold">{periodoActivo.recibos.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#94a3b8]">Total Bruto:</span>
-                  <span className="text-[#f8fafc]">
+                  <span className="text-slate-500 font-normal">Total Bruto:</span>
+                  <span className="text-slate-900">
                     {ocultarSueldo ? '••••••' : formatearMoneda(periodoActivo.montoTotalBruto, periodoActivo.monedaPrincipal)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#94a3b8]">Total Deducciones:</span>
-                  <span className="text-[#f87171]">
+                  <span className="text-slate-500 font-normal">Total Deducciones:</span>
+                  <span className="text-rose-600">
                     {ocultarSueldo ? '••••••' : `-${formatearMoneda(periodoActivo.montoTotalDeducciones, periodoActivo.monedaPrincipal)}`}
                   </span>
                 </div>
-                <div className="flex justify-between pt-2 border-t border-[#1e293b] text-sm">
+                <div className="flex justify-between pt-2 border-t border-slate-200 text-sm">
                   <span className="text-[#177E89] font-bold">Total Neto a Pagar:</span>
                   <span className="text-[#177E89] font-bold">
                     {ocultarSueldo ? '••••••' : formatearMoneda(periodoActivo.montoTotalNeto, periodoActivo.monedaPrincipal)}
@@ -480,21 +483,21 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 bg-[#f59e0b]/10 border border-[#f59e0b]/25 rounded-lg text-[#fbbf24] text-[11px] inline-flex items-center gap-1.5">
+              <div className="p-3 bg-[#f59e0b]/10 border border-[#f59e0b]/25 rounded-lg text-amber-600 text-[11px] inline-flex items-center gap-1.5">
                 <IconWarning size={12} /> Recordatorio: Los cambios posteriores deberán realizarse exclusivamente mediante notas de ajuste o reverso justificado.
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-[#1e2d48]">
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
               <button
                 onClick={() => setModalRevisionAbierto(false)}
-                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+                className="px-4 py-2 rounded-lg bg-slate-100 text-xs font-normal text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleAprobarPeriodo}
-                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-semibold text-xs focus:outline-none focus:ring-2 focus:ring-white"
+                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-normal text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Confirmar y Congelar Nómina
               </button>
@@ -506,20 +509,20 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
       {/* Modal de Registro de Ajuste o Reverso */}
       {accionesNominaConectadas && modalAjusteAbierto && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-ajuste-reverso-titulo"
         >
-          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-[#1e2d48]">
-              <h3 id="modal-ajuste-reverso-titulo" className="text-base font-bold text-[#f8fafc]">
+          <div className="bg-slate-50 border border-slate-200 w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <h3 id="modal-ajuste-reverso-titulo" className="text-base font-bold tracking-tight text-slate-900">
                 Ajuste / Reverso de Período [DEMO]
               </h3>
               <button
                 ref={btnCerrarAjusteRef}
                 onClick={() => setModalAjusteAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
+                className="text-slate-500 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕
@@ -527,32 +530,32 @@ export const NominaPersonal: React.FC<NominaPersonalProps> = ({
             </div>
 
             <div className="space-y-3 text-xs">
-              <p className="text-[#94a3b8]">
+              <p className="text-slate-500 font-normal">
                 Indique el motivo justificado que quedará asentado en la bitácora inmutable de auditoría:
               </p>
 
               <div>
-                <label className="text-[#94a3b8] block mb-1">Motivo de la Corrección:</label>
+                <label className="text-slate-500 block mb-1 font-normal">Motivo de la Corrección:</label>
                 <textarea
                   rows={3}
                   value={motivoAjuste}
                   onChange={(e) => setMotivoAjuste(e.target.value)}
                   placeholder="Ej. Corrección por reporte tardío de jornada extraordinaria..."
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-[#1e2d48]">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-slate-200">
               <button
                 onClick={() => handleRegistrarAjuste('AJUSTE_POSTERIOR')}
-                className="px-3.5 py-2 rounded-lg bg-[#1e293b] hover:bg-[#334155] border border-[#334155] text-[#177E89] font-medium text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+                className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-[#177E89] font-normal text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Registrar Nota de Ajuste
               </button>
               <button
                 onClick={() => handleRegistrarAjuste('REVERSO_TOTAL')}
-                className="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-white font-medium text-xs focus:outline-none focus:ring-2 focus:ring-white"
+                className="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-white font-normal text-xs focus:outline-none focus:ring-2 focus:ring-[#177E89]"
               >
                 Reversar Período Completo
               </button>

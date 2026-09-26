@@ -193,6 +193,7 @@ const INDUSTRIA_A_MODULO: Record<string, string> = {
   retail: "repuestos",
   veterinaria: "salud",
   odontologia: "odontologia",
+  estetica: "estetica",
   finca: "ganaderia",
   construccion: "construccion",
   otro: "horeca",
@@ -208,6 +209,7 @@ const MODULOS_POR_INDUSTRIA: Record<string, typeof CLINIC_MODULES> = {
   retail: RETAIL_MODULES,
   veterinaria: CLINIC_MODULES,
   odontologia: CLINIC_MODULES,
+  estetica: CLINIC_MODULES,
   finca: GANADERIA_MODULES,
   construccion: CONSTRUCTION_MODULES,
   otro: RESTAURANT_MODULES,
@@ -223,6 +225,7 @@ const NOMBRE_POR_DEFECTO: Record<string, string> = {
   retail: "Mi Tienda",
   veterinaria: "Mi Veterinaria",
   odontologia: "Mi Consultorio Dental",
+  estetica: "Mi Centro de Estética",
   finca: "Mi Finca",
   construccion: "Constructora & Proyectos Civiles",
   otro: "Mi Negocio",
@@ -238,6 +241,7 @@ const VERTICAL_LABEL: Record<string, string> = {
   retail: "Aurora Comercio (Ferretería, Repuestos & Tiendas)",
   veterinaria: "Mediclinic Vet",
   odontologia: "Mediclinic Odonto",
+  estetica: "Aurora Estética (Estética & Cosmiatría)",
   finca: "Aurora Ganadería (Control de Fincas & Ganado)",
   otro: "Aurora Suite Comercial",
 };
@@ -303,6 +307,8 @@ export default function Onboarding() {
         ? "/construccion"
         : selectedIndustry === "veterinaria"
         ? "/veterinaria"
+        : selectedIndustry === "estetica"
+        ? "/estetica"
         : selectedIndustry === "clinica" || selectedIndustry === "farmacia" || selectedIndustry === "odontologia"
         ? "/mediclinic"
         : "/dashboard";
@@ -678,7 +684,7 @@ export default function Onboarding() {
                   ¿Cómo prefieres pagar cuando termine tu prueba?
                 </h2>
                 <p className="text-slate-500 text-sm mt-1">
-                  Tu prueba de <strong className="text-slate-700">30 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
+                  Tu prueba de <strong className="text-slate-700">15 días es 100% gratis</strong> — no se te cobra nada ahora. Esto solo queda guardado como tu método preferido para cuando decidas continuar.
                 </p>
               </div>
 
@@ -776,7 +782,7 @@ export default function Onboarding() {
                 <div className="h-px bg-white/10" />
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Prueba Gratuita:</span>
-                  <span className="text-emerald-400 font-bold">30 días de acceso completo</span>
+                  <span className="text-emerald-400 font-bold">15 días de acceso completo</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-white/40 uppercase tracking-wider font-mono">Método de Pago:</span>

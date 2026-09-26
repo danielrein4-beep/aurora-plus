@@ -1,9 +1,11 @@
-import { obtenerCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { obtenerCuentasCobro, combinarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { descargarReciboPagoAurora } from "../utils/reciboAurora";
+import MiAsistencia from "../components/personal/MiAsistencia";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AuroraLogo from "../AuroraLogo";
 import {
-  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconHardware, IconCard, IconUsers, IconCustomize,
+  AuroraGradientDef, IconClinic, IconVet, IconTooth, IconSparkles, IconHardware, IconCard, IconUsers, IconCustomize,
   IconStethoscope, IconCalendar, IconPrescription, IconRocket, IconDownload, IconKey,
   IconHourglass, IconUser, IconClose, IconCheckCircle, IconBank, IconChat, IconFileText,
   IconRestaurant, IconFarm, IconShield,
@@ -37,14 +39,21 @@ import {
   type RepuestoItem,
   type MapaMesaEntrada,
   obtenerCapacidadesPersonal,
+  obtenerEstadoSuscripcion,
+  obtenerCuentasCobroServidor,
+  reportarPagoSuscripcion,
+  tasaVigente,
+  type EstadoSuscripcion,
 } from "../api";
 import MediclinicApp from "../components/MediclinicApp";
+import SelectorVertical from "../components/SelectorVertical";
 
 const VERTICAL_ICON: Record<string, (props: { size?: number }) => React.ReactNode> = {
   clinica: IconClinic,
   farmacia: IconPrescription,
   veterinaria: IconVet,
   odontologia: IconTooth,
+  estetica: IconSparkles,
   comercio: IconHardware,
   ferreteria: IconHardware,
   repuestos: IconHardware,
@@ -63,6 +72,8 @@ const ACTION_ICON: Record<string, (props: { size?: number }) => React.ReactNode>
   "Ficha Mascota": IconVet,
   "Plan Vacunación": IconPrescription,
   "Venta PetShop": IconCard,
+  "Ficha de Piel": IconSparkles,
+  "Vender Paquete": IconCard,
   "Cirugías": IconClinic,
   "Abrir Caja / POS": IconCard,
   "Consultar Kardex": IconHardware,
@@ -137,6 +148,24 @@ const VERTICAL_METADATA: Record<string, {
       { label: "Plan Vacunación", desc: "Recordatorios automáticos" },
       { label: "Venta PetShop", desc: "Cobro rápido por mostrador" },
       { label: "Cirugías", desc: "Registro pre y post operatorio" },
+    ],
+    defaultPatients: [],
+  },
+  estetica: {
+    name: "Aurora Estética",
+    badge: "ESTÉTICA & COSMIATRÍA",
+    desc: "Fichas de piel, sesiones con fotos de antes y después, paquetes de sesiones, consentimientos firmados y caja.",
+    stats: [
+      { label: "Clientas Registradas", val: "0", change: "Sin clientas aún", color: "text-rose-500 dark:text-rose-300" },
+      { label: "Citas de Hoy", val: "0", change: "Sin citas agendadas", color: "text-sky-500 dark:text-sky-400" },
+      { label: "Ingresos del Día", val: "$0.00", change: "Multi-moneda (USD/VES)", color: "text-purple-500 dark:text-purple-400" },
+      { label: "Por Atender Hoy", val: "0", change: "Sin citas pendientes", color: "text-amber-500 dark:text-amber-400" },
+    ],
+    actions: [
+      { label: "Ficha de Piel", desc: "Biotipo, fototipo y contraindicaciones" },
+      { label: "Agendar Cita", desc: "Con duración según el servicio" },
+      { label: "Vender Paquete", desc: "Bonos de sesiones con saldo" },
+      { label: "Cobrar Factura", desc: "Caja multi-moneda" },
     ],
     defaultPatients: [],
   },
@@ -303,6 +332,23 @@ const ROL_LABEL: Record<string, string> = {
   TRABAJADOR_FINCA: "Trabajador de Finca",
 };
 
+// Roles que tienen sentido en cada rubro: antes la lista de Equipo & Roles mostraba todos
+// (en una finca salían Médico y Mesero). Rubro sin entrada: se muestran todos.
+const ROLES_POR_RUBRO: Record<string, string[]> = {
+  ganaderia: ["ADMINISTRADOR_FINCA", "ENCARGADO_FINCA", "TRABAJADOR_FINCA"],
+  finca: ["ADMINISTRADOR_FINCA", "ENCARGADO_FINCA", "TRABAJADOR_FINCA"],
+  clinica: ["MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR"],
+  odontologia: ["MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR"],
+  estetica: ["MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR"],
+  veterinaria: ["MEDICO", "RECEPCIONISTA", "CAJERO_VENDEDOR"],
+  restaurante: ["CAJERO_VENDEDOR", "MESERO", "ENCARGADO_INVENTARIO"],
+  comercio: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+  ferreteria: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+  repuestos: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+  retail: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+  farmacia: ["CAJERO_VENDEDOR", "ENCARGADO_INVENTARIO"],
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -357,7 +403,8 @@ export default function Dashboard() {
     }
   };
   const [workspaceTab, setWorkspaceTab] = useState<"kpis" | "patients" | "agenda" | "pos">("kpis");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  // "Pagar" desde el aviso de una vertical llega con ?tab=billing&pagar=1 y abre el reporte de pago.
+  const [showPaymentModal, setShowPaymentModal] = useState(() => searchParams.get("pagar") === "1");
   const [cuentasCobro, setCuentasCobro] = useState<SaasCuentasCobroConfig>(obtenerCuentasCobro);
   const [copiadoCampo, setCopiadoCampo] = useState<string | null>(null);
 
@@ -369,10 +416,23 @@ export default function Dashboard() {
     } catch {}
   };
 
-  const tasaBcv = 45.0;
+  // Tasa guardada por el propio negocio; si no tiene ninguna no se inventa: se pide pagar a la tasa BCV del día.
+  const [tasaBcv, setTasaBcv] = useState<number | null>(null);
+  const [suscripcion, setSuscripcion] = useState<EstadoSuscripcion | null>(null);
+  const [enviandoPago, setEnviandoPago] = useState(false);
+  const [errorPago, setErrorPago] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    obtenerEstadoSuscripcion().then(setSuscripcion).catch(() => setSuscripcion(null));
+    // Las cuentas que configuró el equipo de Aurora en el servidor; si no hay, quedan las de siempre.
+    obtenerCuentasCobroServidor().then((c) => setCuentasCobro(combinarCuentasCobro(c))).catch(() => {});
+    tasaVigente(user.tenantId, "USD", "VES")
+      .then((t) => setTasaBcv(t && Number(t.tasa) > 0 ? Number(t.tasa) : null))
+      .catch(() => setTasaBcv(null));
+  }, [user?.tenantId]);
   const [paymentForm, setPaymentForm] = useState({
     metodo: "Pago Móvil (Bolívares - Tasa BCV)",
-    monto: "$35.00",
+    monto: "$25.00",
     referencia: "",
     banco: "Banesco",
   });
@@ -381,8 +441,9 @@ export default function Dashboard() {
   const userIndustry = user?.industry || "clinica";
   const vertical = VERTICAL_METADATA[userIndustry] || VERTICAL_METADATA["clinica"];
   const VerticalIcon = VERTICAL_ICON[userIndustry] || VERTICAL_ICON["clinica"];
-  const isTrial = user?.planStatus !== "active";
-  const daysLeft = isTrial ? trialDaysLeft : 30;
+  // El servidor manda: prueba = nunca ha pagado; días = hasta la fecha real de vencimiento.
+  const isTrial = suscripcion ? suscripcion.enPrueba : user?.planStatus !== "active";
+  const daysLeft = suscripcion ? suscripcion.diasRestantes : trialDaysLeft;
 
   // Estados de datos reales conectados al backend multi-tenant
   const [metricasEnVivo, setMetricasEnVivo] = useState<{ label: string; val: string; change: string; color: string }[] | null>(null);
@@ -406,7 +467,7 @@ export default function Dashboard() {
   // (ver ComercioApp.tsx); Farmacia comparte la misma app/ruta pero sigue
   // siendo su propio rubro visualmente.
   const esRubroComercio = userIndustry === "ferreteria" || userIndustry === "repuestos" || userIndustry === "retail" || userIndustry === "comercio";
-  const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia") && !!user?.tenantId;
+  const esClinicaReal = (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia" || userIndustry === "estetica") && !!user?.tenantId;
   const esRestauranteReal = userIndustry === "restaurante" && !!user?.tenantId;
   const esComercioReal = (esRubroComercio || userIndustry === "farmacia") && !!user?.tenantId;
   const esGanaderiaReal = (userIndustry === "finca" || userIndustry === "ganaderia") && !!user?.tenantId;
@@ -419,7 +480,9 @@ export default function Dashboard() {
           ? "/ganaderia"
           : userIndustry === "veterinaria"
             ? "/veterinaria"
-            : "/mediclinic";
+            : userIndustry === "estetica"
+              ? "/estetica"
+              : "/mediclinic";
   const esVerticalReal = esClinicaReal || esRestauranteReal || esComercioReal || esGanaderiaReal;
 
   useEffect(() => {
@@ -703,9 +766,9 @@ export default function Dashboard() {
 
         setMetricasEnVivo([
           {
-            label: "Pacientes Registrados",
+            label: userIndustry === "estetica" ? "Clientas Registradas" : "Pacientes Registrados",
             val: String(pacientes.length),
-            change: pacientes.length > 0 ? "Total en consultorio" : "Sin pacientes aún",
+            change: pacientes.length > 0 ? (userIndustry === "estetica" ? "Total en el centro" : "Total en consultorio") : (userIndustry === "estetica" ? "Sin clientas aún" : "Sin pacientes aún"),
             color: "text-teal-400",
           },
           {
@@ -721,9 +784,9 @@ export default function Dashboard() {
             color: "text-purple-400",
           },
           {
-            label: "Sala de Espera",
-            val: String(enEspera),
-            change: enEspera > 0 ? "Pacientes en espera" : "Sin pacientes en espera",
+            label: userIndustry === "estetica" ? "Por Atender Hoy" : "Sala de Espera",
+            val: String(userIndustry === "estetica" ? citas.filter(c => !["ATENDIDA", "CANCELADA", "NO_ASISTIO"].includes(c.estado)).length : enEspera),
+            change: userIndustry === "estetica" ? "Citas pendientes del día" : enEspera > 0 ? "Pacientes en espera" : "Sin pacientes en espera",
             color: "text-amber-400",
           },
         ]);
@@ -731,21 +794,33 @@ export default function Dashboard() {
     }
   }, [user?.tenantId, userIndustry]);
 
-  const handleReportPaymentSubmit = (e: React.FormEvent) => {
+  // Antes marcaba el plan como "activado" solo en este navegador, sin avisar a nadie. Ahora el
+  // reporte llega al equipo de Aurora (ticket de soporte) y queda en verificación.
+  const handleReportPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentForm.referencia.trim()) return;
-
-    reportPayment({
-      monto: paymentForm.monto,
-      metodo: paymentForm.metodo,
-      referencia: paymentForm.referencia,
-    });
-
-    setPaymentSuccessMsg("¡Pago registrado con éxito! Tu plan ha sido activado inmediatamente.");
-    setTimeout(() => {
-      setShowPaymentModal(false);
-      setPaymentSuccessMsg("");
-    }, 2000);
+    const monto = parseFloat(paymentForm.monto.replace(/[^0-9.,]/g, "").replace(",", "."));
+    if (!(monto > 0)) { setErrorPago("Indica el monto que pagaste."); return; }
+    const enBolivares = paymentForm.metodo.startsWith("Pago Móvil") || paymentForm.metodo.startsWith("Transferencia");
+    setEnviandoPago(true);
+    setErrorPago(null);
+    try {
+      await reportarPagoSuscripcion({
+        monto,
+        moneda: enBolivares && /bs/i.test(paymentForm.monto) ? "VES" : "USD",
+        metodo: paymentForm.metodo,
+        referencia: paymentForm.referencia.trim(),
+        plan: suscripcion?.planSolicitado || undefined,
+      });
+      reportPayment({ monto: paymentForm.monto, metodo: paymentForm.metodo, referencia: paymentForm.referencia });
+      obtenerEstadoSuscripcion().then(setSuscripcion).catch(() => {});
+      setPaymentSuccessMsg("Recibimos tu reporte de pago. Lo verificamos y activamos tu plan; te avisamos por WhatsApp o correo.");
+      setPaymentForm((f) => ({ ...f, referencia: "" }));
+    } catch (err) {
+      setErrorPago(err instanceof Error ? err.message : "No se pudo enviar el reporte. Intenta de nuevo.");
+    } finally {
+      setEnviandoPago(false);
+    }
   };
 
   return (
@@ -763,7 +838,7 @@ export default function Dashboard() {
         {/* Izquierda: Logo + Nombre del Hub + Empresa */}
         <div className="flex items-center gap-3.5">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => setActiveTab("vertical")}
             className="flex items-center gap-3 cursor-pointer group text-left"
           >
             <div className="p-1.5 rounded-xl bg-white/5 border border-white/10 group-hover:scale-105 transition-transform">
@@ -773,9 +848,9 @@ export default function Dashboard() {
               <div className="font-['Outfit'] font-black text-lg text-aurora leading-none">
                 Aurora Hub
               </div>
-              <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-medium flex items-center gap-1.5">
+              <div className="text-slate-500 dark:text-white/45 text-[10px] tracking-wider uppercase mt-0.5 font-light flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                <span>{user?.empresa || "Clínica & Consultorios Médicos"}</span>
+                <span>{user?.empresa || "Mi negocio"}</span>
               </div>
             </div>
           </button>
@@ -785,7 +860,7 @@ export default function Dashboard() {
         <nav className="flex items-center gap-1.5 apple-glass-pill rounded-full p-1.5 border border-slate-300/80 dark:border-white/15 bg-slate-100/90 dark:bg-white/[0.04] shadow-inner text-xs overflow-x-auto whitespace-nowrap">
           <button
             onClick={() => setActiveTab("vertical")}
-            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-full font-light uppercase tracking-wide transition-all duration-300 cursor-pointer flex items-center gap-2 ${
               activeTab === "vertical"
                 ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
                 : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
@@ -796,7 +871,7 @@ export default function Dashboard() {
 
           <button
             onClick={() => setActiveTab("billing")}
-            className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-full font-light uppercase tracking-wide transition-all duration-300 cursor-pointer flex items-center gap-2 ${
               activeTab === "billing"
                 ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
                 : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
@@ -808,7 +883,7 @@ export default function Dashboard() {
           {esDuenoAdmin && (
             <button
               onClick={() => setActiveTab("team")}
-              className={`px-4 py-2 rounded-full font-bold transition-all duration-300 cursor-pointer flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-full font-light uppercase tracking-wide transition-all duration-300 cursor-pointer flex items-center gap-2 ${
                 activeTab === "team"
                   ? "bg-white text-slate-950 shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:bg-white/20 dark:text-white dark:border dark:border-white/25"
                   : "text-slate-600 dark:text-white/65 hover:text-slate-950 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/8"
@@ -818,22 +893,16 @@ export default function Dashboard() {
             </button>
           )}
 
-          <button
-            onClick={() => navigate("/onboarding")}
-            title="Cambiar o explorar otras verticales de Aurora"
-            className="px-3.5 py-2 rounded-full font-medium transition-all duration-300 text-slate-500 dark:text-white/40 hover:text-teal-500 dark:hover:text-teal-300 hover:bg-white/40 dark:hover:bg-white/8 flex items-center gap-1.5 text-xs">
-            <IconCustomize size={14} />
-            <span>Cambiar Rubro</span>
-          </button>
         </nav>
 
         {/* Derecha: Botón Directo a la vertical + Estado + Salir */}
         <div className="flex items-center gap-2.5 whitespace-nowrap">
+          <SelectorVertical />
           {/* Botón Destacado: Entrar a la app de la vertical activa */}
           {esVerticalReal && (
             <button
               onClick={() => navigate(rutaVertical)}
-              className="btn-cyber-neon text-white text-xs font-extrabold px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.5)] hover:scale-105 transition-all cursor-pointer"
+              className="btn-cyber-neon text-white text-xs font-light uppercase tracking-wide px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(14,165,233,0.5)] hover:scale-105 transition-all cursor-pointer"
               title={`Abrir ${vertical.name}`}
             >
               <span className="w-2 h-2 rounded-full bg-teal-300 animate-pulse" />
@@ -842,18 +911,26 @@ export default function Dashboard() {
           )}
 
           {/* Badge de Licencia compacto en 1 línea */}
-          <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${
+          <div className={`hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-light uppercase tracking-wide ${
             isTrial
               ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
               : "bg-teal-500/10 border-teal-500/30 text-teal-700 dark:text-teal-300"
           }`}>
             <span className={`w-2 h-2 rounded-full ${isTrial ? "bg-amber-400 animate-ping" : "bg-teal-400"}`} />
-            <span>{isTrial ? `Trial (${daysLeft}d)` : "Plan Activo"}</span>
+            <span>{suscripcion?.vencida ? "Plan vencido" : isTrial ? `Prueba gratis · ${daysLeft} ${daysLeft === 1 ? "día" : "días"}` : "Plan activo"}</span>
           </div>
 
           <button
+            onClick={() => window.dispatchEvent(new Event("aurora:abrir-soporte"))}
+            className="apple-glass-btn text-xs font-light uppercase tracking-wide px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
+            title="Abrir el chat de soporte de Aurora"
+          >
+            Soporte
+          </button>
+
+          <button
             onClick={logout}
-            className="apple-glass-btn text-xs font-semibold px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
+            className="apple-glass-btn text-xs font-light uppercase tracking-wide px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
             title="Cerrar sesión de Aurora"
           >
             Salir
@@ -864,8 +941,23 @@ export default function Dashboard() {
       {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10 space-y-8">
         
+        {/* Plan vencido: sigue trabajando unos días de gracia, pero hay que avisarle con claridad */}
+        {suscripcion?.vencida && (
+          <div className="rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-rose-300 bg-rose-50 text-rose-900">
+            <div>
+              <h4 className="font-bold text-sm">Tu plan venció el {suscripcion.fechaVencimiento ? new Date(suscripcion.fechaVencimiento + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long" }) : ""}</h4>
+              <p className="text-xs mt-0.5">
+                Puedes seguir trabajando hasta el {suscripcion.accesoHasta ? new Date(suscripcion.accesoHasta + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long" }) : "final del período de gracia"}. Después el acceso se pausa hasta que se confirme tu pago; tus datos no se borran.
+              </p>
+            </div>
+            <button onClick={() => setShowPaymentModal(true)} className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-light uppercase tracking-wide px-5 py-2.5 rounded-xl cursor-pointer">
+              Reportar mi pago →
+            </button>
+          </div>
+        )}
+
         {/* BARRA DE RECORDATORIO DE TRIAL / PAGO (DISEÑO PREMIUM EN 1 LÍNEA) */}
-        {isTrial && (
+        {isTrial && !suscripcion?.vencida && (
           <div className="apple-glass rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border border-teal-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.06)] bg-gradient-to-r from-teal-500/10 via-transparent to-purple-500/10 backdrop-blur-xl">
             <div className="flex items-center gap-3.5">
               <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-300 flex items-center justify-center shadow-inner flex-shrink-0">
@@ -876,15 +968,15 @@ export default function Dashboard() {
                   Estás disfrutando de tu prueba gratuita de {vertical.name}
                 </h4>
                 <p className="text-slate-500 dark:text-white/50 text-xs mt-0.5">
-                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Tus datos e historias clínicas se guardan permanentemente.
+                  Te quedan <strong className="text-teal-600 dark:text-teal-400 font-bold">{daysLeft} días</strong> de acceso completo. Todo lo que registres se queda guardado cuando actives tu plan.
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowPaymentModal(true)}
-                className="btn-electric-blue text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md cursor-pointer hover:scale-105 transition-all">
-                Activar Plan Pro ($35/mes) →
+                className="btn-electric-blue text-white text-xs font-light uppercase tracking-wide px-5 py-2.5 rounded-xl shadow-md cursor-pointer hover:scale-105 transition-all">
+                Activar mi plan →
               </button>
             </div>
           </div>
@@ -893,6 +985,8 @@ export default function Dashboard() {
         {/* ── PESTAÑA 1: LAUNCHER & ENTORNO DE LA VERTICAL (MEDICLINIC PRO) ── */}
         {activeTab === "vertical" && (
           <div className="space-y-8">
+            {/* El trabajador vinculado a su usuario marca aquí su entrada y su salida (se oculta para el dueño). */}
+            <MiAsistencia compacto />
             
             {/* HERO LAUNCHER CARD — DISEÑO REDONDEADO Y ELEGANTE ESTILO APPLE LIQUID GLASS */}
             <div className="relative apple-glass rounded-[32px] p-6 sm:p-9 overflow-hidden shadow-2xl border border-teal-500/30 bg-gradient-to-br from-slate-900/95 via-[#0c1424]/95 to-slate-900/95 backdrop-blur-2xl">
@@ -901,7 +995,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
                 {/* Lado Izquierdo: Presentación y Botones Principales */}
                 <div className="lg:col-span-7 space-y-5 text-left">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-xs font-extrabold text-teal-300 tracking-wider uppercase shadow-xs">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-xs font-light text-teal-300 tracking-wider uppercase shadow-xs">
                     <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
                     <span>{vertical.badge}</span>
                   </div>
@@ -910,43 +1004,25 @@ export default function Dashboard() {
                     <span className="text-aurora">{vertical.name}</span> — Centro de Operaciones
                   </h2>
 
-                  <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-normal">
-                    {vertical.desc}{" "}
-                    {userIndustry === "restaurante"
-                      ? "Gestiona mesas, comandas y cocina en tiempo real desde un solo lugar."
-                      : "Administra consultas médicas, historias clínicas, agenda de especialistas, sala de espera reactiva y cotizaciones multi-moneda en tiempo real."}
+                  <p className="text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl font-light uppercase tracking-wide">
+                    {vertical.desc}
                   </p>
 
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <button
                       onClick={() => navigate(rutaVertical)}
-                      className="btn-cyber-neon text-white text-xs sm:text-sm font-extrabold px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
+                      className="btn-cyber-neon text-white text-xs sm:text-sm font-light uppercase tracking-wide px-7 py-3.5 rounded-2xl flex items-center gap-2.5 shadow-[0_0_30px_rgba(255,59,128,0.5)] cursor-pointer hover:scale-105 transition-all">
                       <IconRocket size={17} />
-                      <span>Entrar a {vertical.name} (Cloud Web)</span>
+                      <span>Entrar a {vertical.name}</span>
                       <span className="text-base">→</span>
                     </button>
 
-                    <a
-                      href="https://github.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="apple-glass-btn text-xs sm:text-sm font-semibold px-5 py-3.5 rounded-2xl flex items-center gap-2 text-white/90 hover:text-white border border-white/15 cursor-pointer hover:border-teal-400/40 transition-all">
-                      <IconDownload size={15} />
-                      <span>Descargar para Windows (.exe)</span>
-                    </a>
-
-                    <button
-                      onClick={() => alert("Tu API Token de Licencia: AURORA-MED-PRO-9842-SECURE")}
-                      className="apple-glass-btn text-xs font-mono px-4 py-3.5 rounded-2xl text-white/60 hover:text-white border border-white/10 cursor-pointer flex items-center gap-2 transition-all">
-                      <IconKey size={14} />
-                      <span>Clave de Licencia</span>
-                    </button>
                   </div>
                 </div>
 
                 {/* Lado Derecho: Métricas Reales en Grid 2x2 Estilo Glassmorphism */}
                 <div className="lg:col-span-5 grid grid-cols-2 gap-3.5">
-                  {(metricasEnVivo || vertical.stats).map((s) => (
+                  {(metricasEnVivo || vertical.stats.map((s) => ({ ...s, val: "—", change: "Sin datos por ahora", color: "text-white/40" }))).map((s) => (
                     <div key={s.label} className="apple-glass rounded-2xl p-4 sm:p-5 text-left border border-white/10 shadow-md hover:border-teal-400/40 transition-all duration-300">
                       <div className="text-white/50 text-[11px] font-medium leading-tight">{s.label}</div>
                       <div className={`font-['Outfit'] font-black text-2xl sm:text-3xl mt-1.5 ${s.color}`}>{s.val}</div>
@@ -963,7 +1039,7 @@ export default function Dashboard() {
                 <div>
                   <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white flex items-center gap-2">
                     <span>Módulos de tu Empresa</span>
-                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-semibold">
+                    <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30 font-light uppercase tracking-wide">
                       Multi-Tenant Cloud
                     </span>
                   </h3>
@@ -984,7 +1060,7 @@ export default function Dashboard() {
                       <div className="w-12 h-12 rounded-2xl bg-teal-500/10 dark:bg-teal-400/10 text-teal-600 dark:text-teal-300 flex items-center justify-center border border-teal-500/20 group-hover:scale-110 transition-transform">
                         <VerticalIcon size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 uppercase">
+                      <span className="text-[10px] font-light font-mono tracking-wider px-2.5 py-1 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 uppercase">
                         Vertical Activa
                       </span>
                     </div>
@@ -999,7 +1075,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-teal-600 dark:text-teal-300">
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-light uppercase tracking-wide text-teal-600 dark:text-teal-300">
                     <span>Entrar al Sistema</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
@@ -1015,7 +1091,7 @@ export default function Dashboard() {
                       <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-300 flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
                         <IconBank size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase">
+                      <span className="text-[10px] font-light font-mono tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 uppercase">
                         Finanzas & Control
                       </span>
                     </div>
@@ -1030,13 +1106,14 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-300">
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-light uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
                     <span>Abrir Centro Financiero</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
                 </div>
 
-                {/* 3. Gestión de Personal & Nómina */}
+                {/* 3. Gestión de Personal & Nómina — solo si el negocio la tiene activa */}
+                {accesoPersonal && (
                 <div 
                   onClick={() => navigate("/personal")}
                   className="apple-glass rounded-3xl p-6 border border-slate-300/60 dark:border-white/10 hover:border-purple-400/50 transition-all duration-300 group cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between relative overflow-hidden"
@@ -1046,7 +1123,7 @@ export default function Dashboard() {
                       <div className="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-400/10 text-purple-600 dark:text-purple-300 flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
                         <IconUsers size={24} />
                       </div>
-                      <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 uppercase">
+                      <span className="text-[10px] font-light font-mono tracking-wider px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 uppercase">
                         Talento & Nómina
                       </span>
                     </div>
@@ -1056,16 +1133,17 @@ export default function Dashboard() {
                         Gestión de Personal
                       </h4>
                       <p className="text-slate-500 dark:text-white/60 text-xs mt-1 leading-relaxed line-clamp-2">
-                        Control de turnos, asistencias biométricas, comisiones por venta y liquidación periódica.
+                        Directorio del equipo, turnos, asistencia, metas y comisiones por venta.
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-purple-600 dark:text-purple-300">
+                  <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-light uppercase tracking-wide text-purple-600 dark:text-purple-300">
                     <span>Abrir Gestión de Personal</span>
                     <span className="group-hover:translate-x-1 transition-transform">→</span>
                   </div>
                 </div>
+                )}
 
                 {/* 4. Auditoría — solo el Dueño/Administrador la ve */}
                 {user?.rol === "DUENO_ADMIN" && (
@@ -1078,7 +1156,7 @@ export default function Dashboard() {
                         <div className="w-12 h-12 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-300 flex items-center justify-center border border-amber-500/20 group-hover:scale-110 transition-transform">
                           <IconShield size={24} />
                         </div>
-                        <span className="text-[10px] font-bold font-mono tracking-wider px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 uppercase">
+                        <span className="text-[10px] font-light font-mono tracking-wider px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 uppercase">
                           Solo Dueño/Admin
                         </span>
                       </div>
@@ -1093,7 +1171,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-300">
+                    <div className="pt-5 mt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs font-light uppercase tracking-wide text-amber-600 dark:text-amber-300">
                       <span>Abrir Auditoría</span>
                       <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </div>
@@ -1116,6 +1194,7 @@ export default function Dashboard() {
                        esRubroComercio ? "Espacio de Comercio en Vivo" :
                        userIndustry === "finca" || userIndustry === "ganaderia" ? "Espacio Agropecuario & Ganadería en Vivo" :
                        userIndustry === "veterinaria" ? "Espacio Veterinario & Mascotas en Vivo" :
+                       userIndustry === "estetica" ? "Espacio de Estética & Cosmiatría en Vivo" :
                        "Espacio de Trabajo Clínico en Vivo"}
                     </h3>
                     <p className="text-slate-500 dark:text-white/40 text-xs">
@@ -1124,6 +1203,7 @@ export default function Dashboard() {
                        esRubroComercio ? "Kardex multi-unidad, código de barras, compras y cuentas por cobrar." :
                        userIndustry === "finca" || userIndustry === "ganaderia" ? "Rotación agronómica de potreros, control de hato, producción lechera y trazabilidad." :
                        userIndustry === "veterinaria" ? "Expedientes por mascota, plan de vacunas, cirugías e inventario veterinario." :
+                       userIndustry === "estetica" ? "Clientas, fichas de piel, sesiones con fotos, paquetes y caja." :
                        "Base de datos PostgreSQL Multi-tenant sincronizada en tiempo real."}
                     </p>
                   </div>
@@ -1133,25 +1213,26 @@ export default function Dashboard() {
                 <div className="apple-glass-pill rounded-full p-1 flex items-center gap-1 text-xs">
                   <button
                     onClick={() => setWorkspaceTab("kpis")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
+                    className={`px-3.5 py-1.5 rounded-full font-light uppercase tracking-wide transition-all ${
                       workspaceTab === "kpis" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
                     Panel General
                   </button>
                   <button
                     onClick={() => setWorkspaceTab("patients")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
+                    className={`px-3.5 py-1.5 rounded-full font-light uppercase tracking-wide transition-all ${
                       workspaceTab === "patients" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
                     {userIndustry === "finca" || userIndustry === "ganaderia" ? "Hato & Animales" :
                      userIndustry === "restaurante" ? "Mesas & Comandas" :
                      esRubroComercio || userIndustry === "farmacia" ? "Kárdex & Stock" :
                      userIndustry === "veterinaria" ? "Expedientes Mascotas" :
+                     userIndustry === "estetica" ? "Clientas & Fichas" :
                      "Expedientes & Triaje"}
                   </button>
                   <button
                     onClick={() => setWorkspaceTab("agenda")}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold transition-all ${
+                    className={`px-3.5 py-1.5 rounded-full font-light uppercase tracking-wide transition-all ${
                       workspaceTab === "agenda" ? "bg-white text-black shadow-sm" : "text-slate-600 dark:text-white/60"
                     }`}>
                     {userIndustry === "finca" || userIndustry === "ganaderia" ? "Agenda Sanitaria" :
@@ -1171,14 +1252,16 @@ export default function Dashboard() {
                        userIndustry === "restaurante" ? "Mesas y Comandas en el Salón" :
                        esRubroComercio || userIndustry === "farmacia" ? "Artículos en Catálogo & Kárdex" :
                        userIndustry === "veterinaria" ? "Expedientes Veterinarios & Pacientes" :
+                       userIndustry === "estetica" ? "Clientas Registradas" :
                        "Lista de Pacientes en Consulta / Triaje"}
                     </h4>
                     <button
                       onClick={() => navigate(rutaVertical)}
-                      className="btn-electric-blue text-xs font-semibold px-4 py-2 rounded-full cursor-pointer">
+                      className="btn-electric-blue text-xs font-light uppercase tracking-wide px-4 py-2 rounded-full cursor-pointer">
                       {userIndustry === "finca" || userIndustry === "ganaderia" ? "+ Registrar Animal" :
                        userIndustry === "restaurante" ? "+ Abrir Mesa" :
                        esRubroComercio || userIndustry === "farmacia" ? "+ Nuevo Artículo" :
+                       userIndustry === "estetica" ? "+ Nueva Clienta" :
                        "+ Ingresar Paciente"}
                     </button>
                   </div>
@@ -1206,20 +1289,20 @@ export default function Dashboard() {
                             ) : (
                               animalesGanaderia.slice(0, 8).map((a) => (
                                 <tr key={a.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold font-mono text-emerald-600 dark:text-emerald-400">{a.arete}</td>
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{a.nombre || "—"}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide font-mono text-emerald-600 dark:text-emerald-400">{a.arete}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-slate-900 dark:text-white">{a.nombre || "—"}</td>
                                   <td className="p-3.5 text-slate-600 dark:text-white/70">{a.raza || a.especie || "Bovino"}</td>
                                   <td className="p-3.5 text-slate-700 dark:text-white/80">{a.tipoAnimal || "VACA"} · {a.sexo}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{a.pesoActual ? `${a.pesoActual} kg` : "—"}</td>
                                   <td className="p-3.5">
-                                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-semibold text-[10px]">
+                                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-light uppercase tracking-wide text-[10px]">
                                       {a.estado || "ACTIVO"}
                                     </span>
                                   </td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer">
+                                      className="text-emerald-600 dark:text-emerald-400 font-light uppercase tracking-wide hover:underline cursor-pointer">
                                       Ver Ficha →
                                     </button>
                                   </td>
@@ -1248,15 +1331,15 @@ export default function Dashboard() {
                             ) : (
                               repuestosReales.slice(0, 8).map((r) => (
                                 <tr key={r.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold font-mono text-teal-600 dark:text-teal-400">{r.codigoSku}</td>
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{r.descripcion}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide font-mono text-teal-600 dark:text-teal-400">{r.codigoSku}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-slate-900 dark:text-white">{r.descripcion}</td>
                                   <td className="p-3.5 text-slate-700 dark:text-white/80 font-mono">{r.stockActual}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/50">{r.unidadBase || "UNIDAD"}</td>
-                                  <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">${Number(r.precioVenta || 0).toFixed(2)}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">${Number(r.precioVenta || 0).toFixed(2)}</td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      className="text-teal-600 dark:text-teal-400 font-light uppercase tracking-wide hover:underline cursor-pointer">
                                       Ver Kárdex →
                                     </button>
                                   </td>
@@ -1285,10 +1368,10 @@ export default function Dashboard() {
                             ) : (
                               mapaReales.slice(0, 8).map((m) => (
                                 <tr key={m.mesa.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">Mesa #{m.mesa.numero}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-slate-900 dark:text-white">Mesa #{m.mesa.numero}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/60">{m.mesa.zona || "Principal"} · {m.mesa.capacidad || 4}p</td>
                                   <td className="p-3.5">
-                                    <span className={`px-2.5 py-1 rounded-full font-semibold text-[10px] ${
+                                    <span className={`px-2.5 py-1 rounded-full font-light uppercase tracking-wide text-[10px] ${
                                       m.estado === "OCUPADA"
                                         ? "bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-300"
                                         : "bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300"
@@ -1297,11 +1380,11 @@ export default function Dashboard() {
                                     </span>
                                   </td>
                                   <td className="p-3.5 text-slate-700 dark:text-white/80">{m.comandaAbierta ? `Comanda #${m.comandaAbierta.id} (${m.comandaAbierta.mesero})` : "Sin comanda"}</td>
-                                  <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{m.comandaAbierta ? `$${Number(m.comandaAbierta.totalConsumo || 0).toFixed(2)}` : "—"}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">{m.comandaAbierta ? `$${Number(m.comandaAbierta.totalConsumo || 0).toFixed(2)}` : "—"}</td>
                                   <td className="p-3.5 text-right">
                                     <button
                                       onClick={() => navigate(rutaVertical)}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      className="text-teal-600 dark:text-teal-400 font-light uppercase tracking-wide hover:underline cursor-pointer">
                                       Abrir Mesa →
                                     </button>
                                   </td>
@@ -1330,19 +1413,19 @@ export default function Dashboard() {
                             ) : (
                               citasReales.map((c) => (
                                 <tr key={c.id} className="hover:bg-slate-100/50 dark:hover:bg-white/[0.02] transition-colors">
-                                  <td className="p-3.5 font-bold text-slate-900 dark:text-white">{c.paciente?.nombreCompleto || "—"}</td>
+                                  <td className="p-3.5 font-light uppercase tracking-wide text-slate-900 dark:text-white">{c.paciente?.nombreCompleto || "—"}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/60">{c.paciente?.edad ? `${c.paciente.edad} años` : "—"}</td>
                                   <td className="p-3.5 text-slate-700 dark:text-white/80">{c.motivo || c.especialidad || "—"}</td>
                                   <td className="p-3.5 text-slate-500 dark:text-white/50 font-mono">{c.horaInicio}</td>
                                   <td className="p-3.5">
-                                    <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
+                                    <span className="px-2.5 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-300 font-light uppercase tracking-wide text-[10px]">
                                       {c.estado}
                                     </span>
                                   </td>
                                   <td className="p-3.5 text-right">
                                     <button
-                                      onClick={() => alert(`Abriendo historia clínica de ${c.paciente?.nombreCompleto}`)}
-                                      className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer">
+                                      onClick={() => navigate("/mediclinic")}
+                                      className="text-teal-600 dark:text-teal-400 font-light uppercase tracking-wide hover:underline cursor-pointer">
                                       Abrir Historia →
                                     </button>
                                   </td>
@@ -1373,10 +1456,10 @@ export default function Dashboard() {
                       ].slice(0, 3).map((item, i) => (
                         <div key={i} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold">{item.tag}</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 text-xs font-mono font-light uppercase tracking-wide">{item.tag}</span>
                             <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">Pendiente</span>
                           </div>
-                          <div className="font-bold text-sm text-slate-900 dark:text-white">{item.titulo}</div>
+                          <div className="font-light uppercase tracking-wide text-sm text-slate-900 dark:text-white">{item.titulo}</div>
                           <p className="text-slate-500 dark:text-white/40 text-xs">{item.sub}</p>
                         </div>
                       ))
@@ -1385,7 +1468,7 @@ export default function Dashboard() {
                         No hay tareas sanitarias ni partos próximos programados para hoy en el hato.
                       </p>
                     )
-                  ) : (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia") ? (
+                  ) : (userIndustry === "clinica" || userIndustry === "veterinaria" || userIndustry === "odontologia" || userIndustry === "estetica") ? (
                     citasReales === null ? (
                       <p className="text-slate-400 dark:text-white/30 text-sm col-span-3 text-center py-4">Cargando…</p>
                     ) : citasReales.length === 0 ? (
@@ -1394,10 +1477,10 @@ export default function Dashboard() {
                       citasReales.map((c) => (
                         <div key={c.id} className="apple-glass rounded-2xl p-4 border border-white/10 text-left space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-bold">{c.horaInicio} — {c.horaFin}</span>
+                            <span className="text-teal-600 dark:text-teal-400 text-xs font-mono font-light uppercase tracking-wide">{c.horaInicio} — {c.horaFin}</span>
                             <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-600 dark:text-teal-300">{c.estado}</span>
                           </div>
-                          <div className="font-bold text-sm text-slate-900 dark:text-white">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
+                          <div className="font-light uppercase tracking-wide text-sm text-slate-900 dark:text-white">{c.paciente?.nombreCompleto} — {c.especialidad || c.motivo}</div>
                           <p className="text-slate-500 dark:text-white/40 text-xs">{c.motivo}</p>
                         </div>
                       ))
@@ -1446,7 +1529,7 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => setShowPaymentModal(true)}
-                  className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md flex items-center gap-2">
+                  className="btn-electric-blue text-xs font-light uppercase tracking-wide px-6 py-3 rounded-full cursor-pointer shadow-md flex items-center gap-2">
                   <IconCard size={14} />
                   <span>Reportar Nuevo Pago</span>
                 </button>
@@ -1455,29 +1538,31 @@ export default function Dashboard() {
               {/* Tarjetas de Estado del Plan */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="apple-glass rounded-2xl p-5 border border-teal-500/30 space-y-2">
-                  <div className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">Plan Actual</div>
+                  <div className="text-xs font-light text-teal-600 dark:text-teal-400 uppercase tracking-wider">Plan Actual</div>
                   <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
-                    {user?.plan || "Estándar"} ($35/mes)
+                    {suscripcion?.vencida ? "Plan vencido" : isTrial ? "Prueba gratis" : "Plan activo"}
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
-                    Módulos ilimitados para tu clínica + versión móvil.
+                    {suscripcion?.planSolicitado === "full" ? "Elegiste Aurora Full (desde $40/mes)." : suscripcion?.planSolicitado === "basico" ? "Elegiste Aurora Básico ($25/mes)." : "Aurora Básico $25/mes · Aurora Full desde $40/mes."}
                   </p>
                 </div>
 
                 <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-xs font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">Próxima Fecha de Corte</div>
+                  <div className="text-xs font-light text-sky-600 dark:text-sky-400 uppercase tracking-wider">{isTrial ? "Tu prueba termina" : "Próxima fecha de corte"}</div>
                   <div className="font-['Outfit'] font-black text-2xl text-slate-900 dark:text-white">
-                    25 Septiembre 2026
+                    {suscripcion?.fechaVencimiento
+                      ? new Date(suscripcion.fechaVencimiento + "T00:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" })
+                      : "—"}
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
-                    Recordatorio automático por WhatsApp 5 días antes.
+                    Te avisamos por correo 5 días antes.
                   </p>
                 </div>
 
                 <div className="apple-glass rounded-2xl p-5 border border-white/10 space-y-2">
-                  <div className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Métodos Disponibles</div>
-                  <div className="text-sm font-semibold text-slate-800 dark:text-white/90">
-                    Pago Móvil · Binance · Zelle · Tarjeta
+                  <div className="text-xs font-light text-purple-600 dark:text-purple-400 uppercase tracking-wider">Métodos Disponibles</div>
+                  <div className="text-sm font-light uppercase tracking-wide text-slate-800 dark:text-white/90">
+                    Pago Móvil · Binance · Zelle
                   </div>
                   <p className="text-xs text-slate-500 dark:text-white/40">
                     Tasa oficial BCV para pagos en bolívares.
@@ -1500,25 +1585,24 @@ export default function Dashboard() {
                         <th className="p-3.5">Monto</th>
                         <th className="p-3.5">Método / Referencia</th>
                         <th className="p-3.5">Estado</th>
-                        <th className="p-3.5 text-right">Comprobante</th>
+                        <th className="p-3.5 text-right">Recibo</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
-                      {(user?.payments && user.payments.length > 0) ? (
-                        user.payments.map((p) => (
+                      {(suscripcion?.pagos && suscripcion.pagos.length > 0) ? (
+                        suscripcion.pagos.map((p) => (
                           <tr key={p.id}>
-                            <td className="p-3.5 font-mono font-bold text-slate-900 dark:text-white">{p.id}</td>
-                            <td className="p-3.5 text-slate-600 dark:text-white/60">{p.fecha}</td>
-                            <td className="p-3.5 font-bold text-teal-600 dark:text-teal-400">{p.monto}</td>
-                            <td className="p-3.5 text-slate-600 dark:text-white/70">{p.metodo} · Ref: {p.referencia}</td>
+                            <td className="p-3.5 font-mono font-light uppercase tracking-wide text-slate-900 dark:text-white">#{p.id}</td>
+                            <td className="p-3.5 text-slate-600 dark:text-white/60">{new Date(p.fecha).toLocaleDateString("es-VE")}</td>
+                            <td className="p-3.5 font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">{Number(p.monto).toFixed(2)} {p.moneda}</td>
+                            <td className="p-3.5 text-slate-600 dark:text-white/70">{p.metodoPago}{p.referencia ? ` · Ref: ${p.referencia}` : ""}</td>
                             <td className="p-3.5">
-                              <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-300 font-semibold text-[10px]">
-                                {p.estado.toUpperCase()}
+                              <span className="px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-300 font-light uppercase tracking-wide text-[10px]">
+                                VERIFICADO
                               </span>
                             </td>
                             <td className="p-3.5 text-right">
-                              <button
-                                onClick={() => alert(`Descargando factura en PDF del pago ${p.id}`)}
+                              <button onClick={() => suscripcion && descargarReciboPagoAurora(p, suscripcion)}
                                 className="text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer inline-flex items-center gap-1">
                                 <IconFileText size={12} /> Descargar PDF
                               </button>
@@ -1528,10 +1612,21 @@ export default function Dashboard() {
                       ) : (
                         <tr>
                           <td colSpan={6} className="p-6 text-center text-slate-400 dark:text-white/40">
-                            Sin pagos ni recibos registrados aún en esta cuenta. Usa &ldquo;Reportar Nuevo Pago&rdquo; para registrar tu comprobante.
+                            Aún no hay pagos confirmados. Cuando reportes uno, aparece aquí en cuanto el equipo de Aurora lo verifique.
                           </td>
                         </tr>
                       )}
+                      {(suscripcion?.reportes || []).filter((r) => r.estado === "EN_VERIFICACION").map((r) => (
+                        <tr key={`rep-${r.id}`} className="bg-amber-50/50 dark:bg-amber-500/5">
+                          <td className="p-3.5 font-mono text-slate-500 dark:text-white/50">Reporte #{r.id}</td>
+                          <td className="p-3.5 text-slate-600 dark:text-white/60">{new Date(r.fecha).toLocaleDateString("es-VE")}</td>
+                          <td className="p-3.5 text-slate-600 dark:text-white/70" colSpan={2}>{r.detalle.replace(/^Pago reportado:\s*/, "")}</td>
+                          <td className="p-3.5">
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 font-semibold text-[10px]">EN VERIFICACIÓN</span>
+                          </td>
+                          <td className="p-3.5 text-right text-[11px] text-slate-400">Al verificarlo</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -1554,13 +1649,13 @@ export default function Dashboard() {
               </div>
               <button
                 onClick={() => setModalNuevoColaborador(true)}
-                className="btn-electric-blue text-xs font-bold px-6 py-3 rounded-full cursor-pointer shadow-md">
+                className="btn-electric-blue text-xs font-light uppercase tracking-wide px-6 py-3 rounded-full cursor-pointer shadow-md">
                 + Nuevo Colaborador
               </button>
             </div>
 
             {errorEquipo && (
-              <p className="text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{errorEquipo}</p>
+              <p className="text-xs font-light uppercase tracking-wide text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{errorEquipo}</p>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1569,13 +1664,13 @@ export default function Dashboard() {
                 <div className="font-['Outfit'] font-bold text-base text-slate-900 dark:text-white">
                   {user?.nombre || "Usuario Administrador"}
                 </div>
-                <div className="text-xs font-semibold text-teal-600 dark:text-teal-400">
+                <div className="text-xs font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">
                   {ROL_LABEL[user?.rol || ""] || user?.rol || "Propietario / Admin"}
                 </div>
                 <div className="text-xs text-slate-500 dark:text-white/40 font-mono">
                   {user?.email || "admin@auroraplus.com"}
                 </div>
-                <span className="inline-block text-[9px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">
+                <span className="inline-block text-[9px] font-light uppercase tracking-wider bg-teal-500/15 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">
                   Tú (Dueño/Administrador)
                 </span>
               </div>
@@ -1600,18 +1695,18 @@ export default function Dashboard() {
                             {u.nombreCompleto || u.username}
                           </span>
                           {!u.activo && (
-                            <span className="text-[9px] font-bold uppercase tracking-wider bg-slate-500/15 text-slate-500 dark:text-white/50 px-2 py-0.5 rounded-full shrink-0">
+                            <span className="text-[9px] font-light uppercase tracking-wider bg-slate-500/15 text-slate-500 dark:text-white/50 px-2 py-0.5 rounded-full shrink-0">
                               Desactivado
                             </span>
                           )}
                         </div>
                         <div className="text-xs text-slate-500 dark:text-white/40 font-mono">@{u.username}</div>
-                        <div className="text-[11px] font-semibold text-teal-600 dark:text-teal-400">{ROL_LABEL[u.rol] || u.rol}</div>
+                        <div className="text-[11px] font-light uppercase tracking-wide text-teal-600 dark:text-teal-400">{ROL_LABEL[u.rol] || u.rol}</div>
                       </div>
                       {u.activo && (
                         <button
                           onClick={() => desactivarColaborador(u.id)}
-                          className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 cursor-pointer shrink-0"
+                          className="px-3 py-1.5 rounded-xl text-[11px] font-light uppercase tracking-wide bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 cursor-pointer shrink-0"
                         >
                           Desactivar
                         </button>
@@ -1659,22 +1754,22 @@ export default function Dashboard() {
                 className="space-y-3 text-sm"
               >
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Nombre completo</label>
+                  <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Nombre completo</label>
                   <input name="nombreCompleto" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Usuario (para iniciar sesión)</label>
+                  <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Usuario (para iniciar sesión)</label>
                   <input required name="username" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Contraseña</label>
+                  <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Contraseña</label>
                   <input required name="password" type="password" minLength={6} className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 dark:text-white/50 block mb-1">Rol</label>
+                  <label className="text-xs font-light uppercase tracking-wide text-slate-500 dark:text-white/50 block mb-1">Rol</label>
                   <select required name="rol" defaultValue="" className="w-full px-3 py-2 rounded-xl bg-white/80 dark:bg-white/5 border border-slate-300 dark:border-white/15 text-slate-900 dark:text-white">
                     <option value="" disabled>Selecciona un rol…</option>
-                    {Object.entries(ROL_LABEL).filter(([id]) => id !== "DUENO_ADMIN").map(([id, label]) => (
+                    {Object.entries(ROL_LABEL).filter(([id]) => id !== "DUENO_ADMIN" && (!ROLES_POR_RUBRO[userIndustry] || ROLES_POR_RUBRO[userIndustry].includes(id))).map(([id, label]) => (
                       <option key={id} value={id}>{label}</option>
                     ))}
                   </select>
@@ -1683,10 +1778,10 @@ export default function Dashboard() {
                   Este colaborador no tendrá acceso a Equipo & Roles ni a Auditoría — eso queda reservado al Dueño/Administrador.
                 </p>
                 <div className="pt-2 flex justify-end gap-2">
-                  <button type="button" onClick={() => setModalNuevoColaborador(false)} className="px-4 py-2 rounded-xl bg-slate-200/70 dark:bg-white/10 text-xs font-bold text-slate-800 dark:text-white cursor-pointer">
+                  <button type="button" onClick={() => setModalNuevoColaborador(false)} className="px-4 py-2 rounded-xl bg-slate-200/70 dark:bg-white/10 text-xs font-light uppercase tracking-wide text-slate-800 dark:text-white cursor-pointer">
                     Cancelar
                   </button>
-                  <button type="submit" disabled={guardandoColaborador} className="px-5 py-2 rounded-xl btn-electric-blue text-xs font-bold cursor-pointer disabled:opacity-60">
+                  <button type="submit" disabled={guardandoColaborador} className="px-5 py-2 rounded-xl btn-electric-blue text-xs font-light uppercase tracking-wide cursor-pointer disabled:opacity-60">
                     {guardandoColaborador ? "Creando…" : "Crear Colaborador"}
                   </button>
                 </div>
@@ -1712,7 +1807,7 @@ export default function Dashboard() {
                     Pagar Suscripción Aurora Plus
                   </h3>
                   <p className="text-slate-500 dark:text-white/40 text-xs">
-                    Activación automática para {vertical.name}
+                    Reporta tu pago y lo activamos al verificarlo
                   </p>
                 </div>
               </div>
@@ -1733,26 +1828,26 @@ export default function Dashboard() {
 
                 {/* Datos bancarios oficiales para transferir */}
                 <div className="p-4 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-300/80 dark:border-white/10 text-xs space-y-2.5">
-                  <div className="font-bold text-emerald-600 dark:text-emerald-400 font-sans text-xs flex items-center justify-between">
+                  <div className="font-light uppercase tracking-wide text-emerald-600 dark:text-emerald-400 font-sans text-xs flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <IconBank size={14} /> Cuentas Oficiales para Transferir:
                     </div>
-                    <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                      Tasa BCV Oficial: {tasaBcv.toFixed(2)} Bs/$
+                    <span className="text-[10px] font-mono font-light uppercase tracking-wide bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                      {tasaBcv ? `Tasa de referencia: ${tasaBcv.toFixed(2)} Bs/$` : "Paga a la tasa BCV del día"}
                     </span>
                   </div>
 
                   {/* Pago Movil Banesco */}
                   <div className="p-3 rounded-xl bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 space-y-1.5 font-mono text-[11px]">
                     <div className="flex items-center justify-between">
-                      <span className="font-sans font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span className="font-sans font-light uppercase tracking-wide text-slate-900 dark:text-white flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                         Pago Movil {cuentasCobro.banco || "Banesco (0134)"}
                       </span>
                       <button
                         type="button"
                         onClick={() => copiarTexto(`${cuentasCobro.telefono} ${cuentasCobro.cedula}`, "todo")}
-                        className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline cursor-pointer font-sans"
+                        className="text-[10px] text-emerald-600 dark:text-emerald-400 font-light uppercase tracking-wide hover:underline cursor-pointer font-sans"
                       >
                         {copiadoCampo === "todo" ? "Copiado!" : "Copiar Datos"}
                       </button>
@@ -1786,13 +1881,15 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    {/* Total equivalente en Bs */}
+                    {/* Total equivalente en Bs: solo si hay una tasa real cargada */}
+                    {tasaBcv && (
                     <div className="pt-1.5 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px] font-sans">
                       <span className="text-slate-500 dark:text-slate-400">Monto exacto a transferir:</span>
-                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs">
-                        Bs. {((parseFloat(paymentForm.monto.replace(/[^0-9.]/g, "")) || 35.0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className="font-mono font-light uppercase tracking-wide text-emerald-600 dark:text-emerald-400 text-xs">
+                        Bs. {((parseFloat(paymentForm.monto.replace(/[^0-9.]/g, "")) || 25.0) * tasaBcv).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
+                    )}
                   </div>
 
                   {/* Binance USDT si existe */}
@@ -1802,7 +1899,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => copiarTexto(cuentasCobro.binanceUsdt, "binance")}
-                        className="text-[10px] text-sky-500 font-bold hover:underline cursor-pointer flex-shrink-0"
+                        className="text-[10px] text-sky-500 font-light uppercase tracking-wide hover:underline cursor-pointer flex-shrink-0"
                       >
                         {copiadoCampo === "binance" ? "Copiado!" : "Copiar"}
                       </button>
@@ -1816,7 +1913,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => copiarTexto(cuentasCobro.zelle, "zelle")}
-                        className="text-[10px] text-purple-500 font-bold hover:underline cursor-pointer flex-shrink-0"
+                        className="text-[10px] text-purple-500 font-light uppercase tracking-wide hover:underline cursor-pointer flex-shrink-0"
                       >
                         {copiadoCampo === "zelle" ? "Copiado!" : "Copiar"}
                       </button>
@@ -1831,7 +1928,7 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                  <label className="block text-xs font-light uppercase tracking-wide text-slate-700 dark:text-white/70 mb-1">
                     Metodo de Pago Utilizado
                   </label>
                   <select
@@ -1842,13 +1939,12 @@ export default function Dashboard() {
                     <option value="Transferencia Bancaria Nacional (Banesco/Mercantil)">Transferencia Bancaria Nacional</option>
                     <option value="Binance Pay / USDT">Binance Pay / USDT</option>
                     <option value="Zelle">Zelle</option>
-                    <option value="Tarjeta de Crédito / Débito Internacional">Tarjeta Internacional</option>
                   </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                    <label className="block text-xs font-light uppercase tracking-wide text-slate-700 dark:text-white/70 mb-1">
                       Monto a Reportar
                     </label>
                     <input
@@ -1856,11 +1952,11 @@ export default function Dashboard() {
                       value={paymentForm.monto}
                       onChange={(e) => setPaymentForm({ ...paymentForm, monto: e.target.value })}
                       className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white/50 dark:bg-black/20 text-xs text-slate-900 dark:text-white font-mono"
-                      placeholder="$35.00 USD"
+                      placeholder="$25.00"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-white/70 mb-1">
+                    <label className="block text-xs font-light uppercase tracking-wide text-slate-700 dark:text-white/70 mb-1">
                       Número de Referencia
                     </label>
                     <input
@@ -1874,17 +1970,20 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {errorPago && <p className="text-xs text-rose-600 dark:text-rose-400">{errorPago}</p>}
+
                 <div className="pt-2 flex items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setShowPaymentModal(false)}
-                    className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl text-slate-700 dark:text-white cursor-pointer">
+                    className="apple-glass-btn text-xs font-light uppercase tracking-wide px-4 py-2.5 rounded-xl text-slate-700 dark:text-white cursor-pointer">
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="btn-electric-blue text-xs font-bold px-6 py-2.5 rounded-xl cursor-pointer shadow-md">
-                    Confirmar y Activar Plan →
+                    disabled={enviandoPago}
+                    className="btn-electric-blue text-xs font-light uppercase tracking-wide px-6 py-2.5 rounded-xl cursor-pointer shadow-md disabled:opacity-60">
+                    {enviandoPago ? "Enviando…" : "Enviar reporte de pago →"}
                   </button>
                 </div>
               </form>

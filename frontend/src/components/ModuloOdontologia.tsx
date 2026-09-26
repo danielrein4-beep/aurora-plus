@@ -92,9 +92,13 @@ export default function ModuloOdontologia({
   }, [pacientes, busqueda]);
 
   const tasaBcvNum = useMemo(() => {
-    if (config?.tasaBcv && typeof config.tasaBcv === "number") return config.tasaBcv;
-    if (config?.tasaCambio && typeof config.tasaCambio === "number") return config.tasaCambio;
-    return 50.0;
+    // MediclinicApp la entrega como tasaBCV; antes solo se leía tasaBcv y siempre caía en 50.
+    // Sin tasa real se devuelve 0 y las pantallas no muestran bolívares.
+    for (const v of [config?.tasaBCV, config?.tasaBcv, config?.tasaCambio]) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return 0;
   }, [config]);
 
   return (
@@ -234,7 +238,7 @@ export default function ModuloOdontologia({
                   title="Ver expediente clinico completo en Historias Clinicas"
                 >
                   <IconFileText size={14} />
-                  <span>Historia Clinica</span>
+                  <span>Historia Clínica</span>
                 </button>
               )}
               {onIrACotizador && (
@@ -252,7 +256,7 @@ export default function ModuloOdontologia({
           </div>
         ) : (
           <div className="mt-4 pt-4 border-t border-slate-200/80 dark:border-white/10 flex items-center justify-between text-xs text-slate-400">
-            <span>Ningun paciente seleccionado. Busca un paciente arriba para cargar su expediente odontologico.</span>
+            <span>Ningún paciente seleccionado. Busca un paciente arriba para cargar su expediente odontológico.</span>
           </div>
         )}
 
@@ -263,18 +267,18 @@ export default function ModuloOdontologia({
             onClick={() => setPestanaActiva("hoy")}
             className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "hoy"
-                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-black shadow-md"
+                ? "bg-[#0F172A] text-[#FFFFFF] dark:bg-white dark:text-slate-900 font-black shadow-md"
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Hoy en la clinica</span>
+            <span>Hoy en la clínica</span>
           </button>
           <button
             type="button"
             onClick={() => setPestanaActiva("insumos")}
             className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "insumos"
-                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-black shadow-md"
+                ? "bg-[#0F172A] text-[#FFFFFF] dark:bg-white dark:text-slate-900 font-black shadow-md"
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
@@ -290,18 +294,18 @@ export default function ModuloOdontologia({
                 : "bg-violet-500/10 hover:bg-violet-500/20 text-violet-700 dark:text-violet-300"
             }`}
           >
-            <span>Consulta en sillon</span>
+            <span>Consulta en sillón</span>
           </button>
           <button
             type="button"
             onClick={() => setPestanaActiva("anamnesis")}
             className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               pestanaActiva === "anamnesis"
-                ? "bg-rose-500 text-white font-black shadow-md shadow-rose-500/20"
+                ? "bg-rose-600 text-[#FFFFFF] font-black shadow-md shadow-rose-500/20"
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Ficha & Riesgo Quirurgico</span>
+            <span>Ficha y riesgo quirúrgico</span>
           </button>
 
           <button
@@ -337,7 +341,7 @@ export default function ModuloOdontologia({
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Bitacora de Evolucion en Sillon</span>
+            <span>Bitácora de evolución en sillón</span>
           </button>
 
           <button
@@ -373,7 +377,7 @@ export default function ModuloOdontologia({
                 : "bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
             }`}
           >
-            <span>Radiografias</span>
+            <span>Radiografías</span>
           </button>
 
           <button

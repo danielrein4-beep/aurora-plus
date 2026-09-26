@@ -56,8 +56,38 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> manejarRuntimeException(RuntimeException ex) {
+        // Un fallo de programación o de base de datos no es una regla de negocio: su mensaje
+        // (nombres de tablas, SQL, "Cannot invoke ... because null") no debe llegar al usuario, y
+        // tiene que quedar como ERROR con la traza para que Sentry lo vea (antes era un warn y un 400).
+        if (esErrorTecnico(ex)) {
+            log.error("Error interno no controlado", ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message",
+                "Ocurrió un error interno. Ya quedó registrado; intenta de nuevo y, si se repite, escríbenos a soporte."));
+        }
         log.warn("Error de negocio: {}", ex.getMessage());
         return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage() != null ? ex.getMessage() : "Ocurrió un error inesperado"));
+    }
+
+    /** Un id con letras en la URL o un JSON mal armado: es un 400, pero sin el texto interno de Spring. */
+    @ExceptionHandler({
+        org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+        org.springframework.http.converter.HttpMessageNotReadableException.class
+    })
+    public ResponseEntity<Map<String, String>> manejarDatoMalFormado(RuntimeException ex) {
+        log.warn("Petición con datos mal formados: {}", ex.getMessage());
+        return ResponseEntity.badRequest().body(Map.of("message", "Los datos enviados no tienen el formato correcto."));
+    }
+
+    private static boolean esErrorTecnico(RuntimeException ex) {
+        return ex.getMessage() == null
+            || ex instanceof NullPointerException
+            || ex instanceof ClassCastException
+            || ex instanceof IndexOutOfBoundsException
+            || ex instanceof ArithmeticException
+            || ex instanceof UnsupportedOperationException
+            || ex instanceof org.springframework.dao.DataAccessException
+            || ex instanceof jakarta.persistence.PersistenceException
+            || ex instanceof org.hibernate.HibernateException;
     }
 
     /**

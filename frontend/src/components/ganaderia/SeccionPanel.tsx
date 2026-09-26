@@ -1,6 +1,10 @@
+import { useEffect, useState } from "react";
 import { IconSettings } from "../../Icons";
+import { obtenerFincaGanaderia } from "../../api";
 import type { AnimalGanaderia, PotreroGanaderia, RegistroOrdenoGanaderia, VacunaGanaderia, AlertaSanitariaGanaderia, TanqueLeche, VentaLecheTanque } from "../../api";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
+import { KG_POR_UG, num, verFecha } from "./formato";
+import TarjetaIndicadores from "./TarjetaIndicadores";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { MonedasConfig, TabGanaderia, SubPotreros } from "./tipos";
 
@@ -21,6 +25,8 @@ interface Props {
   ventasLeche: VentaLecheTanque[];
   abrirNuevoPotrero: () => void;
   setAltaAnimal: (valores: Partial<FormAltaAnimal> | null) => void;
+  /** Registro rápido del hato con potrero por animal (solo quien puede importar). */
+  abrirRegistroRapido?: () => void;
   setModalAjusteTanque: (abierto: boolean) => void;
   setModalRotar: (potrero: PotreroGanaderia | null) => void;
   setModalVentaLeche: (abierto: boolean) => void;
@@ -33,12 +39,21 @@ interface Props {
 export default function SeccionPanel({
   alertasSanitarias, animales, animalesActivos, monedasConfig, ordenos, potreros, precioLecheUSD,
   tanqueLeche, tasaBCV, tasaCOP, tenantId, totalAnimales, vacunas, ventasLeche, abrirNuevoPotrero,
-  setAltaAnimal, setModalAjusteTanque, setModalRotar, setModalVentaLeche, setOrdenoAbierto,
+  setAltaAnimal, abrirRegistroRapido, setModalAjusteTanque, setModalRotar, setModalVentaLeche, setOrdenoAbierto,
   setSubPotreros, setTab,
 }: Props) {
+  // Ubicación real de la finca (backend). Antes se miraba una clave del navegador que es de las monedas.
+  const [fincaUbicada, setFincaUbicada] = useState(false);
+  useEffect(() => {
+    obtenerFincaGanaderia().then(f => setFincaUbicada(f?.latitud != null && f?.longitud != null)).catch(() => setFincaUbicada(false));
+  }, [tenantId]);
   const vacasOrdeno = animalesActivos.filter(a => a.tipoAnimal === "VACA" && a.sexo === "HEMBRA").length;
   const totalHectareas = potreros.reduce((sum, p) => sum + (Number(p.areaHectareas) || 0), 0);
-  const cargaAnimalHa = totalHectareas > 0 ? (totalAnimales / totalHectareas).toFixed(2) : "0.00";
+  // Carga animal en UG/ha: una unidad ganadera = 450 kg de peso vivo. Los animales sin peso
+  // cargado no suman (se avisa cuántos son) en vez de suponerles un peso.
+  const pesoVivoTotal = animalesActivos.reduce((s, a) => s + (Number(a.pesoActual) || 0), 0);
+  const sinPeso = animalesActivos.filter(a => !(Number(a.pesoActual) > 0)).length;
+  const cargaUgHa = totalHectareas > 0 ? pesoVivoTotal / KG_POR_UG / totalHectareas : null;
   const litrosHoy = ordenos
     .filter(o => o.fecha === fechaLocalISO())
     .reduce((sum, o) => sum + (Number(o.cantidadLitros) || 0), 0);
@@ -49,7 +64,6 @@ export default function SeccionPanel({
 
       {/* Checklist de Primeros Pasos (Onboarding de Finca Vacía) */}
       {(() => {
-        const fincaUbicada = typeof window !== "undefined" && !!localStorage.getItem(`aurora_finca_config_${tenantId}`);
         const tienePotreros = potreros.length > 0;
         const tieneAnimales = animales.length > 0;
         const pasosCompletados = (fincaUbicada ? 1 : 0) + (tienePotreros ? 1 : 0) + (tieneAnimales ? 1 : 0);
@@ -60,23 +74,29 @@ export default function SeccionPanel({
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
                   <h3 className="font-['Outfit'] font-black text-lg text-slate-900">
-                    Checklist de Primeros Pasos para tu Finca
+                    Primeros pasos en tu finca
                   </h3>
-                  <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+                  <span className="text-[11px] tabular-nums px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
                     {pasosCompletados} de 3 completados
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
                   {pasosCompletados === 3
                     ? "¡Felicidades! Has completado la configuración esencial de tu predio."
-                    : "Configura tu predio en 3 pasos clave para desbloquear el control agronómico completo:"}
+                    : "Tres pasos para tener tu finca lista en Aurora:"}
                 </p>
+                {/* En celular los pasos hechos se resumen en una línea y solo se muestran los pendientes. */}
+                {pasosCompletados > 0 && pasosCompletados < 3 && (
+                  <p className="md:hidden text-xs font-semibold text-teal-700">
+                    Listo: {[fincaUbicada && "ubicación", tienePotreros && `${potreros.length} potreros`, tieneAnimales && `${totalAnimales} animales`].filter(Boolean).join(" · ")}
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Paso 1: Fijar Ubicación */}
-              <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+              <div className={`p-4 rounded-2xl border transition-all flex-col justify-between gap-3 ${fincaUbicada ? "hidden md:flex" : "flex"} ${
                 fincaUbicada
                   ? "bg-teal-50 border-teal-200"
                   : "bg-slate-50 border-slate-200 hover:border-teal-300"
@@ -112,7 +132,7 @@ export default function SeccionPanel({
               </div>
 
               {/* Paso 2: Crear Primer Potrero */}
-              <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+              <div className={`p-4 rounded-2xl border transition-all flex-col justify-between gap-3 ${tienePotreros ? "hidden md:flex" : "flex"} ${
                 tienePotreros
                   ? "bg-teal-50 border-teal-200"
                   : "bg-slate-50 border-slate-200 hover:border-teal-300"
@@ -148,7 +168,7 @@ export default function SeccionPanel({
               </div>
 
               {/* Paso 3: Dar de Alta Primer Animal */}
-              <div className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+              <div className={`p-4 rounded-2xl border transition-all flex-col justify-between gap-3 ${tieneAnimales ? "hidden md:flex" : "flex"} ${
                 tieneAnimales
                   ? "bg-teal-50 border-teal-200"
                   : "bg-slate-50 border-slate-200 hover:border-teal-300"
@@ -157,29 +177,31 @@ export default function SeccionPanel({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-400">Paso 3</span>
                     {tieneAnimales ? (
-                      <span className="text-[11px] font-bold text-teal-700">Completado ({animales.length})</span>
+                      <span className="text-[11px] font-bold text-teal-700">Completado ({totalAnimales})</span>
                     ) : (
                       <span className="text-[11px] font-bold text-amber-600">Pendiente</span>
                     )}
                   </div>
                   <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                    Dar de Alta Primer Animal
+                    {!tieneAnimales && abrirRegistroRapido ? "Registrar tu ganado" : "Dar de Alta Primer Animal"}
                   </h4>
                   <p className="text-[11px] text-slate-500">
                     {tieneAnimales
-                      ? `${animales.length} cabezas en el hato.`
-                      : "Registra tu primer animal por nacimiento o compra con su arete."}
+                      ? `${totalAnimales} cabezas activas en el hato.`
+                      : abrirRegistroRapido
+                        ? "Todos a la vez, con el potrero de cada uno. Los potreros los ubicas en el mapa después."
+                        : "Registra tu primer animal por nacimiento o compra con su arete."}
                   </p>
                 </div>
                 <button
-                  onClick={() => setAltaAnimal({})}
+                  onClick={() => (!tieneAnimales && abrirRegistroRapido ? abrirRegistroRapido() : setAltaAnimal({}))}
                   className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     tieneAnimales
                       ? "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
                       : "btn-cyber-neon text-white shadow-sm"
                   }`}
                 >
-                  {tieneAnimales ? "+ Nuevo Animal" : "+ Dar de Alta"}
+                  {tieneAnimales ? "+ Nuevo Animal" : abrirRegistroRapido ? "+ Registrar mi ganado" : "+ Dar de Alta"}
                 </button>
               </div>
             </div>
@@ -191,10 +213,6 @@ export default function SeccionPanel({
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1 text-left">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-[10px] font-bold text-teal-700 uppercase tracking-wider">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-              Sincronización Agronómica Activa
-            </div>
             <h2 className="font-['Outfit'] font-black text-2xl text-slate-900">
               Control Integral de Finca & Hato
             </h2>
@@ -228,8 +246,11 @@ export default function SeccionPanel({
               </div>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between gap-3 flex-wrap text-xs text-slate-500">
-              <span>{totalHectareas.toFixed(1)} hectáreas totales</span>
-              <span className="font-semibold text-teal-700">{cargaAnimalHa} UG/ha de carga animal</span>
+              <span>{totalHectareas > 0 ? `${num(totalHectareas, 1)} ha en potreros` : "Sin hectáreas cargadas en los potreros"}</span>
+              <span className="font-semibold text-teal-700" title="Unidad ganadera (UG) = 450 kg de peso vivo">
+                {cargaUgHa != null ? `${num(cargaUgHa, 2)} UG/ha de carga animal` : "Carga animal: falta el área"}
+                {cargaUgHa != null && sinPeso > 0 && <span className="font-normal text-slate-500"> ({sinPeso} sin peso)</span>}
+              </span>
             </div>
           </div>
 
@@ -240,7 +261,7 @@ export default function SeccionPanel({
             </div>
             <div className="grid grid-cols-2 divide-x divide-slate-200 text-center">
               <div className="px-1.5">
-                <div className="text-xl font-black text-slate-900 font-['Outfit']">{litrosHoy.toFixed(1)}</div>
+                <div className="text-xl font-black text-slate-900 font-['Outfit']">{num(litrosHoy, 1)}</div>
                 <div className="text-[10px] font-medium text-slate-500 mt-0.5">Litros Hoy</div>
               </div>
               <div className="px-1.5">
@@ -252,14 +273,16 @@ export default function SeccionPanel({
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
               <span>
-                ${ingresosLecheHoy.toFixed(2)} USD
-                {monedasConfig.VES && ` · Bs. ${(ingresosLecheHoy * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                ${num(ingresosLecheHoy, 2)} USD
+                {monedasConfig.VES && ` · Bs. ${num((ingresosLecheHoy * tasaBCV), 2)}`}
               </span>
-              <span className="text-emerald-700 font-semibold">Sincronizado</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Indicadores de gestión: se recalculan cuando cambia el hato o llegan ordeños. */}
+      <TarjetaIndicadores version={animales.length * 100000 + ordenos.length} />
 
       {/* Widget: Tanque de Leche Frío (Stock en Finca & Despacho a Cisterna) */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 text-left">
@@ -271,7 +294,7 @@ export default function SeccionPanel({
                   Tanque de Leche Frío
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-50 text-sky-700 border border-sky-200">
-                  <span>{tanqueLeche?.temperaturaCelsius ?? 4.0}°C Óptima</span>
+                  <span>{tanqueLeche?.temperaturaCelsius != null ? `${num(tanqueLeche.temperaturaCelsius, 1)} °C` : "Sin temperatura"}</span>
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -299,13 +322,13 @@ export default function SeccionPanel({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 font-medium">Stock en Tanque</span>
-              <span className="text-[11px] font-mono font-bold text-sky-700">
+              <span className="text-[11px] text-slate-500 font-medium">Leche en el tanque</span>
+              <span className="text-[11px] tabular-nums font-bold text-sky-700">
                 {Math.round(((tanqueLeche?.stockActualLitros ?? 0) / (tanqueLeche?.capacidadLitros ?? 2000)) * 100)}%
               </span>
             </div>
             <div className="font-['Outfit'] font-black text-2xl text-slate-900">
-              {(tanqueLeche?.stockActualLitros ?? 0).toLocaleString()} <span className="text-xs font-normal text-slate-500">/ {(tanqueLeche?.capacidadLitros ?? 2000).toLocaleString()} L</span>
+              {num((tanqueLeche?.stockActualLitros ?? 0), 0)} <span className="text-xs font-normal text-slate-500">/ {num((tanqueLeche?.capacidadLitros ?? 2000), 0)} L</span>
             </div>
             <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
               <div
@@ -316,24 +339,24 @@ export default function SeccionPanel({
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-            <div className="text-[11px] text-slate-500 font-medium">Valor Comercial del Stock</div>
+            <div className="text-[11px] text-slate-500 font-medium">Valor de la leche en el tanque</div>
             <div className="font-['Outfit'] font-black text-2xl text-emerald-700">
-              ${((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${num(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD), 2)}
             </div>
             <div className="text-[10px] text-slate-500">
-              A ${precioLecheUSD.toFixed(2)} USD/L
-              {monedasConfig.VES && ` • Bs. ${(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              {monedasConfig.COP && ` • COP $${Math.round(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaCOP).toLocaleString()}`}
+              A ${num(precioLecheUSD, 2)} USD/L
+              {monedasConfig.VES && ` • Bs. ${num((((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaBCV), 2)}`}
+              {monedasConfig.COP && ` • COP $${num(Math.round(((tanqueLeche?.stockActualLitros ?? 0) * precioLecheUSD) * tasaCOP), 0)}`}
             </div>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
             <div className="text-[11px] text-slate-500 font-medium">Último Despacho Registrado</div>
             <div className="font-bold text-sm text-slate-900 truncate">
-              {ventasLeche[0] ? `${ventasLeche[0].litrosVendidos} L • ${ventasLeche[0].compradorOPlanta}` : "Sin despachos recientes"}
+              {ventasLeche[0] ? `${num(ventasLeche[0].litrosVendidos, 1)} L • ${ventasLeche[0].compradorOPlanta}` : "Sin despachos recientes"}
             </div>
             <div className="text-[10px] text-slate-500">
-              {ventasLeche[0] ? `${ventasLeche[0].fecha} • $${Number(ventasLeche[0].totalUSD).toFixed(2)} USD (${ventasLeche[0].monedaPago || "USD"})` : "Tanque en fase de recolección"}
+              {ventasLeche[0] ? `${verFecha(ventasLeche[0].fecha)} • $${num(Number(ventasLeche[0].totalUSD), 2)} (cobrado en ${ventasLeche[0].monedaPago || "USD"})` : "Tanque en fase de recolección"}
             </div>
           </div>
         </div>
@@ -402,18 +425,24 @@ export default function SeccionPanel({
                 <div>
                   <div className="font-bold text-sm text-slate-900 dark:text-white">{pot.nombre}</div>
                   <div className="text-xs text-slate-500 dark:text-white/40">
-                    {pot.areaHectareas} ha • {pot.tipoPasto || "Pasto Natural"} • Capacidad: {pot.capacidadAnimales || 20} cabezas
+                    {[
+                      pot.areaHectareas ? `${num(pot.areaHectareas, 1)} ha` : null,
+                      pot.tipoPasto || null,
+                      pot.capacidadAnimales ? `capacidad ${pot.capacidadAnimales} cabezas` : null,
+                    ].filter(Boolean).join(" · ") || "Faltan área, pasto y capacidad"}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                    pot.estado === "ACTIVO"
-                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                    pot.estado === "EN_DESCANSO"
+                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                      : pot.estado === "EN_MANTENIMIENTO"
+                        ? "bg-slate-100 text-slate-600 border border-slate-200"
+                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                   }`}>
-                    {pot.estado === "ACTIVO" ? "EN USO" : "DESCANSO"}
+                    {pot.estado === "EN_DESCANSO" ? "En descanso" : pot.estado === "EN_MANTENIMIENTO" ? "Mantenimiento" : "En uso"}
                   </span>
-                  {pot.estado === "ACTIVO" && (
+                  {pot.estado !== "EN_DESCANSO" && pot.estado !== "EN_MANTENIMIENTO" && (
                     <button
                       onClick={() => { setModalRotar(pot); }}
                       className="px-2.5 py-1 rounded-xl bg-emerald-500 text-white text-[11px] font-bold cursor-pointer hover:scale-105 transition-all">

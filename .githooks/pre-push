@@ -1,0 +1,93 @@
+#!/bin/sh
+# Chequeo de migraciones Flyway antes de cada push (rama unica de Aurora).
+#
+# Detiene el push si:
+#   1. hay dos migraciones con el mismo numero de version en la carpeta;
+#   2. el remoto tiene commits que no tienes (hay que hacer git pull --rebase primero);
+#   3. se edito, borro o renombro una migracion que ya estaba en el remoto
+#      (Flyway compara el checksum y fallaria);
+#   4. una migracion nueva tiene un numero menor o igual al mas alto del remoto
+#      (spring.flyway.out-of-order esta apagado: no se aplicaria en una base que ya va por delante).
+#
+# Activarlo una vez por copia del repositorio:  git config core.hooksPath .githooks
+# Saltarlo solo en una emergencia y sabiendo por que:  git push --no-verify
+
+DIR="src/main/resources/db/migration"
+remoto="$1"
+ceros="0000000000000000000000000000000000000000"
+fallo=0
+
+# Git manda por la entrada estandar una linea por rama a subir; git lfs tambien la necesita.
+entrada=$(cat)
+
+version() {
+  sed -n -E 's/^V([0-9]+)__.*/\1/p'
+}
+
+error() {
+  if [ "$fallo" -eq 0 ]; then
+    printf '\n[Aurora] PUSH DETENIDO por el chequeo de migraciones Flyway\n\n' >&2
+  fi
+  fallo=1
+  printf '%s\n' "$1" >&2
+}
+
+# 1. Versiones repetidas en la carpeta (incluye archivos aun sin commitear).
+if [ -d "$DIR" ]; then
+  for v in $(ls "$DIR" | version | sort -n | uniq -d); do
+    error "- Hay dos o mas migraciones con la version V$v:"
+    ls "$DIR" | grep -E "^V${v}__" | sed 's/^/    /' >&2
+    error "  Renombra la tuya al siguiente numero libre y avisa al equipo."
+  done
+fi
+
+git fetch -q "$remoto" 2>/dev/null
+
+printf '%s\n' "$entrada" | while read -r ref_local sha_local ref_remota sha_remoto; do
+  [ -z "$ref_local" ] && continue
+  [ "$sha_local" = "$ceros" ] && continue
+  rama=${ref_remota#refs/heads/}
+  base="refs/remotes/$remoto/$rama"
+  git rev-parse -q --verify "$base" >/dev/null || continue
+
+  # 2. El remoto va por delante.
+  atras=$(git rev-list --count "$sha_local..$base")
+  if [ "$atras" -gt 0 ]; then
+    error "- $remoto/$rama tiene $atras commit(s) que no tienes. Haz 'git pull --rebase' y vuelve a revisar las migraciones."
+  fi
+
+  # 3. Migraciones del remoto editadas, borradas o renombradas.
+  tocadas=$(git diff --name-status "$base" "$sha_local" -- "$DIR" | grep -E '^(M|D|R)')
+  if [ -n "$tocadas" ]; then
+    error "- Estas cambiando migraciones que ya estan en $remoto/$rama (Flyway las rechazaria):"
+    printf '%s\n' "$tocadas" | sed 's/^/    /' >&2
+    error "  No se editan migraciones ya subidas: crea una nueva con el siguiente numero."
+  fi
+
+  # 4. Migraciones nuevas con numero que no queda por encima del remoto.
+  maximo=$(git ls-tree --name-only "$base:$DIR" 2>/dev/null | version | sort -n | tail -1)
+  if [ -n "$maximo" ]; then
+    for f in $(git diff --name-only --diff-filter=A "$base" "$sha_local" -- "$DIR"); do
+      n=$(basename "$f" | version)
+      if [ -n "$n" ] && [ "$n" -le "$maximo" ]; then
+        error "- $(basename "$f") usa V$n, pero $remoto/$rama ya llega a V$maximo. Usa V$((maximo + 1)) o superior."
+      fi
+    done
+  fi
+
+  if [ "$fallo" -eq 1 ]; then
+    exit 1
+  fi
+done || fallo=1
+
+if [ "$fallo" -eq 1 ]; then
+  printf '\nNada se subio. Corrige lo anterior y vuelve a hacer git push.\n\n' >&2
+  exit 1
+fi
+
+# Git LFS (imagenes de la landing): mismo hook que instala "git lfs install".
+if [ -n "$AURORA_SOLO_CHEQUEO" ]; then
+  exit 0
+fi
+command -v git-lfs >/dev/null 2>&1 || { printf >&2 '\n%s\n\n' "Este repositorio usa Git LFS pero 'git-lfs' no esta instalado."; exit 2; }
+printf '%s\n' "$entrada" | git lfs pre-push "$@"

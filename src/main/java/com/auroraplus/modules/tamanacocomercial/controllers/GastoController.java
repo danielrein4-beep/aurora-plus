@@ -23,7 +23,8 @@ public class GastoController {
     }
 
     @PostMapping
-    public Gasto crear(@RequestParam Long tenantId, @RequestBody Gasto gasto) {
+    public Gasto crear(@RequestBody Gasto gasto) {
+        Long tenantId = TenantContext.getCurrentTenant();
         TamanacoAccessService.exigirDuenoAdmin();
         gasto.setTenantId(tenantId);
         if (gasto.getMoneda() == null || gasto.getMoneda().trim().isEmpty()) {

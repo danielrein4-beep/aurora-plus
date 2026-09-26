@@ -2,6 +2,8 @@
 // simulados que había en AuthContext/Dashboard. Todo pasa por /api, que
 // vite.config.ts redirige a localhost:8080 en desarrollo (evita CORS).
 
+import { borrarDatosGuardados } from "./sinConexion";
+
 const TOKEN_KEY = "aurora_token";
 
 export interface SesionAurora {
@@ -52,6 +54,7 @@ const SESSION_USER_KEY = "aurora_session_user";
 function manejarSesionVencida() {
   borrarSesion();
   try { localStorage.removeItem(SESSION_USER_KEY); } catch {}
+  borrarDatosGuardados();
   if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
     window.location.href = "/auth";
   }
@@ -176,6 +179,11 @@ export interface RegistroNegocio {
   telefonoContacto?: string;
   username: string;
   password: string;
+  /** Obligatorio en el registro público: el servidor guarda fecha, versión e IP. */
+  aceptaTerminos?: boolean;
+  versionTerminos?: string;
+  /** Plan elegido en la web ("basico" | "full"), si llegó desde Precios. */
+  planSolicitado?: string;
 }
 
 export async function registrarNegocio(datos: RegistroNegocio): Promise<SesionAurora> {
@@ -219,6 +227,10 @@ export interface MiNegocio {
   moduloPrincipal: string;
   logoBase64: string | null;
   hierroBase64: string | null;
+  /** Fin de la prueba o del período pagado (AAAA-MM-DD). */
+  fechaVencimientoPago?: string | null;
+  /** Cuenta de verificación creada desde el superadmin: puede cambiar de vertical en el Hub. */
+  permiteCambioVertical?: boolean;
 }
 
 export function obtenerMiNegocio(): Promise<MiNegocio> {
@@ -279,6 +291,78 @@ export interface FacturacionFiscalConfig {
   numeroActual?: number | null;
   numeroHasta?: number | null;
   numerosRestantes?: number | null;
+}
+
+/** Impuestos y cargos del negocio (Comercio). Todo apagado por defecto. */
+export interface ImpuestosNegocio {
+  cobraIva: boolean;
+  alicuotaIva: number;
+  preciosIncluyenIva: boolean;
+  igtfActivo: boolean;
+  alicuotaIgtf: number;
+  catalogoPrecioConIva: boolean;
+  costoEnvioDelivery: number;
+}
+
+export function obtenerImpuestosNegocio(): Promise<ImpuestosNegocio> {
+  return request(`/api/config/mi-negocio/impuestos`);
+}
+
+export function actualizarImpuestosNegocio(datos: Partial<ImpuestosNegocio>): Promise<ImpuestosNegocio> {
+  return request(`/api/config/mi-negocio/impuestos`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface RenglonLibroVentas {
+  fecha: string;
+  numeroTicket: string;
+  numeroControl: string | null;
+  clienteNombre: string | null;
+  clienteRif: string | null;
+  tasaBcv: number | null;
+  tasaEstimada: boolean;
+  exento: number;
+  baseImponible: number;
+  alicuotaIva: number;
+  iva: number;
+  igtf: number;
+  delivery: number;
+  total: number;
+  ivaQuitado: boolean;
+  ivaQuitadoPor: string | null;
+  esCredito: boolean;
+}
+
+export interface RenglonLibroCompras {
+  fecha: string;
+  proveedor: string;
+  proveedorRif: string | null;
+  numeroFactura: string | null;
+  numeroControl: string | null;
+  tasaBcv: number | null;
+  tasaEstimada: boolean;
+  sinFacturaFiscal: boolean;
+  exento: number;
+  baseImponible: number;
+  alicuotaIva: number;
+  iva: number;
+  ivaRetenido: number;
+  total: number;
+}
+
+export interface LibroFiscal<T> {
+  monedaBase: string;
+  desde: string;
+  hasta: string;
+  renglones: T[];
+}
+
+/** Libros para el contador; desde/hasta en "YYYY-MM-DD". */
+export function obtenerLibroVentas(desde: string, hasta: string): Promise<LibroFiscal<RenglonLibroVentas>> {
+  return request(`/api/comercio/libros/ventas?desde=${desde}&hasta=${hasta}`);
+}
+
+export function obtenerLibroCompras(desde: string, hasta: string): Promise<LibroFiscal<RenglonLibroCompras>> {
+  return request(`/api/comercio/libros/compras?desde=${desde}&hasta=${hasta}`);
 }
 
 export function obtenerFacturacionFiscal(): Promise<FacturacionFiscalConfig> {
@@ -481,12 +565,8 @@ export interface CobroConsulta {
   estado: string;
 }
 
-export async function listarCobrosDelDia(inicioIso: string, finIso: string): Promise<CobroConsulta[]> {
-  try {
-    return await request(`/api/salud/cobros/reporte?inicio=${inicioIso}&fin=${finIso}`);
-  } catch {
-    return [];
-  }
+export function listarCobrosDelDia(inicioIso: string, finIso: string): Promise<CobroConsulta[]> {
+  return request(`/api/salud/cobros/reporte?inicio=${inicioIso}&fin=${finIso}`);
 }
 
 export interface NuevoCobro {
@@ -539,6 +619,8 @@ export interface CierreCajaRegistro {
   totalCOP?: number;
   totalPacientes: number;
   observaciones?: string;
+  /** Detalle de cobros del cierre en JSON (V104), para reimprimirlo desde cualquier equipo. */
+  cobrosJson?: string;
 }
 
 export function listarCierresCaja(): Promise<CierreCajaRegistro[]> {
@@ -2038,6 +2120,38 @@ export async function extraerFacturaOcr(archivo: File): Promise<FacturaExtraidaO
   return res.json();
 }
 
+/** Fila que la IA leyó de la foto de una libreta o planilla del hato (propuesta para revisar). */
+export interface FilaHatoLeida {
+  arete: string;
+  sexo: "HEMBRA" | "MACHO" | "";
+  tipoAnimal: string;
+  raza: string;
+  peso: string;
+  potrero: string;
+}
+
+export async function leerHatoDesdeFoto(archivo: File): Promise<FilaHatoLeida[]> {
+  const sesion = leerSesion();
+  const headers: Record<string, string> = {};
+  if (sesion?.token) headers["Authorization"] = `Bearer ${sesion.token}`;
+  const formData = new FormData();
+  formData.append("file", archivo);
+  const res = await fetch(`/api/ganaderia/animales/leer-foto`, { method: "POST", body: formData, headers });
+  if (res.status === 401) {
+    manejarSesionVencida();
+    throw new ApiError("Sesión vencida — redirigiendo al login");
+  }
+  if (!res.ok) {
+    let mensaje = `Error ${res.status}`;
+    try {
+      const body = await res.json();
+      mensaje = body.error || body.message || mensaje;
+    } catch {}
+    throw new ApiError(mensaje);
+  }
+  return res.json();
+}
+
 export function listarComprasInsumo(tenantId: number): Promise<CompraInsumoHoreca[]> {
   return request(`/api/horeca/compras-insumo?tenantId=${tenantId}`);
 }
@@ -2766,6 +2880,8 @@ export interface LicenciaTenant {
   createdAt?: string;
   limiteUsuarios?: number | null;
   cantidadUsuarios?: number;
+  /** Cuenta de verificación: puede cambiar de vertical desde el Hub (V101). */
+  permiteCambioVertical?: boolean;
 }
 
 export interface ModuloTenant {
@@ -3201,19 +3317,13 @@ export function cambiarClaveSuperAdmin(actual: string, nueva: string, codigo?: s
   return requestSuperAdmin("/api/super-admin/seguridad/cambiar-clave", { method: "POST", body: JSON.stringify({ actual, nueva, codigo }) });
 }
 
+// Antes, si el servidor fallaba por cualquier motivo, el panel mostraba una lista guardada o de
+// demostración como si fueran los negocios reales. Ahora el error se muestra tal cual.
 export async function listarTenantsSuperAdmin(): Promise<LicenciaTenant[]> {
-  try {
-    const data = await requestSuperAdmin<LicenciaTenant[]>("/api/super-admin/tenants");
-    if (Array.isArray(data)) {
-      guardarTenantsLocales(data);
-      return data;
-    }
-  } catch (err: any) {
-    if (err?.message?.includes("Token") || err?.message?.includes("expirado") || err?.message?.includes("401")) {
-      throw err;
-    }
-  }
-  return obtenerTenantsLocales();
+  const data = await requestSuperAdmin<LicenciaTenant[]>("/api/super-admin/tenants");
+  if (!Array.isArray(data)) throw new Error("Respuesta inesperada al listar negocios");
+  guardarTenantsLocales(data);
+  return data;
 }
 
 // Las funciones de escritura de este panel (crear/activar/desactivar/renovar/
@@ -3230,6 +3340,12 @@ export async function crearTenantSuperAdmin(requestData: CrearTenantRequest): Pr
   const lista = obtenerTenantsLocales();
   guardarTenantsLocales([nuevo, ...lista]);
   return nuevo;
+}
+
+export async function permitirCambioVerticalSuperAdmin(tenantId: number, permitido: boolean): Promise<LicenciaTenant> {
+  return requestSuperAdmin<LicenciaTenant>(`/api/super-admin/tenants/${tenantId}/cambio-vertical?permitido=${permitido}`, {
+    method: "PATCH",
+  });
 }
 
 export async function activarTenantSuperAdmin(tenantId: number): Promise<LicenciaTenant> {
@@ -3272,22 +3388,11 @@ export async function cambiarPlanTenantSuperAdmin(tenantId: number, tipoLicencia
   return res;
 }
 
+// Sin respaldo inventado: si falla, el panel muestra el error en vez de módulos que no son los reales.
 export async function listarModulosTenantSuperAdmin(tenantId: number): Promise<ModuloTenant[]> {
-  try {
-    const res = await requestSuperAdmin<ModuloTenant[]>(`/api/super-admin/tenants/${tenantId}/modulos`);
-    if (Array.isArray(res)) return res;
-  } catch {}
-
-  const raw = localStorage.getItem(`aurora_super_admin_modulos_${tenantId}`);
-  if (raw) return JSON.parse(raw);
-
-  const modulosDefault: ModuloTenant[] = [
-    { tenantId, moduloNombre: "salud", activo: true },
-    { tenantId, moduloNombre: "horeca", activo: false },
-    { tenantId, moduloNombre: "repuestos", activo: false },
-    { tenantId, moduloNombre: "ganaderia", activo: false },
-  ];
-  return modulosDefault;
+  const res = await requestSuperAdmin<ModuloTenant[]>(`/api/super-admin/tenants/${tenantId}/modulos`);
+  if (!Array.isArray(res)) throw new Error("Respuesta inesperada al listar módulos");
+  return res;
 }
 
 export async function concederAccesoTotalSuperAdmin(tenantId: number): Promise<LicenciaTenant> {
@@ -3394,6 +3499,44 @@ export async function registrarPagoSuperAdmin(datos: RegistrarPagoSuperAdminRequ
   return requestSuperAdmin<PagoSuscripcion>("/api/super-admin/tenants/pagos", {
     method: "POST",
     body: JSON.stringify(datos),
+  });
+}
+
+/** Pago que un cliente reportó desde Aurora Hub y el equipo todavía no verifica. */
+export interface PagoReportadoSuperAdmin {
+  ticketId: number;
+  tenantId: number;
+  nombreEmpresa: string;
+  usuario: string | null;
+  fecha: string;
+  monto: number | null;
+  moneda: string;
+  metodo: string | null;
+  referencia: string | null;
+  plan: string | null;
+  nota: string | null;
+  estado: string;
+  fechaVencimiento: string | null;
+  vencida: boolean;
+}
+
+export async function listarPagosReportadosSuperAdmin(): Promise<PagoReportadoSuperAdmin[]> {
+  return requestSuperAdmin<PagoReportadoSuperAdmin[]>("/api/super-admin/tenants/pagos-reportados");
+}
+
+export async function verificarPagoReportadoSuperAdmin(ticketId: number, datos: {
+  monto?: number; moneda?: string; metodoPago?: string; referencia?: string; meses?: number; dias?: number; notas?: string;
+}): Promise<PagoSuscripcion> {
+  return requestSuperAdmin<PagoSuscripcion>(`/api/super-admin/tenants/pagos-reportados/${ticketId}/verificar`, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export async function rechazarPagoReportadoSuperAdmin(ticketId: number, motivo: string): Promise<void> {
+  await requestSuperAdmin<void>(`/api/super-admin/tenants/pagos-reportados/${ticketId}/rechazar`, {
+    method: "POST",
+    body: JSON.stringify({ motivo }),
   });
 }
 
@@ -3510,6 +3653,7 @@ export interface RepuestoItem {
   atributoVariante?: string | null; // etiqueta de este SKU dentro del grupo (ej. "Talla 38")
   colorVariante?: string | null; // segunda faceta de variante (ej. "Rojo") — selector de color, luego talla
   fechaVencimiento?: string | null; // "YYYY-MM-DD" — caducidad del artículo (ej. pinturas, químicos), no por lote
+  exentoIva?: boolean | null; // producto exento de IVA (cesta básica, medicinas...)
 }
 
 export interface PresentacionRepuesto {
@@ -3612,6 +3756,13 @@ export interface CompraRepuesto {
   total: number;
   montoPagado?: number | null;
   items?: DetalleCompraRepuesto[];
+  numeroControl?: string | null;
+  montoExento?: number | null;
+  baseImponible?: number | null;
+  alicuotaIva?: number | null;
+  montoIva?: number | null;
+  ivaRetenido?: number | null;
+  tasaBcv?: number | null;
 }
 
 export interface ItemCompraRepuestoRequest {
@@ -3628,6 +3779,13 @@ export interface CompraRepuestoRequest {
   montoPagadoAhora?: number;
   monedaPago?: string;
   diasCredito?: number;
+  /** Datos de la factura fiscal del proveedor, para el libro de compras (opcionales). */
+  numeroControl?: string;
+  montoExento?: number;
+  baseImponible?: number;
+  alicuotaIva?: number;
+  montoIva?: number;
+  ivaRetenido?: number;
 }
 
 export interface ResultadoVentaRepuestoVolumen {
@@ -3747,13 +3905,32 @@ export interface TicketPosRequest {
   diasCredito?: number;
   clienteId?: number;
   nombreCliente?: string;
+  /** false = el cajero quitó el IVA en esta venta (queda en el libro con su usuario). */
+  aplicaIva?: boolean;
+  /** true/false = el cajero activó o quitó el IGTF en esta venta. */
+  aplicaIgtf?: boolean;
+  /** Cargo de delivery en la moneda base. */
+  delivery?: number;
+  clienteRif?: string;
+}
+
+/** Desglose fiscal que calculó el servidor al cobrar (en la moneda base). */
+export interface DesgloseFiscalTicket {
+  exento: number;
+  baseImponible: number;
+  alicuotaIva: number;
+  iva: number;
+  delivery: number;
+  subtotal: number;
+  igtf: number;
+  total: number;
 }
 
 /**
  * Cobra el ticket completo del POS en una sola transacción: si una línea falla no queda nada
  * a medias, y si el ticket ya se cobró (reintento tras un corte de red) devuelve yaProcesado.
  */
-export function cobrarTicketPos(datos: TicketPosRequest): Promise<{ yaProcesado: boolean; total: number | null }> {
+export function cobrarTicketPos(datos: TicketPosRequest): Promise<{ yaProcesado: boolean; total: number | null; desglose?: DesgloseFiscalTicket | null }> {
   return request(`/api/repuestos/ventas/ticket`, { method: "POST", body: JSON.stringify(datos) });
 }
 
@@ -4158,6 +4335,10 @@ export interface ResultadoImportacionHato {
   errores: Array<{ fila: number; campo: string | null; mensaje: string }>;
   porTipo: Record<string, number>;
   porRaza: Record<string, number>;
+  /** Animales por potrero ("Sin potrero" si no se indicó). */
+  porPotrero?: Record<string, number>;
+  /** Potreros que no existían y se crean con esta carga, solo con el nombre. */
+  potrerosNuevos?: string[];
 }
 
 /** confirmar=false: solo vista previa. confirmar=true: guarda todo o nada. */
@@ -4166,6 +4347,82 @@ export function importarHatoGanaderia(filas: FilaImportacionHato[], confirmar: b
     method: "POST",
     body: JSON.stringify({ filas }),
   });
+}
+
+/**
+ * Nota de movilización de la finca: acompaña a los animales en un traslado junto con la
+ * guía oficial del INSAI (su número va en numeroGuiaOficial cuando ya se emitió).
+ */
+export interface GuiaMovilizacionGanaderia {
+  id: number;
+  /** Número interno de la nota (NM-aaaammdd-n). */
+  numeroGuia: string;
+  /** Guía oficial del INSAI, si ya se emitió. */
+  numeroGuiaOficial?: string;
+  fecha: string;
+  origen?: string;
+  destino?: string;
+  motivo?: string;
+  transportista?: string;
+  placaVehiculo?: string;
+  responsable?: string;
+  animales: { id: number; animal: AnimalGanaderia }[];
+}
+
+export function listarGuiasMovilizacion(): Promise<GuiaMovilizacionGanaderia[]> {
+  return request("/api/ganaderia/guias-traslado");
+}
+
+export function crearGuiaMovilizacion(datos: {
+  numeroGuiaOficial?: string; fecha: string; origen?: string; destino: string; motivo?: string;
+  transportista?: string; placaVehiculo?: string; responsable?: string; animalIds: number[];
+}): Promise<GuiaMovilizacionGanaderia> {
+  return request("/api/ganaderia/guias-traslado", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function descargarNotaMovilizacionPdf(id: number): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/guias-traslado/${id}/pdf`);
+}
+
+/** Baja de un animal: muerte (queda MUERTO) o robo/abigeato (queda ROBADO). */
+export interface BajaAnimalGanaderia {
+  id: number;
+  animal: AnimalGanaderia;
+  fecha: string;
+  motivo: string;
+  observaciones?: string;
+}
+
+export function registrarBajaGanaderia(datos: { animalId: number; fecha: string; motivo: string; observaciones?: string }): Promise<BajaAnimalGanaderia> {
+  return request("/api/ganaderia/bajas", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarBajasGanaderia(): Promise<BajaAnimalGanaderia[]> {
+  return request("/api/ganaderia/bajas");
+}
+
+/** Indicadores de gestión del hato; null = sin datos suficientes para calcularlo. */
+export interface IndicadoresGanaderia {
+  hembrasReproductivas: number;
+  prenadas: number;
+  porcentajePrenez: number | null;
+  vacas: number;
+  nacimientos12Meses: number;
+  natalidad12Meses: number | null;
+  intervaloEntrePartosDias: number | null;
+  intervalosMedidos: number;
+  diasAbiertos: number | null;
+  diasAbiertosMedidos: number;
+  muertes12Meses: number;
+  mortalidad12Meses: number | null;
+  litrosPorVacaDia: number | null;
+  vacasOrdenadas30Dias: number;
+  gdpPromedioKgDia: number | null;
+  animalesConGdp: number;
+}
+
+export function obtenerIndicadoresGanaderia(): Promise<IndicadoresGanaderia> {
+  return request("/api/ganaderia/indicadores");
 }
 
 export interface PrenezActualGanaderia {
@@ -4177,6 +4434,126 @@ export interface PrenezActualGanaderia {
 
 export function listarPrenezActualGanaderia(): Promise<PrenezActualGanaderia[]> {
   return request(`/api/ganaderia/animales/prenez-actual`);
+}
+
+/** Margen de un animal: costos directos (compra, sanidad, alimento) e indirectos (nómina, gastos) contra su ingreso. */
+export interface MargenAnimalGanaderia {
+  animalId: number;
+  arete: string;
+  nombre: string | null;
+  tipoAnimal: string | null;
+  lote: string | null;
+  estado: string | null;
+  entrada: string | null;
+  salida: string | null;
+  dias: number;
+  pesoActual: number | null;
+  adquisicion: number;
+  vacunas: number;
+  medicamentos: number;
+  sanidadGeneral: number;
+  alimentacion: number;
+  costoDirecto: number;
+  manoDeObra: number;
+  gastosGenerales: number;
+  costoIndirecto: number;
+  costoTotal: number;
+  tipoIngreso: "VENTA" | "PROYECTADO" | "BAJA" | "SIN_VALORAR";
+  ingreso: number | null;
+  margenBruto: number | null;
+  margenNeto: number | null;
+}
+
+export interface MargenLoteGanaderia {
+  lote: string;
+  animales: number;
+  vendidos: number;
+  bajas: number;
+  sinValorar: number;
+  adquisicion: number;
+  sanidad: number;
+  alimentacion: number;
+  costoDirecto: number;
+  costoIndirecto: number;
+  costoTotal: number;
+  ingreso: number;
+  margenBruto: number;
+  margenNeto: number;
+  margenPorAnimal: number | null;
+}
+
+export type AlcanceMargen = "TODOS" | "ACTIVOS" | "VENDIDOS";
+
+export interface MargenGanaderia {
+  fechaCorte: string;
+  monedaBase: string;
+  alcance: AlcanceMargen;
+  precioKg: number | null;
+  precioKgSugerido: number | null;
+  animales: MargenAnimalGanaderia[];
+  lotes: MargenLoteGanaderia[];
+  totales: MargenLoteGanaderia;
+  notas: string[];
+}
+
+function consultaMargen(params: { precioKg?: number; alcance?: AlcanceMargen; lote?: string }): string {
+  const q = new URLSearchParams();
+  if (params.precioKg && params.precioKg > 0) q.set("precioKg", String(params.precioKg));
+  if (params.alcance) q.set("alcance", params.alcance);
+  if (params.lote) q.set("lote", params.lote);
+  const texto = q.toString();
+  return texto ? `?${texto}` : "";
+}
+
+export function obtenerMargenGanaderia(params: { precioKg?: number; alcance?: AlcanceMargen }): Promise<MargenGanaderia> {
+  return request(`/api/ganaderia/margen${consultaMargen(params)}`);
+}
+
+export function descargarMargenLotesPdf(params: { precioKg?: number; alcance?: AlcanceMargen; lote?: string }): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/margen/pdf${consultaMargen(params)}`);
+}
+
+export function descargarMargenAnimalPdf(animalId: number, precioKg?: number): Promise<Blob> {
+  return descargarPdfGanaderia(`/api/ganaderia/margen/animal/${animalId}/pdf${consultaMargen({ precioKg })}`);
+}
+
+/** Alimento, suplemento o sal mineral del depósito de la finca. costoUnitario = promedio de lo comprado. */
+export interface InsumoGanaderia {
+  id: number;
+  nombre: string;
+  tipo: string;
+  unidadMedida: string;
+  stockActual: number;
+  costoUnitario: number | null;
+}
+
+/** Ración dada en un potrero: su costo se reparte entre los animales que estaban ahí ese día. */
+export interface RacionGanaderia {
+  id: number;
+  fecha: string;
+  cantidad: number;
+  insumo: InsumoGanaderia;
+  potrero: { id: number; nombre: string };
+}
+
+export function listarInsumosGanaderia(): Promise<InsumoGanaderia[]> {
+  return request(`/api/ganaderia/alimentacion/insumos`);
+}
+
+export function crearInsumoGanaderia(datos: { nombre: string; tipo: string; unidadMedida: string }): Promise<InsumoGanaderia> {
+  return request(`/api/ganaderia/alimentacion/insumos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function registrarCompraInsumoGanaderia(datos: { insumoId: number; cantidad: number; costoTotal: number; motivo?: string }): Promise<InsumoGanaderia> {
+  return request(`/api/ganaderia/alimentacion/entradas`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function registrarRacionGanaderia(datos: { insumoId: number; potreroId: number; fecha: string; cantidad: number }): Promise<RacionGanaderia> {
+  return request(`/api/ganaderia/alimentacion/consumos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function listarRacionesGanaderia(dias = 90): Promise<RacionGanaderia[]> {
+  return request(`/api/ganaderia/alimentacion/consumos?dias=${dias}`);
 }
 
 async function descargarPdfGanaderia(ruta: string): Promise<Blob> {
@@ -4279,10 +4656,10 @@ export function actualizarPotreroGanaderia(id: number, tenantId: number, datos: 
   });
 }
 
-export function rotarPotreroGanaderia(id: number, tenantId: number, potreroDestinoId: number, animalIds?: number[]): Promise<any> {
+export function rotarPotreroGanaderia(id: number, tenantId: number, potreroDestinoId: number, animalIds?: number[], claveIdempotencia?: string): Promise<any> {
   return request(`/api/ganaderia/potreros/${id}/rotar?tenantId=${tenantId}`, {
     method: "POST",
-    body: JSON.stringify({ potreroDestinoId, animalIds }),
+    body: JSON.stringify({ potreroDestinoId, animalIds, claveIdempotencia }),
   });
 }
 
@@ -4341,10 +4718,10 @@ export function obtenerReporteOrdenoGanaderia(tenantId: number, desde: string, h
   return request(`/api/ganaderia/ordeno/reporte?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
 }
 
-export function registrarPesoGanaderia(tenantId: number, animalId: number, pesoKg: number, fecha?: string): Promise<RegistroPesoGanaderia> {
+export function registrarPesoGanaderia(tenantId: number, animalId: number, pesoKg: number, fecha?: string, claveIdempotencia?: string): Promise<RegistroPesoGanaderia> {
   return request(`/api/ganaderia/pesos?tenantId=${tenantId}`, {
     method: "POST",
-    body: JSON.stringify({ animalId, pesoKg, fecha }),
+    body: JSON.stringify({ animalId, pesoKg, fecha, claveIdempotencia }),
   });
 }
 
@@ -4588,6 +4965,7 @@ export function registrarMastitisGanaderia(tenantId: number, datos: {
   gradoCmt?: string;
   farmacoAplicado?: string;
   diasRetiroLeche?: number;
+  diasRetiroCarne?: number;
   veterinario?: string;
   costo?: number;
   notas?: string;
@@ -4609,6 +4987,8 @@ export interface GastoGanaderia {
   descripcion: string;
   monto: number;
   fecha: string;
+  /** Lote al que se le carga el gasto en el margen; null = todo el hato. */
+  lote?: string | null;
 }
 
 export function listarGastosGanaderia(tenantId?: number): Promise<GastoGanaderia[]> {
@@ -4621,6 +5001,7 @@ export function crearGastoGanaderia(tenantId: number, datos: {
   descripcion: string;
   monto: number;
   fecha: string;
+  lote?: string;
 }): Promise<GastoGanaderia> {
   return request(`/api/ganaderia/gastos?tenantId=${tenantId}`, {
     method: "POST",
@@ -4754,6 +5135,10 @@ export function listarEmpleadosPersonal(): Promise<EmpleadoPersonalApi[]> {
   return request("/api/personal/empleados");
 }
 
+export function crearEmpleadoPersonal(datos: { nombreCompleto: string; documentoIdentidad: string; fechaIngreso: string }): Promise<EmpleadoPersonalApi> {
+  return request("/api/personal/empleados", { method: "POST", body: JSON.stringify(datos) });
+}
+
 export interface EntradaDirectorioPersonalApi {
   id: number;
   nombreCompleto: string;
@@ -4813,6 +5198,8 @@ export interface PeriodoNominaApi {
   moneda: "USD" | "VES" | "COP";
   estado: "BORRADOR" | "CALCULADA" | "EN_REVISION" | "APROBADA" | "PAGADA" | "REVERSADA";
   fechaAprobacion: string | null;
+  /** Solo entran quienes cobran con esta frecuencia (null en períodos viejos = todos). */
+  frecuencia?: "SEMANAL" | "QUINCENAL" | "MENSUAL" | null;
 }
 
 export interface DetallePeriodoNominaApi {
@@ -4848,7 +5235,102 @@ export interface DetallePeriodoNominaApi {
       moneda: "USD" | "VES" | "COP";
       fecha: string;
     }>;
+    diasTrabajados: number | null;
+    horasMarcadas: number | null;
+    bono: number | null;
+    descuento: number | null;
+    nota: string | null;
+    tipoSalario: TipoSalarioNomina;
+    salario: number;
+    frecuencia: FrecuenciaPagoNomina;
+    fechaPago: string | null;
   }>;
+}
+
+// --- Nómina cómoda del dueño: sueldo de cada quien, preparar, revisar, pagar y recibos ---
+export type FrecuenciaPagoNomina = "SEMANAL" | "QUINCENAL" | "MENSUAL";
+export type TipoSalarioNomina = "FIJO_MENSUAL" | "DIARIO" | "POR_HORA" | "POR_JORNADA";
+
+export interface TrabajadorNomina {
+  id: number;
+  nombre: string;
+  cedula: string;
+  fechaIngreso: string;
+  fechaEgreso: string | null;
+  cargo: string | null;
+  tipoSalario: TipoSalarioNomina | null;
+  salario: number | null;
+  moneda: string | null;
+  frecuencia: FrecuenciaPagoNomina | null;
+  tieneUsuario: boolean;
+  horasSemana: number;
+  diasSemana: number;
+  trabajandoAhora: boolean;
+  ultimoPagoHasta: string | null;
+}
+
+export function listarTrabajadoresNomina(): Promise<TrabajadorNomina[]> {
+  return request("/api/personal/nomina/trabajadores");
+}
+
+export function ponerSueldoTrabajador(empleadoId: number, datos: {
+  cargo: string; tipoSalario: TipoSalarioNomina; salario: number; moneda: string; frecuencia: FrecuenciaPagoNomina;
+}): Promise<unknown> {
+  return request(`/api/personal/nomina/sueldo/${empleadoId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function prepararNomina(datos: { frecuencia: FrecuenciaPagoNomina; desde: string; hasta: string }): Promise<PeriodoNominaApi> {
+  return request("/api/personal/nomina/preparar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function revisarReciboNomina(id: number, datos: {
+  dias?: number | null; horas?: number | null; bono?: number | null; descuento?: number | null; nota?: string | null;
+}): Promise<unknown> {
+  return request(`/api/personal/nomina/recibos/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function quitarReciboNomina(id: number): Promise<unknown> {
+  return request(`/api/personal/nomina/recibos/${id}`, { method: "DELETE" });
+}
+
+export function pagarPeriodoNomina(id: number): Promise<PeriodoNominaApi> {
+  return request(`/api/personal/nomina/periodos/${id}/pagar`, { method: "POST" });
+}
+
+export function descartarPeriodoNomina(id: number): Promise<unknown> {
+  return request(`/api/personal/nomina/periodos/${id}`, { method: "DELETE" });
+}
+
+export interface ReciboNominaImprimible {
+  id: number;
+  estado: string;
+  negocio: string | null;
+  razonSocial: string | null;
+  rif: string | null;
+  direccion: string | null;
+  telefono: string | null;
+  trabajador: string;
+  cedula: string | null;
+  cargo: string | null;
+  formaDePago: TipoSalarioNomina | null;
+  frecuencia: FrecuenciaPagoNomina | null;
+  periodo: string;
+  desde: string;
+  hasta: string;
+  fechaPago: string | null;
+  diasTrabajados: number | null;
+  horasMarcadas: number | null;
+  moneda: string;
+  lineas: { descripcion: string; tipo: "ASIGNACION" | "DEDUCCION" | "APORTE_PATRONAL"; monto: number }[];
+  totalAsignaciones: number;
+  totalDeducciones: number;
+  neto: number;
+  netoEfectivo: number;
+  nota: string | null;
+}
+
+export function obtenerReciboNomina(id: number): Promise<ReciboNominaImprimible> {
+  return request(`/api/personal/nomina/recibos/${id}`);
 }
 
 export function listarDirectorioPersonal(): Promise<EntradaDirectorioPersonalApi[]> {
@@ -4888,6 +5370,42 @@ export function registrarSalidaPersonal(id: number, fechaHoraSalida: string): Pr
     method: "PATCH",
     body: JSON.stringify({ fechaHoraSalida }),
   });
+}
+
+/** Marcaje propio: el trabajador vinculado a este usuario (la hora la pone el servidor). */
+export interface EstadoMiAsistencia {
+  empleadoId: number;
+  nombre: string;
+  entradaAbierta: AsistenciaPersonalApi | null;
+  recientes: AsistenciaPersonalApi[];
+}
+
+export function obtenerMiAsistencia(): Promise<EstadoMiAsistencia> {
+  return request(`/api/personal/asistencia/mia`);
+}
+
+export function marcarMiEntrada(): Promise<AsistenciaPersonalApi> {
+  return request(`/api/personal/asistencia/mia/entrada`, { method: "POST" });
+}
+
+export function marcarMiSalida(): Promise<AsistenciaPersonalApi> {
+  return request(`/api/personal/asistencia/mia/salida`, { method: "POST" });
+}
+
+/** Usuario del negocio vinculado a un trabajador para que marque su asistencia (solo el dueño). */
+export interface AccesoTrabajador { usuarioId: number; username: string | null }
+
+export async function verAccesoTrabajador(empleadoId: number): Promise<AccesoTrabajador | null> {
+  const r = await request<AccesoTrabajador | undefined>(`/api/personal/accesos/empleado/${empleadoId}`);
+  return r ?? null;
+}
+
+export function vincularAccesoTrabajador(empleadoId: number, usuarioId: number): Promise<AccesoTrabajador> {
+  return request(`/api/personal/accesos/empleado/${empleadoId}`, { method: "PUT", body: JSON.stringify({ usuarioId }) });
+}
+
+export function quitarAccesoTrabajador(empleadoId: number): Promise<{ quitado: boolean }> {
+  return request(`/api/personal/accesos/empleado/${empleadoId}`, { method: "DELETE" });
 }
 
 export function listarMetasPersonal(): Promise<MetaPersonalApi[]> {
@@ -5215,6 +5733,154 @@ export interface DetalleActividadVertical {
   tenants: TenantActividad[];
 }
 
+// --- Páginas dedicadas por vertical (super-admin)
+
+export interface PanoramaVertical {
+  id: string;
+  nombre: string;
+  negocios: number;
+  activos: number;
+  conActividad: number;
+  enRiesgo: number;
+  registrosPeriodo: number;
+  ingresosPeriodo: number;
+}
+
+export interface MetricaVertical {
+  clave: string;
+  etiqueta: string;
+  conFecha: boolean;
+  total: number;
+  periodo: number | null;
+  /** "USD", "litros", "unidades"... cuando la métrica además suma una columna. */
+  unidadSuma: string | null;
+  sumaPeriodo: number | null;
+  sumaTotal: number | null;
+  /** Conteo por mes, alineado con `meses` (12 meses). */
+  serie: number[] | null;
+  serieSuma: number[] | null;
+}
+
+export interface NegocioVertical {
+  tenantId: number;
+  nombre: string;
+  modulo: string;
+  plan: string;
+  activa: boolean;
+  email: string | null;
+  vencimiento: string | null;
+  diasRestantes: number | null;
+  usuarios: number;
+  ingresosHistorico: number;
+  ultimaActividad: string | null;
+  enRiesgo: boolean;
+  metricas: Record<string, { total: number; periodo?: number; sumaPeriodo?: number }>;
+}
+
+export interface DetalleVertical {
+  id: string;
+  nombre: string;
+  modulos: string[];
+  dias: number;
+  meses: string[];
+  kpis: {
+    negocios: number; activos: number; suspendidos: number; porVencer: number; conActividad: number;
+    enRiesgo: number; usuarios: number; altasPeriodo: number; ingresosPeriodo: number; ingresosHistorico: number;
+  };
+  serieIngresos: number[];
+  serieAltas: number[];
+  metricas: MetricaVertical[];
+  negocios: NegocioVertical[];
+}
+
+export interface ConteoEtiqueta { etiqueta: string; n: number }
+
+export interface OperacionRestaurantes {
+  comandas: number;
+  ventas: number;
+  ticketPromedio: number;
+  porHora: number[];
+  ventasPorHora: number[];
+  porDiaSemana: number[];
+  canales: ConteoEtiqueta[];
+  metodosPago: ConteoEtiqueta[];
+  topPlatos: { nombre: string; cantidad: number; ventas: number }[];
+  topRestaurantes: { tenantId: number; nombre: string; comandas: number; ventas: number }[];
+}
+
+export interface ProduccionGanaderia {
+  litros: number;
+  ordenos: number;
+  promedioPorOrdeno: number;
+  grasaPromedio: number;
+  proteinaPromedio: number;
+  vacasOrdenadas: number;
+  hatoPorEstado: ConteoEtiqueta[];
+  hatoPorSexo: ConteoEtiqueta[];
+  hatoPorTipo: ConteoEtiqueta[];
+  topFincas: { tenantId: number; nombre: string; litros: number; ordenos: number }[];
+}
+
+export interface ClinicaOdontologia {
+  planesPorEstado: { etiqueta: string; n: number; monto: number; pagado: number }[];
+  carteraTotal: number;
+  carteraPagada: number;
+  topProcedimientos: ConteoEtiqueta[];
+}
+
+export function obtenerPanoramaVerticales(dias: number): Promise<PanoramaVertical[]> {
+  return requestSuperAdmin(`/api/super-admin/verticales?dias=${dias}`);
+}
+
+export function obtenerDetalleVertical(id: string, dias: number): Promise<DetalleVertical> {
+  return requestSuperAdmin(`/api/super-admin/verticales/${encodeURIComponent(id)}?dias=${dias}`);
+}
+
+export function obtenerOperacionRestaurantes(dias: number): Promise<OperacionRestaurantes> {
+  return requestSuperAdmin(`/api/super-admin/verticales/restaurantes/operacion?dias=${dias}`);
+}
+
+export function obtenerProduccionGanaderia(dias: number): Promise<ProduccionGanaderia> {
+  return requestSuperAdmin(`/api/super-admin/verticales/ganaderia/produccion?dias=${dias}`);
+}
+
+export function obtenerClinicaOdontologia(dias: number): Promise<ClinicaOdontologia> {
+  return requestSuperAdmin(`/api/super-admin/verticales/odontologia/clinica?dias=${dias}`);
+}
+
+/** Reporte de una enfermedad en toda la red: casos por médico y por mes (año vs anterior). */
+export interface MedicoReporteEnfermedad {
+  tenantId: number;
+  medico: string;
+  especialidad: string | null;
+  clinica: string | null;
+  casosAnio: number;
+  casosAnioAnterior: number;
+  casosHistorico: number;
+  pacientesDistintos: number;
+  ultimoCaso: string | null;
+  porMes: number[];
+  participacionPct: number;
+}
+
+export interface ReporteEnfermedad {
+  cie10: string;
+  descripcion: string | null;
+  anio: number;
+  totalAnio: number;
+  totalAnioAnterior: number;
+  totalHistorico: number;
+  pacientesDistintos: number;
+  medicosConCasos: number;
+  porMes: number[];
+  porMesAnterior: number[];
+  medicos: MedicoReporteEnfermedad[];
+}
+
+export function obtenerReporteEnfermedadSuperAdmin(cie10: string, anio: number): Promise<ReporteEnfermedad> {
+  return requestSuperAdmin(`/api/super-admin/actividad/enfermedad?cie10=${encodeURIComponent(cie10)}&anio=${anio}`);
+}
+
 export function obtenerResumenActividadSuperAdmin(dias: number): Promise<ResumenActividadVertical[]> {
   return requestSuperAdmin(`/api/super-admin/actividad/resumen?dias=${dias}`);
 }
@@ -5262,6 +5928,8 @@ export interface SaasSoporteMensaje {
   contenido: string;
   fechaEnvio: string;
   leidoPorDestinatario: boolean;
+  /** Captura de pantalla adjunta (data URL). */
+  imagen?: string | null;
 }
 
 export interface CrearTicketRequest {
@@ -5272,6 +5940,8 @@ export interface CrearTicketRequest {
   categoria?: string;
   prioridad?: string;
   usuarioCreador?: string;
+  /** Captura de pantalla del problema (data URL, opcional). */
+  imagen?: string | null;
 }
 
 // SUPER ADMIN SOPORTE APIS
@@ -5345,7 +6015,7 @@ export async function listarMensajesTicketTenant(ticketId: number): Promise<Saas
   return res.json();
 }
 
-export async function enviarMensajeTicketTenant(ticketId: number, contenido: string, emisorNombre?: string): Promise<SaasSoporteMensaje> {
+export async function enviarMensajeTicketTenant(ticketId: number, contenido: string, emisorNombre?: string, imagen?: string | null): Promise<SaasSoporteMensaje> {
   const sesion = leerSesion();
   const res = await fetch(`/api/tenant/soporte/tickets/${ticketId}/mensajes`, {
     method: "POST",
@@ -5353,7 +6023,7 @@ export async function enviarMensajeTicketTenant(ticketId: number, contenido: str
       "Content-Type": "application/json",
       ...(sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {}),
     },
-    body: JSON.stringify({ contenido, emisorNombre: emisorNombre || sesion?.username || "Usuario" }),
+    body: JSON.stringify({ contenido, emisorNombre: emisorNombre || sesion?.username || "Usuario", imagen: imagen || undefined }),
   });
   if (!res.ok) throw new Error("Error al enviar mensaje");
   return res.json();
@@ -6087,7 +6757,12 @@ export type CategoriaMercado = "PADROTE" | "VACA_PARIDA" | "VACA_ORDENO" | "NOVI
 export interface PerfilMercado {
   nombre: string;
   revelado: boolean;
+  /** El equipo de Aurora verificó la cédula del titular. */
   verificado: boolean;
+  /** Registro de hierro verificado: la prueba de que el ganado es suyo. */
+  hierroVerificado?: boolean;
+  /** Título de propiedad o arrendamiento verificado (opcional). */
+  tierraVerificada?: boolean;
   mesesEnAurora: number | null;
   diasEnAurora: number | null;
   ventas: number;
@@ -6139,9 +6814,12 @@ export interface PublicacionMercado {
 export interface OfertaMercado {
   id: number;
   monto: number;
-  estado: "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "RETIRADA";
+  estado: "PENDIENTE" | "ACEPTADA" | "RECHAZADA" | "RETIRADA" | "ANULADA";
   fecha: string;
   mensaje: string | null;
+  /** El vendedor confirmó que recibió el pago: recién entonces el comprador puede recibir el animal. */
+  pagoConfirmado?: boolean;
+  motivoAnulacion?: string | null;
   /** Referencia opaca de la finca compradora (el vendedor no ve su número interno). */
   compradorRef?: string;
   comprador?: PerfilMercado;
@@ -6166,7 +6844,14 @@ export interface DetallePublicacionMercado extends PublicacionMercado {
   ofertas?: OfertaMercado[];
   misOfertas?: OfertaMercado[];
   contraparte?: ContactoMercado;
-  ofertaCerrada: { id: number; monto: number; traspasado: boolean } | null;
+  ofertaCerrada: { id: number; monto: number; traspasado: boolean; pagoConfirmado?: boolean } | null;
+  /** Solo para quien vende un trato cerrado: con qué armar la nota de movilización. */
+  notaMovilizacion?: {
+    animalIds: number[];
+    destino: string | null;
+    origen: string | null;
+    emitidas: { id: number; numeroGuia: string; fecha: string }[];
+  };
   yaCalifique?: boolean;
   animalRecibidoId?: number;
   datosOcultos?: boolean;
@@ -6290,12 +6975,57 @@ export function rechazarOfertaMercado(ofertaId: number): Promise<DetallePublicac
   return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/rechazar`, { method: "POST" });
 }
 
+export function confirmarPagoMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/confirmar-pago`, { method: "POST" });
+}
+
+export function anularTratoMercado(ofertaId: number, motivo: string): Promise<DetallePublicacionMercado> {
+  return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/anular`, { method: "POST", body: JSON.stringify({ motivo }) });
+}
+
 export function recibirAnimalMercado(ofertaId: number): Promise<DetallePublicacionMercado> {
   return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/recibir`, { method: "POST" });
 }
 
 export function calificarTratoMercado(ofertaId: number, estrellas: number, comentario?: string): Promise<DetallePublicacionMercado> {
   return request(`/api/ganaderia/mercado/ofertas/${ofertaId}/calificar`, { method: "POST", body: JSON.stringify({ estrellas, comentario }) });
+}
+
+export type TipoDocumentoMercado = "CEDULA" | "HIERRO" | "TIERRA";
+
+export interface DocumentoVerificacionMercado {
+  estado: "PENDIENTE" | "APROBADO" | "RECHAZADO";
+  nombreArchivo: string | null;
+  subidoEn: string | null;
+  revisadoEn: string | null;
+  motivoRechazo: string | null;
+}
+
+/** Nivel de la finca en el mercado: MIRAR (libre), COMPRAR (ubicación + cédula), VENDER (+ hierro). */
+export interface VerificacionMercado {
+  titularNombre: string | null;
+  titularCedula: string | null;
+  numeroHierro: string | null;
+  tipoTierra: string | null;
+  ubicacionCargada: boolean;
+  documentos: Partial<Record<TipoDocumentoMercado, DocumentoVerificacionMercado>>;
+  nivel: "MIRAR" | "COMPRAR" | "VENDER";
+  puedeComprar: boolean;
+  puedeVender: boolean;
+}
+
+export function obtenerVerificacionMercado(): Promise<VerificacionMercado> {
+  return request(`/api/ganaderia/mercado/verificacion`);
+}
+
+export function enviarVerificacionMercado(datos: {
+  titularNombre?: string;
+  titularCedula?: string;
+  numeroHierro?: string;
+  tipoTierra?: string;
+  archivos?: Partial<Record<TipoDocumentoMercado, { nombre: string; dataUrl: string }>>;
+}): Promise<VerificacionMercado> {
+  return request(`/api/ganaderia/mercado/verificacion`, { method: "POST", body: JSON.stringify(datos) });
 }
 
 export function obtenerCondicionesMercado(): Promise<{ aceptadas: boolean; version: number }> {
@@ -6357,6 +7087,407 @@ export function reactivarFincaMercado(tenantId: number): Promise<{ suspendida: b
   return requestSuperAdmin(`/api/super-admin/inteligencia/mercado-ganadero/fincas/${tenantId}/reactivar`, { method: "POST" });
 }
 
+export interface SolicitudVerificacionMercado {
+  tenant_id: number;
+  nombre_empresa: string | null;
+  titular_nombre: string | null;
+  titular_cedula: string | null;
+  numero_hierro: string | null;
+  tipo_tierra: string | null;
+  ultimo_envio: string;
+  ubicacionCargada: boolean;
+  nivel: "MIRAR" | "COMPRAR" | "VENDER";
+  documentos: {
+    id: number; tipo: TipoDocumentoMercado; estado: "PENDIENTE" | "APROBADO" | "RECHAZADO"; nombre_archivo: string | null;
+    tipo_contenido: string; tamano_bytes: number; subido_en: string; revisado_por: string | null; revisado_en: string | null;
+    motivo_rechazo: string | null;
+  }[];
+}
+
+export function listarVerificacionesMercado(estado: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "TODOS"): Promise<SolicitudVerificacionMercado[]> {
+  return requestSuperAdmin(`/api/super-admin/verificaciones-mercado?estado=${estado}`);
+}
+
+/** Descarga el documento descifrado (queda anotado quién lo abrió). */
+export async function abrirDocumentoVerificacionMercado(id: number): Promise<Blob> {
+  const sesion = leerSesionSuperAdmin();
+  const res = await fetch(`/api/super-admin/verificaciones-mercado/documentos/${id}`, {
+    headers: sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {},
+  });
+  if (!res.ok) throw new Error((await res.text()) || "No se pudo abrir el documento");
+  return res.blob();
+}
+
+export function revisarDocumentoVerificacionMercado(id: number, aprobar: boolean, motivo?: string): Promise<{ ok: boolean }> {
+  return requestSuperAdmin(`/api/super-admin/verificaciones-mercado/documentos/${id}/${aprobar ? "aprobar" : "rechazar"}`, {
+    method: "POST",
+    body: JSON.stringify({ motivo }),
+  });
+}
+
 export function obtenerMercadoGanaderoSuperAdmin(dias: number): Promise<PanelMercadoSuperAdmin> {
   return requestSuperAdmin(`/api/super-admin/inteligencia/mercado-ganadero?dias=${dias}`);
+}
+
+// --- Suscripción del propio negocio (Hub > Facturación & Pagos) ---
+// Funciona aunque la licencia esté vencida: el negocio tiene que poder ver y reportar su pago.
+
+export interface PagoSuscripcionVista {
+  id: number;
+  fecha: string;
+  monto: number;
+  moneda: string;
+  metodoPago: string;
+  referencia: string | null;
+  mesesPagados: number | null;
+  diasAcreditados?: number | null;
+}
+
+/** Pago que el cliente reportó y el equipo de Aurora revisa (ticket de soporte PAGO). */
+export interface ReportePagoSuscripcion {
+  id: number;
+  fecha: string;
+  detalle: string;
+  estado: "EN_VERIFICACION" | "REVISADO";
+}
+
+export interface EstadoSuscripcion {
+  nombreEmpresa: string;
+  tipoLicencia: string;
+  planSolicitado: string | null;
+  fechaVencimiento: string | null;
+  diasRestantes: number;
+  vencida: boolean;
+  enPrueba: boolean;
+  pagos: PagoSuscripcionVista[];
+  reportes: ReportePagoSuscripcion[];
+  rif: string | null;
+  /** Último día con acceso, contando los días de gracia tras el vencimiento. */
+  accesoHasta: string | null;
+}
+
+export function obtenerEstadoSuscripcion(): Promise<EstadoSuscripcion> {
+  return request("/api/suscripcion/estado");
+}
+
+/** Avisa al equipo de Aurora que se pagó (abre un ticket de soporte de prioridad alta). No acredita nada por sí solo. */
+export function reportarPagoSuscripcion(datos: { monto: number; moneda: string; metodo: string; referencia: string; plan?: string }): Promise<unknown> {
+  return request("/api/suscripcion/reportar-pago", { method: "POST", body: JSON.stringify(datos) });
+}
+
+// --- Cuentas de cobro de la suscripción (guardadas en el servidor, V98) ---
+export function obtenerCuentasCobroServidor(): Promise<Record<string, string>> {
+  return request("/api/suscripcion/cuentas-cobro");
+}
+export function obtenerCuentasCobroSuperAdmin(): Promise<Record<string, string>> {
+  return requestSuperAdmin("/api/super-admin/tenants/finanzas/cuentas-cobro");
+}
+export function guardarCuentasCobroSuperAdmin(datos: Record<string, string>): Promise<Record<string, string>> {
+  return requestSuperAdmin("/api/super-admin/tenants/finanzas/cuentas-cobro", { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// --- Estética y Cosmiatría (/api/salud/estetica, V99) ---
+// La clienta es un Paciente de salud: agenda, servicios (procedimientos) y caja se reutilizan tal cual.
+export interface FichaEstetica {
+  paciente_id: number;
+  nivel: "BASICO" | "DETALLADO";
+  fototipo?: string | null;
+  biotipo?: string | null;
+  sensibilidad?: string | null;
+  lesiones?: string | null;
+  zonas_afectadas?: string | null;
+  objetivo?: string | null;
+  rutina_domiciliaria?: string | null;
+  exposicion_solar?: string | null;
+  medicacion_actual?: string | null;
+  alergias_cosmeticos?: string | null;
+  usa_isotretinoina: boolean;
+  embarazo_lactancia: boolean;
+  herpes_recurrente: boolean;
+  marcapasos_implantes: boolean;
+  derivar_dermatologo: boolean;
+  observaciones?: string | null;
+  fecha_actualizacion?: string;
+  /** true cuando la clienta todavía no tiene ficha guardada. */
+  nueva?: boolean;
+}
+
+export function obtenerFichaEstetica(pacienteId: number): Promise<FichaEstetica> {
+  return request(`/api/salud/estetica/ficha?pacienteId=${pacienteId}`);
+}
+
+export function guardarFichaEstetica(datos: {
+  pacienteId: number; nivel: string; fototipo?: string; biotipo?: string; sensibilidad?: string; lesiones?: string;
+  zonasAfectadas?: string; objetivo?: string; rutinaDomiciliaria?: string; exposicionSolar?: string;
+  medicacionActual?: string; alergiasCosmeticos?: string; usaIsotretinoina: boolean; embarazoLactancia: boolean;
+  herpesRecurrente: boolean; marcapasosImplantes: boolean; derivarDermatologo: boolean; observaciones?: string;
+}): Promise<{ mensaje: string }> {
+  return request(`/api/salud/estetica/ficha`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface PaqueteEstetica {
+  id: number;
+  paciente_id: number;
+  paciente_nombre: string;
+  paciente_telefono: string | null;
+  nombre: string;
+  sesiones_total: number;
+  sesiones_usadas: number;
+  precio: number;
+  moneda: string;
+  fecha_compra: string;
+  fecha_vencimiento: string | null;
+  estado: "ACTIVO" | "AGOTADO" | "VENCIDO" | "ANULADO";
+  cobro_id: number | null;
+  notas: string | null;
+}
+
+/** Con pacienteId: todos los paquetes de la clienta. Sin él: los activos del negocio. */
+export function listarPaquetesEstetica(pacienteId?: number): Promise<PaqueteEstetica[]> {
+  return request(`/api/salud/estetica/paquetes${pacienteId ? `?pacienteId=${pacienteId}` : ""}`);
+}
+
+export function crearPaqueteEstetica(datos: {
+  pacienteId: number; nombre: string; sesionesTotal: number; precio: number; moneda: string;
+  fechaVencimiento?: string; cobroId?: number; notas?: string;
+}): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/paquetes`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function vincularCobroPaqueteEstetica(paqueteId: number, cobroId: number): Promise<unknown> {
+  return request(`/api/salud/estetica/paquetes/${paqueteId}/cobro?cobroId=${cobroId}`, { method: "PATCH" });
+}
+
+export function anularPaqueteEstetica(paqueteId: number): Promise<unknown> {
+  return request(`/api/salud/estetica/paquetes/${paqueteId}/anular`, { method: "PATCH" });
+}
+
+export interface SesionEstetica {
+  id: number;
+  paciente_id: number;
+  paquete_id: number | null;
+  paquete_nombre: string | null;
+  fecha_sesion: string;
+  servicio: string;
+  zona: string | null;
+  parametros: string | null;
+  productos: string | null;
+  reaccion: string | null;
+  indicaciones: string | null;
+  proxima_sesion: string | null;
+  profesional: string | null;
+  profesional_id: number | null;
+  valor: number | null;
+  moneda: string;
+  tiene_foto_antes: boolean;
+  tiene_foto_despues: boolean;
+}
+
+export function listarSesionesEstetica(pacienteId: number): Promise<SesionEstetica[]> {
+  return request(`/api/salud/estetica/sesiones?pacienteId=${pacienteId}`);
+}
+
+export function fotosSesionEstetica(sesionId: number): Promise<{ antes: string | null; despues: string | null }> {
+  return request(`/api/salud/estetica/sesiones/${sesionId}/fotos`);
+}
+
+export function registrarSesionEstetica(datos: {
+  pacienteId: number; paqueteId?: number; fechaSesion?: string; servicio: string; zona?: string; parametros?: string;
+  productos?: string; reaccion?: string; indicaciones?: string; proximaSesion?: string; fotoAntes?: string; fotoDespues?: string;
+  profesionalId?: number; valor?: number;
+}): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/sesiones`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function eliminarSesionEstetica(sesionId: number): Promise<unknown> {
+  return request(`/api/salud/estetica/sesiones/${sesionId}`, { method: "DELETE" });
+}
+
+export interface ConsentimientoEstetica {
+  id: number;
+  paciente_id: number;
+  procedimiento: string;
+  texto?: string;
+  nombre_firmante: string;
+  identificacion_firmante: string | null;
+  firma?: string;
+  profesional: string | null;
+  fecha_firma: string;
+}
+
+export function listarConsentimientosEstetica(pacienteId: number): Promise<ConsentimientoEstetica[]> {
+  return request(`/api/salud/estetica/consentimientos?pacienteId=${pacienteId}`);
+}
+
+export function obtenerConsentimientoEstetica(id: number): Promise<ConsentimientoEstetica> {
+  return request(`/api/salud/estetica/consentimientos/${id}`);
+}
+
+export function firmarConsentimientoEstetica(datos: {
+  pacienteId: number; procedimiento: string; texto: string; nombreFirmante: string; identificacionFirmante?: string; firma: string;
+}): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/consentimientos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export interface ResumenEstetica {
+  paquetes_activos: number;
+  sesiones_pendientes: number;
+  paquetes_por_vencer: number;
+  sesiones_mes: number;
+  derivaciones: number;
+  proximas_sesiones: { paciente_id: number; proxima_sesion: string; servicio: string; paciente_nombre: string; paciente_telefono: string | null }[];
+}
+
+export function resumenEstetica(): Promise<ResumenEstetica> {
+  return request(`/api/salud/estetica/resumen`);
+}
+
+export interface CobroSaludDetalle {
+  id: number;
+  paciente: Paciente | null;
+  concepto: string;
+  montoTotal: number;
+  monedaCobrada: string;
+  montoRecibido: number;
+  monedaPago: string;
+  metodoPago: string;
+  referenciaPago: string | null;
+  fechaHora: string;
+  estado: string;
+}
+
+/** Cobros de salud en un rango. A diferencia de listarCobrosDelDia, un error llega a la pantalla. */
+export function reporteCobrosSalud(inicioIso: string, finIso: string): Promise<CobroSaludDetalle[]> {
+  return request(`/api/salud/cobros/reporte?inicio=${encodeURIComponent(inicioIso)}&fin=${encodeURIComponent(finIso)}`);
+}
+
+export function actualizarProcedimiento(tenantId: number, id: number, datos: Omit<ProcedimientoMedico, "id">): Promise<ProcedimientoMedico> {
+  return request(`/api/salud/procedimientos/${id}?tenantId=${tenantId}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+// --- Estadísticas de Comercio: todas las ventas del Kárdex (incluye las anteriores al historial del POS) ---
+export interface LineaEstadisticaComercio {
+  fecha: string;
+  repuestoId: number;
+  descripcion: string;
+  categoria: string | null;
+  cantidad: number;
+  total: number | null;
+  costoUnitario: number | null;
+  ticket: string;
+  devolucion: boolean;
+}
+export function obtenerEstadisticasComercio(desde: string, hasta: string): Promise<LineaEstadisticaComercio[]> {
+  return request(`/api/repuestos/reportes/estadisticas?desde=${desde}&hasta=${hasta}`);
+}
+
+// --- Estética: profesionales, comisiones y productos (V100) ---
+export interface ProfesionalEstetica {
+  id: number;
+  nombre: string;
+  telefono: string | null;
+  comision_servicios: number;
+  comision_productos: number;
+  activo: boolean;
+}
+
+export function listarProfesionalesEstetica(): Promise<ProfesionalEstetica[]> {
+  return request(`/api/salud/estetica/profesionales`);
+}
+
+export interface DatosProfesionalEstetica {
+  nombre: string; telefono?: string; comisionServicios: number; comisionProductos: number; activo?: boolean;
+}
+
+export function crearProfesionalEstetica(datos: DatosProfesionalEstetica): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/profesionales`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function actualizarProfesionalEstetica(id: number, datos: DatosProfesionalEstetica): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/profesionales/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export interface ComisionProfesional {
+  id: number;
+  nombre: string;
+  activo: boolean;
+  comision_servicios: number;
+  comision_productos: number;
+  sesiones: number;
+  sesiones_sin_valor: number;
+  total_servicios: number;
+  comision_servicios_monto: number;
+  ventas_productos: number;
+  total_productos: number;
+  comision_productos_monto: number;
+}
+
+export function comisionesEstetica(desde: string, hasta: string): Promise<{ profesionales: ComisionProfesional[]; sesionesSinProfesional: number }> {
+  return request(`/api/salud/estetica/comisiones?desde=${desde}&hasta=${hasta}`);
+}
+
+export interface ProductoEstetica {
+  id: number;
+  sku: string;
+  nombre: string;
+  categoria: string;
+  stock_actual: number;
+  stock_minimo: number | null;
+  costo_unitario: number;
+  precio_venta: number;
+}
+
+export function listarProductosEstetica(): Promise<{ productos: ProductoEstetica[]; moneda: string }> {
+  return request(`/api/salud/estetica/productos`);
+}
+
+export interface DatosProductoEstetica {
+  nombre: string; sku?: string; categoria: string; precioVenta: number; costoUnitario: number;
+  stockMinimo?: number | null; stockInicial?: number;
+}
+
+export function crearProductoEstetica(datos: DatosProductoEstetica): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/productos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+export function actualizarProductoEstetica(id: number, datos: DatosProductoEstetica): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/productos/${id}`, { method: "PUT", body: JSON.stringify(datos) });
+}
+
+export function entradaProductoEstetica(id: number, cantidad: number, costoUnitario?: number): Promise<{ id: number }> {
+  return request(`/api/salud/estetica/productos/${id}/entrada`, { method: "POST", body: JSON.stringify({ cantidad, costoUnitario }) });
+}
+
+export function venderProductosEstetica(datos: {
+  claveIdempotencia: string; pacienteId?: number; profesionalId?: number;
+  items: { articuloId: number; cantidad: number }[];
+  monedaPago: string; montoRecibido?: number; metodoPago: NuevoCobro["metodoPago"]; referenciaPago?: string;
+}): Promise<{ id: number; cobro_id: number; total: number; moneda: string }> {
+  return request(`/api/salud/estetica/ventas-productos`, { method: "POST", body: JSON.stringify(datos) });
+}
+
+/** Cobro de consulta tal como lo guarda el servidor (con paciente, método y hora). */
+export interface CobroConsultaDetalle {
+  id: number;
+  paciente?: { nombreCompleto?: string; identificacion?: string } | null;
+  concepto?: string | null;
+  montoTotal: number;
+  monedaCobrada: string;
+  metodoPago?: string | null;
+  referenciaPago?: string | null;
+  fechaHora?: string | null;
+  estado: string;
+}
+
+/** Ajustes del negocio que se guardan en el servidor (antes solo en el navegador). */
+export type ClavePreferencia = "horeca_config" | "ganaderia_config" | "salud_agenda_bloqueos";
+
+/** null = el negocio todavía no ha guardado este ajuste en el servidor. */
+export async function leerPreferencia<T>(clave: ClavePreferencia): Promise<T | null> {
+  const valor = await request<T | undefined>(`/api/preferencias/${clave}`);
+  return valor ?? null;
+}
+
+export function guardarPreferencia<T>(clave: ClavePreferencia, valor: T): Promise<T> {
+  return request<T>(`/api/preferencias/${clave}`, { method: "PUT", body: JSON.stringify(valor) });
 }

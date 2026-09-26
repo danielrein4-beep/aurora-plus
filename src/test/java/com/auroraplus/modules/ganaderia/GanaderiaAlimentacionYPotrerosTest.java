@@ -105,6 +105,17 @@ class GanaderiaAlimentacionYPotrerosTest {
     }
 
     @Test
+    void elCostoDelInsumoEsElPromedioDeLoQueHayEnDeposito() {
+        long tenantId = 99027L;
+        InsumoAlimentacion insumo = crearInsumo(tenantId, "Sal mineral", BigDecimal.ZERO);
+        ganaderiaAlimentacionService.registrarEntrada(tenantId, insumo.getId(), new BigDecimal("10"), new BigDecimal("200.00"), "Compra 1");
+        ganaderiaAlimentacionService.registrarEntrada(tenantId, insumo.getId(), new BigDecimal("10"), new BigDecimal("300.00"), "Compra 2");
+
+        InsumoAlimentacion releido = insumoAlimentacionRepository.findById(insumo.getId()).orElseThrow();
+        assertEquals(0, new BigDecimal("25.00").compareTo(releido.getCostoUnitario()), "(10 x 20 + 300) / 20 = 25");
+    }
+
+    @Test
     void registrarConsumoDescuentaStockYQuedaVinculadoAlPotrero() {
         long tenantId = 99002L;
         InsumoAlimentacion insumo = crearInsumo(tenantId, "Heno", new BigDecimal("50"));

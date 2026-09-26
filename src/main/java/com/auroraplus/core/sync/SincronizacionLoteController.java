@@ -1,5 +1,6 @@
 package com.auroraplus.core.sync;
 
+import com.auroraplus.core.config.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +26,8 @@ public class SincronizacionLoteController {
 
     @PostMapping("/lote")
     public ResponseEntity<List<SincronizacionLoteService.ResultadoOperacionLote>> procesarLote(
-            @RequestParam Long tenantId, @RequestBody LoteRequest request) {
+            @RequestBody LoteRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         if (request.operaciones == null || request.operaciones.isEmpty()) {
             throw new RuntimeException("El lote debe traer al menos una operación");
         }

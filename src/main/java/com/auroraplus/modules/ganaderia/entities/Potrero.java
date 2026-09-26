@@ -167,8 +167,11 @@ public class Potrero {
     /** true si ya cumplió los días mínimos de descanso (o si no se configuró un mínimo, cualquier descanso ya cuenta como suficiente). */
     @Transient
     public boolean isListoParaVolverAUso() {
+        if (!"EN_DESCANSO".equals(estado)) return false;
+        // En descanso sin fecha de inicio (creado así o importado): no hay cómo contar los días, y
+        // exigirlos lo dejaba bloqueado para siempre sin que el ganadero supiera por qué.
+        if (fechaInicioDescanso == null) return true;
         Long dias = getDiasEnDescanso();
-        if (dias == null) return false;
         return diasDescansoMinimo == null || dias >= diasDescansoMinimo;
     }
 }

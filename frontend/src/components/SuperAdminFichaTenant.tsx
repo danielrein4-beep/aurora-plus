@@ -20,6 +20,7 @@ interface Props {
   onSoporte: () => void;
   onActivar: () => void;
   onSuspender: () => void;
+  onCambioVertical: (permitido: boolean) => void;
 }
 
 type Pestana = "RESUMEN" | "COBROS" | "AUDITORIA";
@@ -34,7 +35,7 @@ function fechaCorta(iso: string | null | undefined): string {
 
 /** Ficha completa de un negocio: datos, acciones, actividad, cobros y auditoría en un solo lugar. */
 export default function SuperAdminFichaTenant({
-  tenant, diasRestantes, onCerrar, onCobro, onCortesia, onModulos, onUsuarios, onSoporte, onActivar, onSuspender,
+  tenant, diasRestantes, onCerrar, onCobro, onCortesia, onModulos, onUsuarios, onSoporte, onActivar, onSuspender, onCambioVertical,
 }: Props) {
   const [pestana, setPestana] = useState<Pestana>("RESUMEN");
   const [actividad, setActividad] = useState<ActividadTenant | null>(null);
@@ -107,6 +108,17 @@ export default function SuperAdminFichaTenant({
             ) : (
               <button onClick={onActivar} className="px-3 py-2 rounded-xl border border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-bold text-xs cursor-pointer">Reactivar</button>
             )}
+            <button
+              onClick={() => onCambioVertical(!tenant.permiteCambioVertical)}
+              className={`px-3 py-2 rounded-xl border font-bold text-xs cursor-pointer ${
+                tenant.permiteCambioVertical
+                  ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+              title="Cuenta de verificación: puede cambiar de vertical desde el Hub y entrar a todas"
+            >
+              {tenant.permiteCambioVertical ? "Cambio de vertical: SÍ" : "Cambio de vertical: NO"}
+            </button>
           </div>
 
           {/* PESTAÑAS */}

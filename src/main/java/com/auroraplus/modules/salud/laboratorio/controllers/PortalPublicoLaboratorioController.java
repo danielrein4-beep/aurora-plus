@@ -19,6 +19,16 @@ public class PortalPublicoLaboratorioController {
     @Autowired
     private SaludLaboratorioService laboratorioService;
 
+    private static final int DIAS_VIGENCIA_ENLACE = 90;
+
+    static String enmascararCedula(String cedula) {
+        if (cedula == null || cedula.isBlank()) return cedula;
+        String limpia = cedula.trim();
+        int visibles = Math.min(4, limpia.length());
+        String prefijo = limpia.matches("^[A-Za-z]-.*") ? limpia.substring(0, 2) : "";
+        return prefijo + "****" + limpia.substring(limpia.length() - visibles);
+    }
+
     @GetMapping("/{token}")
     public ResponseEntity<?> consultarOrden(@PathVariable String token) {
         var ordenOpt = laboratorioService.buscarPorToken(token);
@@ -45,12 +55,23 @@ public class PortalPublicoLaboratorioController {
             return ResponseEntity.ok(respSellada);
         }
 
+        // Un enlace abierto no puede servir para siempre: si la orden no se procesó en 90 días,
+        // el enlace deja de mostrar datos del paciente (el médico puede emitir una nueva).
+        if (orden.getFechaEmision() != null && orden.getFechaEmision().isBefore(java.time.LocalDateTime.now().minusDays(DIAS_VIGENCIA_ENLACE))) {
+            return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
+                "error", "Enlace vencido",
+                "mensaje", "Esta orden tiene más de " + DIAS_VIGENCIA_ENLACE + " días sin procesarse. Pide al médico una orden nueva."
+            ));
+        }
+
         // Orden ABIERTA lista para que el bioanalista procese:
         Map<String, Object> respAbierta = new HashMap<>();
         respAbierta.put("estado", orden.getEstado());
         respAbierta.put("codigoOrden", orden.getCodigoOrden());
         respAbierta.put("pacienteNombre", orden.getPacienteNombre());
-        respAbierta.put("pacienteCedula", orden.getPacienteCedula());
+        // Solo los últimos dígitos: basta para cotejar con la cédula física del paciente, sin
+        // exponerla completa a quien tenga el enlace.
+        respAbierta.put("pacienteCedula", enmascararCedula(orden.getPacienteCedula()));
         respAbierta.put("medicoNombre", orden.getMedicoNombre());
         respAbierta.put("fechaEmision", orden.getFechaEmision());
         respAbierta.put("examenesSolicitados", orden.getExamenesSolicitados());

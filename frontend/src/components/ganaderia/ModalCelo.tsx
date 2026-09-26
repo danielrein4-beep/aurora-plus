@@ -21,8 +21,8 @@ export default function ModalCelo({ animales, animalesActivos, tenantId, notific
     hembraId: animalesActivos.find(a => a.sexo === "HEMBRA")?.id ?? 0,
     fecha: fechaLocalISO(),
     tipoCelo: "NATURAL",
-    sintomasCelo: "Acepta monta, moco cristalino abundante, hiperactividad",
-    horaOptimaIA: "AM/PM: Inseminar 12 horas después de observado el celo",
+    sintomasCelo: "",
+    horaOptimaIA: "",
   });
 
   // Manejador: Registrar Celo (Evento Reproductivo dedicado)
@@ -48,8 +48,8 @@ export default function ModalCelo({ animales, animalesActivos, tenantId, notific
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-purple-500/40 text-left space-y-4">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-md w-full border border-purple-500/40 text-left space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div className="flex items-center gap-2">
             <span className="text-rose-400"><IconFire size={20} /></span>
@@ -81,7 +81,7 @@ export default function ModalCelo({ animales, animalesActivos, tenantId, notific
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Fecha de Detección</label>
               <input
@@ -89,7 +89,7 @@ export default function ModalCelo({ animales, animalesActivos, tenantId, notific
                 required
                 value={formCelo.fecha}
                 onChange={e => setFormCelo({ ...formCelo, fecha: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums"
               />
             </div>
             <div>
@@ -122,7 +122,7 @@ export default function ModalCelo({ animales, animalesActivos, tenantId, notific
               value={formCelo.horaOptimaIA}
               onChange={e => setFormCelo({ ...formCelo, horaOptimaIA: e.target.value })}
               placeholder="Ej. Detectado AM → Inseminar PM (12 horas después)"
-              className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-[11px]"
+              className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums text-[11px]"
             />
             <p className="text-[10px] text-purple-400 mt-1 flex items-start gap-1">
               <IconBulb size={12} className="shrink-0 mt-0.5" /> Al guardar, el estado reproductivo de la hembra cambiará automáticamente a <strong>EN_ESPERA</strong>.

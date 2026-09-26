@@ -38,7 +38,7 @@ public class AjusteNominaService {
 
     @Transactional
     public AjusteNomina corregir(Long tenantId, Long nominaEmpleadoId, BigDecimal montoAjuste, String motivo) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirRol(tenantId, PUEDEN_AJUSTAR);
         NominaEmpleado nomina = obtenerOFallar(tenantId, nominaEmpleadoId);
         if (nomina.getEstado() != NominaEmpleado.Estado.APROBADA && nomina.getEstado() != NominaEmpleado.Estado.PAGADA) {
@@ -70,7 +70,7 @@ public class AjusteNominaService {
 
     @Transactional
     public AjusteNomina reversar(Long tenantId, Long nominaEmpleadoId, String motivo) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirRol(tenantId, PUEDEN_AJUSTAR);
         NominaEmpleado nomina = obtenerOFallar(tenantId, nominaEmpleadoId);
         if (nomina.getEstado() != NominaEmpleado.Estado.APROBADA && nomina.getEstado() != NominaEmpleado.Estado.PAGADA) {

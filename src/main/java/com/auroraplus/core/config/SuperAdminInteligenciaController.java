@@ -37,7 +37,7 @@ import java.util.function.Supplier;
 public class SuperAdminInteligenciaController {
 
     private static final List<String> MODULOS_COMERCIO = List.of("comercio", "retail", "farmacia", "ferreteria", "repuestos");
-    private static final List<String> MODULOS_SALUD = List.of("salud", "odontologia");
+    private static final List<String> MODULOS_SALUD = List.of("salud", "odontologia", "estetica");
 
     /** Tablas que delatan uso real del sistema, para medir actividad de cualquier vertical. */
     private static final List<String[]> FUENTES_ACTIVIDAD = List.of(

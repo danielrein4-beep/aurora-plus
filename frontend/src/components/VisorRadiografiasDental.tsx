@@ -22,7 +22,7 @@ interface RadiografiaItem {
   id: number;
   tipo_estudio: string;
   titulo: string;
-  url_archivo: string;
+  url_archivo?: string; // la lista ya no la trae: se pide al abrir cada estudio (ver imagenes)
   hallazgos: string | null;
   diente_asociado: number | null;
   fecha_toma: string;
@@ -38,6 +38,9 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
   const [estudios, setEstudios] = useState<RadiografiaItem[]>([]);
   const [seleccionado, setSeleccionado] = useState<RadiografiaItem | null>(null);
   const [cargando, setCargando] = useState(false);
+  // Imagen de cada estudio, pedida solo al abrirlo y guardada para no volver a bajarla.
+  const [imagenes, setImagenes] = useState<Record<number, string>>({});
+  const [cargandoImagen, setCargandoImagen] = useState(false);
 
   // Controles de procesamiento visual radiologico
   const [brillo, setBrillo] = useState<number>(100);
@@ -79,6 +82,19 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
   useEffect(() => {
     cargarEstudios();
   }, [pacienteId]);
+
+  useEffect(() => {
+    const id = seleccionado?.id;
+    if (id == null || imagenes[id] !== undefined) return;
+    let cancelado = false;
+    setCargandoImagen(true);
+    fetch(`/api/salud/odontologia/radiografias/${id}/imagen`, { headers: { Authorization: `Bearer ${obtenerTokenSesion()}` } })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`error ${res.status}`))))
+      .then((data: { url: string }) => { if (!cancelado) setImagenes((prev) => ({ ...prev, [id]: data.url || "" })); })
+      .catch(() => { if (!cancelado) setMensaje("No se pudo cargar la imagen del estudio."); })
+      .finally(() => { if (!cancelado) setCargandoImagen(false); });
+    return () => { cancelado = true; };
+  }, [seleccionado?.id]);
 
   const marcarRevisada = async (id: number) => {
     try {
@@ -356,8 +372,13 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
 
                 {/* Pantalla del Negatoscopio Digital */}
                 <div className="relative w-full h-[450px] bg-black rounded-2xl overflow-hidden border-2 border-cyan-500/30 flex items-center justify-center p-4">
+                  {!imagenes[seleccionado.id] ? (
+                    <span className="text-xs font-semibold text-cyan-300/80">
+                      {cargandoImagen ? "Cargando imagen..." : "Imagen no disponible"}
+                    </span>
+                  ) : (
                   <img
-                    src={seleccionado.url_archivo}
+                    src={imagenes[seleccionado.id]}
                     alt={seleccionado.titulo}
                     style={{
                       filter: `brightness(${brillo}%) contrast(${contraste}%) ${invertido ? "invert(1) hue-rotate(180deg)" : ""}`,
@@ -369,6 +390,7 @@ export const VisorRadiografiasDental: React.FC<VisorRadiografiasDentalProps> = (
                     }}
                     className="select-none pointer-events-auto cursor-grab active:cursor-grabbing"
                   />
+                  )}
 
                   <div className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl bg-black/75 border border-slate-300 dark:border-white/20 text-[10px] text-slate-600 dark:text-slate-300 font-mono">
                     Zoom: {Math.round(zoom * 100)}% &bull; Rot: {rotacion}&deg; &bull; Negativo: {invertido ? "ON" : "OFF"}

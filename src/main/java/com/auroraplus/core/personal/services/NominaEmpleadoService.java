@@ -31,7 +31,7 @@ public class NominaEmpleadoService {
     @Autowired private PersonalAccessService accessService;
 
     public NominaEmpleado obtener(Long tenantId, Long nominaEmpleadoId) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         NominaEmpleado nomina = nominaEmpleadoRepository.findByTenantIdAndId(tenantId, nominaEmpleadoId)
             .orElseThrow(() -> new RuntimeException("Nómina de empleado no encontrada"));
         accessService.exigirVerNominaDe(tenantId, nomina.getEmpleadoId());
@@ -40,7 +40,7 @@ public class NominaEmpleadoService {
 
     @Transactional
     public NominaEmpleado editarManualmente(Long tenantId, Long nominaEmpleadoId, BigDecimal nuevoNetoAPagar) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirRol(tenantId, PUEDEN_EDITAR);
         NominaEmpleado nomina = nominaEmpleadoRepository.findByTenantIdAndId(tenantId, nominaEmpleadoId)
             .orElseThrow(() -> new RuntimeException("Nómina de empleado no encontrada"));

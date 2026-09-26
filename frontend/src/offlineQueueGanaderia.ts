@@ -1,5 +1,7 @@
+import { avisar } from "./avisos";
 // Cola de persistencia offline para operaciones de campo en Ganaderia
-// Permite registrar pesajes en manga, rotaciones de potrero, ordeno y vacunas sin cobertura 3G/4G/WiFi.
+// Permite registrar pesajes en manga, rotaciones de potrero, ordeño, vacunas, altas (y partos) y bajas
+// sin cobertura 3G/4G/WiFi.
 
 const CLAVE_STORAGE = (tenantId: number) => `aurora_ganaderia_cola_offline_${tenantId}`;
 
@@ -7,7 +9,9 @@ export type TipoAccionGanaderia =
   | "registrar_peso"
   | "rotar_potrero"
   | "registrar_ordeno"
-  | "aplicar_vacuna";
+  | "aplicar_vacuna"
+  | "alta_animal"
+  | "registrar_baja";
 
 export interface AccionPendientePeso {
   tipo: "registrar_peso";
@@ -67,11 +71,33 @@ export interface AccionPendienteVacuna {
   };
 }
 
-export type AccionPendienteGanaderia = 
-  | AccionPendientePeso 
-  | AccionPendienteRotacion 
-  | AccionPendienteOrdeno 
-  | AccionPendienteVacuna;
+/** Alta de un animal (nacimiento, parto o compra) hecha sin señal: payload = lo que recibe POST /animales. */
+export interface AccionPendienteAlta {
+  tipo: "alta_animal";
+  id: string;
+  claveIdempotencia: string;
+  descripcion: string;
+  creadaEn: number;
+  payload: { arete: string } & Record<string, unknown>;
+}
+
+/** Baja (muerte o robo) hecha sin señal. */
+export interface AccionPendienteBaja {
+  tipo: "registrar_baja";
+  id: string;
+  claveIdempotencia: string;
+  descripcion: string;
+  creadaEn: number;
+  payload: { animalId: number; arete: string; fecha: string; motivo: string; observaciones?: string };
+}
+
+export type AccionPendienteGanaderia =
+  | AccionPendientePeso
+  | AccionPendienteRotacion
+  | AccionPendienteOrdeno
+  | AccionPendienteVacuna
+  | AccionPendienteAlta
+  | AccionPendienteBaja;
 
 export function generarClaveIdempotencia(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -101,7 +127,8 @@ export function guardarColaGanaderia(tenantId: number, cola: AccionPendienteGana
   try {
     localStorage.setItem(CLAVE_STORAGE(tenantId), JSON.stringify(cola));
   } catch {
-    // Almacenamiento lleno o bloqueado
+    // Almacenamiento lleno o bloqueado: lo registrado sin señal no queda guardado en el equipo.
+    avisar("Este equipo no permite guardar datos sin conexión (modo privado o memoria llena). Lo registrado sin señal podría perderse.", "error");
   }
 }
 
@@ -137,6 +164,8 @@ export async function procesarColaGanaderia(
     rotar_potrero: (a: AccionPendienteRotacion) => Promise<unknown>;
     registrar_ordeno: (a: AccionPendienteOrdeno) => Promise<unknown>;
     aplicar_vacuna: (a: AccionPendienteVacuna) => Promise<unknown>;
+    alta_animal: (a: AccionPendienteAlta) => Promise<unknown>;
+    registrar_baja: (a: AccionPendienteBaja) => Promise<unknown>;
   },
 ): Promise<ResultadoSincronizacionGanaderia> {
   const cola = leerColaGanaderia(tenantId);
@@ -153,6 +182,10 @@ export async function procesarColaGanaderia(
         await ejecutores.registrar_ordeno(accion);
       } else if (accion.tipo === "aplicar_vacuna") {
         await ejecutores.aplicar_vacuna(accion);
+      } else if (accion.tipo === "alta_animal") {
+        await ejecutores.alta_animal(accion);
+      } else if (accion.tipo === "registrar_baja") {
+        await ejecutores.registrar_baja(accion);
       }
       eliminarAccionGanaderia(tenantId, accion.id);
       sincronizadas.push(accion);

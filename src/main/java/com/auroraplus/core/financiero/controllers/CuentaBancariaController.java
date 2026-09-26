@@ -1,5 +1,6 @@
 package com.auroraplus.core.financiero.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.financiero.entities.CuentaBancaria;
 import com.auroraplus.core.financiero.entities.MovimientoCuentaBancaria;
 import com.auroraplus.core.financiero.repositories.CuentaBancariaRepository;
@@ -27,7 +28,8 @@ public class CuentaBancariaController {
     private MovimientoCuentaBancariaRepository movimientoRepository;
 
     @GetMapping
-    public List<CuentaBancaria> listar(@RequestParam Long tenantId) {
+    public List<CuentaBancaria> listar() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return cuentaBancariaService.listarConSincronizacion(tenantId);
     }
 
@@ -39,7 +41,8 @@ public class CuentaBancariaController {
     }
 
     @PostMapping
-    public ResponseEntity<CuentaBancaria> crear(@RequestParam Long tenantId, @RequestBody CrearCuentaRequest req) {
+    public ResponseEntity<CuentaBancaria> crear(@RequestBody CrearCuentaRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         CuentaBancaria creada = cuentaBancariaService.crear(tenantId, req.nombre, req.tipo, req.moneda, req.saldoInicial);
         return ResponseEntity.status(HttpStatus.CREATED).body(creada);
@@ -52,7 +55,8 @@ public class CuentaBancariaController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CuentaBancaria> actualizar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody ActualizarCuentaRequest req) {
+    public ResponseEntity<CuentaBancaria> actualizar(@PathVariable Long id, @RequestBody ActualizarCuentaRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(cuentaBancariaService.actualizar(tenantId, id, req.nombre, req.tipo, req.activa));
     }
@@ -63,13 +67,15 @@ public class CuentaBancariaController {
     }
 
     @PostMapping("/{id}/ingresar")
-    public ResponseEntity<CuentaBancaria> ingresar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody MontoConceptoRequest req) {
+    public ResponseEntity<CuentaBancaria> ingresar(@PathVariable Long id, @RequestBody MontoConceptoRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(cuentaBancariaService.ingresar(tenantId, id, req.monto, req.concepto));
     }
 
     @PostMapping("/{id}/retirar")
-    public ResponseEntity<CuentaBancaria> retirar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody MontoConceptoRequest req) {
+    public ResponseEntity<CuentaBancaria> retirar(@PathVariable Long id, @RequestBody MontoConceptoRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         return ResponseEntity.ok(cuentaBancariaService.retirar(tenantId, id, req.monto, req.concepto));
     }
@@ -81,19 +87,22 @@ public class CuentaBancariaController {
     }
 
     @PostMapping("/transferir")
-    public ResponseEntity<Void> transferir(@RequestParam Long tenantId, @RequestBody TransferirRequest req) {
+    public ResponseEntity<Void> transferir(@RequestBody TransferirRequest req) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA");
         cuentaBancariaService.transferir(tenantId, req.origenId, req.destinoId, req.monto);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{id}/movimientos")
-    public List<MovimientoCuentaBancaria> movimientos(@PathVariable Long id, @RequestParam Long tenantId) {
+    public List<MovimientoCuentaBancaria> movimientos(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         return movimientoRepository.findByTenantIdAndCuentaIdOrderByFechaRegistroDesc(tenantId, id);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN");
         cuentaBancariaService.eliminar(tenantId, id);
         return ResponseEntity.ok().build();

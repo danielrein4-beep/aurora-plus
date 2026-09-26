@@ -38,6 +38,9 @@ public class OdontologiaAvanzadaController {
     private TasaCambioRepository tasaCambioRepository;
 
     @Autowired
+    private com.auroraplus.core.config.repositories.LicenciaTenantRepository licenciaTenantRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -79,11 +82,15 @@ public class OdontologiaAvanzadaController {
         return usuario != null && !usuario.isBlank() ? usuario : "Odontologo Tratante";
     }
 
+    // La tasa de la fuente que eligió la clínica (BCV, USDT o PERSONALIZADA, ver el modal de tasas de
+    // MediClinic), la misma que usa la pantalla. Sin tasa registrada devuelve 0: nunca se inventa una.
     private BigDecimal obtenerTasaBcv(Long tenantId) {
-        BigDecimal tasa = BigDecimal.valueOf(50.0);
+        BigDecimal tasa = BigDecimal.ZERO;
         if (tasaCambioRepository != null) {
+            String origen = licenciaTenantRepository.findByTenantId(tenantId)
+                .map(l -> l.getOrigenTasaActiva()).filter(o -> o != null && !o.isBlank()).orElse("USDT");
             Optional<TasaCambio> tc = tasaCambioRepository
-                .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoOrderByFechaActualizacionDesc(tenantId, "USD", "VES");
+                .findTopByTenantIdAndMonedaOrigenAndMonedaDestinoAndOrigenApiOrderByFechaActualizacionDesc(tenantId, "USD", "VES", origen);
             if (tc.isPresent() && tc.get().getTasa() != null && tc.get().getTasa().compareTo(BigDecimal.ZERO) > 0) {
                 tasa = tc.get().getTasa();
             }
@@ -749,11 +756,25 @@ public class OdontologiaAvanzadaController {
         Long tenantId = TenantContext.getCurrentTenant();
         validarPacienteDelTenant(tenantId, pacienteId);
 
+        // Sin url_archivo: cada imagen es un base64 de 1-3 MB y la lista las traía todas juntas
+        // (15 radiografías = ~30 MB solo para ver la lista). La imagen se pide al abrirla (abajo).
         List<Map<String, Object>> fotos = jdbcTemplate.queryForList(
-            "SELECT * FROM salud_odontologia_radiografias WHERE tenant_id = ? AND paciente_id = ? ORDER BY fecha_toma DESC, id DESC",
+            "SELECT id, tenant_id, paciente_id, tipo_estudio, titulo, hallazgos, diente_asociado, fecha_toma, fecha_registro, origen, revisada " +
+            "FROM salud_odontologia_radiografias WHERE tenant_id = ? AND paciente_id = ? ORDER BY fecha_toma DESC, id DESC",
             tenantId, pacienteId
         );
         return ResponseEntity.ok(fotos);
+    }
+
+    /** La imagen de UNA radiografía (data-URI o URL), para el visor. */
+    @GetMapping("/radiografias/{id}/imagen")
+    public ResponseEntity<?> imagenRadiografia(@PathVariable Long id) {
+        validarPermisoClinico();
+        Long tenantId = TenantContext.getCurrentTenant();
+        List<String> url = jdbcTemplate.queryForList(
+            "SELECT url_archivo FROM salud_odontologia_radiografias WHERE tenant_id = ? AND id = ?", String.class, tenantId, id);
+        if (url.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Radiografía no encontrada"));
+        return ResponseEntity.ok(Map.of("url", url.get(0) != null ? url.get(0) : ""));
     }
 
     public static class GuardarRadiografiaRequest {

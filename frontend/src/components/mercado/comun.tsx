@@ -21,6 +21,11 @@ export const RAZAS_COMUNES = [
   "Romosinuano", "Criollo Limonero", "Girolando", "Jersey", "Mestizo",
 ];
 
+/** Cruces F1 de doble propósito (el mismo catálogo que ofrece el alta del animal en Ganadería). */
+export const CRUCES_F1 = [
+  "F1 Brahman x Holstein", "F1 Brahman x Gyr", "F1 Gyr x Holstein", "F1 Pardo Suizo x Cebú", "F1 Angus x Brahman (Brangus)",
+];
+
 export const ESTADOS_VE = [
   "Amazonas", "Anzoátegui", "Apure", "Aragua", "Barinas", "Bolívar", "Carabobo", "Cojedes", "Delta Amacuro", "Distrito Capital",
   "Falcón", "Guárico", "La Guaira", "Lara", "Mérida", "Miranda", "Monagas", "Nueva Esparta", "Portuguesa", "Sucre", "Táchira",
@@ -148,6 +153,16 @@ export function PerfilFinca({ perfil, rol }: { perfil: PerfilMercado; rol: "VEND
         <span className="font-bold text-stone-900 dark:text-white">{perfil.nombre}</span>
         {perfil.verificado && <SelloVerificado pequeno />}
       </div>
+      {(perfil.hierroVerificado || perfil.tierraVerificada) && (
+        <div className="flex flex-wrap gap-1.5">
+          {perfil.hierroVerificado && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEF6F1] text-[#3E8A66] border border-[#CFE6D9]">Hierro registrado verificado</span>
+          )}
+          {perfil.tierraVerificada && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEF6F1] text-[#3E8A66] border border-[#CFE6D9]">Tierra verificada</span>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-500 dark:text-white/50">
         {antiguedadTexto(perfil) && <span>{antiguedadTexto(perfil)}</span>}
         <span>{tratos} {rol === "VENDEDOR" ? (tratos === 1 ? "venta" : "ventas") : (tratos === 1 ? "compra" : "compras")} en Aurora</span>

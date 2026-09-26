@@ -2,14 +2,11 @@ package com.auroraplus.modules.ganaderia.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auditoria.services.RegistroAuditoriaService;
-import com.auroraplus.modules.ganaderia.entities.Animal;
 import com.auroraplus.modules.ganaderia.entities.BajaAnimal;
-import com.auroraplus.modules.ganaderia.repositories.AnimalRepository;
 import com.auroraplus.modules.ganaderia.repositories.BajaAnimalRepository;
 import com.auroraplus.modules.ganaderia.services.GanaderiaTenantAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -24,7 +21,7 @@ public class BajaAnimalController {
     private BajaAnimalRepository bajaAnimalRepository;
 
     @Autowired
-    private AnimalRepository animalRepository;
+    private com.auroraplus.modules.ganaderia.services.GanaderiaAnimalService animalService;
 
     @Autowired
     private RegistroAuditoriaService auditoriaService;
@@ -45,32 +42,12 @@ public class BajaAnimalController {
     }
 
     @PostMapping
-    @Transactional
     public ResponseEntity<BajaAnimal> registrar(@RequestBody BajaRequest request) {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
-        Animal animal = animalRepository.findForUpdateByIdAndTenantId(request.animalId, tenantId)
-            .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
-        if (!"ACTIVO".equals(animal.getEstado())) {
-            throw new RuntimeException("El animal ya no está activo (estado actual: " + animal.getEstado() + ")");
-        }
-        if (request.motivo == null || request.motivo.isBlank()) {
-            throw new RuntimeException("El motivo de la baja es obligatorio");
-        }
-
-        animal.setEstado("MUERTO");
-        animal.setPotrero(null);
-        animalRepository.save(animal);
-
-        BajaAnimal baja = new BajaAnimal();
-        baja.setTenantId(tenantId);
-        baja.setAnimal(animal);
-        baja.setFecha(request.fecha != null ? request.fecha : LocalDate.now());
-        baja.setMotivo(request.motivo);
-        baja.setObservaciones(request.observaciones);
-
-        BajaAnimal guardada = bajaAnimalRepository.save(baja);
-        auditoriaService.registrar(tenantId, "GANADERIA", "ELIMINAR", "Animal", animal.getId(), "Registró baja del animal — motivo: " + request.motivo);
+        BajaAnimal guardada = animalService.registrarBaja(tenantId, request.animalId, request.fecha, request.motivo, request.observaciones);
+        auditoriaService.registrar(tenantId, "GANADERIA", "ELIMINAR", "Animal", guardada.getAnimal().getId(),
+            "Registró baja del animal " + guardada.getAnimal().getArete() + " — motivo: " + guardada.getMotivo());
         return ResponseEntity.ok(guardada);
     }
 }

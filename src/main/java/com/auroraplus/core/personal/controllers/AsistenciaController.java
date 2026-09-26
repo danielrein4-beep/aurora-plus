@@ -30,6 +30,24 @@ public class AsistenciaController {
         return asistenciaService.registrarSalida(TenantContext.getCurrentTenant(), id, request.fechaHoraSalida());
     }
 
+    /** El trabajador vinculado a este usuario: su estado de hoy y sus últimos marcajes. */
+    @GetMapping("/mia")
+    public AsistenciaService.EstadoMiAsistencia miEstado() {
+        return asistenciaService.miEstado(TenantContext.getCurrentTenant());
+    }
+
+    /** Marca la entrada del propio trabajador con la hora del servidor. */
+    @PostMapping("/mia/entrada")
+    public RegistroAsistencia marcarMiEntrada() {
+        return asistenciaService.marcarMiEntrada(TenantContext.getCurrentTenant());
+    }
+
+    /** Marca la salida del propio trabajador con la hora del servidor. */
+    @PostMapping("/mia/salida")
+    public RegistroAsistencia marcarMiSalida() {
+        return asistenciaService.marcarMiSalida(TenantContext.getCurrentTenant());
+    }
+
     @GetMapping("/empleado/{empleadoId}")
     public List<RegistroAsistencia> listarDeEmpleado(@PathVariable Long empleadoId) {
         return asistenciaService.listarDeEmpleado(TenantContext.getCurrentTenant(), empleadoId);

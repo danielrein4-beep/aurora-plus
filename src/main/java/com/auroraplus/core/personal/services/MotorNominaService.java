@@ -41,7 +41,7 @@ public class MotorNominaService {
 
     @Transactional
     public PeriodoNomina calcularPeriodo(Long tenantId, Long periodoId) {
-        accessService.exigirFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA);
+        accessService.exigirNomina(tenantId);
         accessService.exigirRol(tenantId, PUEDEN_CALCULAR);
 
         PeriodoNomina periodo = periodoRepository.findByTenantIdAndId(tenantId, periodoId)
@@ -63,12 +63,21 @@ public class MotorNominaService {
         String monedaBase = motorFinancieroService.obtenerMonedaBase(tenantId);
         List<Empleado> empleados = empleadoRepository.findByTenantId(tenantId).stream()
             .filter(e -> e.getFechaEgreso() == null || !e.getFechaEgreso().isBefore(periodoFinal.getFechaInicio()))
+            .filter(e -> e.getFechaIngreso() == null || !e.getFechaIngreso().isAfter(periodoFinal.getFechaFin()))
             .toList();
 
         for (Empleado empleado : empleados) {
-            Optional<AsignacionEmpleado> asignacionOpt = asignacionRepository.buscarVigenteEn(tenantId, empleado.getId(), periodo.getFechaInicio());
-            if (asignacionOpt.isEmpty()) continue; // sin cargo asignado en la fecha del período: no se le calcula nómina
-            calcularParaEmpleado(tenantId, periodo, empleado, asignacionOpt.get(), monedaBase);
+            // La asignación vigente al cierre del período (si entró a mitad de la semana, también cuenta).
+            Optional<AsignacionEmpleado> asignacionOpt = asignacionRepository.buscarVigenteEn(tenantId, empleado.getId(), periodo.getFechaFin())
+                .or(() -> asignacionRepository.buscarVigenteEn(tenantId, empleado.getId(), periodoFinal.getFechaInicio()));
+            if (asignacionOpt.isEmpty()) continue; // sin sueldo asignado en el período: no se le calcula nómina
+            // Un período semanal solo paga a quien cobra semanal (y así con quincenal y mensual).
+            if (periodo.getFrecuencia() != null && !periodo.getFrecuencia().equals(frecuenciaDe(asignacionOpt.get()))) continue;
+            NominaEmpleado nomina = new NominaEmpleado();
+            nomina.setTenantId(tenantId);
+            nomina.setPeriodoId(periodo.getId());
+            nomina.setEmpleadoId(empleado.getId());
+            calcularParaEmpleado(tenantId, periodo, empleado, asignacionOpt.get(), monedaBase, nomina, null, null);
         }
 
         auditoriaService.registrar(tenantId, periodo.getCalculadoPorUsuarioId(), "CALCULAR", "PeriodoNomina", periodo.getId(),
@@ -85,18 +94,31 @@ public class MotorNominaService {
      * "% del sueldo" siempre calcula sobre el bruto YA con bonos/comisiones incluidos, nunca
      * sobre un total parcial que depende del orden de iteración.
      */
-    private void calcularParaEmpleado(Long tenantId, PeriodoNomina periodo, Empleado empleado, AsignacionEmpleado asignacion, String monedaBase) {
+    /**
+     * Calcula (o vuelve a calcular) el recibo de un trabajador. {@code ajuste} trae lo que el dueño
+     * corrigió al revisar (días, horas, bono, descuento); null = calcular con lo marcado.
+     */
+    private void calcularParaEmpleado(Long tenantId, PeriodoNomina periodo, Empleado empleado, AsignacionEmpleado asignacion,
+                                      String monedaBase, NominaEmpleado nomina, AjusteRevision ajuste, List<DetalleNomina> anteriores) {
+        String moneda = asignacion.getMonedaSalario();
         List<DetalleNomina> detalles = new ArrayList<>();
 
-        BigDecimal totalAsignaciones = calcularSueldoBase(tenantId, periodo, asignacion, detalles);
+        BigDecimal totalAsignaciones = calcularSueldoBase(tenantId, periodo, empleado, asignacion, moneda, nomina, ajuste, detalles);
         BigDecimal totalDeducciones = BigDecimal.ZERO;
         BigDecimal totalAportes = BigDecimal.ZERO;
+
+        BigDecimal bono = ajuste == null ? nomina.getBono() : ajuste.bono();
+        if (bono != null && bono.compareTo(BigDecimal.ZERO) > 0) {
+            detalles.add(lineaManual(tenantId, "Bono", bono, moneda, ConceptoNomina.Tipo.ASIGNACION));
+            totalAsignaciones = totalAsignaciones.add(bono);
+        }
+        nomina.setBono(bono != null && bono.compareTo(BigDecimal.ZERO) > 0 ? bono.setScale(2, RoundingMode.HALF_UP) : null);
 
         List<ConceptoNomina> conceptos = conceptoRepository.findByTenantIdAndActivoTrue(tenantId);
 
         for (ConceptoNomina concepto : conceptos) {
             if (concepto.getTipo() != ConceptoNomina.Tipo.ASIGNACION) continue;
-            DetalleNomina detalle = calcularLineaDeConcepto(tenantId, periodo, concepto, totalAsignaciones);
+            DetalleNomina detalle = calcularLineaDeConcepto(tenantId, periodo, concepto, totalAsignaciones, moneda);
             if (detalle == null) continue;
             detalles.add(detalle);
             totalAsignaciones = totalAsignaciones.add(detalle.getMontoTotal());
@@ -104,7 +126,7 @@ public class MotorNominaService {
 
         for (ConceptoNomina concepto : conceptos) {
             if (concepto.getTipo() == ConceptoNomina.Tipo.ASIGNACION) continue;
-            DetalleNomina detalle = calcularLineaDeConcepto(tenantId, periodo, concepto, totalAsignaciones);
+            DetalleNomina detalle = calcularLineaDeConcepto(tenantId, periodo, concepto, totalAsignaciones, moneda);
             if (detalle == null) continue;
             detalles.add(detalle);
             if (concepto.getTipo() == ConceptoNomina.Tipo.DEDUCCION) {
@@ -114,29 +136,40 @@ public class MotorNominaService {
             }
         }
 
-        BigDecimal netoAPagar = totalAsignaciones.subtract(totalDeducciones).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal descuento = ajuste == null ? nomina.getDescuento() : ajuste.descuento();
+        if (descuento != null && descuento.compareTo(BigDecimal.ZERO) > 0) {
+            detalles.add(lineaManual(tenantId, "Descuento o adelanto", descuento, moneda, ConceptoNomina.Tipo.DEDUCCION));
+            totalDeducciones = totalDeducciones.add(descuento);
+        }
+        nomina.setDescuento(descuento != null && descuento.compareTo(BigDecimal.ZERO) > 0 ? descuento.setScale(2, RoundingMode.HALF_UP) : null);
+        if (ajuste != null) nomina.setNota(ajuste.nota() == null || ajuste.nota().isBlank() ? null : ajuste.nota().trim());
 
-        NominaEmpleado nomina = new NominaEmpleado();
-        nomina.setTenantId(tenantId);
-        nomina.setPeriodoId(periodo.getId());
-        nomina.setEmpleadoId(empleado.getId());
+        BigDecimal netoAPagar = totalAsignaciones.subtract(totalDeducciones).setScale(2, RoundingMode.HALF_UP);
+        if (netoAPagar.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("El descuento de " + empleado.getNombreCompleto() + " es mayor que lo que le toca cobrar");
+        }
+
         nomina.setAsignacionEmpleadoId(asignacion.getId());
         nomina.setTotalAsignaciones(totalAsignaciones.setScale(2, RoundingMode.HALF_UP));
         nomina.setTotalDeducciones(totalDeducciones.setScale(2, RoundingMode.HALF_UP));
         nomina.setTotalAportesPatronales(totalAportes.setScale(2, RoundingMode.HALF_UP));
         nomina.setNetoAPagar(netoAPagar);
-        nomina.setMoneda(periodo.getMoneda());
+        nomina.setMoneda(moneda);
 
         // Congelado una sola vez, acá — nunca se vuelve a convertir con la tasa vigente después
         // (docs/personal-nomina-contract.md §3 punto 4, mismo criterio que finance-contract.md §2.1).
-        if (!periodo.getMoneda().equals(monedaBase)) {
-            BigDecimal equivalente = motorFinancieroService.convertirMoneda(tenantId, netoAPagar, periodo.getMoneda(), monedaBase);
+        nomina.setMontoEquivalenteBase(null);
+        nomina.setMonedaBaseEquivalente(null);
+        nomina.setTasaAplicada(null);
+        if (!moneda.equals(monedaBase)) {
+            BigDecimal equivalente = motorFinancieroService.convertirMoneda(tenantId, netoAPagar, moneda, monedaBase);
             nomina.setMontoEquivalenteBase(equivalente);
             nomina.setMonedaBaseEquivalente(monedaBase);
             nomina.setTasaAplicada(netoAPagar.compareTo(BigDecimal.ZERO) > 0
                 ? equivalente.divide(netoAPagar, 6, RoundingMode.HALF_UP) : BigDecimal.ZERO);
         }
 
+        if (anteriores != null) detalleNominaRepository.deleteAll(anteriores);
         NominaEmpleado guardada = nominaEmpleadoRepository.save(nomina);
         for (DetalleNomina detalle : detalles) {
             detalle.setNominaEmpleadoId(guardada.getId());
@@ -144,8 +177,56 @@ public class MotorNominaService {
         }
     }
 
+    /** Lo que el dueño corrige al revisar un recibo antes de pagar. null en días/horas = usar lo marcado. */
+    public record AjusteRevision(BigDecimal dias, BigDecimal horas, BigDecimal bono, BigDecimal descuento, String nota) {}
+
+    /**
+     * Vuelve a calcular el recibo de un trabajador con lo que el dueño revisó (días u horas
+     * trabajadas, bono, descuento). Solo mientras el período no se ha pagado.
+     */
+    @Transactional
+    public NominaEmpleado recalcularRecibo(Long tenantId, Long nominaEmpleadoId, AjusteRevision ajuste) {
+        accessService.exigirNomina(tenantId);
+        accessService.exigirRol(tenantId, PUEDEN_CALCULAR);
+        NominaEmpleado nomina = nominaEmpleadoRepository.findByTenantIdAndId(tenantId, nominaEmpleadoId)
+            .orElseThrow(() -> new RuntimeException("Recibo no encontrado"));
+        if (nomina.getEstado() != NominaEmpleado.Estado.CALCULADA && nomina.getEstado() != NominaEmpleado.Estado.EN_REVISION) {
+            throw new RuntimeException("Este recibo ya se aprobó o se pagó; los cambios van como un ajuste");
+        }
+        for (BigDecimal v : new BigDecimal[] { ajuste.dias(), ajuste.horas(), ajuste.bono(), ajuste.descuento() }) {
+            if (v != null && v.compareTo(BigDecimal.ZERO) < 0) throw new RuntimeException("Los días, horas, bono y descuento no pueden ser negativos");
+        }
+        PeriodoNomina periodo = periodoRepository.findByTenantIdAndId(tenantId, nomina.getPeriodoId())
+            .orElseThrow(() -> new RuntimeException("Período no encontrado"));
+        Empleado empleado = empleadoRepository.findByTenantIdAndId(tenantId, nomina.getEmpleadoId())
+            .orElseThrow(() -> new RuntimeException("Trabajador no encontrado"));
+        AsignacionEmpleado asignacion = asignacionRepository.findById(nomina.getAsignacionEmpleadoId())
+            .filter(a -> tenantId.equals(a.getTenantId()))
+            .orElseThrow(() -> new RuntimeException("Sueldo del trabajador no encontrado"));
+        List<DetalleNomina> anteriores = detalleNominaRepository.findByTenantIdAndNominaEmpleadoId(tenantId, nomina.getId());
+        calcularParaEmpleado(tenantId, periodo, empleado, asignacion, motorFinancieroService.obtenerMonedaBase(tenantId), nomina, ajuste, anteriores);
+        auditoriaService.registrar(tenantId, accessService.resolverUsuarioIdActual(tenantId), "REVISAR", "NominaEmpleado", nomina.getId(),
+            "Recibo revisado antes de pagar: neto " + nomina.getMoneda() + " " + nomina.getNetoAPagar());
+        return nomina;
+    }
+
+    /** Frecuencia de pago de una asignación (las viejas sin dato cuentan como quincenal, el valor por defecto). */
+    public static String frecuenciaDe(AsignacionEmpleado asignacion) {
+        return asignacion.getFrecuenciaPago() == null ? "QUINCENAL" : asignacion.getFrecuenciaPago();
+    }
+
+    private DetalleNomina lineaManual(Long tenantId, String descripcion, BigDecimal monto, String moneda, ConceptoNomina.Tipo tipo) {
+        DetalleNomina detalle = new DetalleNomina();
+        detalle.setTenantId(tenantId);
+        detalle.setDescripcion(descripcion);
+        detalle.setMontoTotal(monto.setScale(2, RoundingMode.HALF_UP));
+        detalle.setMoneda(moneda);
+        detalle.setTipo(tipo);
+        return detalle;
+    }
+
     /** Concepto activo sin regla vigente => null (no se aplica, no se inventa un valor). Con regla, SIEMPRE produce una línea o revienta — nunca cero silencioso. */
-    private DetalleNomina calcularLineaDeConcepto(Long tenantId, PeriodoNomina periodo, ConceptoNomina concepto, BigDecimal baseAsignaciones) {
+    private DetalleNomina calcularLineaDeConcepto(Long tenantId, PeriodoNomina periodo, ConceptoNomina concepto, BigDecimal baseAsignaciones, String moneda) {
         Optional<ReglaNominaVersionada> reglaOpt = reglaNominaService.buscarVigenteEnPorConcepto(tenantId, concepto.getId(), periodo.getFechaInicio());
         if (reglaOpt.isEmpty()) return null;
 
@@ -159,7 +240,7 @@ public class MotorNominaService {
         detalle.setReglaAplicadaId(regla.getId());
         detalle.setDescripcion(concepto.getNombre());
         detalle.setMontoTotal(monto);
-        detalle.setMoneda(periodo.getMoneda());
+        detalle.setMoneda(moneda);
         detalle.setTipo(concepto.getTipo());
         return detalle;
     }
@@ -182,84 +263,102 @@ public class MotorNominaService {
     }
 
     /**
-     * Tipos de salario soportados por el motor mínimo — docs/personal-nomina-contract.md §3.
-     *
-     * No convierte entre AsignacionEmpleado.monedaSalario y PeriodoNomina.moneda — eso es una
-     * conversión de ENTRADA distinta a la conversión de SALIDA (netoAPagar -> moneda base) que sí
-     * se congela en calcularParaEmpleado. Mezclar ambas sin que el usuario lo pida explícitamente
-     * arriesgaría una conversión doble o silenciosa; por ahora se exige que coincidan, y calcular
-     * un período en una moneda distinta a la pactada del empleado falla con un mensaje claro en
-     * vez de adivinar.
+     * Sueldo del período según cómo se le paga al trabajador:
+     * - FIJO_MENSUAL: el sueldo es mensual y se paga por partes según la frecuencia del período:
+     *   mes calendario completo = el sueldo entero; quincena (1-15 o 16-fin) = la mitad; cualquier
+     *   otro rango (una semana) = días / 30. No se descuenta por días sin marcar (los domingos o los
+     *   días libres no se marcan): solo por los días en que todavía no había entrado o ya se fue.
+     *   Si el dueño corrige los días al revisar, se paga en proporción a esos días.
+     * - DIARIO y POR_JORNADA: sueldo × días (o jornadas) trabajados; salen de lo marcado con su
+     *   usuario, y si no marca, del período en que estuvo contratado.
+     * - POR_HORA: sueldo × horas marcadas.
+     * En todos los casos el dueño puede corregir días u horas al revisar, antes de pagar.
      */
-    private BigDecimal calcularSueldoBase(Long tenantId, PeriodoNomina periodo, AsignacionEmpleado asignacion, List<DetalleNomina> detalles) {
-        if (!asignacion.getMonedaSalario().equals(periodo.getMoneda())) {
-            throw new RuntimeException("El salario del empleado está pactado en " + asignacion.getMonedaSalario()
-                + " pero el período es en " + periodo.getMoneda() + " — este motor mínimo no convierte automáticamente entre ambas");
-        }
+    private BigDecimal calcularSueldoBase(Long tenantId, PeriodoNomina periodo, Empleado empleado, AsignacionEmpleado asignacion,
+                                          String moneda, NominaEmpleado nomina, AjusteRevision ajuste, List<DetalleNomina> detalles) {
+        long diasPeriodo = ChronoUnit.DAYS.between(periodo.getFechaInicio(), periodo.getFechaFin()) + 1;
+        long diasContratado = diasContratadoEnPeriodo(empleado, periodo);
+        var registros = asistenciaRepository.findByTenantIdAndEmpleadoIdAndFechaHoraEntradaGreaterThanEqualAndFechaHoraEntradaLessThan(
+            tenantId, empleado.getId(), periodo.getFechaInicio().atStartOfDay(), periodo.getFechaFin().plusDays(1).atStartOfDay());
+        BigDecimal horasMarcadas = BigDecimal.valueOf(registros.stream().mapToDouble(r -> r.getHorasTrabajadas()).sum())
+            .setScale(2, RoundingMode.HALF_UP);
+        long diasMarcados = registros.stream().filter(r -> r.getFechaHoraSalida() != null)
+            .map(r -> r.getFechaHoraEntrada().toLocalDate()).distinct().count();
+        nomina.setHorasMarcadas(horasMarcadas);
+
+        BigDecimal diasCorregidos = ajuste == null ? null : ajuste.dias();
+        BigDecimal horasCorregidas = ajuste == null ? null : ajuste.horas();
+        BigDecimal salario = asignacion.getSalarioPactado();
         BigDecimal monto;
+        BigDecimal cantidad;
         String descripcion;
         switch (asignacion.getTipoSalario()) {
             case FIJO_MENSUAL -> {
-                long diasPeriodo = ChronoUnit.DAYS.between(periodo.getFechaInicio(), periodo.getFechaFin()) + 1;
-                BigDecimal diasTrabajados = contarDiasTrabajados(tenantId, asignacion.getEmpleadoId(), periodo, diasPeriodo);
-                monto = asignacion.getSalarioPactado().multiply(diasTrabajados)
-                    .divide(BigDecimal.valueOf(diasPeriodo), 6, RoundingMode.HALF_UP);
-                descripcion = "Sueldo fijo mensual (" + diasTrabajados + "/" + diasPeriodo + " días)";
+                BigDecimal fraccion = fraccionDelMes(periodo, diasPeriodo);
+                BigDecimal sueldoDelPeriodo = salario.multiply(fraccion);
+                cantidad = diasCorregidos != null ? diasCorregidos : BigDecimal.valueOf(diasContratado);
+                monto = sueldoDelPeriodo.multiply(cantidad).divide(BigDecimal.valueOf(diasPeriodo), 6, RoundingMode.HALF_UP);
+                descripcion = "Sueldo " + (diasPeriodo == 7 ? "de la semana" : nombrePeriodo(fraccion)) + " (" + cantidad.stripTrailingZeros().toPlainString() + " de " + diasPeriodo + " días)";
             }
-            case DIARIO -> {
-                BigDecimal diasTrabajados = contarDiasTrabajados(tenantId, asignacion.getEmpleadoId(), periodo, null);
-                monto = asignacion.getSalarioPactado().multiply(diasTrabajados);
-                descripcion = "Sueldo diario (" + diasTrabajados + " días trabajados)";
+            case DIARIO, POR_JORNADA -> {
+                cantidad = diasCorregidos != null ? diasCorregidos
+                    : BigDecimal.valueOf(registros.isEmpty() ? diasContratado : diasMarcados);
+                monto = salario.multiply(cantidad);
+                String unidad = asignacion.getTipoSalario() == AsignacionEmpleado.TipoSalario.POR_JORNADA ? "jornadas" : "días trabajados";
+                descripcion = "Pago por " + (asignacion.getTipoSalario() == AsignacionEmpleado.TipoSalario.POR_JORNADA ? "jornada" : "día")
+                    + " (" + cantidad.stripTrailingZeros().toPlainString() + " " + unidad + ")";
             }
             case POR_HORA -> {
-                BigDecimal horasTrabajadas = contarHorasTrabajadas(tenantId, asignacion.getEmpleadoId(), periodo);
-                monto = asignacion.getSalarioPactado().multiply(horasTrabajadas);
-                descripcion = "Sueldo por hora (" + horasTrabajadas + " horas trabajadas)";
-            }
-            case POR_JORNADA -> {
-                BigDecimal jornadas = contarDiasTrabajados(tenantId, asignacion.getEmpleadoId(), periodo, null);
-                monto = asignacion.getSalarioPactado().multiply(jornadas);
-                descripcion = "Sueldo por jornada (" + jornadas + " jornadas)";
+                cantidad = horasCorregidas != null ? horasCorregidas : horasMarcadas;
+                monto = salario.multiply(cantidad);
+                descripcion = "Pago por hora (" + cantidad.stripTrailingZeros().toPlainString() + " horas)";
             }
             default -> throw new RuntimeException("Tipo de salario no soportado: " + asignacion.getTipoSalario());
         }
+        nomina.setDiasTrabajados(asignacion.getTipoSalario() == AsignacionEmpleado.TipoSalario.POR_HORA
+            ? BigDecimal.valueOf(registros.isEmpty() ? 0 : diasMarcados) : cantidad);
+        if (asignacion.getTipoSalario() == AsignacionEmpleado.TipoSalario.POR_HORA) nomina.setHorasMarcadas(cantidad);
 
         DetalleNomina detalleSueldo = new DetalleNomina();
         detalleSueldo.setTenantId(tenantId);
         // conceptoId queda null: el sueldo base no deriva de un ConceptoNomina configurado.
         detalleSueldo.setDescripcion(descripcion);
+        detalleSueldo.setCantidad(cantidad);
+        detalleSueldo.setMontoUnitario(asignacion.getTipoSalario() == AsignacionEmpleado.TipoSalario.FIJO_MENSUAL ? null : salario);
         detalleSueldo.setMontoTotal(monto.setScale(2, RoundingMode.HALF_UP));
-        detalleSueldo.setMoneda(periodo.getMoneda());
+        detalleSueldo.setMoneda(moneda);
         detalleSueldo.setTipo(ConceptoNomina.Tipo.ASIGNACION);
         detalles.add(detalleSueldo);
 
         return monto.setScale(2, RoundingMode.HALF_UP);
     }
 
-    /**
-     * Días con asistencia completa (entrada+salida) dentro del período. Si el tenant no tiene
-     * registros de asistencia para este empleado en el período (ej. no activó el flag
-     * "asistencia", o es personal asalariado sin control de reloj), se asume el período completo
-     * trabajado — comportamiento por defecto razonable para sueldo fijo sin control de asistencia,
-     * en vez de forzar a todo tenant a activar asistencia solo para poder pagar nómina básica.
-     */
-    private BigDecimal contarDiasTrabajados(Long tenantId, Long empleadoId, PeriodoNomina periodo, Long diasPeriodoSiFijo) {
-        var registros = asistenciaRepository.findByTenantIdAndEmpleadoIdAndFechaHoraEntradaGreaterThanEqualAndFechaHoraEntradaLessThan(
-            tenantId, empleadoId, periodo.getFechaInicio().atStartOfDay(), periodo.getFechaFin().plusDays(1).atStartOfDay());
-        if (registros.isEmpty()) {
-            long diasPeriodo = diasPeriodoSiFijo != null ? diasPeriodoSiFijo
-                : ChronoUnit.DAYS.between(periodo.getFechaInicio(), periodo.getFechaFin()) + 1;
-            return BigDecimal.valueOf(diasPeriodo);
+    /** Qué parte del sueldo mensual corresponde al período: 1 (mes completo), 1/2 (quincena) o días/30. */
+    static BigDecimal fraccionDelMes(PeriodoNomina periodo, long diasPeriodo) {
+        var inicio = periodo.getFechaInicio();
+        var fin = periodo.getFechaFin();
+        boolean mismoMes = inicio.getYear() == fin.getYear() && inicio.getMonth() == fin.getMonth();
+        if (mismoMes && inicio.getDayOfMonth() == 1 && fin.getDayOfMonth() == fin.lengthOfMonth()) return BigDecimal.ONE;
+        if (mismoMes && ((inicio.getDayOfMonth() == 1 && fin.getDayOfMonth() == 15)
+                || (inicio.getDayOfMonth() == 16 && fin.getDayOfMonth() == fin.lengthOfMonth()))) {
+            return new BigDecimal("0.5");
         }
-        long dias = registros.stream().filter(r -> r.getFechaHoraSalida() != null)
-            .map(r -> r.getFechaHoraEntrada().toLocalDate()).distinct().count();
-        return BigDecimal.valueOf(dias);
+        return BigDecimal.valueOf(diasPeriodo).divide(BigDecimal.valueOf(30), 6, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal contarHorasTrabajadas(Long tenantId, Long empleadoId, PeriodoNomina periodo) {
-        var registros = asistenciaRepository.findByTenantIdAndEmpleadoIdAndFechaHoraEntradaGreaterThanEqualAndFechaHoraEntradaLessThan(
-            tenantId, empleadoId, periodo.getFechaInicio().atStartOfDay(), periodo.getFechaFin().plusDays(1).atStartOfDay());
-        double horas = registros.stream().mapToDouble(r -> r.getHorasTrabajadas()).sum();
-        return BigDecimal.valueOf(horas);
+    private static String nombrePeriodo(BigDecimal fraccion) {
+        if (fraccion.compareTo(BigDecimal.ONE) == 0) return "del mes";
+        if (fraccion.compareTo(new BigDecimal("0.5")) == 0) return "de la quincena";
+        return "del período";
+    }
+
+    /** Días del período en que la persona ya había entrado y todavía no se había ido. */
+    private static long diasContratadoEnPeriodo(Empleado empleado, PeriodoNomina periodo) {
+        var desde = periodo.getFechaInicio();
+        var hasta = periodo.getFechaFin();
+        if (empleado.getFechaIngreso() != null && empleado.getFechaIngreso().isAfter(desde)) desde = empleado.getFechaIngreso();
+        if (empleado.getFechaEgreso() != null && empleado.getFechaEgreso().isBefore(hasta)) hasta = empleado.getFechaEgreso();
+        if (hasta.isBefore(desde)) return 0;
+        return ChronoUnit.DAYS.between(desde, hasta) + 1;
     }
 }

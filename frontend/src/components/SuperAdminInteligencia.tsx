@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer, AreaChart, Area, ComposedChart, Bar, Line,
@@ -11,6 +12,7 @@ import {
   type Semaforo,
 } from "../api";
 import CanalEndemico from "./CanalEndemico";
+import SuperAdminVerificacionesMercado from "./SuperAdminVerificacionesMercado";
 
 type Pestana = "NEGOCIO" | "COMERCIO" | "SALUD" | "MERCADO";
 
@@ -191,7 +193,7 @@ function Ranking({ filas }: { filas: { clave: string; titulo: string; subtitulo?
 
 // ─────────────────────────── NEGOCIO ───────────────────────────
 
-function VistaNegocio() {
+export function VistaNegocio() {
   const { datos, error, cargando } = useCarga<InteligenciaNegocio>(() => obtenerInteligenciaNegocio(), []);
   const [filtro, setFiltro] = useState<Semaforo | "TODOS">("TODOS");
   if (!datos) return <Estado cargando={cargando} error={error} />;
@@ -326,7 +328,7 @@ function VistaNegocio() {
 
 // ─────────────────────────── COMERCIO ───────────────────────────
 
-function VistaComercio({ dias }: { dias: number }) {
+export function VistaComercio({ dias }: { dias: number }) {
   const { datos, error, cargando } = useCarga<InteligenciaComercio>(() => obtenerInteligenciaComercio(dias), [dias]);
   const [busqueda, setBusqueda] = useState("");
   const [filtroRubro, setFiltroRubro] = useState("TODOS");
@@ -489,7 +491,12 @@ function FilaComercio({ c, dias, abierto, alTocar }: { c: InteligenciaComercio["
 
 // ─────────────────────────── SALUD ───────────────────────────
 
-function VistaSalud({ dias }: { dias: number }) {
+/**
+ * `onAbrirCanal`: si se pasa, tocar un diagnóstico o una clínica lo delega (p. ej. a la
+ * pestaña "Reporte por enfermedad" de la página de Mediclinic) y esta vista no dibuja su
+ * propio canal, para que el Canal Endémico viva en un solo lugar.
+ */
+export function VistaSalud({ dias, onAbrirCanal }: { dias: number; onAbrirCanal?: (cie10?: string, tenantId?: number) => void }) {
   const { datos, error, cargando } = useCarga<InteligenciaSalud>(() => obtenerInteligenciaSalud(dias), [dias]);
   const nombresCie10 = useCatalogoCie10(true);
   const [busqueda, setBusqueda] = useState("");
@@ -513,6 +520,10 @@ function VistaSalud({ dias }: { dias: number }) {
   }, [datos, busqueda]);
 
   const verCanal = (nuevaClinica: { id: number; nombre: string } | null, cie10?: string) => {
+    if (onAbrirCanal) {
+      onAbrirCanal(cie10, nuevaClinica?.id);
+      return;
+    }
     setClinica(nuevaClinica);
     setCie10Canal(cie10);
     setTimeout(() => canalRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -622,7 +633,7 @@ function VistaSalud({ dias }: { dias: number }) {
         </div>
       </div>
 
-      <div ref={canalRef} className="scroll-mt-4 space-y-3">
+      {!onAbrirCanal && <div ref={canalRef} className="scroll-mt-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => verCanal(null, cie10Actual.current)}
@@ -647,7 +658,7 @@ function VistaSalud({ dias }: { dias: number }) {
             onCambioDiagnostico={(cie10) => { cie10Actual.current = cie10; }}
           />
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -660,7 +671,7 @@ const TIPO_SOSPECHA: Record<string, string> = {
   ARETE_EN_HATO_DEL_INTERESADO: "Arete en hato del interesado",
 };
 
-function VistaMercado({ dias }: { dias: number }) {
+export function VistaMercado({ dias }: { dias: number }) {
   const [version, setVersion] = useState(0);
   const { datos, error, cargando } = useCarga<PanelMercadoSuperAdmin>(() => obtenerMercadoGanaderoSuperAdmin(dias), [dias, version]);
   if (!datos) return <Estado cargando={cargando} error={error} />;
@@ -671,12 +682,12 @@ function VistaMercado({ dias }: { dias: number }) {
     const motivo = prompt(`Motivo para suspender a ${nombre ?? "esta finca"} del Mercado Ganadero (lo verá la finca):`);
     if (!motivo || !motivo.trim()) return;
     try { await suspenderFincaMercado(tenantId, motivo.trim()); setVersion((v) => v + 1); }
-    catch (e) { alert(e instanceof Error ? e.message : "No se pudo suspender"); }
+    catch (e) { avisar(e instanceof Error ? e.message : "No se pudo suspender"); }
   };
   const reactivar = async (tenantId: number, nombre: string | null) => {
     if (!confirm(`¿Devolverle el acceso al mercado a ${nombre ?? "esta finca"}?`)) return;
     try { await reactivarFincaMercado(tenantId); setVersion((v) => v + 1); }
-    catch (e) { alert(e instanceof Error ? e.message : "No se pudo reactivar"); }
+    catch (e) { avisar(e instanceof Error ? e.message : "No se pudo reactivar"); }
   };
   const BotonSuspender = ({ tenantId, nombre, etiqueta }: { tenantId: number | null; nombre: string | null; etiqueta: string }) => {
     if (tenantId == null) return null;
@@ -690,6 +701,7 @@ function VistaMercado({ dias }: { dias: number }) {
 
   return (
     <div className="space-y-6">
+      <SuperAdminVerificacionesMercado />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Kpi titulo="En venta ahora" valor={numero.format(resumen.publicacionesActivas)} />
         <Kpi titulo="Tratos cerrados" valor={numero.format(resumen.tratosPeriodo)} nota={`Volumen ${dinero.format(Number(resumen.volumenPeriodo))}`} color="text-emerald-600" />

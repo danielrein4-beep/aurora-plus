@@ -80,7 +80,11 @@ public class ComandaEscPosService {
                 out.write(NEGRITA_OFF);
             }
 
+            // Aún no se emiten facturas: el comprobante lo dice para no confundirse con una.
             out.write('\n');
+            out.write(CENTRAR);
+            escribirLinea(out, "Orden de consumo - Documento no fiscal");
+            out.write(IZQUIERDA);
             out.write('\n');
             out.write('\n');
             out.write(CORTE);

@@ -1,4 +1,4 @@
-import { IconFileText, IconCalendar, IconChart, IconUsers, IconSyringe, IconMilk, IconPin, IconCow, IconTag, IconScale, IconCoins, IconDashboardGrid, IconUpload } from "../../Icons";
+import { IconFileText, IconCalendar, IconChart, IconUsers, IconSyringe, IconMilk, IconPin, IconCow, IconTag, IconScale, IconCoins, IconDashboardGrid, IconUpload, IconClipboardCheck, IconWheat } from "../../Icons";
 import type { AnimalGanaderia, PotreroGanaderia, AlertaSanitariaGanaderia } from "../../api";
 import type { FormAltaAnimal } from "./ModalAltaAnimal";
 import type { ModoVenta } from "./ModalVentaAnimales";
@@ -23,6 +23,8 @@ interface Props {
   setAltaAnimal: (valores: Partial<FormAltaAnimal> | null) => void;
   setAperturaSoporte: (actualizar: (n: number) => number) => void;
   setModalImportarHato: (abierto: boolean) => void;
+  /** Registro rápido del hato con potrero por animal (solo quien puede importar). */
+  abrirRegistroRapido?: () => void;
   setSidebarAbierto: (abierto: boolean) => void;
   setTab: (tab: TabGanaderia) => void;
 }
@@ -31,19 +33,21 @@ interface Props {
 export default function BarraLateralGanaderia({
   alertasSanitarias, animales, potreros, puedeImportarHato, sidebarAbierto, tab, nombreFinca, puedeVerAuditoria, sinLeerMercado, abrirMercado,
   abrirVaqueraRapida, abrirVentaAnimales, onSalir, setAltaAnimal, setAperturaSoporte,
-  setModalImportarHato, setSidebarAbierto, setTab,
+  setModalImportarHato, abrirRegistroRapido, setSidebarAbierto, setTab,
 }: Props) {
   return (
     <>
   {sidebarAbierto && (
     <div
-      className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+      // Por encima del aviso de la prueba gratis y del botón de soporte; touch-none evita que
+      // en el iPhone se desplace la página de atrás al tocar el fondo oscuro.
+      className="fixed inset-0 z-[70] bg-black/50 lg:hidden touch-none"
       onClick={() => setSidebarAbierto(false)}
       aria-hidden="true"
     />
   )}
   <aside
-    className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
+    className={`w-64 flex-shrink-0 h-screen flex flex-col bg-[#fcfdfd] border-r border-slate-200 shadow-none fixed inset-y-0 left-0 z-[80] transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${
       sidebarAbierto ? "translate-x-0" : "-translate-x-full"
     }`}
   >
@@ -51,7 +55,7 @@ export default function BarraLateralGanaderia({
     <button
       onClick={onSalir}
       className="flex items-center gap-3 text-left group cursor-pointer px-5 py-4 border-b border-slate-200"
-      title="Volver al Hub General"
+      title="Volver al inicio de Aurora"
     >
       <div className="w-10 h-10 rounded-md border border-slate-200 bg-white text-slate-700 flex items-center justify-center overflow-hidden group-hover:border-teal-300 transition-colors flex-shrink-0">
         <span className="font-semibold tracking-[-0.06em] text-sm" aria-label="Aurora Plus">A+</span>
@@ -66,7 +70,24 @@ export default function BarraLateralGanaderia({
       </div>
     </button>
 
-    <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
+    <nav className="flex-1 overflow-y-auto overscroll-contain px-3 py-5 space-y-6">
+      {/* Mercado ganadero: arriba y destacado, no escondido entre las acciones rápidas. */}
+      <button
+        type="button"
+        onClick={() => { abrirMercado(); setSidebarAbierto(false); }}
+        title="Compra y venta de ganado entre fincas de Aurora"
+        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-emerald-50 hover:from-teal-100 hover:to-emerald-100 hover:border-teal-300 text-left cursor-pointer transition-colors"
+      >
+        <span className="w-8 h-8 rounded-lg bg-teal-700 text-[#ffffff] flex items-center justify-center flex-shrink-0"><IconCow size={16} /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-semibold text-[13px] text-teal-900">Mercado ganadero</span>
+          <span className="block text-[11px] text-teal-700/80">Compra y vende entre fincas</span>
+        </span>
+        {sinLeerMercado > 0 && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500 text-[#ffffff]" title="Mensajes sin leer">{sinLeerMercado}</span>
+        )}
+      </button>
+
       {([
         {
           titulo: "Operación",
@@ -74,9 +95,10 @@ export default function BarraLateralGanaderia({
             { id: "resumen" as const, Icon: IconDashboardGrid, etiqueta: "Panel General", badge: 0 },
             { id: "inventario" as const, Icon: IconCow, etiqueta: "Hato & Inventario", badge: 0 },
             { id: "potreros" as const, Icon: IconPin, etiqueta: "Potreros", badge: 0 },
+            { id: "alimentacion" as const, Icon: IconWheat, etiqueta: "Alimento y sal", badge: 0 },
             { id: "engorde" as const, Icon: IconScale, etiqueta: "Engorde (GDP)", badge: 0 },
             { id: "sociedades" as const, Icon: IconUsers, etiqueta: "Ceba en sociedad", badge: 0 },
-            { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción & Pesajes", badge: 0 },
+            { id: "produccion" as const, Icon: IconMilk, etiqueta: "Producción de leche", badge: 0 },
           ],
         },
         {
@@ -84,7 +106,8 @@ export default function BarraLateralGanaderia({
           items: [
             { id: "sanidad" as const, Icon: IconSyringe, etiqueta: "Sanidad & Trazabilidad", badge: alertasSanitarias.length },
             { id: "eventos" as const, Icon: IconCalendar, etiqueta: "Centro de Eventos", badge: 0 },
-            { id: "reportes" as const, Icon: IconChart, etiqueta: "Centro de Reportes", badge: 0 },
+            { id: "reportes" as const, Icon: IconChart, etiqueta: "Finanzas y reportes", badge: 0 },
+            { id: "personal" as const, Icon: IconClipboardCheck, etiqueta: "Personal y nómina", badge: 0 },
             ...(puedeVerAuditoria ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría", badge: 0 }] : []),
           ],
         },
@@ -128,6 +151,16 @@ export default function BarraLateralGanaderia({
           <span className="text-slate-400"><IconMilk size={16} /></span>
           <span className="flex-1 text-left">Ordeño rápido</span>
         </button>
+        {abrirRegistroRapido && (
+          <button
+            type="button"
+            onClick={() => { abrirRegistroRapido(); setSidebarAbierto(false); }}
+            className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          >
+            <span className="text-slate-400"><IconTag size={16} /></span>
+            <span className="flex-1 text-left">Registrar mi ganado</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => { setAltaAnimal({}); setSidebarAbierto(false); }}
@@ -143,18 +176,6 @@ export default function BarraLateralGanaderia({
         >
           <span className="text-slate-400"><IconCoins size={16} /></span>
           <span className="flex-1 text-left">Vender animales</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => { abrirMercado(); setSidebarAbierto(false); }}
-          title="Compra y venta entre fincas de Aurora"
-          className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg font-semibold text-[13px] cursor-pointer text-slate-800 hover:bg-slate-50 hover:text-slate-900"
-        >
-          <span className="text-slate-400"><IconCoins size={16} /></span>
-          <span className="flex-1 text-left">Mercado ganadero</span>
-          {sinLeerMercado > 0 && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500 text-white">{sinLeerMercado}</span>
-          )}
         </button>
         {puedeImportarHato && (
           <button
@@ -192,7 +213,7 @@ export default function BarraLateralGanaderia({
         onClick={onSalir}
         className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left"
       >
-        ← Salir al Hub
+        ← Volver a Aurora
       </button>
     </div>
   </aside>

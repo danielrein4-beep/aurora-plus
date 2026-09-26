@@ -1,5 +1,7 @@
+import { avisar } from "../avisos";
 import AsistenteIaModal from "./AsistenteIaModal";
 import jsPDF from "jspdf";
+import EstadisticasComercio from "./EstadisticasComercio";
 import ModalCatalogoQR from "./ModalCatalogoQR";
 import PedidosWebPanel from "./PedidosWebPanel";
 import BitacoraAuditoria from "./BitacoraAuditoria";
@@ -81,7 +83,11 @@ import {
   obtenerFacturacionFiscal, actualizarFacturacionFiscal, siguienteNumeroControlFiscal,
   obtenerDatosFiscalesNegocio, actualizarDatosFiscalesNegocio,
   type FacturacionFiscalConfig, type ModoFacturacionFiscal, type DatosFiscalesNegocio,
+  obtenerImpuestosNegocio, type ImpuestosNegocio, type DesgloseFiscalTicket,
 } from "../api";
+import ArqueoCajaMultimoneda from "./ArqueoCajaMultimoneda";
+import ImpuestosCargosComercio from "./ImpuestosCargosComercio";
+import LibrosFiscalesComercio from "./LibrosFiscalesComercio";
 
 // ── Moneda base del negocio ────────────────────────────────────────────────
 // CONVENCIÓN INTERNA: en todo este archivo, la moneda "USD" significa "la moneda base del
@@ -204,6 +210,7 @@ export interface ProductoComercio {
   grupoVariante?: string; // junta este SKU con otros (mismo zapato, otra talla) en una sola tarjeta pública
   atributoVariante?: string; // etiqueta de este SKU dentro del grupo (ej. "Talla 38")
   colorVariante?: string; // segunda faceta de variante (ej. "Rojo") — selector de color, luego talla
+  exentoIva?: boolean; // no lleva IVA (cesta básica, medicinas...)
 }
 
 export interface LineaCarritoComercio {
@@ -275,6 +282,8 @@ export interface VentaComercio {
   cliente: ClienteComercio;
   lineas: LineaCarritoComercio[];
   fecha: string;
+  /** Fecha y hora real (del servidor o del momento del cobro), para las estadísticas por hora y día. */
+  fechaISO?: string;
   total: number;
   totalBs: number;
   totalCop: number;
@@ -289,6 +298,8 @@ export interface VentaComercio {
   desglosePagos?: Array<{ moneda: string; monto: number; label?: string }>;
   pagosMixtos?: PagoMixtoItem[];
   emailCliente?: string;
+  /** Desglose fiscal que calculó el servidor al cobrar (IVA, IGTF, delivery). */
+  fiscal?: DesgloseFiscalTicket & { ivaQuitado?: boolean };
 }
 
 export interface CotizacionComercio {
@@ -306,36 +317,22 @@ export interface CotizacionComercio {
 // ══════════════════════════════════════════════════════════════════════════
 // CATÁLOGO INICIAL OPTIMIZADO (FERRETERÍA, FARMACIA, RETAIL)
 // ══════════════════════════════════════════════════════════════════════════
-const PRODUCTOS_INICIALES: ProductoComercio[] = [
-  // Ferretería & Repuestos
-  { id: "f-1", codigo: "TORN-38", nombre: "Tornillo Drywall 6x1\" (Caja 100u)", categoria: "Tornillería", rubro: "ferreteria", precio: 2.80, costo: 1.50, stock: 45, stockMinimo: 10, unidadMedida: "Caja", ubicacion: "Pasillo 1 - Gaveta 4", codigoParte: "DW-61" },
-  { id: "f-2", codigo: "TAL-20V", nombre: "Taladro Percutor Inalámbrico 20V", categoria: "Herramientas", rubro: "ferreteria", precio: 68.00, costo: 45.00, stock: 8, stockMinimo: 3, unidadMedida: "Pza", ubicacion: "Vitrina Central", marca: "DeWalt / Ingco" },
-  { id: "f-3", codigo: "CAB-THW12", nombre: "Cable Eléctrico 7 Hilos THW #12 (Metro)", categoria: "Eléctrico", rubro: "ferreteria", precio: 0.95, costo: 0.60, stock: 320, stockMinimo: 50, unidadMedida: "Metro", ubicacion: "Bobina 3" },
-  { id: "f-4", codigo: "TUB-PVC4", nombre: "Tubo PVC Aguas Negras 4\" x 3 Mts", categoria: "Plomería", rubro: "ferreteria", precio: 9.50, costo: 6.50, stock: 24, stockMinimo: 5, unidadMedida: "Tubo", ubicacion: "Patio Trasero" },
-  { id: "f-5", codigo: "DISC-45", nombre: "Disco de Corte para Metal 4 1/2\"", categoria: "Herramientas", rubro: "ferreteria", precio: 1.25, costo: 0.70, stock: 110, stockMinimo: 20, unidadMedida: "Pza", ubicacion: "Pasillo 2" },
-  { id: "f-6", codigo: "CEM-T1", nombre: "Cemento Gris Tipo I 42.5kg", categoria: "Construcción", rubro: "ferreteria", precio: 9.00, costo: 7.20, stock: 65, stockMinimo: 15, unidadMedida: "Saco", ubicacion: "Bodega Principal" },
-  { id: "f-7", codigo: "PAS-HILUX", nombre: "Pastillas de Freno Delanteras Hilux / Fortuner", categoria: "Repuestos", rubro: "ferreteria", precio: 22.00, costo: 14.00, stock: 12, stockMinimo: 4, unidadMedida: "Juego", codigoParte: "04465-0K090", marca: "Bendix / Toyota" },
-  { id: "f-8", codigo: "BUJ-BOSH", nombre: "Bujía Iridium Doble Platino", categoria: "Repuestos", rubro: "ferreteria", precio: 5.50, costo: 3.20, stock: 38, stockMinimo: 8, unidadMedida: "Pza", codigoParte: "FR7DC+", marca: "Bosch" },
 
-  // Farmacia & Droguería
-  { id: "m-1", codigo: "ACT-500", nombre: "Acetaminofén / Paracetamol 500mg x 10 Tab", categoria: "Analgésicos", rubro: "farmacia", precio: 1.20, costo: 0.60, stock: 85, stockMinimo: 20, principioActivo: "Paracetamol", lote: "LT-8842", fechaVencimiento: "2027-10", laboratorio: "Genven / Calox" },
-  { id: "m-2", codigo: "IBU-400", nombre: "Ibuprofeno 400mg x 10 Cápsulas Blandas", categoria: "Analgésicos", rubro: "farmacia", precio: 1.80, costo: 0.95, stock: 60, stockMinimo: 15, principioActivo: "Ibuprofeno", lote: "LT-9102", fechaVencimiento: "2026-05", laboratorio: "Elmor / Ibufen" },
-  { id: "m-3", codigo: "AMX-500", nombre: "Amoxicilina 500mg x 12 Cápsulas", categoria: "Antibióticos", rubro: "farmacia", precio: 3.50, costo: 2.10, stock: 32, stockMinimo: 10, principioActivo: "Amoxicilina", lote: "LT-7740", fechaVencimiento: "2026-08", laboratorio: "Leti" },
-  { id: "m-4", codigo: "LOS-50", nombre: "Losartán Potásico 50mg x 30 Tabletas", categoria: "Cardiovascular", rubro: "farmacia", precio: 4.20, costo: 2.40, stock: 40, stockMinimo: 12, principioActivo: "Losartán", lote: "LT-6211", fechaVencimiento: "2027-12", laboratorio: "Calox" },
-  { id: "m-5", codigo: "OME-20", nombre: "Omeprazol 20mg x 14 Cápsulas", categoria: "Gástrico", rubro: "farmacia", precio: 2.40, costo: 1.30, stock: 50, stockMinimo: 15, principioActivo: "Omeprazol", lote: "LT-5541", fechaVencimiento: "2027-03", laboratorio: "Genéricos" },
-  { id: "m-6", codigo: "ALC-70", nombre: "Alcohol Antiséptico 70% 500ml", categoria: "Insumos", rubro: "farmacia", precio: 1.60, costo: 0.90, stock: 75, stockMinimo: 15, principioActivo: "Alcohol Isopropílico", lote: "LT-3329", fechaVencimiento: "2028-01", laboratorio: "Bialcohol" },
-  { id: "m-7", codigo: "GAS-3X3", nombre: "Gasas Estériles 3\" x 3\" (Sobre 10u)", categoria: "Insumos", rubro: "farmacia", precio: 0.85, costo: 0.40, stock: 120, stockMinimo: 25, lote: "LT-2210", fechaVencimiento: "2028-09", laboratorio: "MedSupply" },
-  { id: "m-8", codigo: "CMP-B", nombre: "Complejo B B12 Inyectable x 3 Ampollas", categoria: "Vitaminas", rubro: "farmacia", precio: 5.80, costo: 3.50, stock: 18, stockMinimo: 6, principioActivo: "Vitaminas B1, B6, B12", lote: "LT-1194", fechaVencimiento: "2026-04", laboratorio: "Bayer / Neurobión" },
+/** Cliente genérico de mostrador: existe en todo negocio, no es un dato de demostración. */
+/**
+ * Número de ticket único: el servidor lo usa como clave permanente contra el doble cobro, así que
+ * no puede repetirse nunca. Antes eran 6 dígitos al azar y hacia los mil tickets se repetía uno,
+ * y esa venta no descontaba stock ni entraba a caja. Milisegundos + 4 caracteres al azar.
+ */
+function nuevoNumeroTicket(): string {
+  const azar = Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, "0");
+  return `TKT-${Date.now().toString(36).toUpperCase()}${azar}`;
+}
 
-  // Retail & Minimarket
-  { id: "r-1", codigo: "HAR-PAN", nombre: "Harina de Maíz Blanco Precocida 1kg", categoria: "Alimentos", rubro: "retail", precio: 1.15, costo: 0.88, stock: 140, stockMinimo: 30 },
-  { id: "r-2", codigo: "ARR-PRIM", nombre: "Arroz Blanco Extra 1kg", categoria: "Alimentos", rubro: "retail", precio: 1.30, costo: 0.95, stock: 95, stockMinimo: 20 },
-  { id: "r-3", codigo: "ACE-SOYA", nombre: "Aceite Vegetal Comestible 1 Litro", categoria: "Alimentos", rubro: "retail", precio: 2.50, costo: 1.85, stock: 48, stockMinimo: 15 },
-  { id: "r-4", codigo: "REF-COCA2", nombre: "Refresco Sabor Cola 2 Litros", categoria: "Bebidas", rubro: "retail", precio: 2.20, costo: 1.60, stock: 36, stockMinimo: 12 },
-  { id: "r-5", codigo: "DET-1KG", nombre: "Detergente Multiusos en Polvo 1kg", categoria: "Limpieza", rubro: "retail", precio: 2.10, costo: 1.45, stock: 40, stockMinimo: 10 },
-  { id: "r-6", codigo: "AGU-5L", nombre: "Botellón de Agua Mineral Purificada 5L", categoria: "Bebidas", rubro: "retail", precio: 1.50, costo: 0.90, stock: 28, stockMinimo: 8 },
-];
+const CONSUMIDOR_FINAL: ClienteComercio = { id: "c-1", nombre: "Consumidor Final", documento: "V-00000000", telefono: "—", saldoPendiente: 0, limiteCredito: 0 };
 
+// Datos de demostración de versiones anteriores. Ya no se muestran; solo sirven para reconocerlos
+// en cachés viejos del navegador y no subirlos al servidor como si fueran reales.
 const CLIENTES_INICIALES: ClienteComercio[] = [
   { id: "c-1", nombre: "Consumidor Final", documento: "V-00000000", telefono: "—", saldoPendiente: 0, limiteCredito: 0 },
   { id: "c-2", nombre: "Taller Mecánico Hermanos Ramos", documento: "J-31456789-2", telefono: "0414-7581290", saldoPendiente: 145.50, limiteCredito: 500 },
@@ -419,100 +416,6 @@ export const VENTAS_INICIALES: VentaComercio[] = [
     esCredito: false,
     recibido: 5.10,
     monedaRecibida: "USD"
-  }
-];
-export const CUENTAS_INICIALES_COMERCIO: CuentaComercio[] = [
-  // Cuentas por Pagar (CXP)
-  {
-    id: "cxp-1",
-    tipo: "CXP",
-    entidadNombre: "Distribuidora Mayorista Ferretera C.A.",
-    entidadDocumento: "J-30987654-1",
-    concepto: "Factura F-94821 - Lote de Tornillería & Discos de Corte",
-    numeroDocumento: "F-94821",
-    montoOriginal: 450.00,
-    saldoPendiente: 450.00,
-    moneda: "USD",
-    estado: "PENDIENTE",
-    fechaRegistro: "2026-09-15",
-    fechaVencimiento: "2026-09-28",
-    referenciaTipo: "COMPRA"
-  },
-  {
-    id: "cxp-2",
-    tipo: "CXP",
-    entidadNombre: "Lubricantes & Filtros Los Andes",
-    entidadDocumento: "J-40112345-8",
-    concepto: "Factura F-73104 - 10 Cajas de Aceite Motor 20W-50",
-    numeroDocumento: "F-73104",
-    montoOriginal: 320.00,
-    saldoPendiente: 120.00,
-    moneda: "USD",
-    estado: "PENDIENTE",
-    fechaRegistro: "2026-09-12",
-    fechaVencimiento: "2026-09-25",
-    referenciaTipo: "COMPRA"
-  },
-  {
-    id: "cxp-3",
-    tipo: "CXP",
-    entidadNombre: "Materiales Eléctricos del Táchira",
-    entidadDocumento: "J-29871023-4",
-    concepto: "Factura F-61209 - Bombillos LED y Cajas de Breakers",
-    numeroDocumento: "F-61209",
-    montoOriginal: 180.00,
-    saldoPendiente: 0.00,
-    moneda: "USD",
-    estado: "PAGADO",
-    fechaRegistro: "2026-09-05",
-    fechaVencimiento: "2026-09-18",
-    referenciaTipo: "COMPRA"
-  },
-  // Cuentas por Cobrar (CXC)
-  {
-    id: "cxc-1",
-    tipo: "CXC",
-    entidadNombre: "Taller Mecánico Hermanos Ramos",
-    entidadDocumento: "J-31456789-2",
-    concepto: "Ticket TKT-382945 - Venta a Crédito 5 Cajas Tornillos y Bombillos",
-    numeroDocumento: "TKT-382945",
-    montoOriginal: 145.50,
-    saldoPendiente: 145.50,
-    moneda: "USD",
-    estado: "PENDIENTE",
-    fechaRegistro: "2026-09-19",
-    fechaVencimiento: "2026-09-30",
-    referenciaTipo: "VENTA"
-  },
-  {
-    id: "cxc-2",
-    tipo: "CXC",
-    entidadNombre: "Constructora Andina C.A.",
-    entidadDocumento: "J-40982314-1",
-    concepto: "Ticket TKT-383012 - Venta a Crédito Materiales de Obra",
-    numeroDocumento: "TKT-383012",
-    montoOriginal: 380.00,
-    saldoPendiente: 380.00,
-    moneda: "USD",
-    estado: "PENDIENTE",
-    fechaRegistro: "2026-09-20",
-    fechaVencimiento: "2026-10-05",
-    referenciaTipo: "VENTA"
-  },
-  {
-    id: "cxc-3",
-    tipo: "CXC",
-    entidadNombre: "Servicios Industriales Vargas",
-    entidadDocumento: "V-18765432",
-    concepto: "Ticket TKT-381044 - Venta a Crédito Repuestos y Filtros",
-    numeroDocumento: "TKT-381044",
-    montoOriginal: 250.00,
-    saldoPendiente: 0.00,
-    moneda: "USD",
-    estado: "PAGADO",
-    fechaRegistro: "2026-09-08",
-    fechaVencimiento: "2026-09-20",
-    referenciaTipo: "VENTA"
   }
 ];
 
@@ -635,16 +538,28 @@ function generarNotaEntregaPDF(
   y += 6;
 
   // ─── Bloque de Totales ─────────────────────────────────────────────
-  const totalBs = venta.total * tasaActivaBs;
+  // En bolívares no se cobra IGTF: el total en Bs sale del subtotal sin IGTF.
+  const totalBs = (venta.fiscal ? venta.fiscal.subtotal : venta.total) * tasaActivaBs;
   const totalCop = venta.total * tasaCop;
   const totX = colRight - 60;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(80, 80, 80);
-  doc.text(`Subtotal ${CODIGO()}:`, totX, y);
-  doc.text(`${SIM()}${venta.total.toFixed(2)}`, colRight - 2, y, { align: "right" });
-  y += 5;
+  const f = venta.fiscal;
+  const lineaTotal = (etiqueta: string, monto: number) => {
+    doc.text(etiqueta, totX, y);
+    doc.text(`${SIM()}${monto.toFixed(2)}`, colRight - 2, y, { align: "right" });
+    y += 5;
+  };
+  if (f && (f.alicuotaIva > 0 || f.iva > 0 || f.igtf > 0 || f.delivery > 0 || f.ivaQuitado)) {
+    if (f.exento > 0) lineaTotal("Exento:", f.exento);
+    lineaTotal(f.alicuotaIva > 0 || f.ivaQuitado ? "Base imponible:" : `Subtotal ${CODIGO()}:`, f.baseImponible);
+    if (f.alicuotaIva > 0) lineaTotal(`IVA ${f.alicuotaIva}%:`, f.iva);
+    if (f.igtf > 0) lineaTotal("IGTF (pago en divisas):", f.igtf);
+  } else {
+    lineaTotal(`Subtotal ${CODIGO()}:`, venta.total);
+  }
   if (!modoEuro()) {
   doc.text(`Tasa BCV aplicada:`, totX, y);
   doc.text(`Bs.${tasaActivaBs.toFixed(2)}/USD`, colRight - 2, y, { align: "right" });
@@ -993,7 +908,13 @@ function ResumenFinancieroComercio() {
   const tarjetas = [
     { titulo: "Ventas del mes", valor: fmt(ventas), nota: "Ventas brutas registradas" },
     { titulo: "Costo de ventas", valor: fmt(costo), nota: "Costo de lo vendido" },
-    { titulo: "Margen bruto", valor: fmt(margen), nota: ventas > 0 ? `${((margen / ventas) * 100).toFixed(1)}% sobre ventas` : "Sin ventas aún" },
+    {
+      titulo: "Margen bruto",
+      valor: fmt(margen),
+      nota: ventas > 0 ? `${((margen / ventas) * 100).toFixed(1)}% sobre ventas` : "Sin ventas aún",
+      // El margen se lee de un vistazo: verde si deja ganancia, rojo si se vende a perdida.
+      tono: ventas > 0 ? (margen >= 0 ? "positivo" : "negativo") : undefined,
+    },
     {
       titulo: variasVerticales ? "Resultado del negocio" : "Resultado estimado",
       valor: fmt(datos.consolidado.resultadoEstimado),
@@ -1014,7 +935,19 @@ function ResumenFinancieroComercio() {
           <div key={t.titulo} className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t.titulo}</div>
             <div className="mt-1 font-['Outfit'] font-black text-xl text-slate-900 dark:text-white truncate">{t.valor}</div>
-            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t.nota}</div>
+            {"tono" in t && t.tono ? (
+              <span
+                className={`mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  t.tono === "positivo"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30"
+                    : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30"
+                }`}
+              >
+                {t.tono === "positivo" ? "▲" : "▼"} {t.nota}
+              </span>
+            ) : (
+              <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{t.nota}</div>
+            )}
           </div>
         ))}
       </div>
@@ -2003,20 +1936,19 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   const tasaCop = !esEuro && tasaCopReal ? Number(tasaCopReal.tasa) : 0;
 
   // Tabs de Navegación
-  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "cierre" | "auditoria" | "configuracion">("general");
+  const [tab, setTab] = useState<"general" | "pos" | "pedidos_web" | "inventario" | "proveedores" | "clientes" | "administracion" | "estadisticas" | "cierre" | "auditoria" | "configuracion">("general");
   // Configuración es una pantalla con secciones (antes era un modal llamado "Catálogo Online & QR"
   // donde además vivían pagos y perfil de tienda, imposible de adivinar por su nombre).
   const [seccionConfig, setSeccionConfig] = useState<SeccionConfiguracion>("tienda");
   // Submódulos dentro de "Administración" — antes CXC/CXP e Ingresos&Gastos eran dos
   // entradas separadas en el sidebar; se agrupan porque ambas son la misma función de
   // negocio (control administrativo del dinero), no dos cosas distintas.
-  const [subTabAdmin, setSubTabAdmin] = useState<"cxc_cxp" | "ingresos_gastos" | "cuentas_bancarias" | "personal">("ingresos_gastos");
+  const [subTabAdmin, setSubTabAdmin] = useState<"cxc_cxp" | "ingresos_gastos" | "cuentas_bancarias" | "personal" | "libros">("ingresos_gastos");
 
   // Las cuentas por cobrar/pagar viven en el backend real (ver cargarCuentas más abajo,
   // definida después junto a cargarIngresosCaja/cargarGastosCaja) — arranca vacío y se
-  // hidrata por useEffect cuando hay tenant activo. CUENTAS_INICIALES_COMERCIO solo se usa
-  // como demo cuando no hay sesión (modo preview sin tenant).
-  const [cuentas, setCuentas] = useState<CuentaComercio[]>(CUENTAS_INICIALES_COMERCIO);
+  // hidrata por useEffect cuando hay tenant activo (sin datos de demostración).
+  const [cuentas, setCuentas] = useState<CuentaComercio[]>([]);
 
   const guardarCuentas = (nuevas: CuentaComercio[]) => {
     setCuentas(nuevas);
@@ -2039,14 +1971,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   const [modalIaVisible, setModalIaVisible] = useState(false);
 
   // Estado del Catálogo y Clientes
-  const [productos, setProductos] = useState<ProductoComercio[]>(() => {
-    try {
-      const g = localStorage.getItem("aurora_comercio_productos");
-      return g ? JSON.parse(g) : PRODUCTOS_INICIALES;
-    } catch {
-      return PRODUCTOS_INICIALES;
-    }
-  });
+  // El catálogo arranca vacío y lo llena el servidor (cargarRepuestosBackend). Antes arrancaba
+  // con productos de demostración que, si el servidor fallaba, se podían vender en el POS.
+  const [productos, setProductos] = useState<ProductoComercio[]>([]);
 
   const productosDelRubro = useMemo(() => productos.filter((p) => p.rubro === perfilActivo), [productos, perfilActivo]);
 
@@ -2065,23 +1992,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     [productosDelRubro]
   );
 
-  const [clientes, setClientes] = useState<ClienteComercio[]>(() => {
-    try {
-      const g = localStorage.getItem("aurora_comercio_clientes");
-      return g ? JSON.parse(g) : CLIENTES_INICIALES;
-    } catch {
-      return CLIENTES_INICIALES;
-    }
-  });
+  // Solo "Consumidor Final" hasta que el servidor devuelve los clientes reales (antes aparecían
+  // clientes inventados con deudas, como "Constructora Andina").
+  const [clientes, setClientes] = useState<ClienteComercio[]>([CONSUMIDOR_FINAL]);
 
-  const [ventas, setVentas] = useState<VentaComercio[]>(() => {
-    try {
-      const g = localStorage.getItem("aurora_comercio_ventas");
-      return g ? JSON.parse(g) : VENTAS_INICIALES;
-    } catch {
-      return VENTAS_INICIALES;
-    }
-  });
+  const [ventas, setVentas] = useState<VentaComercio[]>([]);
 
   const [clienteSel, setClienteSel] = useState<ClienteComercio>(clientes[0]);
 
@@ -2167,6 +2082,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // ─── Pago Mixto ───────────────────────────────────────────────────────
   const [modoCobro, setModoCobro] = useState<"unico" | "mixto">("unico");
   const [pagosMixtos, setPagosMixtos] = useState<PagoMixtoItem[]>([]);
+  // ─── Impuestos y cargos (Configuración > Impuestos y cargos) ─────────
+  // El cálculo que vale lo hace el servidor al cobrar; aquí se repite solo para mostrarlo.
+  const [impuestos, setImpuestos] = useState<ImpuestosNegocio | null>(null);
+  // Como en Restaurante: el cajero decide en cada venta si lleva IVA, IGTF o delivery. Arrancan
+  // según Configuración > Impuestos y cargos, y se pueden activar aunque ahí estén apagados.
+  const [aplicaIvaVenta, setAplicaIvaVenta] = useState(false);
+  const [aplicaIgtfVenta, setAplicaIgtfVenta] = useState(false);
+  const [conDelivery, setConDelivery] = useState(false);
+  const [montoDelivery, setMontoDelivery] = useState("");
   const [pagoMixtoMetodo, setPagoMixtoMetodo] = useState("EFECTIVO_USD");
   const [pagoMixtoMoneda, setPagoMixtoMoneda] = useState<"USD" | "VES" | "COP">("USD");
   const [pagoMixtoMonto, setPagoMixtoMonto] = useState("");
@@ -2289,12 +2213,11 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
         }
         if (cancelado) return;
 
-        const consumidorFinal = CLIENTES_INICIALES.find((c) => c.id === "c-1") || CLIENTES_INICIALES[0];
-        const listaClientes = [consumidorFinal, ...clientesFinal.map(clienteDesdeServidor)];
+        const listaClientes = [CONSUMIDOR_FINAL, ...clientesFinal.map(clienteDesdeServidor)];
         clientesSincronizados.current = new Map(listaClientes.filter((c) => c.id !== "c-1").map((c) => [c.id, firmaCliente(c)]));
         const listaVentas: VentaComercio[] = [];
         for (const v of ventasFinal) {
-          try { listaVentas.push(JSON.parse(v.detalleJson) as VentaComercio); } catch { /* detalle ilegible: se omite esa venta */ }
+          try { listaVentas.push({ ...(JSON.parse(v.detalleJson) as VentaComercio), fechaISO: v.fechaRegistro }); } catch { /* detalle ilegible: se omite esa venta */ }
         }
         setClientes(listaClientes);
         setVentas(listaVentas);
@@ -2369,9 +2292,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
         const previo = ubicacionPorRepuesto.get(u.repuestoId);
         ubicacionPorRepuesto.set(u.repuestoId, previo ? `${previo} · ${texto}` : texto);
       }
-      if (items && items.length > 0) {
+      if (Array.isArray(items)) {
         const itemsTenant = items.filter((r) => r.tenantId === user.tenantId);
-        if (itemsTenant.length > 0) {
+        {
           const mapeados: ProductoComercio[] = itemsTenant.map((r) => ({
             id: `rep-${r.id}`,
             backendId: r.id,
@@ -2397,6 +2320,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             atributoVariante: r.atributoVariante || undefined,
             colorVariante: r.colorVariante || undefined,
             fechaVencimiento: r.fechaVencimiento || undefined,
+            exentoIva: r.exentoIva === true,
           }));
           setProductos((prev) => {
             const otros = prev.filter((p) => p.rubro !== perfilActivo);
@@ -2406,6 +2330,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       }
     } catch (err) {
       console.warn("No se pudo conectar a /api/repuestos/items", err);
+      mostrarToast("No se pudo cargar tu inventario. Revisa la conexión y vuelve a intentar.", "error");
     } finally {
       setCargandoBackend(false);
     }
@@ -2456,8 +2381,73 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       listarMovimientos(user.tenantId, "CXC"),
       listarMovimientos(user.tenantId, "CXP"),
     ])
-      .then(([cxc, cxp]) => setCuentas([...cxc, ...cxp].map(movimientoACuenta)))
-      .catch((err) => console.error("No se pudieron cargar las cuentas por cobrar/pagar:", err));
+      .then(([cxc, cxp]) => { cuentasCargadasRef.current = true; setCuentas([...cxc, ...cxp].map(movimientoACuenta)); })
+      .catch(() => avisar("No se pudieron cargar las cuentas por cobrar y pagar. Revisa la conexión.", "error"));
+  };
+  const cuentasCargadasRef = useRef(false);
+
+  // La deuda de cada cliente es la suma de sus cuentas por cobrar pendientes en el servidor.
+  // Antes era un número aparte que el navegador sumaba al vender a crédito y restaba al abonar,
+  // sin tocar la caja ni la CXC: quedaban dos saldos distintos del mismo cliente.
+  const aMonedaBase = (monto: number, moneda: string) =>
+    moneda === "VES" ? (tasaActivaBs > 0 ? monto / tasaActivaBs : 0)
+    : moneda === "COP" ? (tasaCop > 0 ? monto / tasaCop : 0)
+    : monto;
+  const cxcPendientesDe = (nombre: string) => {
+    const clave = nombre.trim().toLowerCase();
+    return cuentas
+      .filter((c) => c.tipo === "CXC" && c.estado !== "PAGADO" && c.saldoPendiente > 0.005 && c.entidadNombre.trim().toLowerCase() === clave)
+      .sort((a, b) => (a.fechaRegistro || "").localeCompare(b.fechaRegistro || ""));
+  };
+  useEffect(() => {
+    if (!cuentasCargadasRef.current) return;
+    setClientes((prev) => {
+      let cambio = false;
+      const nuevos = prev.map((c) => {
+        const saldo = Math.round(cxcPendientesDe(c.nombre).reduce((s, cta) => s + aMonedaBase(cta.saldoPendiente, cta.moneda), 0) * 100) / 100;
+        if (Math.abs(saldo - (c.saldoPendiente || 0)) < 0.005) return c;
+        cambio = true;
+        return { ...c, saldoPendiente: saldo };
+      });
+      return cambio ? nuevos : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cuentas, tasaActivaBs, tasaCop]);
+
+  // Abono desde la ficha del cliente: se aplica a sus cuentas por cobrar, de la más vieja a la
+  // más nueva, con abonarMovimiento (que también registra el ingreso en caja).
+  const [abonandoCliente, setAbonandoCliente] = useState(false);
+  const registrarAbonoCliente = async (cliente: ClienteComercio, monto: number) => {
+    if (!user?.tenantId || abonandoCliente) return;
+    const pendientes = cxcPendientesDe(cliente.nombre);
+    if (pendientes.length === 0) {
+      avisar("Este cliente no tiene cuentas por cobrar pendientes en el servidor.", "error");
+      return;
+    }
+    setAbonandoCliente(true);
+    let restante = monto;
+    let aplicado = 0;
+    try {
+      for (const cta of pendientes) {
+        if (restante <= 0.005) break;
+        const saldoBase = aMonedaBase(cta.saldoPendiente, cta.moneda);
+        if (saldoBase <= 0) continue;
+        const parteBase = Math.min(restante, saldoBase);
+        const factor = cta.moneda === "VES" ? tasaActivaBs : cta.moneda === "COP" ? tasaCop : 1;
+        const parte = Math.min(cta.saldoPendiente, Math.round(parteBase * factor * 100) / 100);
+        await abonarMovimiento(user.tenantId, Number(cta.id.slice(3)), { monto: parte, moneda: cta.moneda });
+        restante -= parteBase;
+        aplicado += parteBase;
+      }
+      avisar(`Abono de ${SIM()}${aplicado.toFixed(2)} registrado en las cuentas por cobrar de ${cliente.nombre} y en caja.`, "exito");
+      setClienteAbonoSel(null);
+    } catch (err: any) {
+      avisar(`${aplicado > 0 ? `Se registraron ${SIM()}${aplicado.toFixed(2)}, pero el resto falló: ` : ""}${err?.message || "No se pudo registrar el abono en el servidor."}`, "error");
+    } finally {
+      setAbonandoCliente(false);
+      cargarCuentas();
+      cargarIngresosCaja();
+    }
   };
 
   const registrarGasto = async () => {
@@ -2494,7 +2484,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   useEffect(() => {
     if (user?.tenantId) {
       cargarRepuestosBackend();
-      listarProveedoresRepuesto().then(setProveedoresRepuesto).catch(() => {});
+      listarProveedoresRepuesto().then(setProveedoresRepuesto)
+        .catch(() => avisar("No se pudo cargar la lista de proveedores. Revisa la conexión.", "error"));
       cargarIngresosCaja();
       cargarGastosCaja();
       cargarCuentas();
@@ -2585,13 +2576,68 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     return ["Todos", ...Array.from(cats)];
   }, [productos, perfilActivo]);
 
-  // Cálculos de Totales del Carrito
-  const totalUSD = useMemo(() => {
-    return carrito.reduce((acc, l) => acc + l.precio * l.cantidad, 0);
-  }, [carrito]);
+  // Impuestos del negocio: se releen al entrar al POS por si el dueño los cambió en Configuración.
+  // En modo euro no aplican (ni IVA venezolano ni IGTF).
+  useEffect(() => {
+    if (!user?.tenantId || modoEuro() || tab !== "pos") return;
+    obtenerImpuestosNegocio()
+      .then((cfg) => { setImpuestos(cfg); setAplicaIvaVenta(!!cfg.cobraIva); setAplicaIgtfVenta(!!cfg.igtfActivo); })
+      .catch(() => setImpuestos(null));
+  }, [user?.tenantId, tab]);
 
-  const totalBs = useMemo(() => totalUSD * tasaActivaBs, [totalUSD, tasaActivaBs]);
-  const totalCopCalculado = useMemo(() => totalUSD * tasaCop, [totalUSD, tasaCop]);
+  // Cálculos de Totales del Carrito — misma cuenta que CalculoFiscalVenta en el servidor.
+  const desgloseFiscal = useMemo(() => {
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const exentos = new Set(productos.filter((p) => p.exentoIva).map((p) => p.id));
+    let gravado = 0;
+    let exento = 0;
+    for (const l of carrito) {
+      const monto = r2(l.precio * l.cantidad);
+      if (exentos.has(l.productoId)) exento += monto;
+      else gravado += monto;
+    }
+    const porDefecto = !!impuestos?.cobraIva;
+    const cobraIva = !modoEuro() && (aplicaIvaVenta || porDefecto);
+    const alicuota = cobraIva ? (impuestos?.alicuotaIva && impuestos.alicuotaIva > 0 ? impuestos.alicuotaIva : 16) : 0;
+    const factor = 1 + alicuota / 100;
+    const aplica = cobraIva && aplicaIvaVenta;
+    const delivery = conDelivery ? Math.max(0, parseFloat(montoDelivery) || 0) : 0;
+    const g = gravado + delivery;
+    let base: number;
+    let iva: number;
+    if (cobraIva && impuestos?.preciosIncluyenIva !== false) {
+      base = r2(g / factor);
+      iva = aplica ? r2(r2(g) - base) : 0;
+    } else {
+      base = r2(g);
+      iva = aplica ? r2(base * (factor - 1)) : 0;
+    }
+    const ex = r2(exento);
+    const subtotal = r2(ex + base + iva);
+    const alicuotaIgtf = !modoEuro() && aplicaIgtfVenta ? (impuestos?.alicuotaIgtf && impuestos.alicuotaIgtf > 0 ? impuestos.alicuotaIgtf : 3) : 0;
+    return { cobraIva, alicuota, exento: ex, base, iva, delivery: r2(delivery), subtotal, alicuotaIgtf, ivaQuitado: porDefecto && !aplicaIvaVenta };
+  }, [carrito, productos, impuestos, aplicaIvaVenta, aplicaIgtfVenta, conDelivery, montoDelivery]);
+
+  /** IGTF sobre lo pagado en divisas, nunca más que el subtotal. */
+  const igtfSobre = (pagadoEnDivisas: number) =>
+    desgloseFiscal.alicuotaIgtf > 0
+      ? Math.round(Math.min(Math.max(0, pagadoEnDivisas), desgloseFiscal.subtotal) * desgloseFiscal.alicuotaIgtf) / 100
+      : 0;
+
+  // IGTF según cómo paga: todo en divisas, nada en bolívares, o la parte en divisas del pago mixto.
+  const igtfCobro = useMemo(() => {
+    if (!desgloseFiscal.alicuotaIgtf) return 0;
+    if (modoCobro === "mixto") return igtfSobre(pagosMixtos.filter((p) => p.moneda !== "VES").reduce((a, p) => a + p.montoUSD, 0));
+    return monedaRecibida !== "VES" ? igtfSobre(desgloseFiscal.subtotal) : 0;
+  }, [desgloseFiscal, modoCobro, pagosMixtos, monedaRecibida]);
+
+  // totalUSD = lo que se cobra con la forma de pago elegida (incluye IGTF si es en divisas).
+  const totalUSD = useMemo(() => Math.round((desgloseFiscal.subtotal + igtfCobro) * 100) / 100, [desgloseFiscal, igtfCobro]);
+  // En bolívares nunca hay IGTF; en pesos (divisa) sí.
+  // Alias para ejecutarCobro, que redefine totalUSD localmente (a crédito no hay IGTF).
+  const totalUSDCobro = totalUSD;
+  const totalBs = useMemo(() => desgloseFiscal.subtotal * tasaActivaBs, [desgloseFiscal, tasaActivaBs]);
+  const totalCopCalculado = useMemo(() => (desgloseFiscal.subtotal + igtfSobre(desgloseFiscal.subtotal)) * tasaCop, [desgloseFiscal, tasaCop]);
 
   // Agregar al carrito con soporte de presentaciones y precio mayorista dinámico
   const agregarAlCarrito = (p: ProductoComercio, presentacion?: PresentacionRepuesto) => {
@@ -2718,14 +2764,17 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
   // Finalizar Cobro
   const ejecutarCobro = async (esCredito = false) => {
     if (carrito.length === 0) return;
+    // A crédito no se paga nada ahora, así que no hay IGTF (el servidor hace lo mismo).
+    const totalUSD = esCredito ? desgloseFiscal.subtotal : totalUSDCobro;
 
     const firmaCobro = JSON.stringify({
       lineas: carrito.map((l) => [l.backendId, l.presentacionId ?? null, l.cantidad]),
       esCredito, modoCobro, monedaRecibida, montoRecibido,
       pagos: pagosMixtos.map((p) => [p.moneda, p.montoOriginal]),
+      fiscal: [aplicaIvaVenta, aplicaIgtfVenta, conDelivery, montoDelivery],
     });
     if (!ticketEnCursoRef.current || ticketEnCursoRef.current.firma !== firmaCobro) {
-      ticketEnCursoRef.current = { numero: `TKT-${Math.floor(100000 + Math.random() * 900000)}`, firma: firmaCobro };
+      ticketEnCursoRef.current = { numero: nuevoNumeroTicket(), firma: firmaCobro };
     }
     const numRecibo = ticketEnCursoRef.current.numero;
     
@@ -2790,7 +2839,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
 
     // Cálculo exacto de costos y utilidad de la venta
     const costoTotal = carrito.reduce((acc, l) => acc + (l.costo || 0) * l.cantidad, 0);
-    const utilidad = totalUSD - costoTotal;
+    // Sin impuestos ni delivery: el IVA y el IGTF no son ganancia del negocio.
+    const utilidad = desgloseFiscal.exento + desgloseFiscal.base - desgloseFiscal.delivery - costoTotal;
 
     const nuevaVenta: VentaComercio = {
       id: String(Date.now()),
@@ -2798,6 +2848,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       cliente: clienteParaVenta,
       lineas: [...carrito],
       fecha: new Date().toLocaleString(),
+      fechaISO: new Date().toISOString(),
       total: totalUSD,
       totalBs,
       totalCop: totalCopCalculado,
@@ -2823,6 +2874,16 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     // sincronización DETIENE el cobro por completo: no se limpia el carrito, no se
     // descuenta stock local, y se muestra el motivo exacto para que el cajero corrija
     // la cantidad o cancele.
+    // Un producto que no está guardado en el servidor no se puede vender: antes esas líneas se
+    // omitían en silencio (o, si ninguna estaba guardada, la venta quedaba solo en este navegador,
+    // sin stock, caja ni libro fiscal).
+    const sinGuardar = carrito.filter((l) => !l.backendId);
+    if (!user?.tenantId || sinGuardar.length > 0) {
+      avisar(!user?.tenantId
+        ? "La sesión no tiene un negocio asociado. Cierra sesión y vuelve a entrar."
+        : `Estos productos no están guardados en el servidor: ${sinGuardar.map((l) => l.nombre).join(", ")}. Recarga el inventario o guárdalos antes de venderlos.`, "error");
+      return;
+    }
     if (user?.tenantId) {
       try {
         // Todo el ticket en una sola operación: si una línea falla (p. ej. stock), no queda nada
@@ -2846,8 +2907,24 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             montoPagadoAhora: esCredito ? 0 : undefined,
             diasCredito: esCredito ? 15 : undefined,
             nombreCliente: esCredito ? clienteParaVenta.nombre : undefined,
+            // Con el cliente ya guardado, el servidor aplica su precio mayorista y enlaza la venta y la CXC a su ficha.
+            clienteId: clienteParaVenta.backendId,
+            aplicaIva: modoEuro() ? undefined : aplicaIvaVenta,
+            aplicaIgtf: modoEuro() ? undefined : aplicaIgtfVenta,
+            delivery: desgloseFiscal.delivery > 0 ? desgloseFiscal.delivery : undefined,
+            clienteRif: clienteParaVenta.documento && clienteParaVenta.documento !== "V-00000000" && !clienteParaVenta.documento.startsWith("CLI-") && !clienteParaVenta.documento.startsWith("CR-")
+              ? clienteParaVenta.documento : undefined,
           });
           yaEstabaCobrada = resultado.yaProcesado;
+          if (resultado.desglose) {
+            // El total que vale es el del servidor (calcula IVA e IGTF con su propia configuración).
+            nuevaVenta.fiscal = { ...resultado.desglose, ivaQuitado: desgloseFiscal.ivaQuitado };
+            if (Math.abs(resultado.desglose.total - nuevaVenta.total) > 0.009) {
+              mostrarToast(`El total final quedó en ${SIM()}${resultado.desglose.total.toFixed(2)} (impuestos recalculados por el servidor).`, "info");
+              nuevaVenta.total = resultado.desglose.total;
+              nuevaVenta.totalBs = resultado.desglose.subtotal * tasaActivaBs;
+            }
+          }
         }
         ticketEnCursoRef.current = null;
         cargarRepuestosBackend();
@@ -2858,7 +2935,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       } catch (err: any) {
         console.error("Fallo al sincronizar venta en backend:", err);
         cargarRepuestosBackend(); // refresca el stock real por si otra venta concurrente ya lo cambió
-        alert(`No se pudo completar la venta: ${err instanceof Error ? err.message : "error desconocido"}\n\nEl carrito NO se vació — ajusta la cantidad o cancela.`);
+        avisar(`No se pudo completar la venta: ${err instanceof Error ? err.message : "error desconocido"}\n\nEl carrito NO se vació — ajusta la cantidad o cancela.`);
         return;
       }
     }
@@ -2950,40 +3027,70 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     setPagoMixtoRef("");
     setEmailClienteModal("");
     setEnviarEmailAlConfirmar(false);
+    setAplicaIvaVenta(!!impuestos?.cobraIva);
+    setAplicaIgtfVenta(!!impuestos?.igtfActivo);
+    setConDelivery(false);
+    setMontoDelivery("");
     limpiarClienteAMostrador();
   };
 
   // Generar Cotización PDF / Proforma
+  const nombreLocal = user?.empresa || (
+    "Mi negocio"
+  );
+
+  // Cotización en PDF, como en Restaurante (antes bajaba un .txt): el mismo carrito con su IVA,
+  // delivery e IGTF, sin tocar inventario ni caja. Vale 7 días porque los precios cambian con la tasa.
   const generarCotizacion = () => {
     if (carrito.length === 0) return;
-    const num = `COT-${Math.floor(1000 + Math.random() * 9000)}`;
-    const proforma = `
-      ═══════════════════════════════════════════════════════════════════
-      PRESUPUESTO / COTIZACIÓN FORMAL: ${num}
-      Empresa: ${user?.empresa || "Aurora Comercial"}
-      Fecha: ${new Date().toLocaleDateString()} · Validez: 5 días continuos
-      Cliente: ${clienteSel.nombre} (${clienteSel.documento})
-      ═══════════════════════════════════════════════════════════════════
-      ${carrito.map((l) => `${l.cantidad}x ${l.nombre} | Unit: ${SIM()}${l.precio.toFixed(2)} | Subtotal: ${SIM()}${(l.precio * l.cantidad).toFixed(2)}`).join("\n      ")}
-      ═══════════════════════════════════════════════════════════════════
-      TOTAL${modoEuro() ? "" : " REF. USD"}:  ${SIM()}${totalUSD.toFixed(2)}${modoEuro() ? "" : `
-      TOTAL BOLÍVARES: Bs. ${totalBs.toFixed(2)} (Tasa: ${tasaActivaBs.toFixed(2)})
-      TOTAL COP:       COP ${totalCopCalculado.toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
-      ═══════════════════════════════════════════════════════════════════
-      * Precios sujetos a cambio tras vencimiento de la cotización.
-    `;
-    const blob = new Blob([proforma], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Cotizacion_${num}_${clienteSel.nombre.replace(/\s+/g, "_")}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const doc = new jsPDF();
+    const hoyFmt = new Date().toLocaleDateString("es-VE");
+    const vence = new Date(); vence.setDate(vence.getDate() + 7);
+    const num = `COT-${Date.now().toString().slice(-6)}`;
+    const m = (n: number) => `${SIM()}${n.toFixed(2)}`;
+
+    doc.setFontSize(16); doc.setFont("helvetica", "bold");
+    doc.text(nombreLocal, 14, 18);
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    doc.text(`Cotización ${num}`, 14, 26);
+    doc.setFontSize(9); doc.setTextColor(100);
+    doc.text(`Fecha: ${hoyFmt}    Válida hasta: ${vence.toLocaleDateString("es-VE")}`, 14, 32);
+    const tieneCliente = clienteSel && clienteSel.id !== "c-1";
+    if (tieneCliente) doc.text(`Cliente: ${clienteSel.nombre}${clienteSel.documento ? " · " + clienteSel.documento : ""}`, 14, 37);
+    doc.setTextColor(0);
+
+    let y = tieneCliente ? 46 : 42;
+    doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    doc.text("Cant.", 14, y); doc.text("Descripción", 32, y); doc.text("P. Unit.", 150, y, { align: "right" }); doc.text("Subtotal", 196, y, { align: "right" });
+    y += 2; doc.setDrawColor(200); doc.line(14, y, 196, y); y += 6;
+    doc.setFont("helvetica", "normal");
+    carrito.forEach((l) => {
+      if (y > 260) { doc.addPage(); y = 20; }
+      doc.text(String(l.cantidad), 14, y);
+      doc.text(l.nombre, 32, y, { maxWidth: 110 });
+      doc.text(m(l.precio), 150, y, { align: "right" });
+      doc.text(m(l.precio * l.cantidad), 196, y, { align: "right" });
+      y += 7;
+    });
+
+    y += 2; doc.line(120, y, 196, y); y += 6;
+    const renglon = (etiqueta: string, valor: string) => { doc.text(etiqueta, 150, y, { align: "right" }); doc.text(valor, 196, y, { align: "right" }); y += 5.5; };
+    const f = desgloseFiscal;
+    if (f.exento > 0) renglon("Exento de IVA:", m(f.exento));
+    renglon(f.cobraIva ? "Base imponible:" : "Subtotal:", m(f.base - (f.cobraIva ? 0 : f.delivery)));
+    if (f.cobraIva) renglon(f.ivaQuitado ? "IVA (no aplica):" : `IVA ${f.alicuota}%:`, m(f.iva));
+    if (f.delivery > 0) renglon(f.cobraIva ? "Delivery (en la base):" : "Delivery:", m(f.delivery));
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    renglon("Total:", m(f.subtotal));
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    if (f.alicuotaIgtf > 0) renglon(`Pagando en divisas (+IGTF ${f.alicuotaIgtf}%):`, m(f.subtotal + igtfSobre(f.subtotal)));
+    if (!modoEuro() && tasaActivaBs > 0) renglon(`≈ En bolívares (tasa ${tasaActivaBs.toFixed(2)}):`, `Bs. ${(f.subtotal * tasaActivaBs).toFixed(2)}`);
+
+    doc.setFontSize(8); doc.setTextColor(120);
+    doc.text("Esta cotización no es una venta ni afecta inventario o caja. Los precios pueden variar según el tipo de cambio vigente al momento de la compra.", 14, 285, { maxWidth: 182 });
+    doc.save(`Cotizacion_${num}_${(tieneCliente ? clienteSel.nombre : nombreLocal).replace(/\s+/g, "_")}.pdf`);
   };
 
-  const nombreLocal = user?.empresa || (
-    esFarmacia ? "Farmacia & Droguería San Cristóbal" : "Comercio El Tornillo"
-  );
 
   const saludo = (() => {
     const h = new Date().getHours();
@@ -3070,6 +3177,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 ...(esComercio ? [{ id: "proveedores" as const, Icon: IconTruck, etiqueta: "Proveedores" }] : []),
                 { id: "clientes" as const, Icon: IconUsers, etiqueta: "Clientes & Crédito" },
                 { id: "administracion" as const, Icon: IconWallet, etiqueta: "Administración" },
+                { id: "estadisticas" as const, Icon: IconChart, etiqueta: "Estadísticas" },
                 { id: "cierre" as const, Icon: IconLock, etiqueta: "Cierres & Reportes" },
                 ...(user?.rol === "DUENO_ADMIN" ? [{ id: "auditoria" as const, Icon: IconFileText, etiqueta: "Bitácora de Auditoría" }] : []),
               ],
@@ -3101,6 +3209,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         { subTab: "cxc_cxp" as const, etiqueta: "Cuentas por Cobrar & Pagar" },
                         { subTab: "cuentas_bancarias" as const, etiqueta: "Cuentas Bancarias" },
                         { subTab: "personal" as const, etiqueta: "Personal & Nómina" },
+                        // Libros en bolívares para el contador venezolano: no aplica en modo euro.
+                        ...(!modoEuro() && user?.rol === "DUENO_ADMIN" ? [{ subTab: "libros" as const, etiqueta: "Libros de Compras y Ventas" }] : []),
                       ]).map((sub) => (
                         <button
                           key={sub.subTab}
@@ -3164,8 +3274,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
         </div>
         </nav>
 
-        {/* Salir al Hub */}
-        <div className="p-4 border-t border-slate-100">
+        {/* Salir al Hub (y Soporte, por si escondieron el botón flotante) */}
+        <div className="p-4 border-t border-slate-100 space-y-1">
+          <button
+            onClick={() => { window.dispatchEvent(new Event("aurora:abrir-soporte")); setSidebarAbierto(false); }}
+            className="w-full flex items-center gap-2 text-xs font-semibold px-2.5 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left"
+          >
+            <span className="text-slate-400"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg></span>
+            Soporte Aurora
+          </button>
           <button
             onClick={onSalir}
             className="w-full text-xs font-semibold px-2.5 py-2 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left"
@@ -3179,7 +3296,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
 
                 {/* ── TOPBAR PROFESIONAL: SALUDO, FECHA & HORA EN VIVO, TASAS Y TEMA ── */}
-        <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 shadow-sm flex-shrink-0">
+        <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shadow-sm flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarAbierto(true)}
@@ -3201,7 +3318,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   {saludo} <span className="text-slate-300 dark:text-slate-600 font-normal">—</span> <span className="text-teal-600 dark:text-teal-400">{nombreLocal}</span>
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                 <span className="hidden sm:inline text-slate-300 dark:text-slate-700">|</span>
                 <span className="capitalize">{fechaHoyCap}</span>
                 <span className="text-slate-400 font-bold">·</span>
@@ -3257,10 +3374,10 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
               TAB 1: POS MOSTRADOR ULTRA RÁPIDO
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "pos" && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-115px)]">
-            
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:h-[calc(100vh-115px)]">
+
             {/* Columna Izquierda (7 cols): Catálogo, Buscador & Categorías */}
-            <div className="lg:col-span-7 xl:col-span-8 flex flex-col h-full bg-white/60 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
+            <div className="lg:col-span-7 xl:col-span-8 flex flex-col lg:h-full bg-white/60 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 lg:overflow-hidden shadow-xl">
               
               {/* Barra de Búsqueda Reactiva */}
               <div className="relative mb-3 flex-shrink-0">
@@ -3378,7 +3495,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             </div>
 
             {/* Columna Derecha (5 cols): Carrito de Venta & Cobro */}
-            <div className="lg:col-span-5 xl:col-span-4 flex flex-col h-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl overflow-hidden">
+            <div className="lg:col-span-5 xl:col-span-4 flex flex-col lg:h-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl lg:overflow-hidden">
               
               {/* Cliente en Mostrador - Registro Rápido HORECA & Autocompletado */}
               <div className="flex-shrink-0 pb-3 mb-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
@@ -3439,7 +3556,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       <input
                         value={cedulaClienteInput}
                         onChange={(e) => manejarCambioCedula(e.target.value)}
@@ -3554,11 +3671,72 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
 
               {/* Totalizador & Acciones Comerciales */}
               <div className="flex-shrink-0 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                {/* Cargos e impuestos en un clic, como en Restaurante: el cajero decide si esta venta los lleva */}
+                {carrito.length > 0 && !modoEuro() && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {([
+                      ["iva", `IVA ${impuestos?.alicuotaIva && impuestos.alicuotaIva > 0 ? impuestos.alicuotaIva : 16}%`, aplicaIvaVenta, () => setAplicaIvaVenta((v) => !v)],
+                      ["igtf", `IGTF ${impuestos?.alicuotaIgtf && impuestos.alicuotaIgtf > 0 ? impuestos.alicuotaIgtf : 3}%`, aplicaIgtfVenta, () => setAplicaIgtfVenta((v) => !v)],
+                      ["delivery", "Delivery", conDelivery, () => {
+                        const nuevo = !conDelivery;
+                        setConDelivery(nuevo);
+                        if (nuevo && !montoDelivery && (impuestos?.costoEnvioDelivery ?? 0) > 0) setMontoDelivery(String(impuestos!.costoEnvioDelivery));
+                      }],
+                    ] as const).map(([clave, etiqueta, activo, alternar]) => (
+                      <button key={clave} type="button" onClick={alternar}
+                        className={`text-[11px] font-bold px-3 py-1 rounded-full border cursor-pointer transition-colors ${
+                          activo
+                            ? clave === "delivery" ? "bg-teal-600 border-teal-600 text-white" : "bg-amber-600 border-amber-600 text-white"
+                            : "border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400"
+                        }`}>
+                        {activo ? "✓ " : "+ "}{etiqueta}
+                      </button>
+                    ))}
+                    {conDelivery && (
+                      <span className="flex items-center gap-1 text-xs">
+                        <span className="text-slate-500">{SIM()}</span>
+                        <input
+                          type="number" min={0} step={0.5} value={montoDelivery} placeholder="0.00" autoFocus={!montoDelivery}
+                          onChange={(e) => setMontoDelivery(e.target.value)}
+                          className="w-20 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                        />
+                      </span>
+                    )}
+                  </div>
+                )}
+                {desgloseFiscal.ivaQuitado && carrito.length > 0 && (
+                  <div className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-300">
+                    Venta sin IVA: quedará marcada en el libro de ventas con tu usuario.
+                  </div>
+                )}
                 <div className="space-y-1 bg-slate-100/60 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-300/60 dark:border-slate-700/40">
+                  {(desgloseFiscal.cobraIva || desgloseFiscal.delivery > 0 || desgloseFiscal.alicuotaIgtf > 0) && carrito.length > 0 && (
+                    <div className="space-y-0.5 pb-1.5 mb-1 border-b border-slate-300/60 dark:border-slate-700/50 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                      {desgloseFiscal.exento > 0 && (
+                        <div className="flex justify-between"><span>Exento de IVA</span><span>{SIM()}{desgloseFiscal.exento.toFixed(2)}</span></div>
+                      )}
+                      <div className="flex justify-between"><span>{desgloseFiscal.cobraIva ? "Base imponible" : "Subtotal"}</span><span>{SIM()}{(desgloseFiscal.base - (desgloseFiscal.cobraIva ? 0 : desgloseFiscal.delivery)).toFixed(2)}</span></div>
+                      {desgloseFiscal.cobraIva && (
+                        <div className="flex justify-between"><span>IVA {desgloseFiscal.ivaQuitado ? "(quitado)" : `${desgloseFiscal.alicuota}%`}</span><span>{SIM()}{desgloseFiscal.iva.toFixed(2)}</span></div>
+                      )}
+                      {desgloseFiscal.delivery > 0 && (
+                        <div className="flex justify-between"><span>Delivery{desgloseFiscal.cobraIva ? " (en la base)" : ""}</span><span>{SIM()}{desgloseFiscal.delivery.toFixed(2)}</span></div>
+                      )}
+                      {desgloseFiscal.alicuotaIgtf > 0 && (
+                        <div className="flex justify-between"><span>IGTF {desgloseFiscal.alicuotaIgtf}% (si paga en divisas)</span><span>{SIM()}{igtfSobre(desgloseFiscal.subtotal).toFixed(2)}</span></div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">TOTAL {CODIGO()}:</span>
-                    <span className="font-mono font-black text-xl text-teal-400">{SIM()}{totalUSD.toFixed(2)}</span>
+                    <span className="font-mono font-black text-xl text-teal-400">{SIM()}{desgloseFiscal.subtotal.toFixed(2)}</span>
                   </div>
+                  {desgloseFiscal.alicuotaIgtf > 0 && carrito.length > 0 && (
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-500 dark:text-slate-400">Pagando en divisas (+IGTF):</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-bold">{SIM()}{(desgloseFiscal.subtotal + igtfSobre(desgloseFiscal.subtotal)).toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className={`flex items-center justify-between text-xs font-mono ${modoEuro() ? "hidden" : ""}`}>
                     <span className="text-slate-500 dark:text-slate-400">Total Bolívares (Bs):</span>
                     <span className="text-slate-800 dark:text-slate-200 font-bold">Bs. {totalBs.toFixed(2)}</span>
@@ -3578,7 +3756,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     title="Descargar presupuesto formal para cliente"
                   >
                     <IconFileText size={14} />
-                    <span> Cotización</span>
+                    <span>Cotización PDF</span>
                   </button>
 
                                     <button
@@ -3609,7 +3787,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   disabled={carrito.length === 0}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-400 text-slate-950 font-black text-sm cursor-pointer hover:opacity-95 disabled:opacity-40 shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all flex items-center justify-center gap-2"
                 >
-                  <span> Cobrar en Mostrador ({SIM()}{totalUSD.toFixed(2)})</span>
+                  <span> Cobrar en Mostrador ({SIM()}{desgloseFiscal.subtotal.toFixed(2)})</span>
                   <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-950/25 text-[10px] font-mono text-slate-950 font-black">
                     F4
                   </kbd>
@@ -4274,7 +4452,9 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "administracion" && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-            {subTabAdmin === "personal" ? (
+            {subTabAdmin === "libros" ? (
+              <LibrosFiscalesComercio nombreNegocio={user?.empresa || "Mi Comercio"} mostrarToast={mostrarToast} />
+            ) : subTabAdmin === "personal" ? (
               <PersonalRoute embebido>
                 <PersonalPage embedded />
               </PersonalRoute>
@@ -4316,6 +4496,17 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             TAB 4: CIERRE & REPORTES — TURNOS DE CAJA CON ARQUEO REAL
             (mismo motor /api/financiero/turnos que usa Aurora Horeca)
             ══════════════════════════════════════════════════════════════════ */}
+        {tab === "estadisticas" && (
+          <EstadisticasComercio
+            ventas={ventas}
+            productos={productosDelRubro}
+            gastos={gastosCaja}
+            simbolo={SIM()}
+            tasaBs={tasaActivaBs}
+            tasaCop={tasaCop}
+          />
+        )}
+
         {tab === "cierre" && user?.tenantId && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60 w-fit">
@@ -4350,7 +4541,12 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             </div>
 
             {subCierre === "caja" ? (
-              <TurnoCajaComercio tenantId={user.tenantId} tasaUsdVes={tasaActivaBs} tasaUsdCop={tasaCop} />
+              <ArqueoCajaMultimoneda
+                tenantId={user.tenantId}
+                tasaUsdVes={tasaActivaBs}
+                tasaUsdCop={tasaCop}
+                monedas={modoEuro() ? ["USD"] : ["USD", "VES", "COP"]}
+              />
             ) : subCierre === "devoluciones" && puedeDevolver ? (
               <DevolucionesComercio
                 ticketInicial={ticketADevolver}
@@ -4466,6 +4662,12 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 <span>Total a Cobrar:</span>
                 <span className="font-mono text-xl font-black text-teal-400">{SIM()}{totalUSD.toFixed(2)}</span>
               </div>
+              {igtfCobro > 0 && (
+                <div className="flex justify-between items-center text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                  <span>Incluye IGTF {desgloseFiscal.alicuotaIgtf}% por pago en divisas:</span>
+                  <span>{SIM()}{igtfCobro.toFixed(2)}</span>
+                </div>
+              )}
               <div className={`flex justify-between items-center text-xs font-mono text-slate-600 dark:text-slate-300 ${modoEuro() ? "hidden" : ""}`}>
                 <span>En Bolívares (Bs):</span>
                 <span className="font-bold">Bs. {totalBs.toFixed(2)}</span>
@@ -5163,6 +5365,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 const precioMayorista = fd.get("precioMayorista") ? Number(fd.get("precioMayorista")) : undefined;
                 const cantidadMinimaMayorista = fd.get("cantidadMinimaMayorista") ? Number(fd.get("cantidadMinimaMayorista")) : undefined;
                 const fechaVencimiento = String(fd.get("fechaVencimiento") || "") || undefined;
+                const exentoIva = fd.get("exentoIva") === "on";
 
                 let backendId: number | undefined = undefined;
 
@@ -5179,6 +5382,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       precioMayorista,
                       cantidadMinimaMayorista,
                       fechaVencimiento,
+                      exentoIva,
                     });
                     backendId = guardado.id;
                     const ubicacionInicial = String(fd.get("ubicacion") || "").trim();
@@ -5210,6 +5414,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   precio,
                   costo,
                   stock,
+                  exentoIva,
                   stockMinimo: Number(fd.get("stockMinimo")) || 5,
                   principioActivo: String(fd.get("principioActivo") || "") || undefined,
                   unidadMedida,
@@ -5296,6 +5501,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                       <input name="cantidadMinimaMayorista" type="number" step="1" placeholder="Ej. 10" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                     </div>
                   </div>
+                  {!modoEuro() && (
+                    <label className="flex items-start gap-2 p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/60 dark:border-slate-700/60 cursor-pointer">
+                      <input name="exentoIva" type="checkbox" className="w-4 h-4 mt-0.5 accent-teal-600 cursor-pointer" />
+                      <span>
+                        <span className="block text-xs font-bold text-slate-900 dark:text-white">Exento de IVA</span>
+                        <span className="block text-[10.5px] text-slate-500 dark:text-slate-400">Alimentos de la cesta básica, medicinas y otros que no pagan IVA. Solo cuenta si tu negocio cobra IVA.</span>
+                      </span>
+                    </label>
+                  )}
                   <div>
                     <label className="text-[10px] font-bold text-teal-400 block mb-1">Ubicación en Almacén / Estante</label>
                     <input name="ubicacion" placeholder="Ej. Pasillo 3 - Gaveta 4" className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white" />
@@ -5380,20 +5594,16 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 Cancelar
               </button>
               <button
+                disabled={abonandoCliente}
                 onClick={() => {
                   const val = parseFloat(montoAbono);
-                  if (!isNaN(val) && val > 0) {
-                    setClientes((prev) => {
-                      const updated = prev.map((it) => it.id === clienteAbonoSel.id ? { ...it, saldoPendiente: Math.max(0, it.saldoPendiente - val) } : it);
-                      try { localStorage.setItem("aurora_comercio_clientes", JSON.stringify(updated)); } catch {}
-                      return updated;
-                    });
-                    setClienteAbonoSel(null);
-                  }
+                  if (isNaN(val) || val <= 0) { avisar("Indica un monto válido.", "error"); return; }
+                  if (val > clienteAbonoSel.saldoPendiente + 0.005) { avisar("El abono no puede ser mayor que la deuda.", "error"); return; }
+                  registrarAbonoCliente(clienteAbonoSel, val);
                 }}
-                className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+                className="flex-1 py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg disabled:opacity-60"
               >
-                Confirmar Abono
+                {abonandoCliente ? "Registrando…" : "Confirmar Abono"}
               </button>
             </div>
           </div>
@@ -5499,6 +5709,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                 const atributoVariante = String(fd.get("atributoVariante") || "").trim();
                 const colorVariante = String(fd.get("colorVariante") || "").trim();
                 const fechaVencimiento = String(fd.get("fechaVencimiento") || "") || undefined;
+                // En modo euro la casilla no se muestra: no se manda y el servidor conserva lo que había.
+                const exentoIva = modoEuro() ? undefined : fd.get("exentoIva") === "on";
 
                 setGuardandoEdicion(true);
                 try {
@@ -5519,6 +5731,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     atributoVariante,
                     colorVariante,
                     fechaVencimiento,
+                    exentoIva,
                   });
                   setProductos((prev) => prev.map((p) => p.id === editarModalItem.id ? {
                     ...p, nombre, precio, unidadMedida, codigoOem, stockMinimo, precioMayorista, cantidadMinimaMayorista,
@@ -5526,6 +5739,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                     grupoVariante: grupoVariante || undefined, atributoVariante: atributoVariante || undefined,
                     colorVariante: colorVariante || undefined,
                     fechaVencimiento: fechaVencimiento || p.fechaVencimiento,
+                    exentoIva: exentoIva ?? p.exentoIva,
                   } : p));
                   const ubicacionNueva = String(fd.get("ubicacion") ?? "").trim();
                   if (ubicacionEdicion && fd.has("ubicacion") && ubicacionNueva !== ubicacionEdicion.valor) {
@@ -5621,6 +5835,15 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                         <input name="cantidadMinimaMayorista" type="number" step="1" defaultValue={editarModalItem.cantidadMinimaMayorista ?? ""} className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono" />
                       </div>
                     </div>
+                  {!modoEuro() && (
+                    <label className="flex items-start gap-2 p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-300/60 dark:border-slate-700/60 cursor-pointer">
+                      <input name="exentoIva" type="checkbox" defaultChecked={!!editarModalItem.exentoIva} className="w-4 h-4 mt-0.5 accent-teal-600 cursor-pointer" />
+                      <span>
+                        <span className="block text-xs font-bold text-slate-900 dark:text-white">Exento de IVA</span>
+                        <span className="block text-[10.5px] text-slate-500 dark:text-slate-400">Alimentos de la cesta básica, medicinas y otros que no pagan IVA. Solo cuenta si tu negocio cobra IVA.</span>
+                      </span>
+                    </label>
+                  )}
                     {ubicacionEdicion && (
                       <div>
                         <label className="text-[10px] font-bold text-teal-400 block mb-1">Ubicación en Almacén Principal</label>
@@ -6117,13 +6340,15 @@ function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOri
           <span className="underline">Configurar tasa →</span>
         )}
         {tasaCop && (
-          <span className="text-slate-500 dark:text-slate-400 text-[10px] font-normal">· COP {Number(tasaCop.tasa).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+          <span className="hidden sm:inline text-slate-500 dark:text-slate-400 text-[10px] font-normal">· COP {Number(tasaCop.tasa).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
         )}
         <span className="text-slate-500 dark:text-slate-400 text-[9px]">▼</span>
       </button>
 
       {abierto && (
-        <div className="absolute right-0 mt-2 z-50 w-80 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
+        // En el teléfono la píldora queda a la izquierda: el cuadro se abre desde ahí y con el ancho de la
+        // pantalla (alineado a la derecha se salía por la izquierda y quedaba cortado).
+        <div className="absolute left-0 w-[calc(100vw-2rem)] max-h-[calc(100dvh-8rem)] overflow-y-auto sm:left-auto sm:right-0 sm:w-80 sm:max-h-none sm:overflow-visible mt-2 z-50 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-300 dark:border-slate-700 space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
             <div>
               <p className="text-xs font-bold text-slate-900 dark:text-white">Fuente de la Tasa (USD → Bs)</p>
@@ -6157,6 +6382,9 @@ function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOri
               </p>
               {tasaVes && (
                 <p className="text-[10px] text-slate-400">Actualizado: {new Date(tasaVes.fechaActualizacion).toLocaleString()}</p>
+              )}
+              {origenTasaActiva === "BCV" && (
+                <p className="text-[10px] text-teal-700 dark:text-teal-400">La tasa BCV se actualiza sola a las 8:05 a. m., 1:05 p. m. y 5:05 p. m. La USDT se actualiza con el botón.</p>
               )}
               <button type="button" onClick={actualizarAhora} disabled={actualizandoAhora}
                 className="w-full py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
@@ -6553,14 +6781,6 @@ function CuentasPorCobrarPagarComercio({
               );
             } else {
               cargarIngresosCaja();
-              // Descontar saldo del cliente en la lista local de clientes (solo caché de UI para el CRM del mostrador)
-              setClientes((prev) => {
-                const updated = prev.map((cl) =>
-                  cl.nombre === cta.entidadNombre ? { ...cl, saldoPendiente: Math.max(0, cl.saldoPendiente - montoAbono) } : cl
-                );
-                try { localStorage.setItem("aurora_comercio_clientes", JSON.stringify(updated)); } catch {}
-                return updated;
-              });
               mostrarToast(
                 `Cobro de ${monedaAbono === "USD" ? "$" : "Bs. "}${montoAbono.toFixed(2)} registrado (${formaPago}). Se contabilizó el ingreso en caja y se actualizó el saldo del cliente.${avisoSaldada}`,
                 "success"
@@ -6603,7 +6823,7 @@ const TIPO_CUENTA_LABELS: Record<TipoCuentaBancaria, string> = {
 
 /** "Dónde está guardado el dinero" (Caja Efectivo, Cuenta Dólares, cada banco) —
  * independiente del ledger de ventas/gastos por moneda que ya lleva MovimientoCaja. */
-type SeccionConfiguracion = "tienda" | "qr" | "pagos" | "fiscal" | "moneda";
+type SeccionConfiguracion = "tienda" | "qr" | "pagos" | "fiscal" | "impuestos" | "moneda";
 
 const SECCIONES_CONFIGURACION: { id: SeccionConfiguracion; etiqueta: string; ayuda: string }[] = [
   { id: "tienda", etiqueta: "Mi Tienda", ayuda: "Nombre, logo, colores y banner de tu catálogo online." },
@@ -6611,6 +6831,7 @@ const SECCIONES_CONFIGURACION: { id: SeccionConfiguracion; etiqueta: string; ayu
   { id: "pagos", etiqueta: "Métodos de Pago", ayuda: "Pago Móvil, Zelle, Binance y Bancolombia: solo aparecen a tus clientes los que tengan datos reales cargados." },
   { id: "moneda", etiqueta: "Moneda", ayuda: "En qué moneda trabaja tu negocio. Con euro se trabaja solo en euros: sin bolívares, sin pesos y sin tasas de cambio." },
   { id: "fiscal", etiqueta: "Facturación Fiscal", ayuda: "RIF, razón social y el rango de números de control que te asignó tu imprenta." },
+  { id: "impuestos", etiqueta: "Impuestos y cargos", ayuda: "IVA, IGTF y delivery: si se cobran, cómo se muestran los precios y cuánto cuesta el envío." },
 ];
 
 /** Todo lo que se configura una vez y se deja (no es de uso diario), en un solo lugar y con nombres
@@ -6642,7 +6863,7 @@ function ConfiguracionComercio({ tenantId, nombreNegocio, esDuenoAdmin, onIrAEqu
 
         <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
           <nav className="w-full md:w-56 flex md:flex-col gap-1 overflow-x-auto md:overflow-visible flex-shrink-0">
-            {SECCIONES_CONFIGURACION.filter((s) => !(modoEuro() && (s.id === "pagos" || s.id === "fiscal"))).map((s) => (
+            {SECCIONES_CONFIGURACION.filter((s) => !(modoEuro() && (s.id === "pagos" || s.id === "fiscal" || s.id === "impuestos"))).map((s) => (
               <button key={s.id} type="button" onClick={() => onSeccion(s.id)} className={claseBoton(seccion === s.id)}>
                 {s.etiqueta}
               </button>
@@ -6659,6 +6880,8 @@ function ConfiguracionComercio({ tenantId, nombreNegocio, esDuenoAdmin, onIrAEqu
             <p className="text-xs text-slate-500 dark:text-slate-400">{seccionActual.ayuda}</p>
             {seccion === "fiscal" ? (
               <FacturacionFiscalComercio mostrarToast={mostrarToast} />
+            ) : seccion === "impuestos" ? (
+              <ImpuestosCargosComercio esDuenoAdmin={esDuenoAdmin} mostrarToast={mostrarToast} />
             ) : seccion === "moneda" ? (
               <MonedaNegocioComercio esDuenoAdmin={esDuenoAdmin} mostrarToast={mostrarToast} />
             ) : (
@@ -7900,20 +8123,14 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
   const [cerrando, setCerrando] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
 
+  // El servidor compara contra el EFECTIVO de la moneda del turno (lo que se puede contar en la
+  // gaveta). Punto, Pago Móvil, Zelle y las otras monedas se anotan como referencia pero no entran
+  // en el monto declarado; antes se sumaban y cada cierre salía con un "sobrante" falso.
   const totalDesgloseCalculado = useMemo(() => {
-    const usd = Number(desgloseArqueo.usd) || 0;
-    const zelle = Number(desgloseArqueo.zelle) || 0;
-    const ves = (Number(desgloseArqueo.ves) || 0) + (Number(desgloseArqueo.punto) || 0) + (Number(desgloseArqueo.pagoMovil) || 0);
-    const cop = Number(desgloseArqueo.cop) || 0;
-
-    if (moneda === "USD") {
-      return usd + zelle + (tasaUsdVes > 0 ? ves / tasaUsdVes : 0) + (tasaUsdCop > 0 ? cop / tasaUsdCop : 0);
-    } else if (moneda === "VES") {
-      return ves + (usd + zelle) * tasaUsdVes + (tasaUsdCop > 0 ? (cop / tasaUsdCop) * tasaUsdVes : 0);
-    } else {
-      return cop + (usd + zelle) * tasaUsdCop;
-    }
-  }, [desgloseArqueo, moneda, tasaUsdVes, tasaUsdCop]);
+    if (moneda === "USD") return Number(desgloseArqueo.usd) || 0;
+    if (moneda === "VES") return Number(desgloseArqueo.ves) || 0;
+    return Number(desgloseArqueo.cop) || 0;
+  }, [desgloseArqueo, moneda]);
 
   const montoDeclaradoFinal = modoArqueo === "DESGLOSADO" ? totalDesgloseCalculado : (Number(montoDeclarado) || 0);
 
@@ -8068,7 +8285,7 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
             {modoArqueo === "DESGLOSADO" ? (
               <div className="space-y-3 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                 <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                  Ingresá lo contado físicamente en cada método para calcular el total sin errores:
+                  Anota lo contado en cada método. El arqueo compara solo el efectivo en {moneda}; los pagos electrónicos y las otras monedas quedan como referencia.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
@@ -8103,7 +8320,7 @@ function TurnoCajaComercio({ tenantId, tasaUsdVes, tasaUsdCop }: { tenantId: num
                   </div>
                 </div>
                 <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-slate-700">
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Total declarado acumulado:</span>
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Efectivo declarado en {moneda}:</span>
                   <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">{totalDesgloseCalculado.toFixed(2)} {moneda}</span>
                 </div>
               </div>
@@ -8494,6 +8711,9 @@ function ModalCompraProveedorComercio({
   // lo que el usuario indique (o nada) y el resto queda como Cuenta por
   // Pagar (CXP) — mismo patrón que Registrar Compra de Horeca.
   const [pagoDeContado, setPagoDeContado] = useState(true);
+  // Datos de la factura fiscal del proveedor, para el libro de compras (opcional).
+  const [facturaFiscal, setFacturaFiscal] = useState(false);
+  const [fiscalCompra, setFiscalCompra] = useState({ numeroControl: "", baseImponible: "", montoExento: "", alicuotaIva: "16", montoIva: "", ivaRetenido: "" });
   const [montoPagadoParcial, setMontoPagadoParcial] = useState("");
   const [monedaPago, setMonedaPago] = useState("USD");
   const [diasCredito, setDiasCredito] = useState("");
@@ -8751,6 +8971,14 @@ function ModalCompraProveedorComercio({
         montoPagadoAhora: montoPagadoAhora && montoPagadoAhora > 0 ? montoPagadoAhora : undefined,
         monedaPago: montoPagadoAhora && montoPagadoAhora > 0 ? monedaPago : undefined,
         diasCredito: !pagoDeContado && diasCredito ? Number(diasCredito) : undefined,
+        ...(facturaFiscal ? {
+          numeroControl: fiscalCompra.numeroControl.trim() || undefined,
+          baseImponible: Number(fiscalCompra.baseImponible) || 0,
+          montoExento: Number(fiscalCompra.montoExento) || 0,
+          alicuotaIva: Number(fiscalCompra.alicuotaIva) || 0,
+          montoIva: Number(fiscalCompra.montoIva) || 0,
+          ivaRetenido: Number(fiscalCompra.ivaRetenido) || 0,
+        } : {}),
       });
       onCompraExitosa();
     } catch (err: any) {
@@ -9104,6 +9332,80 @@ function ModalCompraProveedorComercio({
             </tbody>
           </table>
         </div>
+
+        {/* Factura fiscal del proveedor — solo alimenta el libro de compras; no cambia stock ni pagos */}
+        {!modoEuro() && (
+          <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2.5">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox" checked={facturaFiscal} className="w-4 h-4 accent-teal-600 cursor-pointer"
+                onChange={(e) => {
+                  setFacturaFiscal(e.target.checked);
+                  if (e.target.checked && !fiscalCompra.baseImponible && totalFactura > 0) {
+                    const alic = Number(fiscalCompra.alicuotaIva) || 0;
+                    setFiscalCompra((f) => ({ ...f, baseImponible: totalFactura.toFixed(2), montoIva: (totalFactura * alic / 100).toFixed(2) }));
+                  }
+                }}
+              />
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">Es factura fiscal con IVA (va al libro de compras)</span>
+            </label>
+            {facturaFiscal && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  N° de control
+                  <input
+                    type="text" value={fiscalCompra.numeroControl} placeholder="00-000123"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, numeroControl: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  Base imponible
+                  <input
+                    type="number" value={fiscalCompra.baseImponible} placeholder="0.00"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, baseImponible: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  Exento
+                  <input
+                    type="number" value={fiscalCompra.montoExento} placeholder="0.00"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, montoExento: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  Alícuota %
+                  <input
+                    type="number" value={fiscalCompra.alicuotaIva} placeholder="16"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, alicuotaIva: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  IVA
+                  <input
+                    type="number" value={fiscalCompra.montoIva} placeholder="0.00"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, montoIva: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                  IVA retenido
+                  <input
+                    type="number" value={fiscalCompra.ivaRetenido} placeholder="0.00"
+                    onChange={(e) => setFiscalCompra((f) => ({ ...f, ivaRetenido: e.target.value }))}
+                    className="mt-1 w-full px-2.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white"
+                  />
+                </label>
+                <p className="col-span-2 sm:col-span-3 text-[10.5px] text-slate-500 dark:text-slate-400">
+                  Copia los montos tal como están en la factura del proveedor, en {CODIGO()}. El libro los pasa a bolívares con la tasa BCV del día.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Forma de pago — de contado (sale de caja como EGRESO) o a crédito (Cuenta por Pagar) */}
         <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-800/40 border border-slate-300/70 dark:border-slate-700/60 space-y-2.5">

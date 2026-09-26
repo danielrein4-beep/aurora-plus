@@ -46,7 +46,7 @@ export default function ModalPrecioLeche({ precioLecheUSD, onGuardar, onCerrar }
               Precio por Litro (USD $)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-slate-400 font-mono font-bold text-sm">$</span>
+              <span className="absolute left-3 top-2.5 text-slate-400 tabular-nums font-bold text-sm">$</span>
               <input
                 name="precioLeche"
                 type="number"
@@ -55,7 +55,7 @@ export default function ModalPrecioLeche({ precioLecheUSD, onGuardar, onCerrar }
                 min="0.01"
                 defaultValue={precioLecheUSD}
                 required
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white font-mono text-base font-bold focus:border-sky-500 focus:outline-none"
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-800/90 border border-white/15 text-white tabular-nums text-base font-bold focus:border-sky-500 focus:outline-none"
                 placeholder="0.55"
               />
             </div>

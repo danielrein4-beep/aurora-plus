@@ -1,8 +1,12 @@
 package com.auroraplus.modules.comercio;
 
+import com.auroraplus.core.config.entities.LicenciaTenant;
+import com.auroraplus.core.config.repositories.LicenciaTenantRepository;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.repositories.MovimientoCajaRepository;
+import com.auroraplus.modules.comercio.entities.LibroVenta;
 import com.auroraplus.modules.comercio.entities.PedidoWebComercio;
+import com.auroraplus.modules.comercio.repositories.LibroVentaRepository;
 import com.auroraplus.modules.comercio.repositories.PedidoWebComercioRepository;
 import com.auroraplus.modules.comercio.services.ConfirmacionPedidoWebService;
 import com.auroraplus.modules.repuestos.entities.RepuestoItem;
@@ -13,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -33,6 +38,8 @@ class ConfirmacionPedidoWebServiceTest {
     @Autowired private PedidoWebComercioRepository pedidoWebRepository;
     @Autowired private RepuestoItemRepository repuestoItemRepository;
     @Autowired private MovimientoCajaRepository movimientoCajaRepository;
+    @Autowired private LicenciaTenantRepository licenciaTenantRepository;
+    @Autowired private LibroVentaRepository libroVentaRepository;
 
     private RepuestoItem crearRepuesto(Long tenantId, String sku, BigDecimal stock, BigDecimal precio) {
         RepuestoItem r = new RepuestoItem();
@@ -140,5 +147,58 @@ class ConfirmacionPedidoWebServiceTest {
         RuntimeException ex = assertThrows(RuntimeException.class,
             () -> confirmacionPedidoWebService.confirmar(tenantId, pedido.getId()));
         assertTrue(ex.getMessage().contains("no tiene artículos vinculados"), "Debe bloquear: " + ex.getMessage());
+    }
+
+    @Test
+    void confirmarCobraIvaIgtfYDeliveryYDejaElRenglonDelLibroDeVentas() {
+        long tenantId = 96007L;
+        LicenciaTenant l = new LicenciaTenant();
+        l.setTenantId(tenantId);
+        l.setNombreEmpresa("Negocio con IVA " + tenantId);
+        l.setModuloPrincipal("repuestos");
+        l.setTipoLicencia(LicenciaTenant.TipoLicencia.COMERCIAL);
+        l.setActiva(true);
+        l.setFechaVencimientoPago(LocalDate.now().plusYears(1));
+        l.setMonedaBase("USD");
+        l.setCobraIva(true);
+        l.setAlicuotaIva(new BigDecimal("16"));
+        l.setPreciosIncluyenIva(false); // el IVA se suma encima
+        l.setIgtfActivo(true);
+        l.setAlicuotaIgtf(new BigDecimal("3"));
+        l.setCostoEnvioDelivery(new BigDecimal("5.00"));
+        licenciaTenantRepository.save(l);
+
+        RepuestoItem gravado = crearRepuesto(tenantId, "SKU-96007-G", new BigDecimal("10"), new BigDecimal("10.00"));
+        RepuestoItem exento = crearRepuesto(tenantId, "SKU-96007-E", new BigDecimal("10"), new BigDecimal("10.00"));
+        exento.setExentoIva(true);
+        repuestoItemRepository.save(exento);
+
+        PedidoWebComercio pedido = crearPedidoPendiente(tenantId,
+            "[{\"productoId\":\"rep-" + gravado.getId() + "\",\"cantidad\":2,\"nombre\":\"Gravado\"},"
+            + "{\"productoId\":\"rep-" + exento.getId() + "\",\"cantidad\":1,\"nombre\":\"Exento\"}]",
+            new BigDecimal("35.00"));
+        pedido.setTipoEntrega("DELIVERY");
+        pedido.setMetodoPago("ZELLE"); // divisas: lleva IGTF
+        pedidoWebRepository.save(pedido);
+
+        PedidoWebComercio confirmado = confirmacionPedidoWebService.confirmar(tenantId, pedido.getId());
+
+        // Gravado 20 + delivery 5 = base 25, IVA 4; exento 10; subtotal 39; IGTF 3% = 1.17; total 40.17
+        assertEquals(0, new BigDecimal("40.17").compareTo(confirmado.getTotalUsd()), "Total final: " + confirmado.getTotalUsd());
+        List<MovimientoCaja> movimientos = movimientoCajaRepository.findByTenantIdOrderByFechaRegistroDesc(tenantId);
+        assertEquals(1, movimientos.size());
+        assertEquals(0, new BigDecimal("40.17").compareTo(movimientos.get(0).getMonto()));
+
+        List<LibroVenta> libro = libroVentaRepository.findByTenantIdAndFechaBetweenOrderByFechaAsc(tenantId,
+            LocalDateTime.now().minusDays(1), LocalDateTime.now().plusDays(1));
+        assertEquals(1, libro.size(), "El pedido web confirmado debe quedar en el libro de ventas");
+        LibroVenta renglon = libro.get(0);
+        assertEquals("WEB-" + pedido.getId(), renglon.getNumeroTicket());
+        assertEquals(0, new BigDecimal("25.00").compareTo(renglon.getBaseImponible()));
+        assertEquals(0, new BigDecimal("4.00").compareTo(renglon.getMontoIva()));
+        assertEquals(0, new BigDecimal("10.00").compareTo(renglon.getMontoExento()));
+        assertEquals(0, new BigDecimal("1.17").compareTo(renglon.getMontoIgtf()));
+        assertEquals(0, new BigDecimal("5.00").compareTo(renglon.getMontoDelivery()));
+        assertEquals("Cliente Web de Prueba", renglon.getClienteNombre());
     }
 }

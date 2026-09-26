@@ -2,6 +2,20 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "aurora-backend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "C:/Users/Windows/Projects/aurora-plus/mvnw.cmd",
+        "-f",
+        "C:/Users/Windows/Projects/aurora-plus/pom.xml",
+        "-o",
+        "spring-boot:run"
+      ],
+      "port": 8080,
+      "autoPort": false
+    },
+    {
       "name": "aurora-frontend-claude",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

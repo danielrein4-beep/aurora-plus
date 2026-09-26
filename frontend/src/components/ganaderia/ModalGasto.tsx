@@ -5,24 +5,28 @@ import { fechaLocalISO } from "../ReportesCampoGanaderia";
 import { CATEGORIAS_GASTO_GANADERIA } from "./catalogos";
 import type { MonedasConfig } from "./tipos";
 import type { Notificar } from "./tipos";
+import { num } from "./formato";
 
 interface Props {
   tasaBCV: number;
   tasaCOP: number;
   monedasConfig: MonedasConfig;
   tenantId: number;
+  /** Lotes del hato: la sal o el alimento de un lote se le carga solo a ese lote en el margen. */
+  lotes: string[];
   notificar: Notificar;
   onRegistrado: (gasto: GastoGanaderia) => void;
   onCerrar: () => void;
 }
 
 /** Gasto operativo del hato (alimento, sanidad, mano de obra...), en USD con su equivalente. */
-export default function ModalGasto({ tasaBCV, tasaCOP, monedasConfig, tenantId, notificar, onRegistrado, onCerrar }: Props) {
+export default function ModalGasto({ tasaBCV, tasaCOP, monedasConfig, tenantId, lotes, notificar, onRegistrado, onCerrar }: Props) {
   const [formGasto, setFormGasto] = useState({
     categoria: "ALIMENTACION",
     descripcion: "",
     monto: "" as number | string,
     fecha: fechaLocalISO(),
+    lote: "",
   });
 
   // Manejador: Registrar Gasto Operativo del Hato
@@ -47,10 +51,11 @@ export default function ModalGasto({ tasaBCV, tasaCOP, monedasConfig, tenantId, 
         descripcion: formGasto.descripcion.trim(),
         monto: montoNum,
         fecha: formGasto.fecha || fechaLocalISO(),
+        lote: formGasto.lote || undefined,
       });
       onRegistrado(nuevo);
       onCerrar();
-      notificar(`Gasto registrado: $${montoNum.toFixed(2)} USD en ${catLabel}`);
+      notificar(`Gasto registrado: $${num(montoNum, 2)} USD en ${catLabel}`);
     } catch (err: any) {
       notificar(`Error al registrar gasto: ${err?.message || "revisa tu conexión e inténtalo de nuevo"}.`);
     }
@@ -111,6 +116,23 @@ export default function ModalGasto({ tasaBCV, tasaCOP, monedasConfig, tenantId, 
             />
           </div>
 
+          {lotes.length > 0 && (
+            <div>
+              <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
+                ¿Para qué lote?
+              </label>
+              <select
+                value={formGasto.lote}
+                onChange={e => setFormGasto({ ...formGasto, lote: e.target.value })}
+                className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white text-xs focus:border-emerald-500 focus:outline-none"
+              >
+                <option value="">Todo el hato</option>
+                {lotes.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <p className="text-[10px] text-slate-400 mt-1">En el margen por lote, este gasto se le carga solo a los animales de ese lote.</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
@@ -127,7 +149,7 @@ export default function ModalGasto({ tasaBCV, tasaCOP, monedasConfig, tenantId, 
                   placeholder="0.00"
                   value={formGasto.monto}
                   onChange={e => setFormGasto({ ...formGasto, monto: e.target.value })}
-                  className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-800 border border-white/15 text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 focus:outline-none"
+                  className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-800 border border-white/15 text-emerald-400 tabular-nums font-bold text-sm focus:border-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -141,7 +163,7 @@ export default function ModalGasto({ tasaBCV, tasaCOP, monedasConfig, tenantId, 
                 required
                 value={formGasto.fecha}
                 onChange={e => setFormGasto({ ...formGasto, fecha: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white font-mono text-xs focus:border-emerald-500 focus:outline-none"
+                className="w-full p-2.5 rounded-xl bg-slate-800 border border-white/15 text-white tabular-nums text-xs focus:border-emerald-500 focus:outline-none"
               />
             </div>
           </div>
@@ -152,17 +174,17 @@ export default function ModalGasto({ tasaBCV, tasaCOP, monedasConfig, tenantId, 
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Equivalencia al cambio actual:</span>
               {monedasConfig.VES && (
                 <div className="flex items-center justify-between text-slate-300">
-                  <span>Bolívares (Tasa {tasaBCV.toFixed(2)}):</span>
-                  <span className="font-mono font-bold text-emerald-300">
-                    Bs. {(Number(formGasto.monto) * tasaBCV).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span>Bolívares (Tasa {num(tasaBCV, 2)}):</span>
+                  <span className="tabular-nums font-bold text-emerald-300">
+                    Bs. {num((Number(formGasto.monto) * tasaBCV), 2)}
                   </span>
                 </div>
               )}
               {monedasConfig.COP && (
                 <div className="flex items-center justify-between text-slate-300">
                   <span>Pesos Colombianos (Tasa {tasaCOP}):</span>
-                  <span className="font-mono font-bold text-sky-300">
-                    COP ${Math.round(Number(formGasto.monto) * tasaCOP).toLocaleString()}
+                  <span className="tabular-nums font-bold text-sky-300">
+                    COP ${num(Math.round(Number(formGasto.monto) * tasaCOP), 0)}
                   </span>
                 </div>
               )}

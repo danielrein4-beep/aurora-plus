@@ -20,11 +20,12 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
     fecha: fechaLocalISO(),
     cuartoAfectado: "PD",
     gradoCmt: "GRADO_2",
-    farmacoAplicado: "Cefalexina + Gentamicina Intramamaria",
-    diasRetiroLeche: 4,
-    veterinario: "Dr. Médico Veterinario",
-    costo: 12.0,
-    notas: "Cuarto posterior derecho caliente y reactivo al reactivo California Mastitis Test (CMT).",
+    farmacoAplicado: "",
+    diasRetiroLeche: 0,
+    diasRetiroCarne: "" as string,
+    veterinario: "",
+    costo: 0,
+    notas: "",
   });
 
   // Manejador: Registrar Mastitis (Sanidad dedicada con retiro de leche)
@@ -38,22 +39,23 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
         gradoCmt: formMastitis.gradoCmt,
         farmacoAplicado: formMastitis.farmacoAplicado,
         diasRetiroLeche: Number(formMastitis.diasRetiroLeche),
+        diasRetiroCarne: Number(formMastitis.diasRetiroCarne),
         veterinario: formMastitis.veterinario,
         costo: Number(formMastitis.costo),
         notas: formMastitis.notas,
       });
       const vaca = animales.find(a => a.id === Number(formMastitis.animalId));
       notificar(`Alerta sanitaria: Mastitis registrada en ${vaca?.arete || 'vaca'}. Cuarto ${formMastitis.cuartoAfectado} en tratamiento. Bloqueo de leche activo por ${formMastitis.diasRetiroLeche} días.`);
-    } catch {
-      notificar("No se pudo registrar el tratamiento de mastitis — revisa tu conexión.");
+    } catch (err) {
+      notificar(`No se pudo registrar el tratamiento de mastitis: ${err instanceof Error ? err.message : "revisa tu conexión"}`);
       return;
     }
     onCerrar();
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div className="flex items-center gap-2">
             <span className="text-rose-400"><IconWarning size={20} /></span>
@@ -85,7 +87,7 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Cuarto Mamario Afectado *</label>
               <select
@@ -113,7 +115,7 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Fármaco Intramamario / Antibiótico</label>
               <input
@@ -130,17 +132,32 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
               <input
                 type="number"
                 onFocus={e => e.target.select()}
-                min="0"
+                min="1"
                 max="30"
                 required
-                value={formMastitis.diasRetiroLeche}
+                placeholder="Ej. 4"
+                value={formMastitis.diasRetiroLeche || ""}
                 onChange={e => setFormMastitis({ ...formMastitis, diasRetiroLeche: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 font-mono font-bold"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 tabular-nums font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-rose-400 block mb-1 font-bold">Días de Retiro de Carne *</label>
+              <input
+                type="number"
+                onFocus={e => e.target.select()}
+                min="0"
+                max="120"
+                required
+                placeholder="Según el prospecto"
+                value={formMastitis.diasRetiroCarne}
+                onChange={e => setFormMastitis({ ...formMastitis, diasRetiroCarne: e.target.value })}
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 tabular-nums font-bold"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Veterinario / Técnico</label>
               <input
@@ -158,9 +175,10 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
                 onFocus={e => e.target.select()}
                 step="0.5"
                 min="0"
-                value={formMastitis.costo}
+                placeholder="0,00"
+                value={formMastitis.costo || ""}
                 onChange={e => setFormMastitis({ ...formMastitis, costo: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums"
               />
             </div>
           </div>

@@ -14,6 +14,10 @@
 	# cada despliegue. Si se cachea, el usuario sigue viendo la versión vieja.
 	header /index.html Cache-Control "no-cache"
 
+	# sw.js guarda la app en el teléfono para abrir sin señal: tampoco se cachea, o el
+	# teléfono tardaría en enterarse de que hay una versión nueva.
+	header /sw.js Cache-Control "no-cache"
+
 	# Fallback de SPA: la app usa BrowserRouter, así que rutas como
 	# /catalogo/mi-tienda no existen como archivo — se sirve index.html y el
 	# router del navegador resuelve. Sin esto, recargar cualquier ruta = 404.

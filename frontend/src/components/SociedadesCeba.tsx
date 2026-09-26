@@ -11,6 +11,8 @@ import {
   type ResumenSociedadCeba,
 } from "../api";
 import { fechaLocalISO, BotonPdf } from "./ReportesCampoGanaderia";
+import { num } from "./ganaderia/formato";
+import { useConfirmar } from "./ganaderia/DialogoConfirmar";
 
 /**
  * Ceba en sociedad con reparto de kilos ganados: el socio aporta animales, la finca
@@ -27,7 +29,7 @@ interface Props {
 const kg = (n: number | null | undefined, dec = 0) =>
   n == null ? "—" : `${Number(n).toLocaleString("es-VE", { minimumFractionDigits: dec, maximumFractionDigits: dec })} kg`;
 const usd = (n: number | null | undefined) =>
-  n == null ? "—" : `$${Number(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  n == null ? "—" : `$${num(Number(n), 2)}`;
 const pct = (n: number) => `${Number(n).toLocaleString("es-VE", { maximumFractionDigits: 2 })}%`;
 const fechaCorta = (iso?: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 
@@ -35,6 +37,7 @@ const campo = "px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-
 const btnPrimario = "px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 !text-white text-xs font-bold cursor-pointer disabled:opacity-50";
 
 export default function SociedadesCeba({ animales, puedeGestionar, notificar, onCambio }: Props) {
+  const { confirmar, dialogo } = useConfirmar();
   const [sociedades, setSociedades] = useState<ResumenSociedadCeba[]>([]);
   const [cargando, setCargando] = useState(true);
   const [seleccionada, setSeleccionada] = useState<number | null>(null);
@@ -117,7 +120,7 @@ export default function SociedadesCeba({ animales, puedeGestionar, notificar, on
             {activa && puedeGestionar && (
               <button
                 disabled={ocupado}
-                onClick={() => window.confirm(`¿Cerrar la sociedad con ${s.nombreSocio}? Ya no se podrán ingresar animales.`) && ejecutar(() => cerrarSociedadCeba(s.id), "Sociedad cerrada.")}
+                onClick={async () => (await confirmar(`¿Cerrar la sociedad con ${s.nombreSocio}? Ya no se podrán ingresar animales.`, { accion: "Cerrar sociedad", peligro: true })) && ejecutar(() => cerrarSociedadCeba(s.id), "Sociedad cerrada.")}
                 className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer">
                 Cerrar sociedad
               </button>
@@ -135,7 +138,7 @@ export default function SociedadesCeba({ animales, puedeGestionar, notificar, on
           ].map(([t, v]) => (
             <div key={t} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">{t}</div>
-              <div className="font-mono font-black text-base mt-1 text-slate-900">{v}</div>
+              <div className="tabular-nums font-black text-base mt-1 text-slate-900">{v}</div>
             </div>
           ))}
         </div>
@@ -166,11 +169,11 @@ export default function SociedadesCeba({ animales, puedeGestionar, notificar, on
                 return (
                   <tr key={l.animalId} className={vendido ? "bg-slate-50/60" : ""}>
                     <td className="p-3">
-                      <span className="font-mono font-semibold text-teal-800">{l.arete}</span>
+                      <span className="tabular-nums font-semibold text-teal-800">{l.arete}</span>
                       <span className="ml-2 text-slate-700">{l.nombre || l.tipoAnimal || ""}</span>
                       {vendido && <span className="ml-2 text-[10px] font-bold text-slate-500">VENDIDO</span>}
                     </td>
-                    <td className="p-3 text-right font-mono">
+                    <td className="p-3 text-right tabular-nums">
                       {editando != null ? (
                         <span className="inline-flex items-center gap-1">
                           <input type="number" min="0" step="0.5" value={editando} onChange={e => setPesoEditando(p => ({ ...p, [l.animalId]: e.target.value }))} className={`${campo} w-20 text-right`} />
@@ -193,21 +196,21 @@ export default function SociedadesCeba({ animales, puedeGestionar, notificar, on
                       )}
                       <div className="text-[10px] text-slate-400">{fechaCorta(l.fechaEntrada)}{l.diasEnFinca != null ? ` · ${l.diasEnFinca} d` : ""}</div>
                     </td>
-                    <td className="p-3 text-right font-mono text-slate-900">{kg(l.pesoActual, 1)}</td>
-                    <td className={`p-3 text-right font-mono font-bold ${l.kilosGanados != null && l.kilosGanados < 0 ? "text-rose-600" : "text-teal-700"}`}>{kg(l.kilosGanados, 1)}</td>
-                    <td className="p-3 text-right font-mono text-slate-600">{l.gdpKgDia != null ? Number(l.gdpKgDia).toFixed(3) : "—"}</td>
-                    <td className="p-3 text-right font-mono text-slate-800">{kg(l.kilosFinca, 1)}</td>
-                    <td className="p-3 text-right font-mono text-slate-800">
+                    <td className="p-3 text-right tabular-nums text-slate-900">{kg(l.pesoActual, 1)}</td>
+                    <td className={`p-3 text-right tabular-nums font-bold ${l.kilosGanados != null && l.kilosGanados < 0 ? "text-rose-600" : "text-teal-700"}`}>{kg(l.kilosGanados, 1)}</td>
+                    <td className="p-3 text-right tabular-nums text-slate-600">{l.gdpKgDia != null ? Number(l.gdpKgDia).toFixed(3) : "—"}</td>
+                    <td className="p-3 text-right tabular-nums text-slate-800">{kg(l.kilosFinca, 1)}</td>
+                    <td className="p-3 text-right tabular-nums text-slate-800">
                       {kg(l.kilosSocio, 1)}
                       <div className="text-[10px] text-slate-400">total {kg(l.kilosTotalesSocio, 1)}</div>
                     </td>
-                    <td className="p-3 text-right font-mono text-slate-700">{vendido ? usd(l.precioVentaUSD) : "—"}</td>
-                    <td className="p-3 text-right font-mono text-slate-700">{vendido ? `${usd(l.montoFincaUSD)} / ${usd(l.montoSocioUSD)}` : "—"}</td>
+                    <td className="p-3 text-right tabular-nums text-slate-700">{vendido ? usd(l.precioVentaUSD) : "—"}</td>
+                    <td className="p-3 text-right tabular-nums text-slate-700">{vendido ? `${usd(l.montoFincaUSD)} / ${usd(l.montoSocioUSD)}` : "—"}</td>
                     <td className="p-3 text-right">
                       {activa && puedeGestionar && !vendido && (
                         <button
                           disabled={ocupado}
-                          onClick={() => window.confirm(`¿Sacar ${l.arete} de la sociedad? Vuelve a ser un animal propio.`) && ejecutar(() => quitarAnimalSociedadCeba(s.id, l.animalId), `${l.arete} salió de la sociedad.`)}
+                          onClick={async () => (await confirmar(`¿Sacar ${l.arete} de la sociedad? Vuelve a ser un animal propio.`, { accion: "Sacar de la sociedad", peligro: true })) && ejecutar(() => quitarAnimalSociedadCeba(s.id, l.animalId), `${l.arete} salió de la sociedad.`)}
                           className="px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 font-semibold cursor-pointer">
                           Sacar
                         </button>
@@ -239,10 +242,10 @@ export default function SociedadesCeba({ animales, puedeGestionar, notificar, on
                 <label key={a.id} className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-[11px] cursor-pointer ${marcados.includes(a.id) ? "bg-teal-50 font-semibold" : "hover:bg-slate-50"}`}>
                   <span className="flex items-center gap-2">
                     <input type="checkbox" checked={marcados.includes(a.id)} onChange={e => setMarcados(p => e.target.checked ? [...p, a.id] : p.filter(x => x !== a.id))} className="accent-teal-700" />
-                    <span className="font-mono text-teal-800">{a.arete}</span>
+                    <span className="tabular-nums text-teal-800">{a.arete}</span>
                     <span className="text-slate-700">{a.nombre || a.tipoAnimal}{a.raza ? ` · ${a.raza}` : ""}</span>
                   </span>
-                  <span className={`font-mono ${a.pesoActual ? "text-slate-600" : "text-rose-600"}`}>{a.pesoActual ? kg(a.pesoActual) : "sin peso"}</span>
+                  <span className={`tabular-nums ${a.pesoActual ? "text-slate-600" : "text-rose-600"}`}>{a.pesoActual ? kg(a.pesoActual) : "sin peso"}</span>
                 </label>
               ))}
             </div>
@@ -267,6 +270,7 @@ export default function SociedadesCeba({ animales, puedeGestionar, notificar, on
   // ── Listado de sociedades ──
   return (
     <div className="space-y-5 text-left">
+      {dialogo}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">Ceba en Sociedad</h3>
@@ -325,9 +329,9 @@ export default function SociedadesCeba({ animales, puedeGestionar, notificar, on
               </div>
               <div className="text-[11px] text-slate-500">Finca {pct(r.sociedad.porcentajeFinca)} · Socio {pct(r.porcentajeSocio)} · desde {fechaCorta(r.sociedad.fechaInicio)}</div>
               <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
-                <div><div className="text-slate-400">Animales</div><div className="font-mono font-bold text-slate-900">{r.animalesActivos}</div></div>
-                <div><div className="text-slate-400">Ganados</div><div className="font-mono font-bold text-teal-700">{kg(r.kilosGanadosTotal)}</div></div>
-                <div><div className="text-slate-400">Finca</div><div className="font-mono font-bold text-slate-900">{kg(r.kilosFincaTotal)}</div></div>
+                <div><div className="text-slate-400">Animales</div><div className="tabular-nums font-bold text-slate-900">{r.animalesActivos}</div></div>
+                <div><div className="text-slate-400">Ganados</div><div className="tabular-nums font-bold text-teal-700">{kg(r.kilosGanadosTotal)}</div></div>
+                <div><div className="text-slate-400">Finca</div><div className="tabular-nums font-bold text-slate-900">{kg(r.kilosFincaTotal)}</div></div>
               </div>
             </button>
           ))}

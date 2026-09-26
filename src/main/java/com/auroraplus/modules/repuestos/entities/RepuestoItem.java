@@ -51,6 +51,11 @@ public class RepuestoItem {
     @Column(name = "precio_mayorista", precision = 18, scale = 2)
     private BigDecimal precioMayorista;
 
+    /** Producto exento de IVA (cesta básica, medicinas...). Ver V96 y CalculoFiscalVenta.
+     * Sin valor por defecto en Java: así una edición que no lo manda no lo borra (ver RepuestoItemController.actualizar). */
+    @Column(name = "exento_iva", nullable = false)
+    private Boolean exentoIva;
+
     @Column(name = "cantidad_minima_mayorista", precision = 18, scale = 4)
     private BigDecimal cantidadMinimaMayorista;
 
@@ -156,6 +161,8 @@ public class RepuestoItem {
     public void setUnidadBase(String unidadBase) { this.unidadBase = unidadBase; }
     public BigDecimal getPrecioMayorista() { return precioMayorista; }
     public void setPrecioMayorista(BigDecimal precioMayorista) { this.precioMayorista = precioMayorista; }
+    public Boolean getExentoIva() { return exentoIva; }
+    public void setExentoIva(Boolean exentoIva) { this.exentoIva = exentoIva; }
     public BigDecimal getCantidadMinimaMayorista() { return cantidadMinimaMayorista; }
     public void setCantidadMinimaMayorista(BigDecimal cantidadMinimaMayorista) { this.cantidadMinimaMayorista = cantidadMinimaMayorista; }
     public BigDecimal getCostoUnitario() { return costoUnitario; }
@@ -221,5 +228,6 @@ public class RepuestoItem {
     private void aplicarDefaultsAlCrear() {
         if (visible == null) visible = true;
         if (ordenVisualizacion == null) ordenVisualizacion = 0;
+        if (exentoIva == null) exentoIva = false;
     }
 }

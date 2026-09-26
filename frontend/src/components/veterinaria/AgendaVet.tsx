@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import React, { useState } from 'react';
 import { IconCalendar, IconClose } from '../../Icons';
 import {
@@ -34,7 +35,7 @@ export default function AgendaVet({
   const guardarCita = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!citaForm.mascotaId) {
-      alert('Por favor seleccione una mascota.');
+      avisar('Por favor seleccione una mascota.');
       return;
     }
     try {
@@ -57,7 +58,7 @@ export default function AgendaVet({
       });
       onRecargar();
     } catch (err: any) {
-      alert('Error agendando cita: ' + err.message);
+      avisar('Error agendando cita: ' + err.message);
     }
   };
 
@@ -66,7 +67,7 @@ export default function AgendaVet({
       await actualizarEstadoCitaVet(tenantId, id, estado);
       onRecargar();
     } catch (err: any) {
-      alert('Error actualizando estado: ' + err.message);
+      avisar('Error actualizando estado: ' + err.message);
     }
   };
 

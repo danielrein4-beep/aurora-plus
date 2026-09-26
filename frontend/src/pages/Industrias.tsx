@@ -55,12 +55,12 @@ export default function Industrias() {
 
       {/* Header */}
       <section className="px-4 sm:px-6 max-w-7xl mx-auto text-center mb-16">
-        <Kicker>6 industrias con módulos propios</Kicker>
+        <Kicker>Cinco rubros con módulos propios</Kicker>
         <h1 className="font-bold text-5xl sm:text-6xl lg:text-7xl leading-tight tracking-tight text-slate-900 mb-5">
           Hecho para tu industria,<br />
           <span className="text-[#177E89]">no para todas en general</span>
         </h1>
-        <p className="text-slate-500 text-lg font-light uppercase tracking-wide max-w-2xl mx-auto leading-relaxed">
+        <p className="text-slate-500 text-lg max-w-2xl mx-auto leading-relaxed">
           Cada vertical tiene sus propios módulos preconfigurados y flujos adaptados. Elige tu industria y ve exactamente qué incluye.
         </p>
       </section>
@@ -74,7 +74,7 @@ export default function Industrias() {
             {INDUSTRIES.map((ind) => (
               <button key={ind.name}
                 onClick={() => setActive(ind.name)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-light uppercase tracking-wide transition-all whitespace-nowrap lg:whitespace-normal flex-shrink-0 cursor-pointer ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all whitespace-nowrap lg:whitespace-normal flex-shrink-0 cursor-pointer ${
                   active === ind.name
                     ? "bg-[#177E89] text-white"
                     : "bg-white/70 text-slate-700 hover:bg-white hover:text-black border border-slate-200/80"
@@ -101,7 +101,7 @@ export default function Industrias() {
                   </h2>
                 </div>
 
-                <p className="text-slate-600 text-base font-light uppercase tracking-wide leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
+                <p className="text-slate-600 text-base leading-relaxed mb-8 max-w-2xl">{ind.desc}</p>
 
                 {/* Modules */}
                 <div className="mb-8">
@@ -110,7 +110,7 @@ export default function Industrias() {
                     {ind.modulos.map((m) => (
                       <div key={m} className="flex items-center gap-3 bg-slate-50/80 border border-slate-200/70 rounded-xl px-4 py-3">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#177E89] flex-shrink-0" aria-hidden="true" />
-                        <span className="text-slate-700 text-sm font-light uppercase tracking-wide">{m}</span>
+                        <span className="text-slate-700 text-sm">{m}</span>
                       </div>
                     ))}
                   </div>

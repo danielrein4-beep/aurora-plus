@@ -42,9 +42,9 @@ public class ConsultaVeterinariaController {
     }
 
     @GetMapping("/mascota/{mascotaId}")
-    public List<ConsultaVeterinaria> historialPorMascota(@PathVariable Long mascotaId, @RequestParam(required = false) Long tenantId) {
+    public List<ConsultaVeterinaria> historialPorMascota(@PathVariable Long mascotaId) {
         validarPermisoClinico();
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         return consultaVeterinariaService.historialPorMascota(tenantActivo, mascotaId);
     }
 
@@ -64,11 +64,10 @@ public class ConsultaVeterinariaController {
 
     @PostMapping
     public ResponseEntity<ConsultaVeterinaria> registrarConsulta(
-            @RequestParam(required = false) Long tenantId,
             @RequestBody ConsultaVeterinaria consulta) {
         validarPermisoClinico();
 
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }
@@ -79,8 +78,7 @@ public class ConsultaVeterinariaController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarConsulta(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long tenantId) {
+            @PathVariable Long id) {
         validarPermisoClinico();
         consultaVeterinariaService.eliminarConsulta(id);
         return ResponseEntity.noContent().build();

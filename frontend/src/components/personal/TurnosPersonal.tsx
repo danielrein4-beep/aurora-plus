@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TurnoHorario, AsignacionTurno, Empleado, DepartamentoPersonal } from './types';
+import { useVocabularioPersonal } from './vocabulario';
 
 interface TurnosPersonalProps {
   turnosHorarios: TurnoHorario[];
@@ -14,6 +15,7 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
   empleados,
   onAgregarAsignacion,
 }) => {
+  const v = useVocabularioPersonal();
   const [asignaciones, setAsignaciones] = useState<AsignacionTurno[]>(initialAsignaciones);
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => new Date().toISOString().slice(0, 10));
   const [deptoFiltro, setDeptoFiltro] = useState<string>('TODOS');
@@ -97,23 +99,15 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
     return coincideFecha && coincideDepto;
   });
 
-  const departamentos: (DepartamentoPersonal | 'TODOS')[] = [
-    'TODOS',
-    'Atención & Salud',
-    'Cocina & Restauración',
-    'Operaciones & Campo',
-    'Administración & Finanzas',
-    'Logística & Mantenimiento',
-    'Sistemas & Soporte',
-  ];
+  const departamentos: (DepartamentoPersonal | 'TODOS')[] = ['TODOS', ...v.areas];
 
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMensaje && (
-        <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-[#34d399] font-medium flex items-center justify-between animate-fade-in">
+        <div className="p-3 bg-[#10b981]/20 border border-[#10b981]/40 rounded-xl text-xs text-emerald-600 font-normal flex items-center justify-between animate-fade-in">
           <span>{toastMensaje}</span>
-          <button onClick={() => setToastMensaje(null)} className="text-xs text-[#34d399] hover:underline" aria-label="Cerrar notificación">
+          <button onClick={() => setToastMensaje(null)} className="text-xs text-emerald-600 hover:underline" aria-label="Cerrar notificación">
             ✕
           </button>
         </div>
@@ -123,12 +117,12 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xs sm:text-sm font-semibold text-[#f8fafc] uppercase tracking-wider text-[#94a3b8]">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider text-slate-500">
               Catálogo de Turnos y Jornadas Operativas
             </h3>
-            <p className="text-xs text-[#64748b]">Esquemas horarios adaptados a salud, gastronomía y campo</p>
+            <p className="text-xs font-normal text-slate-500">Esquemas horarios adaptados a salud, gastronomía y campo</p>
           </div>
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#131c2e] text-[#177E89] border border-[#1e2d48]">
+          <span className="text-[11px] font-mono font-normal px-2 py-0.5 rounded bg-slate-50 text-[#177E89] border border-slate-200">
             PLANTILLAS
           </span>
         </div>
@@ -137,29 +131,29 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
           {turnosHorarios.map((th) => (
             <div
               key={th.id}
-              className="p-3.5 bg-[#131c2e] border border-[#1e2d48] rounded-xl space-y-2 text-xs"
+              className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs"
             >
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-[#f8fafc]">{th.nombre}</span>
-                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-[#0b111e] text-[#177E89]">
+                <span className="font-bold tracking-tight text-slate-900">{th.nombre}</span>
+                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-white text-[#177E89] font-normal">
                   {th.horasJornada > 0 ? `${th.horasJornada}h` : 'Descanso'}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[#94a3b8] font-mono text-[11px]">
+              <div className="flex items-center justify-between text-slate-500 font-mono text-[11px] font-normal">
                 <span>Horario: {th.horaInicio} - {th.horaFin}</span>
-                <span className="text-[#64748b]">ID: {th.id}</span>
+                <span className="text-slate-500">ID: {th.id}</span>
               </div>
-              {th.descripcion && <p className="text-[#64748b] text-[11px]">{th.descripcion}</p>}
+              {th.descripcion && <p className="text-slate-500 text-[11px] font-normal">{th.descripcion}</p>}
             </div>
           ))}
         </div>
       </div>
 
       {/* Barra de Filtros de Cronograma */}
-      <div className="p-4 bg-[#131c2e] border border-[#1e2d48] rounded-xl flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <label htmlFor="fecha-turnos" className="text-xs text-[#94a3b8] font-medium">
+            <label htmlFor="fecha-turnos" className="text-xs text-slate-500 font-normal">
               Fecha:
             </label>
             <input
@@ -167,23 +161,23 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
               type="date"
               value={fechaSeleccionada}
               onChange={(e) => setFechaSeleccionada(e.target.value)}
-              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#f8fafc] font-mono focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#177E89]"
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <label htmlFor="depto-turnos" className="text-xs text-[#94a3b8] font-medium">
+            <label htmlFor="depto-turnos" className="text-xs text-slate-500 font-normal">
               Área:
             </label>
             <select
               id="depto-turnos"
               value={deptoFiltro}
               onChange={(e) => setDeptoFiltro(e.target.value)}
-              className="bg-[#0b111e] border border-[#1e293b] rounded-lg px-3 py-1.5 text-xs text-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#177E89]"
+              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#177E89]"
             >
               {departamentos.map((d) => (
                 <option key={d} value={d}>
-                  {d === 'TODOS' ? 'Todas las Áreas' : d}
+                  {d === 'TODOS' ? v.todasLasAreas : v.nombreArea(d)}
                 </option>
               ))}
             </select>
@@ -192,46 +186,46 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
 
         <button
           onClick={() => setModalAsignarAbierto(true)}
-          className="px-3.5 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-semibold text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+          className="px-3.5 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-normal text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#177E89]"
         >
           + Asignar turno
         </button>
       </div>
 
       {/* Matriz de Asignaciones del Día */}
-      <div className="bg-[#131c2e] border border-[#1e2d48] rounded-xl overflow-hidden">
-        <div className="p-4 bg-[#0f172a] border-b border-[#1e2d48] flex items-center justify-between text-xs">
-          <span className="font-semibold text-[#f8fafc]">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+          <span className="font-bold tracking-tight text-slate-900">
             Turnos Programados para el <span className="font-mono text-[#177E89]">{fechaSeleccionada}</span>
           </span>
-          <span className="text-[#94a3b8] font-mono">{asignacionesFiltradas.length} Asignaciones</span>
+          <span className="text-slate-500 font-mono font-normal">{asignacionesFiltradas.length} Asignaciones</span>
         </div>
 
         {asignacionesFiltradas.length === 0 ? (
-          <div className="p-8 text-center text-[#94a3b8] text-xs">
+          <div className="p-8 text-center text-slate-500 text-xs font-normal">
             No se registran turnos asignados para esta fecha y área.
           </div>
         ) : (
-          <div className="divide-y divide-[#1e293b]">
+          <div className="divide-y divide-slate-200">
             {asignacionesFiltradas.map((asg) => (
               <div
                 key={asg.id}
-                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-[#1a2438] transition-colors"
+                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-slate-100 transition-colors"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-[#f8fafc] text-sm">{asg.empleadoNombre}</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0b111e] text-[#94a3b8] font-mono">
-                      {asg.departamento}
+                    <span className="font-bold tracking-tight text-slate-900 text-sm">{asg.empleadoNombre}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-white text-slate-500 font-mono font-normal">
+                      {v.nombreArea(asg.departamento)}
                     </span>
                   </div>
-                  <p className="text-xs text-[#94a3b8]">{asg.empleadoCargo}</p>
+                  <p className="text-xs font-normal text-slate-500">{asg.empleadoCargo}</p>
                 </div>
 
                 <div className="flex items-center gap-4">
                   <div className="text-left sm:text-right">
-                    <span className="font-medium text-[#38bdf8] block">{asg.turnoNombre}</span>
-                    <span className="text-[11px] text-[#64748b] font-mono">Estado: {asg.estado}</span>
+                    <span className="font-normal text-sky-600 block">{asg.turnoNombre}</span>
+                    <span className="text-[11px] text-slate-500 font-mono font-normal">Estado: {asg.estado}</span>
                   </div>
 
                 </div>
@@ -244,20 +238,20 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
       {/* Modal de Asignación Rápida de Turno con Accesibilidad */}
       {modalAsignarAbierto && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-asignar-turno-titulo"
         >
-          <div className="bg-[#131c2e] border border-[#1e2d48] w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xl">
+          <div className="bg-slate-50 border border-slate-200 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 id="modal-asignar-turno-titulo" className="text-base font-bold text-[#f8fafc]">
+              <h3 id="modal-asignar-turno-titulo" className="text-base font-bold tracking-tight text-slate-900">
                 Asignar turno de trabajo
               </h3>
               <button
                 ref={btnCerrarModalRef}
                 onClick={() => setModalAsignarAbierto(false)}
-                className="text-[#94a3b8] hover:text-[#f8fafc] focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
+                className="text-slate-500 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#177E89] rounded p-1"
                 aria-label="Cerrar modal"
               >
                 ✕
@@ -266,11 +260,11 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-[#94a3b8] block mb-1">Colaborador:</label>
+                <label className="text-slate-500 block mb-1 font-normal">{v.Persona}:</label>
                 <select
                   value={empleadoSeleccionado}
                   onChange={(e) => setEmpleadoSeleccionado(e.target.value)}
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-900"
                 >
                   {empleados.map((e) => (
                     <option key={e.id} value={e.id}>
@@ -281,11 +275,11 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
               </div>
 
               <div>
-                <label className="text-[#94a3b8] block mb-1">Turno a Programar:</label>
+                <label className="text-slate-500 block mb-1 font-normal">Turno a Programar:</label>
                 <select
                   value={turnoSeleccionado}
                   onChange={(e) => setTurnoSeleccionado(e.target.value)}
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc]"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-900"
                 >
                   {turnosHorarios.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -296,12 +290,12 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
               </div>
 
               <div>
-                <label className="text-[#94a3b8] block mb-1">Fecha:</label>
+                <label className="text-slate-500 block mb-1 font-normal">Fecha:</label>
                 <input
                   type="date"
                   value={fechaSeleccionada}
                   onChange={(e) => setFechaSeleccionada(e.target.value)}
-                  className="w-full bg-[#0b111e] border border-[#1e293b] rounded-lg p-2 text-[#f8fafc] font-mono"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-900 font-mono"
                 />
               </div>
             </div>
@@ -309,14 +303,14 @@ export const TurnosPersonal: React.FC<TurnosPersonalProps> = ({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setModalAsignarAbierto(false)}
-                className="px-4 py-2 rounded-lg bg-[#1e293b] text-xs text-[#cbd5e1] hover:bg-[#334155]"
+                className="px-4 py-2 rounded-lg bg-slate-100 text-xs font-normal text-slate-700 hover:bg-slate-200"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCrearAsignacion}
                 disabled={guardando}
-                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-semibold text-xs"
+                className="px-4 py-2 rounded-lg bg-[#177E89] hover:bg-[#28b8a6] text-black font-normal text-xs"
               >
                 {guardando ? 'Guardando…' : 'Confirmar asignación'}
               </button>

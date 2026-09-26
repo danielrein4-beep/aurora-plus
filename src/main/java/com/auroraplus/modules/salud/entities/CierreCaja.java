@@ -57,6 +57,10 @@ public class CierreCaja {
     @Column(columnDefinition = "TEXT")
     private String observaciones;
 
+    /** Detalle de los cobros del cierre en JSON (V104), para reimprimirlo desde cualquier equipo. */
+    @Column(name = "cobros_json", columnDefinition = "TEXT")
+    private String cobrosJson;
+
     @Column(name = "creado_en", nullable = false)
     private LocalDateTime creadoEn = LocalDateTime.now();
 
@@ -82,6 +86,8 @@ public class CierreCaja {
     public void setTotalCOP(BigDecimal totalCOP) { this.totalCOP = totalCOP; }
     public Integer getTotalPacientes() { return totalPacientes; }
     public void setTotalPacientes(Integer totalPacientes) { this.totalPacientes = totalPacientes; }
+    public String getCobrosJson() { return cobrosJson; }
+    public void setCobrosJson(String cobrosJson) { this.cobrosJson = cobrosJson; }
     public String getObservaciones() { return observaciones; }
     public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
     public LocalDateTime getCreadoEn() { return creadoEn; }

@@ -24,6 +24,12 @@ public class GanaderiaGastoService {
 
     @Transactional
     public GastoGanaderia registrarGasto(Long tenantId, String categoria, String descripcion, BigDecimal monto, LocalDate fecha) {
+        return registrarGasto(tenantId, categoria, descripcion, monto, fecha, null);
+    }
+
+    /** Con lote: el margen por animal se lo reparte solo a los animales de ese lote. */
+    @Transactional
+    public GastoGanaderia registrarGasto(Long tenantId, String categoria, String descripcion, BigDecimal monto, LocalDate fecha, String lote) {
         if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("El monto del gasto debe ser mayor a cero");
         }
@@ -37,6 +43,7 @@ public class GanaderiaGastoService {
         gasto.setDescripcion(descripcion);
         gasto.setMonto(monto);
         gasto.setFecha(fecha != null ? fecha : LocalDate.now());
+        gasto.setLote(lote != null && !lote.isBlank() ? lote.trim() : null);
         GastoGanaderia guardado = gastoGanaderiaRepository.save(gasto);
 
         // Un gasto operativo (jornaleros, veterinario, limpieza) es efectivo que sale

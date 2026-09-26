@@ -1,5 +1,6 @@
 package com.auroraplus.modules.horeca.controllers;
 
+import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.horeca.entities.Comanda;
 import com.auroraplus.modules.horeca.entities.Mesa;
@@ -36,7 +37,9 @@ public class MesaController {
     }
 
     @PostMapping
-    public ResponseEntity<Mesa> crear(@RequestParam Long tenantId, @RequestBody Mesa mesa) {
+    public ResponseEntity<Mesa> crear(@RequestBody Mesa mesa) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = TenantContext.getCurrentTenant();
         mesa.setTenantId(tenantId);
         return ResponseEntity.ok(mesaRepository.save(mesa));
     }
@@ -50,7 +53,9 @@ public class MesaController {
 
     /** Edita número, capacidad, zona o forma de una mesa ya existente — sin tocar su posición en el plano. */
     @PutMapping("/{id}")
-    public ResponseEntity<Mesa> editar(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody EditarMesaRequest request) {
+    public ResponseEntity<Mesa> editar(@PathVariable Long id, @RequestBody EditarMesaRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = TenantContext.getCurrentTenant();
         Mesa mesa = mesaRepository.findById(id).orElseThrow(() -> new RuntimeException("Mesa no encontrada"));
         if (!mesa.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Mesa no pertenece a este tenant");
@@ -64,7 +69,9 @@ public class MesaController {
 
     /** Elimina una mesa — rechaza si tiene una comanda ABIERTA para no perder el rastro de una cuenta en curso. */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id, @RequestParam Long tenantId) {
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = TenantContext.getCurrentTenant();
         Mesa mesa = mesaRepository.findById(id).orElseThrow(() -> new RuntimeException("Mesa no encontrada"));
         if (!mesa.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Mesa no pertenece a este tenant");
@@ -88,7 +95,9 @@ public class MesaController {
 
     /** Ubica/redimensiona la mesa en el plano — pensado para un arrastrar-y-soltar en el frontend, sin tocar el resto de sus datos (número, capacidad, zona). */
     @PutMapping("/{id}/posicion")
-    public ResponseEntity<Mesa> actualizarPosicion(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody PosicionRequest request) {
+    public ResponseEntity<Mesa> actualizarPosicion(@PathVariable Long id, @RequestBody PosicionRequest request) {
+        AuthContext.exigirRol("DUENO_ADMIN");
+        Long tenantId = TenantContext.getCurrentTenant();
         Mesa mesa = mesaRepository.findById(id).orElseThrow(() -> new RuntimeException("Mesa no encontrada"));
         if (!mesa.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Violación de seguridad: Mesa no pertenece a este tenant");

@@ -1,5 +1,6 @@
 package com.auroraplus.core.financiero.controllers;
 
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.financiero.entities.ArqueoCaja;
 import com.auroraplus.core.financiero.entities.MovimientoCaja;
 import com.auroraplus.core.financiero.repositories.ArqueoCajaRepository;
@@ -45,7 +46,8 @@ public class TesoreriaController {
      * El esperado es solo el efectivo, igual que calcula el cierre.
      */
     @GetMapping("/resumen-periodo-abierto")
-    public ResponseEntity<Map<String, Object>> resumenPeriodoAbierto(@RequestParam Long tenantId, @RequestParam String moneda) {
+    public ResponseEntity<Map<String, Object>> resumenPeriodoAbierto(@RequestParam String moneda) {
+        Long tenantId = TenantContext.getCurrentTenant();
         Optional<ArqueoCaja> ultimoArqueo = arqueoCajaRepository.findTopByTenantIdAndMonedaOrderByFechaArqueoDesc(tenantId, moneda);
         LocalDateTime desde = ultimoArqueo.map(ArqueoCaja::getFechaArqueo).orElse(LocalDateTime.of(2000, 1, 1, 0, 0));
         LocalDateTime ahora = LocalDateTime.now();
@@ -73,8 +75,9 @@ public class TesoreriaController {
 
     /** Cierre de caja: el cajero declara lo que tiene físicamente, el sistema calcula el descuadre. */
     @PostMapping("/cerrar-caja")
-    public ResponseEntity<ArqueoCaja> cerrarCaja(@RequestParam Long tenantId, @RequestParam(required = false) String idCajero,
+    public ResponseEntity<ArqueoCaja> cerrarCaja(@RequestParam(required = false) String idCajero,
                                                   @RequestParam BigDecimal montoDeclarado, @RequestParam String moneda) {
+        Long tenantId = TenantContext.getCurrentTenant();
         com.auroraplus.core.auth.AuthContext.exigirRol("DUENO_ADMIN", "CAJERO_VENDEDOR", "ADMINISTRADOR_FINCA", "RECEPCIONISTA");
         // Quién cierra sale de la sesión: antes el navegador podía poner el nombre de cualquier cajero.
         String cajero = com.auroraplus.core.auth.AuthContext.getUsername();
@@ -83,13 +86,15 @@ public class TesoreriaController {
 
     /** Historial de cierres del tenant, más recientes primero — antes devolvía TODOS los tenants sin filtrar. */
     @GetMapping("/historial-cierres")
-    public List<ArqueoCaja> historialCierres(@RequestParam Long tenantId) {
+    public List<ArqueoCaja> historialCierres() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return arqueoCajaRepository.findByTenantIdOrderByFechaArqueoDesc(tenantId);
     }
 
     /** PDF del comprobante de un cierre de caja ya registrado, con el desglose completo de sus movimientos. */
     @GetMapping(value = "/cierre/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> cierrePdf(@PathVariable Long id, @RequestParam Long tenantId) throws Exception {
+    public ResponseEntity<byte[]> cierrePdf(@PathVariable Long id) throws Exception {
+        Long tenantId = TenantContext.getCurrentTenant();
         ArqueoCaja arqueo = arqueoCajaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Cierre de caja no encontrado"));
 

@@ -55,7 +55,8 @@ public class ChoferRestController {
     }
 
     @PostMapping
-    public ResponseEntity<?> crear(@RequestParam Long tenantId, @RequestBody Chofer chofer) {
+    public ResponseEntity<?> crear(@RequestBody Chofer chofer) {
+        Long tenantId = TenantContext.getCurrentTenant();
         if (chofer.getCedula() == null || chofer.getCedula().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "La cédula es obligatoria"));
         }

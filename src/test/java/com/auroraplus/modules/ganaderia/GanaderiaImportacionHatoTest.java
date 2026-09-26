@@ -30,6 +30,7 @@ class GanaderiaImportacionHatoTest {
     @Autowired private GanaderiaImportacionService importacionService;
     @Autowired private AnimalRepository animalRepository;
     @Autowired private PotreroRepository potreroRepository;
+    @Autowired private com.auroraplus.modules.ganaderia.repositories.RegistroPesoRepository registroPesoRepository;
 
     private static FilaImportacion fila(String arete, String sexo, String tipo, String raza) {
         FilaImportacion f = new FilaImportacion();
@@ -69,19 +70,43 @@ class GanaderiaImportacionHatoTest {
     void unaFilaConErrorBloqueaTodaLaImportacion() {
         Long tenant = TENANT.incrementAndGet();
         FilaImportacion sinSexo = fila("X-2", null, null, null);
-        FilaImportacion potreroInexistente = fila("X-3", "HEMBRA", "VACA", null);
-        potreroInexistente.potrero = "La Lomita";
+        FilaImportacion potreroInvalido = fila("X-3", "HEMBRA", "VACA", null);
+        potreroInvalido.potrero = "P".repeat(101);
         FilaImportacion toroPrenado = fila("X-4", "MACHO", "TORO", null);
         toroPrenado.estadoReproductivo = "preñada";
 
         ResultadoImportacion r = importacionService.importar(tenant, List.of(
-            fila("X-1", "HEMBRA", "VACA", null), sinSexo, potreroInexistente, toroPrenado,
+            fila("X-1", "HEMBRA", "VACA", null), sinSexo, potreroInvalido, toroPrenado,
             fila("X-1", "HEMBRA", "VACA", null)), true);
 
         assertFalse(r.confirmado);
         List<Integer> filasConError = r.errores.stream().map(e -> e.fila).distinct().toList();
         assertEquals(List.of(3, 4, 5, 6), filasConError, "fila de Excel = índice + 2 (encabezado)");
         assertTrue(animalRepository.findByTenantId(tenant).isEmpty(), "todo o nada: no debe quedar medio hato cargado");
+    }
+
+    @Test
+    void unPotreroQueNoExisteSeCreaSoloConElNombre() {
+        Long tenant = TENANT.incrementAndGet();
+        FilaImportacion vaca = fila("N-1", "HEMBRA", "VACA", null);
+        vaca.potrero = "La Lomita";
+        FilaImportacion novilla = fila("N-2", "HEMBRA", "NOVILLA", null);
+        novilla.potrero = "la lomita"; // mismo potrero escrito distinto: no se duplica
+        FilaImportacion sinPotrero = fila("N-3", "MACHO", "TORO", null);
+
+        ResultadoImportacion vista = importacionService.importar(tenant, List.of(vaca, novilla, sinPotrero), false);
+        assertTrue(vista.errores.isEmpty(), () -> "errores inesperados: " + vista.errores.stream().map(e -> e.mensaje).toList());
+        assertEquals(List.of("La Lomita"), vista.potrerosNuevos);
+        assertEquals(Map.of("La Lomita", 2, "Sin potrero", 1), vista.porPotrero);
+
+        ResultadoImportacion r = importacionService.importar(tenant, List.of(vaca, novilla, sinPotrero), true);
+        assertTrue(r.confirmado);
+        var creados = potreroRepository.findByTenantId(tenant);
+        assertEquals(1, creados.size(), "se crea un solo potrero");
+        assertEquals("La Lomita", creados.get(0).getNombre());
+        long enLaLomita = animalRepository.findByTenantId(tenant).stream()
+            .filter(a -> a.getPotrero() != null && creados.get(0).getId().equals(a.getPotrero().getId())).count();
+        assertEquals(2, enLaLomita);
     }
 
     @Test
@@ -147,5 +172,21 @@ class GanaderiaImportacionHatoTest {
 
         assertTrue(b.errores.isEmpty(), () -> "errores inesperados: " + b.errores.stream().map(e -> e.mensaje).toList());
         assertTrue(b.confirmado, "otra finca no debe chocar con el arete 001 de la primera");
+    }
+
+    @Test
+    void elPesoDeLaPlanillaQuedaComoPrimerPesaje() {
+        Long tenant = TENANT.incrementAndGet();
+        FilaImportacion conPeso = fila("P-1", "MACHO", "TORO", "Brahman");
+        conPeso.pesoActual = "512,5";
+        FilaImportacion sinPeso = fila("P-2", "HEMBRA", "VACA", "Gyr");
+
+        assertTrue(importacionService.importar(tenant, List.of(conPeso, sinPeso), true).confirmado);
+
+        var pesajes = registroPesoRepository.findByTenantIdOrdenado(tenant);
+        assertEquals(1, pesajes.size(), "solo el animal con peso en la planilla arranca su curva");
+        assertEquals("P-1", pesajes.get(0).getAnimal().getArete());
+        assertEquals(0, new java.math.BigDecimal("512.5").compareTo(pesajes.get(0).getPesoKg()));
+        assertEquals(java.time.LocalDate.now(), pesajes.get(0).getFecha());
     }
 }

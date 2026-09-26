@@ -17,7 +17,7 @@ export const DEFAULT_SAAS_CUENTAS_COBRO: SaasCuentasCobroConfig = {
   tipoCuenta: "Cuenta Corriente / Pago Movil",
   binanceUsdt: "danielrein4@gmail.com (Binance Pay / Correo)",
   zelle: "danielrein4@gmail.com",
-  instrucciones: "Realizar Pago Movil a la tasa oficial BCV del dia. Al transferir, reportar la referencia bancaria para activacion inmediata de la licencia.",
+  instrucciones: "Realizar Pago Movil a la tasa oficial BCV del dia. Al transferir, reporta la referencia: verificamos el pago y activamos tu plan.",
 };
 
 const STORAGE_KEY = "aurora_saas_cuentas_pago";
@@ -30,6 +30,17 @@ export function obtenerCuentasCobro(): SaasCuentasCobroConfig {
     }
   } catch {}
   return DEFAULT_SAAS_CUENTAS_COBRO;
+}
+
+/** Mezcla lo que viene del servidor sobre los valores por defecto (campos vacíos no pisan nada). */
+export function combinarCuentasCobro(servidor: Record<string, string> | null | undefined): SaasCuentasCobroConfig {
+  const base = { ...DEFAULT_SAAS_CUENTAS_COBRO };
+  if (!servidor) return base;
+  for (const k of Object.keys(base) as (keyof SaasCuentasCobroConfig)[]) {
+    const v = servidor[k];
+    if (typeof v === "string" && v.trim()) base[k] = v;
+  }
+  return base;
 }
 
 export function guardarCuentasCobro(cfg: SaasCuentasCobroConfig): void {

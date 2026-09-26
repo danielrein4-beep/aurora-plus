@@ -21,7 +21,8 @@ import java.time.LocalDate;
 public class AvisoVencimientoTrialJob {
 
     private static final Logger log = LoggerFactory.getLogger(AvisoVencimientoTrialJob.class);
-    private static final int DIAS_ANTES_DEL_AVISO = 5;
+    /** Días antes del vencimiento en que se avisa (con 15 días de prueba, el de 7 ya cae a mitad). */
+    private static final int[] DIAS_ANTES_DEL_AVISO = {7, 3, 1};
 
     @Autowired
     private LicenciaTenantRepository licenciaTenantRepository;
@@ -31,14 +32,25 @@ public class AvisoVencimientoTrialJob {
 
     @Scheduled(cron = "0 0 8 * * *") // todos los días a las 8:00 am, hora del servidor
     public void avisarVencimientosProximos() {
-        LocalDate fechaObjetivo = LocalDate.now().plusDays(DIAS_ANTES_DEL_AVISO);
+        for (int dias : DIAS_ANTES_DEL_AVISO) {
+            avisar(LocalDate.now().plusDays(dias), dias);
+        }
+        // El día que vence: se le recuerdan los días de gracia antes de que se pause el acceso.
+        avisar(LocalDate.now(), 0);
+    }
+
+    private void avisar(LocalDate fechaObjetivo, int dias) {
         for (LicenciaTenant licencia : licenciaTenantRepository.buscarPorVencerEn(fechaObjetivo)) {
             try {
+                String cuando = dias == 0 ? "vence hoy" : dias == 1 ? "vence mañana" : "vence en " + dias + " días";
                 String cuerpo = "<p>Hola,</p>"
-                    + "<p>Tu acceso a Aurora Plus para <strong>" + escapar(licencia.getNombreEmpresa()) + "</strong> vence el "
-                    + licencia.getFechaVencimientoPago() + " (en " + DIAS_ANTES_DEL_AVISO + " días).</p>"
-                    + "<p>Escríbenos a auroraplussoftware@gmail.com para coordinar la renovación y no perder acceso a tu operación.</p>";
-                correoService.enviarHtml(licencia.getEmailContacto(), "Tu acceso a Aurora Plus vence pronto", cuerpo);
+                    + "<p>Tu acceso a Aurora Plus para <strong>" + escapar(licencia.getNombreEmpresa()) + "</strong> " + cuando
+                    + " (" + licencia.getFechaVencimientoPago() + ").</p>"
+                    + "<p>Para renovar, entra a Aurora Hub &gt; Facturación &amp; Pagos, paga con Pago Móvil, Binance o Zelle y reporta la referencia. "
+                    + "Después del vencimiento tienes " + LicenciaService.DIAS_GRACIA + " días de gracia antes de que se pause el acceso; tus datos no se borran.</p>"
+                    + "<p>¿Dudas? Escríbenos a auroraplussoftware@gmail.com.</p>";
+                String asunto = dias == 0 ? "Tu plan de Aurora Plus vence hoy" : "Tu acceso a Aurora Plus " + cuando;
+                correoService.enviarHtml(licencia.getEmailContacto(), asunto, cuerpo);
             } catch (Exception e) {
                 // Un correo fallido no debe tumbar el aviso al resto de los tenants del día.
                 log.error("No se pudo avisar vencimiento a tenant {}: {}", licencia.getTenantId(), e.getMessage(), e);

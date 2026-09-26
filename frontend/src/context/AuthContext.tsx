@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { borrarDatosGuardados } from "../sinConexion";
 import {
   leerSesion,
   borrarSesion,
@@ -9,6 +10,9 @@ import {
   type RegistroNegocio,
   type SesionAurora,
 } from "../api";
+
+/** Duración de la prueba gratuita (igual que AuthController.DIAS_PRUEBA_GRATIS en el servidor). */
+export const DIAS_PRUEBA_GRATIS = 15;
 
 const MENSAJE_SIN_CONEXION = "No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo en un momento.";
 
@@ -44,6 +48,8 @@ export interface User {
   // espacio de trabajo, para no estorbar en el uso diario.
   primerIngreso?: boolean;
   trialStart?: string;
+  /** Fecha real de fin de acceso según el servidor (AAAA-MM-DD). Manda sobre trialStart. */
+  vencimiento?: string;
   plan?: string;
   planStatus?: "trial" | "active" | "expired";
   metodoPagoPreferido?: string;
@@ -85,7 +91,14 @@ const CUENTAS_REGISTRADAS_KEY = "aurora_registered_accounts";
 function obtenerCuentasLocales(): CuentaRegistrada[] {
   try {
     const raw = localStorage.getItem(CUENTAS_REGISTRADAS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const cuentas: CuentaRegistrada[] = raw ? JSON.parse(raw) : [];
+    // Versiones anteriores guardaban la contraseña en claro: se borra en cuanto se lee.
+    if (cuentas.some((c) => "password" in c)) {
+      const limpias = cuentas.map(({ password: _omitida, ...resto }) => resto);
+      localStorage.setItem(CUENTAS_REGISTRADAS_KEY, JSON.stringify(limpias));
+      return limpias;
+    }
+    return cuentas;
   } catch {
     return [];
   }
@@ -169,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let industry = "clinica";
     let nombreUsuario = email.includes("@") ? email.split("@")[0] : email;
     let modulosUsuario: string[] = [];
+    let vencimiento: string | undefined;
 
     // Buscar cuenta local SOLO para completar nombre/empresa en la UI si el backend no puede
     // resolverlo (obtenerMiNegocio falla) — nunca para decidir si el login es válido.
@@ -188,6 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const negocio = await obtenerMiNegocio();
       empresa = negocio.nombreEmpresa || empresa;
+      vencimiento = negocio.fechaVencimientoPago || undefined;
       // moduloPrincipal colapsa varios rubros al mismo módulo backend (ej. clinica/farmacia/
       // veterinaria comparten "salud"), así que por sí solo no alcanza para distinguirlos. El
       // rubro exacto elegido en el registro/onboarding SÍ quedó guardado en la cuenta local de
@@ -215,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasCompletedOnboarding: true,
       primerIngreso: !haVisitadoTenant(sesion.tenantId),
       trialStart: new Date().toISOString(),
+      vencimiento,
       plan: "Estándar",
       planStatus: "trial",
       payments: [],
@@ -246,12 +262,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // backend (ej. clinica/farmacia/veterinaria comparten moduloPrincipal="salud") y perdería esa
     // distinción si se usara como única fuente.
     const industry = datos.industria || MODULO_A_INDUSTRIA[datos.moduloPrincipal] || datos.moduloPrincipal || "clinica";
-    const nombreUsuario = datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario";
+    const nombreUsuario = datos.nombreCompleto?.trim()
+      || (datos.username?.includes("@") ? datos.username.split("@")[0] : datos.username || "Usuario");
 
     // Guardar cuenta registrada localmente
     guardarCuentaLocal({
       email: datos.emailContacto || datos.username,
-      password: datos.password,
       nombre: nombreUsuario,
       empresa: datos.nombreEmpresa || "Mi Empresa",
       industry,
@@ -316,12 +332,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const newPayment: PaymentRecord = {
         id: `PAY-${Date.now().toString().slice(-6)}`,
         fecha: new Date().toLocaleDateString("es-ES"),
-        estado: "aprobado",
+        estado: "pendiente",
         ...payment,
       };
+      // El plan solo se activa cuando el equipo de Aurora registra el pago en el servidor.
       return {
         ...prev,
-        planStatus: "active",
         payments: [newPayment, ...(prev.payments || [])],
       };
     });
@@ -331,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     borrarSesion();
     localStorage.removeItem(STORAGE_KEY);
+    borrarDatosGuardados();
     // Recarga real de página (no solo navegación de React Router): los módulos como Mediclinic
     // guardan caché por tenant en localStorage usando `useState(() => ...)`, que solo se lee al
     // MONTAR el componente. Si el siguiente login ocurre en la misma pestaña sin recargar, ese
@@ -342,11 +359,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Antes se contaba desde el último inicio de sesión (y a 30 días), así que el contador se
+  // reiniciaba cada vez. Ahora sale de la fecha real que guarda el servidor; solo si no se pudo
+  // leer (recién registrado, sin conexión) se estima desde el alta con la prueba de 15 días.
   const trialDaysLeft = (() => {
-    if (!user?.trialStart) return 30;
-    const start = new Date(user.trialStart).getTime();
-    const elapsed = Math.floor((Date.now() - start) / (1000 * 60 * 60 * 24));
-    return Math.max(0, 30 - elapsed);
+    const dia = 1000 * 60 * 60 * 24;
+    if (user?.vencimiento) {
+      const [a, m, d] = user.vencimiento.split("-").map(Number);
+      const fin = new Date(a, m - 1, d).getTime();
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      return Math.max(0, Math.round((fin - hoy.getTime()) / dia));
+    }
+    if (!user?.trialStart) return DIAS_PRUEBA_GRATIS;
+    const elapsed = Math.floor((Date.now() - new Date(user.trialStart).getTime()) / dia);
+    return Math.max(0, DIAS_PRUEBA_GRATIS - elapsed);
   })();
 
   return (

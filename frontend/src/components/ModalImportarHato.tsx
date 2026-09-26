@@ -45,7 +45,7 @@ const INSTRUCCIONES: string[][] = [
   ["Sexo: MACHO o HEMBRA (también se acepta M, H o F)."],
   ["Tipo animal: hembras BECERRA, MAUTA, NOVILLA, VACA; machos BECERRO/TERNERO, MAUTE, NOVILLO, TORO. Si lo deja vacío se calcula por la edad."],
   ["Fechas: día/mes/año, por ejemplo 15/03/2021."],
-  ["Potrero: nombre exacto de un potrero ya creado en Mapa & Potreros. Si aún no los tiene, deje la columna vacía."],
+  ["Potrero: nombre del potrero donde está el animal. Si todavía no existe, se crea solo con el nombre y lo ubica en el mapa después desde Mapa & Potreros."],
   ["Arete madre / Arete padre: aretes de animales que vienen en este mismo archivo o que ya están en Aurora."],
   ["Estado reproductivo: VACIA, PREÑADA o EN_ESPERA. Estado productivo: CRIANDO, ORDEÑO o SECA."],
   ["Padrote de la preñez (solo preñadas): arete del toro si está en su hato, o el nombre del toro o la pajuela si es externo."],
@@ -248,15 +248,15 @@ export default function ModalImportarHato({ onCerrar, onImportado }: Props) {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5">
                 <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/40">Animales en el archivo</div>
-                <div className="font-mono font-black text-2xl text-slate-900 dark:text-white">{vistaPrevia.totalFilas}</div>
+                <div className="tabular-nums font-black text-2xl text-slate-900 dark:text-white">{vistaPrevia.totalFilas}</div>
               </div>
               <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5">
                 <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/40">Preñadas · en sociedad</div>
-                <div className="font-mono font-black text-2xl text-slate-900 dark:text-white">{vistaPrevia.preneces} · {vistaPrevia.animalesEnSociedad ?? 0}</div>
+                <div className="tabular-nums font-black text-2xl text-slate-900 dark:text-white">{vistaPrevia.preneces} · {vistaPrevia.animalesEnSociedad ?? 0}</div>
               </div>
               <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 col-span-2 sm:col-span-1">
                 <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-white/40">Filas con error</div>
-                <div className={`font-mono font-black text-2xl ${sinErrores ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                <div className={`tabular-nums font-black text-2xl ${sinErrores ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
                   {new Set(vistaPrevia.errores.map(e => e.fila)).size}
                 </div>
               </div>
@@ -269,7 +269,7 @@ export default function ModalImportarHato({ onCerrar, onImportado }: Props) {
                   {Object.entries(vistaPrevia.porTipo).map(([tipo, n]) => (
                     <div key={tipo} className="flex justify-between py-0.5">
                       <span className="text-slate-700 dark:text-white/80">{tipo}</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">{n}</span>
+                      <span className="tabular-nums font-bold text-slate-900 dark:text-white">{n}</span>
                     </div>
                   ))}
                 </div>
@@ -278,7 +278,7 @@ export default function ModalImportarHato({ onCerrar, onImportado }: Props) {
                   {Object.entries(vistaPrevia.porRaza).map(([raza, n]) => (
                     <div key={raza} className="flex justify-between py-0.5">
                       <span className="text-slate-700 dark:text-white/80">{raza}</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">{n}</span>
+                      <span className="tabular-nums font-bold text-slate-900 dark:text-white">{n}</span>
                     </div>
                   ))}
                 </div>
@@ -302,7 +302,7 @@ export default function ModalImportarHato({ onCerrar, onImportado }: Props) {
                     <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
                       {vistaPrevia.errores.map((e, i) => (
                         <tr key={i}>
-                          <td className="p-2.5 font-mono font-bold text-slate-900 dark:text-white">{e.fila || "-"}</td>
+                          <td className="p-2.5 tabular-nums font-bold text-slate-900 dark:text-white">{e.fila || "-"}</td>
                           <td className="p-2.5 text-slate-600 dark:text-white/70">{etiquetaCampo(e.campo)}</td>
                           <td className="p-2.5 text-slate-800 dark:text-white/90">{e.mensaje}</td>
                         </tr>

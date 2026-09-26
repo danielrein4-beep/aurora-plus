@@ -1,3 +1,4 @@
+import { avisar } from "./avisos";
 // Cola de sobrevivencia ante cortes de conexión — Horeca, Salón & Mesas.
 //
 // Alcance a propósito, NO es un "modo offline" completo: cubre únicamente
@@ -62,10 +63,9 @@ function guardarCola(tenantId: number, cola: AccionPendiente[]) {
   try {
     localStorage.setItem(CLAVE_STORAGE(tenantId), JSON.stringify(cola));
   } catch {
-    // localStorage lleno o bloqueado (modo privado) — la acción ya se
-    // aplicó de forma optimista en memoria; en el peor caso, si se recarga
-    // la página antes de reconectar, se pierde la cola (no la venta en sí,
-    // que el mesero puede volver a intentar).
+    // localStorage lleno o bloqueado (modo privado): la acción sigue en memoria, pero si se
+    // recarga la página antes de reconectar se pierde. Se avisa para no darla por segura.
+    avisar("Este equipo no permite guardar datos sin conexión (modo privado o memoria llena). No recargues la página hasta que vuelva la señal.", "error");
   }
 }
 

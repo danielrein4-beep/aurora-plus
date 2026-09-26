@@ -1,4 +1,7 @@
+import { avisar } from "../avisos";
 import BitacoraAuditoria from "./BitacoraAuditoria";
+import { NominaDelNegocio } from "./personal/NominaDelNegocio";
+import { ContextoVocabularioPersonal, VOCABULARIO_RESTAURANTE } from "./personal/vocabulario";
 import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -22,8 +25,7 @@ import {
   listarIngredientesEscandallo, listarFastBar,
   listarProveedoresHoreca, crearProveedorHoreca, editarProveedorHoreca, listarArticulos, crearArticulo, entradaArticulo,
   listarMeseros, crearMesero, editarMesero, desactivarMesero, reactivarMesero, type MeseroHoreca, type MeseroConEstado,
-  listarEmpleadosRrhh, type EmpleadoRrhh, editarEmpleadoRrhh, liquidarPeriodoRrhh, type TipoControlEmpleado, type LiquidacionPeriodoRrhh,
-  type PeriodicidadPago, pagarNomina, listarPagosNomina, descargarReciboNominaPdf, type PagoNomina,
+  listarEmpleadosRrhh, type EmpleadoRrhh,
   listarReservasDia, crearReserva, editarReserva, cambiarEstadoReserva, type ReservaHoreca, type EstadoReserva,
   obtenerEstadoBinancePay, guardarBinancePay, pagarComandaConBinance, obtenerComanda, type EstadoBinancePay, type OrdenBinancePay,
   editarArticulo, ajustarStockArticulo, eliminarArticulo, importarArticulosLote,
@@ -42,6 +44,7 @@ import {
   type ResumenPeriodoAbierto, type ArqueoCaja, type PagoParcial, type ResumenUtilidadProducto, type ReporteTicket, type Turno,
   type ItemImportacionArticulo, type ResultadoImportacionArticulos, type Cliente, type MetricasCliente, type InventarioKpis,
   type FacturaExtraidaOcr,
+  leerPreferencia, guardarPreferencia,
 } from "../api";
 
 type Pagina = "general" | "resumen" | "salon" | "cocina" | "reservas" | "recetas" | "compras" | "inventario" | "clientes" | "administracion" | "estadisticas" | "reportes" | "configuracion";
@@ -54,10 +57,11 @@ const NAV_GRUPOS: NavGrupo[] = [
   {
     titulo: "Operación",
     items: [
-      { id: "general", label: "Vista General", Icon: IconCustomize },
-      { id: "resumen", label: "Resumen General", Icon: IconChart },
+      // "Vista General" era la caja y convivía con "Resumen General": dos nombres para cosas distintas.
+      { id: "general", label: "Punto de Venta", Icon: IconCustomize },
+      { id: "resumen", label: "Vista General", Icon: IconChart },
       { id: "salon", label: "Salón & Mesas", Icon: IconRestaurant },
-      { id: "cocina", label: "Cocina (KDS)", Icon: IconHourglass },
+      { id: "cocina", label: "Pantalla de Cocina", Icon: IconHourglass },
       { id: "reservas", label: "Reservas", Icon: IconCalendar },
       { id: "recetas", label: "Recetas & Escandallo", Icon: IconFileText },
     ],
@@ -213,6 +217,9 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   const { user } = useAuth();
   const tenantId = user?.tenantId || 1;
   const [pagina, setPagina] = useState<Pagina>("general");
+  // En teléfono el menú lateral fijo de 256 px se comía la pantalla del mesonero: ahora es un
+  // cajón que se abre con el botón de menú (igual que en Comercio); en escritorio sigue fijo.
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
   // Venta Rápida ya no es una pantalla aparte con su propio overlay — vive
   // fusionada directo en la Vista General (ver VistaGeneral). Este candado
   // solo se dispara desde ahí cuando falta registrar la tasa BCV del día.
@@ -227,10 +234,31 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
       return { nombreLocal: user?.empresa || "Mi Restaurante" };
     }
   });
+  // La configuración del local (nombre, IVA, propina, módulos, logo) se guarda en el servidor:
+  // antes vivía solo en este navegador y otro equipo del mismo local arrancaba con otra.
   const guardarConfig = (c: any) => {
     setConfig(c);
     try { localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); } catch {}
+    guardarPreferencia("horeca_config", c).catch((e) =>
+      avisar(`La configuración quedó solo en este equipo: ${e instanceof Error ? e.message : "error del servidor"}`, "error"));
   };
+  useEffect(() => {
+    leerPreferencia<any>("horeca_config")
+      .then((delServidor) => {
+        if (delServidor) {
+          setConfig(delServidor);
+          try { localStorage.setItem(CONFIG_KEY, JSON.stringify(delServidor)); } catch {}
+        } else if (user?.rol === "DUENO_ADMIN") {
+          // Primera vez: lo que el dueño ya tenía configurado en este navegador sube al servidor.
+          try {
+            const local = localStorage.getItem(CONFIG_KEY);
+            if (local) guardarPreferencia("horeca_config", JSON.parse(local)).catch(() => {});
+          } catch { /* sin almacenamiento */ }
+        }
+      })
+      .catch(() => avisar("No se pudo cargar la configuración del local desde el servidor; se usa la de este equipo.", "error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
   // No todo negocio Horeca prepara platos con receta (una bodega o una venta
   // de productos empacados no la usa) — a diferencia de Salón/Cocina, esto
   // no es un gate de plan, es una preferencia del propio negocio, por eso el
@@ -322,14 +350,14 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
   // un instante.
   const [zonasCocina, setZonasCocina] = useState<string[]>(ESTACIONES);
   const recargarZonasCocina = () => {
-    obtenerZonasCocina().then((r) => setZonasCocina(r.zonas)).catch(() => {});
+    obtenerZonasCocina().then((r) => setZonasCocina(r.zonas)).catch(() => avisar("No se pudieron cargar las zonas de cocina; los pedidos podrían no llegar a la estación correcta. Recarga la página.", "error"));
   };
   useEffect(() => { recargarZonasCocina(); }, [tenantId]);
 
   // Zonas físicas de mesas (Salón & Mesas) — mismo criterio que zonasCocina arriba.
   const [zonasMesa, setZonasMesa] = useState<string[]>(["SALON_PRINCIPAL", "TERRAZA", "BARRA"]);
   const recargarZonasMesa = () => {
-    obtenerZonasMesa().then((r) => setZonasMesa(r.zonas)).catch(() => {});
+    obtenerZonasMesa().then((r) => setZonasMesa(r.zonas)).catch(() => avisar("No se pudieron cargar las zonas del salón. Recarga la página.", "error"));
   };
   useEffect(() => { recargarZonasMesa(); }, [tenantId]);
 
@@ -448,48 +476,51 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
           <defs> compartido que declara ese gradiente. */}
       <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
-      {/* SIDEBAR */}
-      <aside className="w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1 bg-[#0D3B3D]">
-        <div className="px-2 pb-4 mb-2 border-b border-white/10">
+      {/* SIDEBAR (cajón en teléfono, fijo en escritorio) */}
+      {menuMovilAbierto && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMenuMovilAbierto(false)} aria-hidden="true" />
+      )}
+      <aside className={`w-64 flex-shrink-0 border-r border-slate-200 flex flex-col p-4 space-y-1 bg-[#fcfdfd] fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 ease-out lg:static lg:translate-x-0 ${menuMovilAbierto ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="px-2 pb-4 mb-2 border-b border-slate-200">
           <div className="flex items-center justify-between">
-            <div className="font-['Outfit'] font-black text-lg text-white">Aurora Horeca</div>
+            <div className="font-['Outfit'] font-black text-lg text-slate-900">Aurora Horeca</div>
             {/* El badge "N en cocina" depende del módulo KDS, que está
                 detrás del paywall Pro — en Plan Base no debe existir en
                 el DOM, ni siquiera oculto por CSS. */}
             {PLAN_ACTUAL === ("PRO" as PlanLicencia) && kdsCounts > 0 && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 font-mono font-bold">{kdsCounts} en cocina</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-mono font-bold">{kdsCounts} en cocina</span>
             )}
           </div>
-          <div className="text-[10px] text-white/40 uppercase tracking-wider mt-0.5">{config.nombreLocal}</div>
+          <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">{config.nombreLocal}</div>
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 pr-0.5">
           {NAV_GRUPOS.map((grupo) => (
             <div key={grupo.titulo} className="space-y-1">
-              <div className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-white/30">{grupo.titulo}</div>
+              <div className="px-3 pt-1 pb-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">{grupo.titulo}</div>
               {sidebarItemsVisibles(grupo.items).filter((n) => n.id !== "recetas" || recetasActivas).map((n) => {
                 const alertaVencimiento = n.id === "inventario" && (lotesPorVencer || []).length > 0;
                 return (
                   <button
                     key={n.id}
-                    onClick={() => irA(n.id)}
-                    className={`sidebar-glare w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    onClick={() => { irA(n.id); setMenuMovilAbierto(false); }}
+                    className={`sidebar-glare w-full flex items-center justify-between gap-2.5 border-l-2 px-3 py-2.5 rounded-md text-[13px] font-medium text-left transition-colors cursor-pointer ${
                       n.premium
-                        ? "text-white/30"
+                        ? "text-slate-400 border-transparent"
                         : pagina === n.id
-                        ? "sidebar-glare--active bg-white/10 text-white"
+                        ? "sidebar-glare--active bg-teal-50/80 text-teal-900 border-teal-700"
                         : alertaVencimiento
-                        ? "text-red-300"
-                        : "text-white/60 hover:bg-white/5 hover:text-white"
+                        ? "text-red-600 border-transparent hover:bg-red-50"
+                        : "text-slate-800 border-transparent hover:bg-slate-100/70 hover:text-slate-900"
                     }`}
                   >
-                    <span className="flex items-center gap-2.5"><n.Icon size={16} /><span>{n.label}</span></span>
+                    <span className="flex items-center gap-2.5"><span className={pagina === n.id ? "text-teal-700" : "text-slate-500"}><n.Icon size={15} /></span><span>{n.label}</span></span>
                     {n.premium ? (
-                      <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500">
+                      <span className="flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
                         <IconLock size={10} /> PRO
                       </span>
                     ) : alertaVencimiento && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">{(lotesPorVencer || []).length}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">{(lotesPorVencer || []).length}</span>
                     )}
                   </button>
                 );
@@ -499,12 +530,12 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         </div>
 
         {/* Switch Modo Clásico / Aurora */}
-        <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-xs mb-2">
+        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs mb-2">
           <div className="flex items-center justify-between">
-            <span className="text-white/70 text-[11px] font-medium">Modo Clásico</span>
+            <span className="text-slate-600 text-[11px] font-medium">Modo Clásico</span>
             <button
               onClick={alternarModo}
-              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-[#177E89]" : "bg-white/20"}`}
+              className={`w-9 h-5 rounded-full transition-colors relative p-0.5 cursor-pointer ${modoClasico ? "bg-[#177E89]" : "bg-slate-300"}`}
             >
               <div className={`w-4 h-4 rounded-full bg-white transition-transform ${modoClasico ? "translate-x-4" : "translate-x-0"}`} />
             </button>
@@ -512,8 +543,15 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
         </div>
 
         <button
+          onClick={() => window.dispatchEvent(new Event("aurora:abrir-soporte"))}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-[13px] font-medium text-left text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 cursor-pointer border-t border-slate-200"
+        >
+          <span className="text-slate-400"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg></span>
+          Soporte Aurora
+        </button>
+        <button
           onClick={onSalir}
-          className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left text-white/70 hover:bg-white/10 cursor-pointer"
+          className="w-full px-3 py-2.5 rounded-md text-[13px] font-medium text-left text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 cursor-pointer border-t border-slate-200"
         >
           ← Volver al Hub
         </button>
@@ -525,11 +563,18 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
             apilamiento — sin un z-index explícito acá, el popover de la tasa (aunque
             tenga su propio z-index alto) queda atrapado dentro de ese contexto y las
             tarjetas de la Vista General (que vienen después en el DOM) lo tapan. */}
-        <header className="relative z-30 h-16 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-6 bg-white/30 dark:bg-black/10 backdrop-blur-md">
+        <header className="relative z-30 h-16 border-b border-slate-300/60 dark:border-white/10 flex items-center justify-between px-3 sm:px-6 bg-white/30 dark:bg-black/10 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setMenuMovilAbierto(true)}
+              className="lg:hidden p-2 -ml-1 rounded-xl text-slate-600 dark:text-white/70 hover:bg-slate-200/70 dark:hover:bg-white/10 cursor-pointer flex-shrink-0"
+              aria-label="Abrir menú"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+            </button>
+            <button
               onClick={onSalir}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all flex items-center gap-1.5 cursor-pointer border border-slate-300/60 dark:border-white/10"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200/70 dark:bg-white/10 hover:bg-teal-600 hover:text-white text-slate-700 dark:text-white/80 transition-all hidden sm:flex items-center gap-1.5 cursor-pointer border border-slate-300/60 dark:border-white/10"
             >
               <span>← Aurora Hub</span>
             </button>
@@ -611,7 +656,7 @@ export default function RestauranteApp({ onSalir }: { onSalir: () => void }) {
                 escandallos={escandallos} articulos={articulos} onVenta={registrarVenta} onCambio={recargarTodo} zonasCocina={zonasCocina} zonasMesa={zonasMesa} onZonasMesaGuardadas={recargarZonasMesa} nombreLocal={config.nombreLocal}
                 onAccionEncolada={actualizarContadorPendientes} />
           )}
-          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Cocina (KDS)" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} zonasCocina={zonasCocina} onZonasCocinaGuardadas={recargarZonasCocina} nombreLocal={config.nombreLocal} />)}
+          {pagina === "cocina" && (esPremium("cocina") ? <BloqueoPremium modulo="Pantalla de Cocina" /> : <Cocina tenantId={tenantId} onCambio={recargarTodo} zonasCocina={zonasCocina} onZonasCocinaGuardadas={recargarZonasCocina} nombreLocal={config.nombreLocal} />)}
           {pagina === "reservas" && <Reservas mapa={mapa} />}
           {pagina === "recetas" && (recetasActivas
             ? <Recetas tenantId={tenantId} escandallos={escandallos} articulos={articulos} tasaCop={tasaCop} tasaBcv={tasaBcv} onCambio={recargarTodo} zonasCocina={zonasCocina} />
@@ -770,7 +815,7 @@ function imprimirTicketTermicoDirecto(datos: {
         ${datos.recibido != null ? `<div><strong>Recibido:</strong> $${datos.recibido.toFixed(2)}</div>` : ""}
         ${datos.vuelto != null && datos.vuelto > 0.004 ? `<div class="bold" style="font-size: 12px; margin-top: 2px;">VUELTO: ${datos.vuelto.toFixed(2)} ${datos.monedaVuelto || "USD"}</div>` : ""}
         <div class="divider"></div>
-        <div class="footer">¡Muchas gracias por su preferencia!<br>Generado con Aurora HORECA</div>
+        <div class="footer">Orden de consumo · Documento no fiscal<br>¡Muchas gracias por su preferencia!</div>
       </body>
     </html>
   `;
@@ -1028,7 +1073,7 @@ function TasaBadge({ tenantId, tasaPorOrigen, tasaCop, origenTasaActiva, onActua
                 Tasas de Cambio Operativas
               </p>
               <p className="text-[10px] text-slate-500 dark:text-white/40">
-                Selecciona cuál rige el punto de venta hoy
+                Selecciona cuál rige el punto de venta hoy. La BCV se actualiza sola 3 veces al día; la USDT, con su botón.
               </p>
             </div>
             <button
@@ -1085,7 +1130,7 @@ function TasaBadge({ tenantId, tasaPorOrigen, tasaCop, origenTasaActiva, onActua
                 type="button"
                 onClick={() => void refrescarExterna("BCV")}
                 disabled={actualizandoExterna !== null}
-                title="Consultar en vivo (BCV oficial)"
+                title="Consultar ahora (también se actualiza sola a las 8:05 a. m., 1:05 p. m. y 5:05 p. m.)"
                 className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 disabled:opacity-50 cursor-pointer"
               >
                 <IconRefresh size={12} className={actualizandoExterna === "BCV" ? "animate-spin" : ""} />
@@ -1351,7 +1396,7 @@ function Salon({ tenantId, mapa, itemsPorComanda, setItemsPorComanda, escandallo
         .then((itemsBackend) => {
           setItemsPorComanda((prev) => ({ ...prev, [comandaActiva.id]: itemsBackend }));
         })
-        .catch(() => {});
+        .catch(() => avisar("No se pudieron cargar los productos de esta comanda. Revisa la conexión.", "error"));
     }
   }, [comandaActiva?.id, tenantId, setItemsPorComanda]);
 
@@ -1678,7 +1723,7 @@ function MeserosPanel() {
       else await reactivarMesero(m.id);
       cargar();
     } catch {
-      alert("No se pudo actualizar el mesero — revisa tu conexión e inténtalo de nuevo.");
+      avisar("No se pudo actualizar el mesero — revisa tu conexión e inténtalo de nuevo.");
     }
   };
 
@@ -1933,7 +1978,7 @@ function PlanoMesas({ tenantId, mapa, onAbrirMesa, onVerComanda, onEditarMesa, o
     const soltarMouse = () => {
       if (seMovioRef.current) {
         const pos = posiciones[arrastrando];
-        if (pos) actualizarPosicionMesa(tenantId, arrastrando, { posX: Math.round(pos.x), posY: Math.round(pos.y), ancho: ANCHO_DEFECTO, alto: ANCHO_DEFECTO }).catch(() => alert("No se pudo guardar la nueva posición de la mesa — al recargar la página volverá a su lugar anterior."));
+        if (pos) actualizarPosicionMesa(tenantId, arrastrando, { posX: Math.round(pos.x), posY: Math.round(pos.y), ancho: ANCHO_DEFECTO, alto: ANCHO_DEFECTO }).catch(() => avisar("No se pudo guardar la nueva posición de la mesa — al recargar la página volverá a su lugar anterior."));
       }
       setArrastrando(null);
     };
@@ -3179,7 +3224,10 @@ function Cocina({ tenantId, onCambio, zonasCocina, onZonasCocinaGuardadas, nombr
       await actualizarEstadoItem(item.id, next);
       cargar();
       onCambio();
-    } catch {}
+    } catch (err) {
+      // Antes el plato quedaba igual en pantalla sin decir nada y cocina creía que había cambiado.
+      avisar(err instanceof Error ? `No se pudo cambiar el estado del plato: ${err.message}` : "No se pudo cambiar el estado del plato.", "error");
+    }
   };
 
   const columnas: { estado: EstadoItemComanda; label: string; color: string }[] = [
@@ -3354,7 +3402,7 @@ function Reservas({ mapa }: { mapa: MapaMesaEntrada[] | null }) {
       await cambiarEstadoReserva(r.id, nuevoEstado);
       cargar();
     } catch {
-      alert("No se pudo actualizar la reserva — revisa tu conexión e inténtalo de nuevo.");
+      avisar("No se pudo actualizar la reserva — revisa tu conexión e inténtalo de nuevo.");
     }
   };
 
@@ -3931,7 +3979,7 @@ function ModalEditarReceta({
           editarArticulo(art.id, {
             costoUnitario: unitUsd,
             monedaCosto: monedaCompraSel,
-          }).catch(() => {});
+          }).catch(() => avisar(`La compra se registró, pero no se actualizó el costo de "${art.nombre}".`, "error"));
           art.monedaCosto = monedaCompraSel;
           art.costoUnitario = unitUsd;
           art.costoUnitarioOriginal = costoCompraNum;
@@ -5247,7 +5295,7 @@ function GestionArticulos({ tenantId, articulos, onCambio }: { tenantId: number;
   // Moneda base real del negocio (Configuración > Moneda principal) — el
   // costo por defecto se asume tecleado en esta moneda, no en USD fijo.
   const [monedaBaseTenant, setMonedaBaseTenant] = useState("USD");
-  useEffect(() => { monedaBase(tenantId).then(setMonedaBaseTenant).catch(() => {}); }, [tenantId]);
+  useEffect(() => { monedaBase(tenantId).then(setMonedaBaseTenant).catch(() => avisar("No se pudo leer la moneda base del negocio; revisa los montos antes de guardar.", "error")); }, [tenantId]);
   const [form, setForm] = useState({
     nombre: "", unidadMedida: "kg", categoria: "", costoUnitario: "", precioVenta: "", cantidadInicial: "", fechaVencimiento: "",
     // Al cargar cantidad inicial, por defecto se asume que fue una compra
@@ -5962,7 +6010,7 @@ function ModalReabastecerArticulo({ tenantId, articulo, onClose, onReabastecido 
     monedaBase(tenantId).then((m) => {
       setMonedaBaseTenant(m);
       if (!articulo.monedaCosto) setMoneda(m);
-    }).catch(() => {});
+    }).catch(() => avisar("No se pudo leer la moneda base del negocio; revisa la moneda del costo.", "error"));
   }, [tenantId, articulo.monedaCosto]);
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [tasaPropiaCompra, setTasaPropiaCompra] = useState("");
@@ -6390,7 +6438,8 @@ function RegistrarCompra({ tenantId, proveedores, articulos, onCambio }: {
       // lista, se guarda aparte — registrarCompraInsumo solo toca costo/stock.
       for (const f of filas) {
         if (f.articuloId && f.precioVentaNuevo && Number(f.precioVentaNuevo) > 0) {
-          await editarArticulo(Number(f.articuloId), { precioVenta: Number(f.precioVentaNuevo) }).catch(() => {});
+          await editarArticulo(Number(f.articuloId), { precioVenta: Number(f.precioVentaNuevo) })
+            .catch(() => avisar("La compra se registró, pero no se guardó uno de los precios de venta nuevos. Cámbialo desde Inventario.", "error"));
         }
       }
       setFilas([filaVacia()]);
@@ -7004,7 +7053,7 @@ function ZonasCocinaConfig({ onGuardado }: { onGuardado: () => void }) {
       <div>
         <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-base">Zonas de cocina</h3>
         <p className="text-slate-500 dark:text-white/40 text-xs mt-0.5">
-          Las estaciones que ves en Cocina (KDS) y al asignar un plato en Recetas — arma las que realmente tiene tu negocio, no todos tienen las mismas 4.
+          Las estaciones que ves en la Pantalla de Cocina y al asignar un plato en Recetas — arma las que realmente tiene tu negocio, no todos tienen las mismas 4.
         </p>
       </div>
       {zonas === null ? (
@@ -8186,11 +8235,11 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
                 {(buscandoCliente || guardandoCliente) && !clienteSel && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">…</span>}
               </div>
               <input value={telefonoClienteInline} onChange={(e) => setTelefonoClienteInline(e.target.value)}
-                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => alert("No se pudo guardar el teléfono del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
+                onBlur={() => { if (clienteSel) editarCliente(tenantId, clienteSel.id, { telefono: telefonoClienteInline.trim() || undefined }).then(setClienteSel).catch(() => avisar("No se pudo guardar el teléfono del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
                 placeholder="Teléfono (opcional)" className="input-horeca w-full text-xs" />
             </div>
             <input value={nombreClienteInline} onChange={(e) => setNombreClienteInline(e.target.value)}
-              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => alert("No se pudo guardar el nombre del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
+              onBlur={() => { if (clienteSel && nombreClienteInline.trim()) editarCliente(tenantId, clienteSel.id, { nombre: nombreClienteInline.trim() }).then(setClienteSel).catch(() => avisar("No se pudo guardar el nombre del cliente — revisa tu conexión e inténtalo de nuevo.")); else confirmarClienteNuevo(); }}
               placeholder="Nombre y apellido (opcional)" className="input-horeca w-full text-xs" />
           </div>
 
@@ -8546,7 +8595,7 @@ function VentaRapida({ tenantId, escandallos, fastbar, articulos, tasaBcv, tasaC
           tasaCop={tasaCop ? Number(tasaCop.tasa) : 0}
           onClose={() => setMostrarDividirCuenta(false)}
           onSeleccionarParte={(montoParte, index, totalPartes) => {
-            alert(`Comensal #${index} de ${totalPartes} pagará $${montoParte.toFixed(2)}. Puedes registrar su pago en el panel de cobro.`);
+            avisar(`Comensal #${index} de ${totalPartes} pagará $${montoParte.toFixed(2)}. Puedes registrar su pago en el panel de cobro.`);
           }}
         />
       )}
@@ -9880,14 +9929,14 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
             <div>
               <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
                 {rango === "DIA"
-                  ? "Facturación por Horas del Día"
+                  ? "Ventas por hora del día"
                   : rango === "7_DIAS"
                   ? "Tendencia de Ingresos — Últimos 7 Días"
                   : rango === "MES"
                   ? "Evolución Diaria del Mes"
-                  : "Facturación Mensual del Año"}
+                  : "Ventas por mes del año"}
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-white/40">Total facturado en {monedaBaseNegocio || "moneda base"}</p>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">Total vendido en {monedaBaseNegocio || "moneda base"}</p>
             </div>
             <span className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg">
               {monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}{ventasTotal.toFixed(2)}
@@ -9920,7 +9969,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
               <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
                 Horas Top de Venta
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-white/40">Distribución de facturación por hora</p>
+              <p className="text-[11px] text-slate-400 dark:text-white/40">Distribución de ventas por hora</p>
             </div>
             {horaPico && horaPico.ventas > 0 ? (
               <span className="text-xs font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg">
@@ -9943,7 +9992,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
                   formatter={((v: any, name: any, item: any) => {
-                    if (name === "ventas") return [`${monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}${Number(v).toFixed(2)} (${item.payload.pedidos} pedidos)`, "Facturado"];
+                    if (name === "ventas") return [`${monedaBaseNegocio ? `${monedaBaseNegocio} ` : ""}${Number(v).toFixed(2)} (${item.payload.pedidos} pedidos)`, "Vendido"];
                     return [v, name];
                   }) as any}
                   contentStyle={{ fontSize: 11, borderRadius: 10, background: "rgba(15, 23, 42, 0.95)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}
@@ -9974,7 +10023,7 @@ function ResumenFinanciero({ tenantId }: { tenantId: number }) {
             <h3 className="font-['Outfit'] font-bold text-slate-900 dark:text-white text-sm">
               Top 5 Productos más Vendidos
             </h3>
-            <span className="text-[11px] text-slate-400">Unidades facturadas</span>
+            <span className="text-[11px] text-slate-400">Unidades vendidas</span>
           </div>
 
           {topProductos.length === 0 ? (
@@ -10111,281 +10160,14 @@ function Administracion({ tenantId, monedasActivas }: { tenantId: number; moneda
       {tab === "cuentas" && <CuentasPorCobrarPagar tenantId={tenantId} />}
       {tab === "cierre" && <CierreDeCaja tenantId={tenantId} />}
       {tab === "resumen" && <ResumenDiario tenantId={tenantId} />}
-      {tab === "nomina" && <NominaPersonal tenantId={tenantId} monedasActivas={monedasActivas} />}
-      {tab === "auditoria" && esDueno && <BitacoraAuditoria moduloSugerido="HORECA" />}
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// NÓMINA DE PERSONAL — liquida horas fichadas (reloj checador de RRHH) en un
-// período y calcula cuánto se debe pagar, según cómo se configuró CADA
-// empleado (por hora / salario fijo / solo control). No inventa un motor de
-// nómina nuevo: reutiliza RelojChecadorService.liquidarPeriodo, que ya
-// existía en RRHH pero no tenía ninguna pantalla que lo mostrara.
-// ══════════════════════════════════════════════════════════════════════════
-const LABEL_TIPO_CONTROL: Record<TipoControlEmpleado, string> = {
-  POR_HORA: "Por hora", SALARIO_FIJO: "Salario fijo", SOLO_CONTROL: "Solo control (sin pago)",
-};
-const LABEL_PERIODICIDAD: Record<PeriodicidadPago, string> = {
-  SEMANAL: "Semanal", QUINCENAL: "Quincenal", MENSUAL: "Mensual",
-};
-
-function formatMontoNomina(monto: number, moneda: string | null | undefined): string {
-  const m = moneda || "USD";
-  return m === "USD" ? `$${monto.toFixed(2)}` : `${monto.toFixed(2)} ${m}`;
-}
-
-function NominaPersonal({ tenantId, monedasActivas }: { tenantId: number; monedasActivas: typeof MONEDAS_POR_DEFECTO }) {
-  const monedasNomina = ["USD", ...(Object.keys(monedasActivas) as (keyof typeof monedasActivas)[]).filter((m) => monedasActivas[m])];
-  const [desde, setDesde] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; });
-  const [hasta, setHasta] = useState(hoy());
-  const [empleados, setEmpleados] = useState<EmpleadoRrhh[] | null>(null);
-  const [liquidacion, setLiquidacion] = useState<LiquidacionPeriodoRrhh | null>(null);
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [editandoPagoId, setEditandoPagoId] = useState<number | null>(null);
-  const [formPago, setFormPago] = useState<{ tipoControl: TipoControlEmpleado; tarifaPorHora: string; salarioFijo: string; monedaSalario: string; periodicidadPago: PeriodicidadPago }>({ tipoControl: "SOLO_CONTROL", tarifaPorHora: "", salarioFijo: "", monedaSalario: "USD", periodicidadPago: "MENSUAL" });
-  const [guardandoPago, setGuardandoPago] = useState(false);
-  const [pagos, setPagos] = useState<PagoNomina[]>([]);
-  const [pagandoId, setPagandoId] = useState<number | null>(null);
-  const [descargandoReciboId, setDescargandoReciboId] = useState<number | null>(null);
-
-  const cargarEmpleados = () => listarEmpleadosRrhh().then((r) => setEmpleados(r.filter((e) => e.activo))).catch(() => setEmpleados([]));
-  const cargarPagos = () => listarPagosNomina(tenantId).then(setPagos).catch(() => setPagos([]));
-  useEffect(() => { cargarEmpleados(); cargarPagos(); }, [tenantId]);
-
-  const calcular = () => {
-    setCargando(true);
-    setError(null);
-    liquidarPeriodoRrhh(tenantId, `${desde}T00:00:00`, `${hasta}T23:59:59`)
-      .then(setLiquidacion)
-      .catch((e) => setError(e instanceof Error ? e.message : "No se pudo calcular la nómina"))
-      .finally(() => setCargando(false));
-  };
-  useEffect(() => { calcular(); }, [tenantId]);
-
-  const abrirEditarPago = (emp: EmpleadoRrhh) => {
-    setEditandoPagoId(emp.id);
-    setFormPago({
-      tipoControl: emp.tipoControl,
-      tarifaPorHora: emp.tarifaPorHora != null ? String(emp.tarifaPorHora) : "",
-      salarioFijo: emp.salarioFijo != null ? String(emp.salarioFijo) : "",
-      monedaSalario: emp.monedaSalario || "USD",
-      periodicidadPago: emp.periodicidadPago || "MENSUAL",
-    });
-  };
-
-  const guardarPago = async (emp: EmpleadoRrhh) => {
-    if (formPago.tipoControl === "POR_HORA" && !formPago.tarifaPorHora) { setError("Indica la tarifa por hora"); return; }
-    if (formPago.tipoControl === "SALARIO_FIJO" && !formPago.salarioFijo) { setError("Indica el monto del salario"); return; }
-    setGuardandoPago(true);
-    setError(null);
-    try {
-      await editarEmpleadoRrhh(emp.id, {
-        nombre: emp.nombre, cedula: emp.cedula || undefined, cargo: emp.cargo || undefined,
-        tipoControl: formPago.tipoControl,
-        tarifaPorHora: formPago.tipoControl === "POR_HORA" ? Number(formPago.tarifaPorHora) : undefined,
-        salarioFijo: formPago.tipoControl === "SALARIO_FIJO" ? Number(formPago.salarioFijo) : undefined,
-        monedaSalario: formPago.tipoControl === "SALARIO_FIJO" ? formPago.monedaSalario : undefined,
-        periodicidadPago: formPago.periodicidadPago,
-      });
-      setEditandoPagoId(null);
-      cargarEmpleados();
-      calcular();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar la forma de pago");
-    } finally {
-      setGuardandoPago(false);
-    }
-  };
-
-  // Un pago ya hecho que se solapa con [desde,hasta] bloquea el botón "Pagar"
-  // para ese empleado — el backend también lo rechaza, esto solo evita el
-  // viaje redondo y muestra de una vez el recibo ya emitido.
-  const pagoDelPeriodo = (empleadoId: number) =>
-    pagos.find((p) => p.empleadoId === empleadoId && p.periodoDesde <= hasta && p.periodoHasta >= desde);
-
-  const pagarEmpleado = async (emp: EmpleadoRrhh, monto: number, moneda: string, horasTrabajadas: number) => {
-    if (!window.confirm(`¿Confirmas el pago de ${formatMontoNomina(monto, moneda)} a ${emp.nombre} por el período ${desde} a ${hasta}? Esto registrará el gasto en caja y no se puede deshacer.`)) return;
-    setPagandoId(emp.id);
-    setError(null);
-    try {
-      await pagarNomina(tenantId, {
-        empleadoId: emp.id, periodoDesde: desde, periodoHasta: hasta,
-        horasTrabajadas: emp.tipoControl === "POR_HORA" ? horasTrabajadas : undefined,
-        monto, moneda,
-      });
-      cargarPagos();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo registrar el pago");
-    } finally {
-      setPagandoId(null);
-    }
-  };
-
-  const descargarRecibo = async (pagoId: number) => {
-    setDescargandoReciboId(pagoId);
-    try {
-      const blob = await descargarReciboNominaPdf(tenantId, pagoId);
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo generar el recibo");
-    } finally {
-      setDescargandoReciboId(null);
-    }
-  };
-
-  // Combina el directorio completo (para que salga el que aún no fichó nada
-  // en el período, con 0 horas) con lo que sí calculó la liquidación.
-  const filas = (empleados || []).map((emp) => {
-    const linea = liquidacion?.empleados.find((l) => l.empleadoId === emp.id);
-    return {
-      empleado: emp,
-      horasTrabajadas: linea?.horasTrabajadas ?? 0,
-      totalPagar: linea?.totalPagar ?? null,
-      monedaPago: linea?.monedaPago ?? null,
-    };
-  });
-  // No se suman montos de distinta moneda entre sí — se agrupan por moneda
-  // para no mezclar, por ejemplo, salarios en USD con salarios en VES.
-  const totalesPorMoneda = filas.reduce<Record<string, number>>((acc, f) => {
-    if (f.totalPagar != null) {
-      const m = f.monedaPago || "USD";
-      acc[m] = (acc[m] || 0) + f.totalPagar;
-    }
-    return acc;
-  }, {});
-
-  return (
-    <div className="space-y-5">
-      <div className="apple-glass rounded-2xl p-5 space-y-3">
-        <p className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">Período a liquidar</p>
-        <div className="flex items-end gap-2 flex-wrap">
-          <Campo label="Desde"><input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="input-horeca" /></Campo>
-          <Campo label="Hasta"><input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="input-horeca" /></Campo>
-          <button onClick={calcular} disabled={cargando} className="g-aurora text-white text-xs font-semibold px-5 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
-            {cargando ? "Calculando…" : "Calcular"}
-          </button>
-        </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
-      </div>
-
-      {empleados === null ? (
-        <p className="text-xs text-slate-400">Cargando personal…</p>
-      ) : empleados.length === 0 ? (
-        <div className="apple-glass rounded-2xl p-8 text-center">
-          <p className="text-slate-500 dark:text-white/40 text-sm">Aún no tienes personal registrado con reloj checador (RRHH).</p>
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {filas.map(({ empleado: emp, horasTrabajadas, totalPagar, monedaPago }) => (
-            <div key={emp.id} className="apple-glass rounded-2xl p-4">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="font-bold text-sm text-slate-900 dark:text-white">{emp.nombre}</div>
-                  <div className="text-xs text-slate-500 dark:text-white/40 flex items-center gap-2 flex-wrap mt-0.5">
-                    {emp.cargo && <span>{emp.cargo}</span>}
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${emp.tipoControl === "POR_HORA" ? "bg-teal-500/15 text-teal-600 dark:text-teal-400" : emp.tipoControl === "SALARIO_FIJO" ? "bg-sky-500/15 text-sky-600 dark:text-sky-400" : "bg-slate-300/50 dark:bg-white/10 text-slate-500 dark:text-white/50"}`}>
-                      {LABEL_TIPO_CONTROL[emp.tipoControl]}
-                      {emp.tipoControl === "POR_HORA" && emp.tarifaPorHora ? ` · $${Number(emp.tarifaPorHora).toFixed(2)}/h` : ""}
-                      {emp.tipoControl === "SALARIO_FIJO" && emp.salarioFijo ? ` · ${formatMontoNomina(Number(emp.salarioFijo), emp.monedaSalario)}` : ""}
-                    </span>
-                    {emp.tipoControl !== "SOLO_CONTROL" && (
-                      <span className="text-[10px] font-semibold text-slate-400 dark:text-white/30">
-                        Se le paga: {LABEL_PERIODICIDAD[emp.periodicidadPago] || "Mensual"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500 dark:text-white/40">{horasTrabajadas.toFixed(2)} horas fichadas</div>
-                  <div className="font-mono font-bold text-slate-900 dark:text-white">{totalPagar != null ? formatMontoNomina(totalPagar, monedaPago) : "—"}</div>
-                </div>
-                <button onClick={() => abrirEditarPago(emp)} className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 cursor-pointer flex-shrink-0">
-                  Elegir cómo se le paga
-                </button>
-              </div>
-              {editandoPagoId === emp.id && (
-                <div className="mt-3 pt-3 border-t border-slate-300/50 dark:border-white/10 flex items-end gap-2 flex-wrap">
-                  <Campo label="Forma de pago">
-                    <select value={formPago.tipoControl} onChange={(e) => setFormPago({ ...formPago, tipoControl: e.target.value as TipoControlEmpleado })} className="input-horeca">
-                      <option value="POR_HORA">Por hora fichada</option>
-                      <option value="SALARIO_FIJO">Salario fijo (monto pactado por período)</option>
-                      <option value="SOLO_CONTROL">Solo control de asistencia (sin pago)</option>
-                    </select>
-                  </Campo>
-                  {formPago.tipoControl === "POR_HORA" && (
-                    <Campo label="Tarifa por hora ($)">
-                      <input type="number" step="0.01" min="0" value={formPago.tarifaPorHora} onChange={(e) => setFormPago({ ...formPago, tarifaPorHora: e.target.value })} className="input-horeca w-28" />
-                    </Campo>
-                  )}
-                  {formPago.tipoControl === "SALARIO_FIJO" && (
-                    <>
-                      <Campo label="Monto del salario">
-                        <input type="number" step="0.01" min="0" value={formPago.salarioFijo} onChange={(e) => setFormPago({ ...formPago, salarioFijo: e.target.value })} className="input-horeca w-28" />
-                      </Campo>
-                      <Campo label="Moneda">
-                        <select value={formPago.monedaSalario} onChange={(e) => setFormPago({ ...formPago, monedaSalario: e.target.value })} className="input-horeca">
-                          {monedasNomina.map((m) => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      </Campo>
-                    </>
-                  )}
-                  {formPago.tipoControl !== "SOLO_CONTROL" && (
-                    <Campo label="Cada cuánto se le paga">
-                      <select value={formPago.periodicidadPago} onChange={(e) => setFormPago({ ...formPago, periodicidadPago: e.target.value as PeriodicidadPago })} className="input-horeca">
-                        <option value="SEMANAL">Semanal</option>
-                        <option value="QUINCENAL">Quincenal</option>
-                        <option value="MENSUAL">Mensual</option>
-                      </select>
-                    </Campo>
-                  )}
-                  <button onClick={() => guardarPago(emp)} disabled={guardandoPago} className="btn-cyber-neon text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-60">
-                    {guardandoPago ? "Guardando…" : "Guardar"}
-                  </button>
-                  <button onClick={() => setEditandoPagoId(null)} className="apple-glass-btn text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer">Cancelar</button>
-                </div>
-              )}
-              {totalPagar != null && totalPagar > 0 && (() => {
-                const pagoExistente = pagoDelPeriodo(emp.id);
-                return (
-                  <div className="mt-3 pt-3 border-t border-slate-300/50 dark:border-white/10 flex items-center justify-between gap-2 flex-wrap">
-                    {pagoExistente ? (
-                      <>
-                        <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                          Pagado el {new Date(pagoExistente.fechaPago).toLocaleDateString("es-VE")} · {formatMontoNomina(pagoExistente.monto, pagoExistente.moneda)}
-                        </span>
-                        <button onClick={() => descargarRecibo(pagoExistente.id)} disabled={descargandoReciboId === pagoExistente.id}
-                          className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 cursor-pointer disabled:opacity-60">
-                          {descargandoReciboId === pagoExistente.id ? "Generando…" : "Descargar recibo"}
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => pagarEmpleado(emp, totalPagar, monedaPago || "USD", horasTrabajadas)} disabled={pagandoId === emp.id}
-                        className="g-aurora text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer disabled:opacity-60">
-                        {pagandoId === emp.id ? "Pagando…" : `Pagar ${formatMontoNomina(totalPagar, monedaPago)}`}
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          ))}
-          <div className="apple-glass rounded-2xl p-4 flex items-center justify-between font-bold text-slate-900 dark:text-white flex-wrap gap-2">
-            <span>Total a pagar en el período</span>
-            <span className="font-mono flex items-center gap-3">
-              {Object.keys(totalesPorMoneda).length === 0
-                ? "$0.00"
-                : Object.entries(totalesPorMoneda).map(([moneda, monto]) => (
-                    <span key={moneda}>{formatMontoNomina(monto, moneda)}</span>
-                  ))}
-            </span>
-          </div>
-        </div>
+      {/* La misma nómina de Personal que usan todos los rubros: sueldo de cada quien, pagar la semana o
+          la quincena con lo que marcó cada uno, egreso en caja y recibos para imprimir. */}
+      {tab === "nomina" && (
+        <ContextoVocabularioPersonal.Provider value={VOCABULARIO_RESTAURANTE}>
+          <NominaDelNegocio />
+        </ContextoVocabularioPersonal.Provider>
       )}
+      {tab === "auditoria" && esDueno && <BitacoraAuditoria moduloSugerido="HORECA" />}
     </div>
   );
 }
@@ -10418,33 +10200,14 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
   const [cerrando, setCerrando] = useState(false);
   const [ultimoCierre, setUltimoCierre] = useState<Turno | null>(null);
 
-  // Tasas reales del negocio para convertir el arqueo desglosado — nunca un valor fijo
-  // inventado (65.50 / 4180 no son cifras reales, eran solo un placeholder que además
-  // podía desincronizarse de lo que en verdad se cobró en el POS).
-  const [tasaVesArqueo, setTasaVesArqueo] = useState<number | null>(null);
-  const [tasaCopArqueo, setTasaCopArqueo] = useState<number | null>(null);
-  useEffect(() => {
-    tasaVigente(tenantId, "USD", "VES").then((t) => setTasaVesArqueo(Number(t.tasa))).catch(() => setTasaVesArqueo(null));
-    tasaVigente(tenantId, "USD", "COP").then((t) => setTasaCopArqueo(Number(t.tasa))).catch(() => setTasaCopArqueo(null));
-  }, [tenantId]);
-
+  // El servidor compara contra el EFECTIVO de la moneda del turno (lo que se puede contar en la
+  // gaveta). Punto, Pago Móvil, Zelle y las otras monedas se anotan como referencia pero no entran
+  // en el monto declarado; antes se sumaban y cada cierre salía con un "sobrante" falso.
   const totalDesgloseCalculado = useMemo(() => {
-    const usd = Number(desgloseArqueo.usd) || 0;
-    const zelle = Number(desgloseArqueo.zelle) || 0;
-    const ves = (Number(desgloseArqueo.ves) || 0) + (Number(desgloseArqueo.punto) || 0) + (Number(desgloseArqueo.pagoMovil) || 0);
-    const cop = Number(desgloseArqueo.cop) || 0;
-
-    const tasaVes = tasaVesArqueo ?? 0;
-    const tasaCop = tasaCopArqueo ?? 0;
-
-    if (moneda === "USD") {
-      return usd + zelle + (tasaVes > 0 ? ves / tasaVes : 0) + (tasaCop > 0 ? cop / tasaCop : 0);
-    } else if (moneda === "VES") {
-      return ves + (usd + zelle) * tasaVes + (tasaCop > 0 ? (cop / tasaCop) * tasaVes : 0);
-    } else {
-      return cop + (usd + zelle) * tasaCop;
-    }
-  }, [desgloseArqueo, moneda, tasaVesArqueo, tasaCopArqueo]);
+    if (moneda === "USD") return Number(desgloseArqueo.usd) || 0;
+    if (moneda === "VES") return Number(desgloseArqueo.ves) || 0;
+    return Number(desgloseArqueo.cop) || 0;
+  }, [desgloseArqueo, moneda]);
 
   const montoDeclaradoFinal = modoArqueo === "DESGLOSADO" ? totalDesgloseCalculado : (Number(montoDeclarado) || 0);
 
@@ -10597,7 +10360,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
             {modoArqueo === "DESGLOSADO" ? (
               <div className="space-y-3 bg-slate-50 dark:bg-white/[0.02] p-4 rounded-xl border border-slate-200 dark:border-white/5">
                 <p className="text-[11px] font-semibold text-slate-600 dark:text-white/60">
-                  Introduce lo contado físicamente en cada método para calcular el total sin errores:
+                  Anota lo contado en cada método. El arqueo compara solo el efectivo en {moneda}; los pagos electrónicos y las otras monedas quedan como referencia.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div>
@@ -10676,7 +10439,7 @@ function TurnosCaja({ tenantId }: { tenantId: number }) {
 
                 <div className="pt-2 flex items-center justify-between border-t border-slate-200 dark:border-white/10">
                   <span className="text-xs font-bold text-slate-600 dark:text-white/70">
-                    Total declarado acumulado:
+                    Efectivo declarado en {moneda}:
                   </span>
                   <span className="font-mono font-black text-base text-teal-600 dark:text-teal-400">
                     {fmtCostoEnMoneda(totalDesgloseCalculado, moneda)}

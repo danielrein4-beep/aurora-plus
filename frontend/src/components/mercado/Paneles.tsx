@@ -124,6 +124,7 @@ const ESTADO_OFERTA: Record<string, { texto: string; clase: string }> = {
   ACEPTADA: { texto: "Aceptada", clase: "bg-[#EEF6F1] text-[#2F6B4F]" },
   RECHAZADA: { texto: "Rechazada", clase: "bg-rose-50 text-rose-700" },
   RETIRADA: { texto: "Reemplazada", clase: "bg-stone-100 text-stone-600" },
+  ANULADA: { texto: "Trato anulado", clase: "bg-rose-50 text-rose-700" },
 };
 
 export function MisCompras({ onAbrir }: { onAbrir: (id: number) => void }) {
@@ -161,7 +162,9 @@ export function MisCompras({ onAbrir }: { onAbrir: (id: number) => void }) {
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-xs text-stone-600">Ofreciste <strong>{dinero.format(oferta.monto)}</strong> · {fechaCorta(oferta.fecha)}</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ESTADO_OFERTA[oferta.estado]?.clase ?? ""}`}>
-                      {oferta.estado === "ACEPTADA" && oferta.traspasado ? "En tu hato" : ESTADO_OFERTA[oferta.estado]?.texto ?? oferta.estado}
+                      {oferta.estado === "ACEPTADA" && oferta.traspasado ? "En tu hato"
+                        : oferta.estado === "ACEPTADA" && !oferta.pagoConfirmado ? "Aceptada · falta confirmar pago"
+                        : ESTADO_OFERTA[oferta.estado]?.texto ?? oferta.estado}
                     </span>
                   </div>
                 }

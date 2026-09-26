@@ -1,3 +1,4 @@
+import { avisar } from "../../avisos";
 import React, { useState } from 'react';
 import { IconFileText, IconTrash, IconClose } from '../../Icons';
 import {
@@ -56,7 +57,7 @@ export default function HistoriasClinicasVet({
 
   const abrirNueva = () => {
     if (!mascotaSeleccionada) {
-      alert('Seleccione primero una mascota para registrar su consulta.');
+      avisar('Seleccione primero una mascota para registrar su consulta.');
       return;
     }
     setFormConsulta({
@@ -95,7 +96,7 @@ export default function HistoriasClinicasVet({
       setModalNuevaConsulta(false);
       onRecargarConsultas();
     } catch (err: any) {
-      alert('Error guardando consulta veterinaria: ' + err.message);
+      avisar('Error guardando consulta veterinaria: ' + err.message);
     }
   };
 
@@ -106,7 +107,7 @@ export default function HistoriasClinicasVet({
       await eliminarConsultaVet(tenantId, mascotaSeleccionada.id, id);
       onRecargarConsultas();
     } catch (err: any) {
-      alert('Error eliminando consulta: ' + err.message);
+      avisar('Error eliminando consulta: ' + err.message);
     }
   };
 

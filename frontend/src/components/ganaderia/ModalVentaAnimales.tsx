@@ -5,6 +5,7 @@ import {
   type AnimalGanaderia,
 } from "../../api";
 import { fechaLocalISO } from "../ReportesCampoGanaderia";
+import { num } from "./formato";
 
 export type ModoVenta = "INDIVIDUAL" | "MULTIPLE";
 
@@ -15,6 +16,8 @@ interface Props {
   notificar: (msg: string) => void;
   /** Animales ya vendidos en el backend: el padre los marca VENDIDO en su lista. */
   onVendidos: (ids: number[]) => void;
+  /** Después de vender: armar la nota de movilización con esos mismos animales. */
+  onHacerGuia: (ids: number[]) => void;
   onCerrar: () => void;
 }
 
@@ -23,7 +26,7 @@ interface Props {
  * trae su peso del sistema y se puede corregir con el de báscula; ese peso queda
  * guardado como pesaje. Al terminar ofrece la nota de entrega en PDF.
  */
-export default function ModalVentaAnimales({ modoInicial, animales, tenantId, notificar, onVendidos, onCerrar }: Props) {
+export default function ModalVentaAnimales({ modoInicial, animales, tenantId, notificar, onVendidos, onHacerGuia, onCerrar }: Props) {
   // Estado inicial al abrir: el primer animal activo preseleccionado con su peso del sistema.
   const primerActivo = animales.find(a => a.estado === "ACTIVO" || !a.estado);
   const [formVenta, setFormVenta] = useState({
@@ -45,6 +48,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
     return escrito > 0 ? escrito : (animales.find(a => a.id === id)?.pesoActual || 0);
   };
   const [ultimaVentaId, setUltimaVentaId] = useState<number | null>(null);
+  const [vendidosIds, setVendidosIds] = useState<number[]>([]);
 
   // Manejador: Despacho por Venta / Beneficio (POST /api/ganaderia/ventas a través de VentaAnimalController)
   const handleRegistrarVentaAnimal = async (e: React.FormEvent) => {
@@ -107,6 +111,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
       onVendidos(idsVenta);
       notificar(`Venta registrada exitosamente (Ticket ${ticket}). ${animalesAVender.length} animal(es) despachado(s) y liquidado(s).`);
       setUltimaVentaId(ventaCreada?.id ?? null);
+      setVendidosIds(idsVenta);
     } catch (err: any) {
       const msg = err?.message || "Revisa tu conexión e inténtalo de nuevo";
       notificar(`No se pudo procesar la venta: ${msg}`);
@@ -188,6 +193,14 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
               <IconDownload size={14} />
               Descargar Nota de Entrega (PDF)
             </button>
+            <div>
+              <button
+                type="button"
+                onClick={() => onHacerGuia(vendidosIds)}
+                className="px-5 py-2.5 rounded-xl border border-teal-300 bg-white text-teal-800 hover:bg-teal-50 font-semibold cursor-pointer">
+                Hacer la nota de movilización de estos animales
+              </button>
+            </div>
             <div>
               <button
                 type="button"
@@ -288,7 +301,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                           )}
                           className="rounded accent-teal-700 focus:ring-0"
                         />
-                        <span className="font-mono text-teal-800">{a.arete}</span>
+                        <span className="tabular-nums text-teal-800">{a.arete}</span>
                         <span className="truncate">{a.nombre || a.tipoAnimal}{a.raza ? ` · ${a.raza}` : ""}</span>
                       </label>
                       {isSel ? (
@@ -300,7 +313,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                             value={pesosVenta[a.id] ?? String(a.pesoActual || "")}
                             onFocus={e => e.target.select()}
                             onChange={e => setPesosVenta(prev => ({ ...prev, [a.id]: e.target.value }))}
-                            className="w-20 px-2 py-1 rounded-md border border-slate-300 bg-white text-right font-mono text-[11px] text-slate-900 focus:border-teal-600 focus:outline-none"
+                            className="w-20 px-2 py-1 rounded-md border border-slate-300 bg-white text-right tabular-nums text-[11px] text-slate-900 focus:border-teal-600 focus:outline-none"
                           />
                           <span className="text-[10px] text-slate-500">kg</span>
                         </div>
@@ -343,7 +356,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                 placeholder="Ej. 480"
                 value={formVenta.pesoSalida || ""}
                 onChange={e => setFormVenta({ ...formVenta, pesoSalida: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums"
               />
             </div>
           )}
@@ -359,7 +372,7 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                 placeholder="Ej. 2.20"
                 value={formVenta.precioPorKg || ""}
                 onChange={e => setFormVenta({ ...formVenta, precioPorKg: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-emerald-300 font-mono"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-emerald-300 tabular-nums"
               />
             </div>
             <div>
@@ -376,13 +389,13 @@ export default function ModalVentaAnimales({ modoInicial, animales, tenantId, no
                 placeholder="Ej. 1100"
                 value={formVenta.precioPorKg > 0 ? totalEstimado.toFixed(2) : (formVenta.precioUSD || "")}
                 onChange={e => setFormVenta({ ...formVenta, precioUSD: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono disabled:opacity-60"
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-white tabular-nums disabled:opacity-60"
               />
             </div>
           </div>
           {formVenta.precioPorKg > 0 && (
             <p className="text-[10px] text-emerald-400 -mt-1">
-              {pesoTotalSeleccion} kg × ${formVenta.precioPorKg}/kg = ${totalEstimado.toFixed(2)} USD
+              {pesoTotalSeleccion} kg × ${formVenta.precioPorKg}/kg = ${num(totalEstimado, 2)} USD
               {ventaModo === "MULTIPLE" ? " (repartido por el peso real de cada animal)" : ""}
             </p>
           )}

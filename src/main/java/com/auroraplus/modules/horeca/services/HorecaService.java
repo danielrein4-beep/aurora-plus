@@ -600,6 +600,12 @@ public class HorecaService {
         if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("La cantidad debe ser mayor a cero");
         }
+        // Solo un ítem libre de la estación CARGOS puede ir en negativo (descuento; el rol lo
+        // exige el controlador). Un plato, artículo o trago con precio negativo rebajaría la cuenta.
+        if (precioUnitario != null && precioUnitario.signum() < 0
+                && (escandalloId != null || articuloId != null || fastBarTragoId != null || !"CARGOS".equals(estacionCocina))) {
+            throw new RuntimeException("El precio no puede ser negativo. Para rebajar la cuenta usa Descuento.");
+        }
 
         // Venta de mostrador (Venta Rápida: RECOGER_EN_TIENDA) — el cliente se
         // lleva el producto en el momento, no hay mesero ni cocinero con
@@ -640,8 +646,12 @@ public class HorecaService {
             if (!articulo.getTenantId().equals(tenantId)) {
                 throw new RuntimeException("Violación de seguridad: Artículo no pertenece a este tenant");
             }
-            if (precioUnitario == null) {
-                throw new RuntimeException("Debe indicar el precio de venta del artículo");
+            // El precio lo pone el inventario, no el navegador: así nadie vende por debajo de la lista.
+            BigDecimal precioLista = articulo.getPrecioVenta();
+            if (precioLista != null && precioLista.signum() > 0) {
+                precioUnitario = precioLista;
+            } else if (precioUnitario == null) {
+                throw new RuntimeException("Este artículo no tiene precio de venta en el inventario");
             }
 
             // Descuenta el stock ANTES de aceptar el ítem: si no alcanza, revienta aquí

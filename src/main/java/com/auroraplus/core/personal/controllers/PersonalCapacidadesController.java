@@ -36,7 +36,9 @@ public class PersonalCapacidadesController {
             accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_PERSONAL) && (dueno || permiso != null),
             accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA),
             accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_METAS),
-            accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA),
+            // La nómina básica viene con Personal (ver PersonalAccessService.exigirNomina).
+            accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_PERSONAL)
+                || accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_NOMINA_AVANZADA),
             accessService.puedeVerDirectorio(tenantId),
             accessService.puedeVerMontosGenerales(tenantId),
             accessService.tieneFlag(tenantId, PersonalAccessService.FLAG_ASISTENCIA) && accessService.puedeGestionarOperacion(tenantId),

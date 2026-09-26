@@ -1,6 +1,7 @@
 package com.auroraplus.modules.repuestos.controllers;
 
 import com.auroraplus.core.auth.AuthContext;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.modules.repuestos.entities.OrdenCompraSugerida;
 import com.auroraplus.modules.repuestos.repositories.OrdenCompraSugeridaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +19,8 @@ public class OrdenCompraSugeridaController {
     private OrdenCompraSugeridaRepository ordenCompraSugeridaRepository;
 
     @GetMapping
-    public List<OrdenCompraSugerida> listar(@RequestParam Long tenantId) {
+    public List<OrdenCompraSugerida> listar() {
+        Long tenantId = TenantContext.getCurrentTenant();
         return ordenCompraSugeridaRepository.findByTenantIdOrderByFechaCreacionDesc(tenantId);
     }
 
@@ -28,7 +30,8 @@ public class OrdenCompraSugeridaController {
 
     /** El administrador aprueba o rechaza el borrador — nunca se dispara nada automático desde acá todavía. */
     @PatchMapping("/{id}")
-    public ResponseEntity<OrdenCompraSugerida> decidir(@PathVariable Long id, @RequestParam Long tenantId, @RequestBody DecisionRequest request) {
+    public ResponseEntity<OrdenCompraSugerida> decidir(@PathVariable Long id, @RequestBody DecisionRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         AuthContext.exigirRol("DUENO_ADMIN", "ENCARGADO_INVENTARIO");
         if (request.estado != OrdenCompraSugerida.Estado.APROBADA && request.estado != OrdenCompraSugerida.Estado.RECHAZADA) {
             throw new RuntimeException("Solo se puede aprobar o rechazar un borrador");

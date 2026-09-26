@@ -3,6 +3,7 @@ package com.auroraplus.core.auth.controllers;
 import com.auroraplus.core.auth.AuthContext;
 import com.auroraplus.core.auth.entities.Usuario;
 import com.auroraplus.core.auth.services.AuthService;
+import com.auroraplus.core.config.TenantContext;
 import com.auroraplus.core.config.TenantProvisioningService;
 import com.auroraplus.core.config.entities.LicenciaTenant;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,19 +36,28 @@ public class AuthController {
         public String telefonoContacto;
         public String username; // el correo con el que inician sesión
         public String password;
+        public Boolean aceptaTerminos;
+        public String versionTerminos;
+        public String planSolicitado; // "basico" | "full", si llegó desde Precios
     }
 
     // Registro público de autoservicio — crea el tenant, activa su módulo y su
     // usuario DUENO_ADMIN, y entrega el token de una vez para no pedir un
-    // segundo login. Prueba gratuita de 1 mes por defecto (ver
-    // TenantProvisioningService — mesesVigencia null = 1 mes).
+    // segundo login. Prueba gratuita de 15 días (DIAS_PRUEBA_GRATIS).
+    /** Duración de la prueba gratuita del registro público. Los textos de la web dicen lo mismo. */
+    public static final int DIAS_PRUEBA_GRATIS = 15;
+
     @PostMapping("/registro-negocio")
-    public ResponseEntity<AuthService.ResultadoLogin> registroNegocio(@RequestBody RegistroNegocioRequest request) {
+    public ResponseEntity<AuthService.ResultadoLogin> registroNegocio(@RequestBody RegistroNegocioRequest request,
+                                                                    jakarta.servlet.http.HttpServletRequest http) {
         if (request.username == null || request.username.isBlank()) {
             throw new RuntimeException("El correo es obligatorio");
         }
         if (request.password == null || request.password.length() < 6) {
             throw new RuntimeException("La contraseña debe tener al menos 6 caracteres");
+        }
+        if (!Boolean.TRUE.equals(request.aceptaTerminos)) {
+            throw new RuntimeException("Debes aceptar los términos y la política de privacidad");
         }
         if (authService.existeUsername(request.username)) {
             throw new RuntimeException("Ya existe una cuenta con este correo");
@@ -57,11 +67,16 @@ public class AuthController {
         alta.nombreEmpresa = request.nombreEmpresa;
         alta.moduloPrincipal = request.moduloPrincipal;
         alta.tipoLicencia = LicenciaTenant.TipoLicencia.COMERCIAL;
+        alta.diasVigencia = DIAS_PRUEBA_GRATIS;
         alta.emailContacto = request.emailContacto;
         alta.telefonoContacto = request.telefonoContacto;
         alta.usuarioInicial = request.username;
         alta.nombreUsuarioInicial = request.nombreCompleto;
         alta.passwordInicial = request.password;
+        alta.terminosVersion = request.versionTerminos != null && !request.versionTerminos.isBlank()
+            ? request.versionTerminos.trim() : "sin-version";
+        alta.terminosIp = com.auroraplus.core.config.RateLimitInterceptor.ipCliente(http.getRemoteAddr(), http.getHeader("X-Forwarded-For"));
+        alta.planSolicitado = "basico".equals(request.planSolicitado) || "full".equals(request.planSolicitado) ? request.planSolicitado : null;
         LicenciaTenant licencia = tenantProvisioningService.crear(alta);
 
         return ResponseEntity.ok(authService.login(licencia.getTenantId(), request.username, request.password));
@@ -157,19 +172,22 @@ public class AuthController {
     }
 
     @PostMapping("/usuarios")
-    public ResponseEntity<Usuario> crearUsuario(@RequestParam Long tenantId, @RequestBody CrearUsuarioRequest request) {
+    public ResponseEntity<Usuario> crearUsuario(@RequestBody CrearUsuarioRequest request) {
+        Long tenantId = TenantContext.getCurrentTenant();
         exigirDuenoAdmin();
         return ResponseEntity.ok(authService.crearUsuario(tenantId, request.username, request.password, request.rol, request.nombreCompleto));
     }
 
     @GetMapping("/usuarios")
-    public List<Usuario> listarUsuarios(@RequestParam Long tenantId) {
+    public List<Usuario> listarUsuarios() {
+        Long tenantId = TenantContext.getCurrentTenant();
         exigirDuenoAdmin();
         return authService.listarUsuarios(tenantId);
     }
 
     @PostMapping("/usuarios/{usuarioId}/desactivar")
-    public ResponseEntity<Void> desactivarUsuario(@RequestParam Long tenantId, @PathVariable Long usuarioId) {
+    public ResponseEntity<Void> desactivarUsuario(@PathVariable Long usuarioId) {
+        Long tenantId = TenantContext.getCurrentTenant();
         exigirDuenoAdmin();
         authService.desactivarUsuario(tenantId, usuarioId);
         return ResponseEntity.ok().build();

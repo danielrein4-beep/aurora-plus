@@ -28,9 +28,8 @@ public class CotizacionVeterinariaController {
 
     @PostMapping
     public ResponseEntity<CotizacionVeterinaria> crear(
-            @RequestParam(required = false) Long tenantId,
             @RequestBody CotizacionVeterinaria cotizacion) {
-        Long tenantActivo = tenantId != null ? tenantId : TenantContext.getCurrentTenant();
+        Long tenantActivo = TenantContext.getCurrentTenant();
         if (tenantActivo == null) {
             throw new RuntimeException("Tenant no identificado en la sesión");
         }

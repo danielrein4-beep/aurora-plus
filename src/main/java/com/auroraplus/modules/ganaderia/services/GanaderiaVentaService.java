@@ -33,6 +33,9 @@ public class GanaderiaVentaService {
     @Autowired
     private GanaderiaSanidadService ganaderiaSanidadService;
 
+    @Autowired
+    private PublicacionesMercadoService publicacionesMercado;
+
     public static class ItemVentaAnimal {
         public Long animalId;
         public BigDecimal precioVenta;
@@ -91,6 +94,7 @@ public class GanaderiaVentaService {
             animal.setEstado("VENDIDO");
             animal.setPotrero(null);
             animalRepository.save(animal);
+            publicacionesMercado.retirarPublicacionesDe(tenantId, animal.getId());
 
             totalVenta = totalVenta.add(item.precioVenta);
 

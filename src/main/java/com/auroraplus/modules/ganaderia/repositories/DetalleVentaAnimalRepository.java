@@ -10,4 +10,7 @@ import java.util.Optional;
 public interface DetalleVentaAnimalRepository extends JpaRepository<DetalleVentaAnimal, Long> {
     // Un animal solo se vende una vez (después queda VENDIDO, no vuelve a estar disponible).
     Optional<DetalleVentaAnimal> findByAnimalId(Long animalId);
+
+    /** Todo lo de la finca de una vez (margen por animal): evita una consulta por animal. */
+    java.util.List<DetalleVentaAnimal> findByTenantId(Long tenantId);
 }

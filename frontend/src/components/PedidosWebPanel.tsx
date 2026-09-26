@@ -94,11 +94,6 @@ function generarNotaEntregaWebPDF(pedido: PedidoWeb, nombreTienda: string): jsPD
     doc.text("Total Bs.:", totX, y);
     doc.text(`Bs.${Number(pedido.totalBs).toFixed(2)}`, colRight - 2, y, { align: "right" });
   }
-  y += 12;
-
-  doc.setFontSize(7);
-  doc.setTextColor(150, 150, 150);
-  doc.text("Documento generado automáticamente por Aurora Plus al confirmar el pedido.", margin, y);
 
   doc.save(`Nota-Entrega-${pedido.numeroPedido}.pdf`);
   return doc;

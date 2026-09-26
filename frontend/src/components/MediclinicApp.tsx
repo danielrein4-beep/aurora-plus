@@ -1,3 +1,4 @@
+import { avisar } from "../avisos";
 import BitacoraAuditoria from "./BitacoraAuditoria";
 import InboxLaboratorioMedico from "./laboratorio/InboxLaboratorioMedico";
 import {
@@ -34,6 +35,7 @@ import {
   contadorInboxExamenesRecibidos, listarExamenesRecibidosPorPaciente, type ExamenRecibidoPaciente,
   listarPacientes, crearPaciente, actualizarPaciente, eliminarPaciente, buscarPacientePorIdentificacion,
   listarCitasDelDia, listarCitasPorRango, agendarCita, actualizarEstadoCita, reprogramarCita, listarCobrosDelDia,
+  eliminarCierreCaja, type CobroConsultaDetalle,
   listarSalaEspera, registrarLlegadaSalaEspera, finalizarAtencionSalaEspera, llamarAConsultorioSalaEspera, procesarCobro,
   listarCierresCaja, registrarCierreCaja,
   estadoPinDoctor, verificarPinDoctor, configurarPinDoctor,
@@ -46,6 +48,7 @@ import {
   type Paciente, type CitaMedica, type SalaEsperaEntrada, type ProcedimientoMedico, type ConsultaMedica,
   type CierreCajaRegistro, type CotizacionMedicaApi, type TasaCambio, type OrigenTasaActiva,
   type PerfilMedicoDocumentos,
+  leerPreferencia, guardarPreferencia,
 } from "../api";
 import {
   generarPdfCierreCaja, generarPdfInformeConsulta, generarTextoWhatsAppConsulta,
@@ -270,6 +273,8 @@ function EstiloClasico() {
 }
 
 const PERFIL_ACTIVO_KEY = "aurora_mediclinic_perfil_activo";
+/** Perfil elegido en ESTA pestaña (sessionStorage): sobrevive a recargas, no a cerrar el navegador. */
+const PERFIL_SESION_KEY = "aurora_mediclinic_perfil_sesion";
 
 // ══════════════════════════════════════════════════════════════════════════
 // SELECTOR DE PERFILES ESTILO NETFLIX (QUIÉN ESTÁ INGRESANDO A MEDICLINIC)
@@ -719,10 +724,28 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     if (pagina !== "odontograma") setOdontoEnConsulta(false);
   }, [pagina]);
   
-  // Estado del perfil activo: siempre null al montar para mostrar la pantalla de selección estilo Netflix
-  const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(null);
+  // Perfil activo: se recuerda en la pestaña; si no hay, se muestra la pantalla de selección de perfil.
+  const [perfilActivo, setPerfilActivo] = useState<RolVista | null>(() => {
+    try { const p = sessionStorage.getItem(PERFIL_SESION_KEY); return p === "MEDICO" || p === "SECRETARIA" ? p : null; } catch { return null; }
+  });
+  useEffect(() => {
+    try {
+      if (perfilActivo) sessionStorage.setItem(PERFIL_SESION_KEY, perfilActivo);
+      else sessionStorage.removeItem(PERFIL_SESION_KEY);
+    } catch { /* sin sessionStorage: se vuelve a elegir al recargar */ }
+  }, [perfilActivo]);
+  // En teléfono el menú lateral fijo tapaba media pantalla: ahora es un cajón (igual que en Comercio).
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
 
-  const [rolActivo, setRolActivo] = useState<RolVista>("MEDICO");
+  // El perfil (médico o secretaria) se recuerda mientras la pestaña esté abierta, para no volver
+  // a elegirlo en cada recarga. Se usa sessionStorage y no localStorage a propósito: en una
+  // computadora compartida, cerrar el navegador obliga a elegir perfil (y PIN) de nuevo.
+  const [rolActivo, setRolActivo] = useState<RolVista>(() => {
+    try { const r = sessionStorage.getItem(PERFIL_SESION_KEY + "_rol"); return r === "SECRETARIA" ? "SECRETARIA" : "MEDICO"; } catch { return "MEDICO"; }
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem(PERFIL_SESION_KEY + "_rol", rolActivo); } catch { /* sin sessionStorage */ }
+  }, [rolActivo]);
   const [modalClaveDoctor, setModalClaveDoctor] = useState(false);
   const [accionPendienteDoctor, setAccionPendienteDoctor] = useState<(() => void) | null>(null);
 
@@ -743,8 +766,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     matriculaMPPS: "",
     colegioMedicos: "",
     clinicaNombre: user?.empresa || (esOdontologia ? "Mi Consultorio Odontológico" : "Mi Consultorio Médico"),
-    tasaBCV: 56.40,
-    tasaCOP: 4200,
+    tasaBCV: 0, // sin tasa real no se inventa una (antes 56,40)
+    tasaCOP: 0,
     claveDoctor: "1234",
     // false hasta que el médico elige su propio PIN por primera vez (ver
     // ModalConfigurarClavePrimeraVez) — mientras esté en false, en vez de pedir
@@ -794,7 +817,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   useEffect(() => {
     if (!tenantId) return;
-    obtenerPerfilMedicoDocumentos().then(setPerfilDocs).catch(() => setPerfilDocs(null));
+    obtenerPerfilMedicoDocumentos().then(setPerfilDocs)
+      .catch(() => { setPerfilDocs(null); avisar("No se pudieron cargar tus datos de documentos (logo, firma, sello). Los PDF pueden salir incompletos.", "error"); });
     obtenerMiNegocio().then((r) => setLogoBase64(r.logoBase64)).catch(() => setLogoBase64(null));
   }, [tenantId]);
 
@@ -901,6 +925,10 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const claveCobrosLocales = () => `aurora_mediclinic_cobros_locales_${tenantId}_${hoy()}`;
 
+  // La caja del día sale de los cobros guardados en el servidor (antes se armaba en el navegador:
+  // otro equipo no la veía y un cobro que el servidor rechazaba igual aparecía). Lo local solo se
+  // usa mientras responde el servidor. "Reiniciar caja" marca desde qué hora se cuenta el turno.
+  const claveCajaDesde = () => `aurora_mediclinic_caja_desde_${tenantId}_${hoy()}`;
   const [cobrosLocales, setCobrosLocales] = useState<CobroItem[]>(() => {
     try {
       const raw = localStorage.getItem(claveCobrosLocales());
@@ -908,12 +936,8 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
     } catch { return []; }
   });
 
-  const [historialCierres, setHistorialCierres] = useState<CierreCajaData[]>(() => {
-    try {
-      const raw = localStorage.getItem(claveHistorialCierres(tenantId));
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  });
+  // Historial de cierres: en el servidor (salud_cierres_caja, con el detalle de cobros desde V104).
+  const [historialCierres, setHistorialCierres] = useState<(CierreCajaData & { serverId?: number })[]>([]);
 
   const [modalTasasRapidas, setModalTasasRapidas] = useState(false);
   const [tasaCOPInput, setTasaCOPInput] = useState<string>("");
@@ -996,45 +1020,86 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
   }, [cobrosLocales, tenantId]);
 
   useEffect(() => {
-    try { localStorage.setItem(claveHistorialCierres(tenantId), JSON.stringify(historialCierres)); } catch {}
-  }, [historialCierres, tenantId]);
+    if (!user?.tenantId) return;
+    listarCierresCaja()
+      .then((lista) => setHistorialCierres(lista.map((c: CierreCajaRegistro) => {
+        let cobros: CobroItem[] = [];
+        try { cobros = c.cobrosJson ? JSON.parse(c.cobrosJson) : []; } catch { /* detalle ilegible: solo totales */ }
+        return {
+          clinicaNombre: configPerfil?.clinicaNombre || "Consultorio Médico",
+          doctorNombre: configPerfil?.doctorNombre || "",
+          responsableNombre: c.responsableNombre,
+          logoBase64: configPerfil?.logoBase64,
+          fecha: c.fecha,
+          horaCierre: c.horaCierre,
+          tasaBCV: Number(c.tasaBCV) || 0,
+          tasaCOP: Number(c.tasaCOP) || 0,
+          cobros,
+          totalUSD: Number(c.totalUSD) || 0,
+          totalVES: Number(c.totalVES) || 0,
+          totalCOP: Number(c.totalCOP) || 0,
+          totalPacientes: c.totalPacientes,
+          observaciones: c.observaciones,
+          serverId: c.id,
+        };
+      })))
+      .catch(() => avisar("No se pudo cargar el historial de cierres de caja. Revisa la conexión.", "error"));
+  }, [user?.tenantId]);
 
   const agregarCobroLocal = (item: CobroItem) => {
     setCobrosLocales((prev) => [item, ...prev]);
   };
 
-  const eliminarCobroLocal = (index: number) => {
-    setCobrosLocales((prev) => {
-      const nuevas = prev.filter((_, i) => i !== index);
-      try { localStorage.setItem(claveCobrosLocales(), JSON.stringify(nuevas)); } catch {}
-      return nuevas;
-    });
-    setToastTasa("✓ Cobro eliminado de la auditoría.");
-    setTimeout(() => setToastTasa(null), 3000);
+  // Un cobro ya registrado en el servidor no se borra desde aquí (volvería al recargar y la caja
+  // no cuadraría con la contabilidad): se explica cómo corregirlo.
+  const eliminarCobroLocal = (_index: number) => {
+    avisar("Los cobros registrados no se borran para que la caja cuadre. Si hubo un error, registra la corrección como egreso en Finanzas.", "info");
   };
 
   const limpiarCobrosLocales = () => {
     setCobrosLocales([]);
-    try { localStorage.removeItem(claveCobrosLocales()); } catch {}
+    try { localStorage.removeItem(claveCobrosLocales()); localStorage.setItem(claveCajaDesde(), new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19)); } catch {}
     setToastTasa("✓ Caja de hoy reiniciada correctamente.");
     setTimeout(() => setToastTasa(null), 3000);
   };
 
   const agregarCierreAuditado = (cierre: CierreCajaData) => {
-    setHistorialCierres((prev) => [cierre, ...prev]);
+    registrarCierreCaja({
+      fecha: cierre.fecha,
+      horaCierre: cierre.horaCierre,
+      responsableNombre: cierre.responsableNombre,
+      tasaBCV: cierre.tasaBCV,
+      tasaCOP: cierre.tasaCOP,
+      totalUSD: cierre.totalUSD,
+      totalVES: cierre.totalVES,
+      totalCOP: cierre.totalCOP,
+      totalPacientes: cierre.totalPacientes,
+      observaciones: cierre.observaciones,
+      cobrosJson: JSON.stringify(cierre.cobros || []),
+    })
+      .then((g) => setHistorialCierres((prev) => [{ ...cierre, serverId: g.id }, ...prev]))
+      .catch((err) => avisar(`El cierre se generó, pero no se guardó en el historial: ${err instanceof Error ? err.message : "error del servidor"}`, "error"));
   };
 
-  const eliminarCierreAuditado = (index: number) => {
-    setHistorialCierres((prev) => {
-      const nuevas = prev.filter((_, i) => i !== index);
-      try { localStorage.setItem(claveHistorialCierres(tenantId), JSON.stringify(nuevas)); } catch {}
-      return nuevas;
-    });
-    setToastTasa("✓ Cierre auditado eliminado del historial.");
-    setTimeout(() => setToastTasa(null), 3000);
+  const eliminarCierreAuditado = async (index: number) => {
+    const cierre = historialCierres[index];
+    try {
+      if (cierre?.serverId) await eliminarCierreCaja(cierre.serverId);
+      setHistorialCierres((prev) => prev.filter((_, i) => i !== index));
+      setToastTasa("✓ Cierre auditado eliminado del historial.");
+      setTimeout(() => setToastTasa(null), 3000);
+    } catch (err) {
+      avisar(`No se pudo eliminar el cierre: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
+    }
   };
 
-  const limpiarHistorialCierres = () => {
+  const limpiarHistorialCierres = async () => {
+    try {
+      for (const c of historialCierres) if (c.serverId) await eliminarCierreCaja(c.serverId);
+    } catch (err) {
+      avisar(`No se pudo vaciar el historial: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
+      return;
+    }
     setHistorialCierres([]);
     try { localStorage.removeItem(claveHistorialCierres(tenantId)); } catch {}
     setToastTasa("✓ Historial de auditorías vaciado.");
@@ -1043,19 +1108,47 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
 
   const recargarTodo = () => {
     cargarContadorLab();
-    listarPacientes().then(setPacientes).catch(() => setPacientes([]));
-    listarCitasDelDia(hoy()).then(setCitasHoy).catch(() => setCitasHoy([]));
-    listarSalaEspera().then(setSalaEspera).catch(() => setSalaEspera([]));
-    listarProcedimientos(tenantId).then(setProcedimientos).catch(() => setProcedimientos([]));
+    // Antes, si algo fallaba, la pantalla quedaba vacía como si no hubiera pacientes o citas.
+    const noCargo: string[] = [];
+    const fallo = (que: string, vaciar: () => void) => () => {
+      vaciar();
+      noCargo.push(que);
+      if (noCargo.length === 1) setTimeout(() => avisar(`No se pudo cargar ${noCargo.join(", ")}. Lo que ves puede estar incompleto; revisa la conexión.`, "error"), 300);
+    };
+    listarPacientes().then(setPacientes).catch(fallo("los pacientes", () => setPacientes([])));
+    listarCitasDelDia(hoy()).then(setCitasHoy).catch(fallo("las citas de hoy", () => setCitasHoy([])));
+    listarSalaEspera().then(setSalaEspera).catch(fallo("la sala de espera", () => setSalaEspera([])));
+    listarProcedimientos(tenantId).then(setProcedimientos).catch(fallo("los procedimientos", () => setProcedimientos([])));
     listarCobrosDelDia(`${hoy()}T00:00:00`, `${hoy()}T23:59:59`)
       .then((c) => {
-        const totalApi = c.reduce((s, x) => s + Number(x.montoTotal), 0);
-        const totalLocal = cobrosLocales.reduce((s, x) => s + Number(x.montoUSD), 0);
-        setIngresosHoy(Math.max(totalApi, totalLocal));
+        const validos = (c as unknown as CobroConsultaDetalle[]).filter((x) => x.estado !== "ANULADO");
+        setIngresosHoy(validos.reduce((s, x) => s + Number(x.montoTotal), 0));
+        // La caja del turno: cobros del servidor desde el último "reiniciar caja" de hoy
+        let desde = "";
+        try { desde = localStorage.getItem(claveCajaDesde()) || ""; } catch { /* sin almacenamiento: se cuenta todo el día */ }
+        const delTurno = validos.filter((x) => !desde || (x.fechaHora || "") >= desde);
+        setCobrosLocales(delTurno.map((x, i) => {
+          const moneda = (x.monedaCobrada || "USD").toUpperCase();
+          const monto = Number(x.montoTotal) || 0;
+          return {
+            turno: delTurno.length - i,
+            pacienteNombre: x.paciente?.nombreCompleto || "Paciente sin ficha",
+            identificacion: x.paciente?.identificacion || "S/C",
+            concepto: x.concepto || "Consulta",
+            metodoPago: x.metodoPago || "",
+            referencia: x.referenciaPago || "N/A",
+            moneda,
+            montoCobrado: monto,
+            montoUSD: moneda === "USD" ? monto : 0,
+            montoVES: moneda === "VES" ? monto : 0,
+            montoCOP: moneda === "COP" ? monto : 0,
+            hora: x.fechaHora ? new Date(x.fechaHora).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+          } as CobroItem;
+        }));
       })
       .catch(() => {
-        const totalLocal = cobrosLocales.reduce((s, x) => s + Number(x.montoUSD), 0);
-        setIngresosHoy(totalLocal);
+        setIngresosHoy(null);
+        avisar("No se pudieron cargar los cobros de hoy. La caja puede estar incompleta.", "error");
       });
   };
 
@@ -1130,7 +1223,10 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
       <AuroraGradientDef />
       {modoClasico && <EstiloClasico />}
       
-      <aside className="w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1.5 bg-[#0D3B3D]">
+      {menuMovilAbierto && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMenuMovilAbierto(false)} aria-hidden="true" />
+      )}
+      <aside className={`w-64 flex-shrink-0 border-r border-white/10 flex flex-col p-4 space-y-1.5 bg-[#0D3B3D] fixed inset-y-0 left-0 z-50 overflow-y-auto transform transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${menuMovilAbierto ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="px-2 pb-3 mb-2 border-b border-white/10">
           <div className="flex items-center justify-between">
             {esOdontologia ? (
@@ -1166,7 +1262,7 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
             return (
               <button
                 key={n.id}
-                onClick={() => intentarNavegar(n.id)}
+                onClick={() => { intentarNavegar(n.id); setMenuMovilAbierto(false); }}
                 className={`sidebar-glare w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                   activo
                     ? "sidebar-glare--active bg-white/10 text-white"
@@ -1229,9 +1325,16 @@ export default function MediclinicApp({ onSalir }: { onSalir: () => void }) {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-y-auto">
-        <header className="py-3 px-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-white/70 backdrop-blur-md">
+      <main className="flex-1 min-w-0 flex flex-col overflow-y-auto">
+        <header className="py-3 px-3 sm:px-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-white/70 backdrop-blur-md">
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMenuMovilAbierto(true)}
+              className="lg:hidden p-2 -ml-1 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer flex-shrink-0"
+              aria-label="Abrir menú"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+            </button>
             <button
               onClick={cerrarSesionPerfil}
               className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors cursor-pointer flex-shrink-0"
@@ -1932,7 +2035,7 @@ function VistaGeneral({
         const rawC = localStorage.getItem(claveCotizaciones(tenantId));
         if (rawC) setCotizacionesVivas(JSON.parse(rawC));
         else setCotizacionesVivas([]);
-      } catch {}
+      } catch { /* caché local ilegible: se ignora */ }
     };
     refrescarDatos();
     window.addEventListener("storage", refrescarDatos);
@@ -3085,7 +3188,7 @@ function LaboratoriosRecibidosPaciente({ tenantId, pacienteId }: { tenantId: num
     setExamenes(null);
     listarExamenesRecibidosPorPaciente(tenantId, pacienteId)
       .then(setExamenes)
-      .catch(() => setExamenes([]));
+      .catch(() => { setExamenes([]); avisar("No se pudieron cargar los exámenes de laboratorio de este paciente.", "error"); });
   }, [tenantId, pacienteId]);
 
   if (!examenes || examenes.length === 0) return null;
@@ -3176,8 +3279,8 @@ function HistoriasClinicas({
   const [itemsRecipe, setItemsRecipe] = useState<ItemRecipePrescrito[]>([]);
   const [form, setForm] = useState({
     motivoConsulta: "",
-    talla: "1.75",
-    peso: "70.0",
+    talla: "",
+    peso: "",
     // Antes no existían — los informes médicos imprimían "120/80, 75bpm,
     // 36.8°C, 99% SatO2" fijos para CUALQUIER paciente porque no había dónde
     // capturarlos de verdad. El backend (ConsultaMedica.java) ya los guarda;
@@ -3230,7 +3333,8 @@ function HistoriasClinicas({
     }
     historialConsultasPaciente(Number(pacienteSeleccionado.id))
       .then(setHistorial)
-      .catch(() => setHistorial([]));
+      // Una historia clínica vacía por un error de red es peligrosa: se avisa claramente.
+      .catch(() => { setHistorial([]); avisar("No se pudo cargar el historial de consultas de este paciente. No asumas que no tiene consultas previas.", "error"); });
   }, [pacienteSeleccionado]);
 
   const handleBuscarPaciente = (e?: React.FormEvent) => {
@@ -3253,8 +3357,8 @@ function HistoriasClinicas({
     setItemsRecipe([]);
     setForm({
       motivoConsulta: "",
-      talla: "1.75",
-      peso: "70.0",
+      talla: "",
+      peso: "",
       presionArterial: "",
       frecuenciaCardiaca: "",
       frecuenciaRespiratoria: "",
@@ -3273,11 +3377,21 @@ function HistoriasClinicas({
     setError(null);
   };
 
+  // Matrícula MPPS y Colegio de Médicos son obligatorios en un documento médico venezolano: sin
+  // ellos no se emite nada (antes salían números inventados, "109842" y "5421").
+  const faltanDatosLegalesMedico = (): boolean => {
+    if (config.matriculaMPPS?.trim() && config.colegioMedicos?.trim() && config.doctorNombre?.trim()) return false;
+    dispararToast("Para emitir documentos, completa tu nombre, matrícula MPPS y N° del Colegio de Médicos en Configuración & Perfil.");
+    return true;
+  };
+
   const construirReportData = (): ConsultaReportData | null => {
+    if (faltanDatosLegalesMedico()) return null;
     if (!pacienteSeleccionado) return null;
-    const pKg = parseFloat(form.peso) || 70;
-    const tM = parseFloat(form.talla) || 1.75;
-    const imcCalc = (pKg / (tM * tM)).toFixed(1);
+    // Sin peso o talla no se inventan valores (antes salían 70 kg / 1,75 m y un IMC calculado con ellos).
+    const pKg = parseFloat(form.peso);
+    const tM = parseFloat(form.talla);
+    const imcCalc = pKg > 0 && tM > 0 ? (pKg / (tM * tM)).toFixed(1) : "No registrado";
 
     const esForaneo =
       pacienteSeleccionado.tipoOrigen === "Foráneo" ||
@@ -3285,11 +3399,11 @@ function HistoriasClinicas({
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     return {
-      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
-      doctorNombre: config.doctorNombre || "Médico Titular",
-      especialidad: config.especialidad || "Dermatología / Medicina General",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       logoBase64: config.logoBase64,
       firmaBase64: config.firmaBase64,
       encabezadoTexto: config.encabezadoTexto,
@@ -3302,7 +3416,7 @@ function HistoriasClinicas({
           : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
-        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        origen: `${esForaneo ? "Foráneo" : "Local"}${pacienteSeleccionado.ciudadOrigen ? ` (${pacienteSeleccionado.ciudadOrigen})` : ""}`,
         fechaConsulta: hoy(),
       },
       signosVitales: {
@@ -3310,14 +3424,14 @@ function HistoriasClinicas({
         fc: form.frecuenciaCardiaca || "No registrado",
         fr: form.frecuenciaRespiratoria || "No registrado",
         temp: form.temperatura || "No registrado",
-        peso: `${form.peso || "70"} kg`,
-        talla: `${form.talla || "1.75"} m`,
+        peso: form.peso ? `${form.peso} kg` : "No registrado",
+        talla: form.talla ? `${form.talla} m` : "No registrado",
         imc: imcCalc,
         satO2: form.saturacionOxigeno ? `${form.saturacionOxigeno}%` : "No registrado",
       },
-      motivoConsulta: form.motivoConsulta || "Control de rutina y evolución clínica",
+      motivoConsulta: form.motivoConsulta || "No registrado",
       evolucionClinica: form.evolucionClinica,
-      diagnosticoCIE10: form.descripcionDiagnostico || "Evaluación Clínica General",
+      diagnosticoCIE10: form.descripcionDiagnostico || "No registrado",
       planTratamiento: construirTextoPlanTratamiento(),
       proximaCita: form.proximaCita,
     };
@@ -3360,8 +3474,8 @@ function HistoriasClinicas({
         planTratamiento: construirTextoPlanTratamiento(),
         recipeMedicamentos: itemsRecipe.length > 0 ? JSON.stringify(itemsRecipe) : undefined,
         anotacionesPrivadas: form.anotacionesPrivadas,
-        talla: form.talla,
-        peso: form.peso,
+        talla: form.talla || undefined,
+        peso: form.peso || undefined,
         presionArterial: form.presionArterial.trim() || undefined,
         frecuenciaCardiaca: form.frecuenciaCardiaca ? Number(form.frecuenciaCardiaca) : undefined,
         frecuenciaRespiratoria: form.frecuenciaRespiratoria ? Number(form.frecuenciaRespiratoria) : undefined,
@@ -3390,6 +3504,7 @@ function HistoriasClinicas({
   };
 
   const construirRecipeReportData = (itemsCustom?: ItemRecipePrescrito[], c?: ConsultaMedica): RecipeReportData | null => {
+    if (faltanDatosLegalesMedico()) return null;
     if (!pacienteSeleccionado) return null;
     const listaItems = itemsCustom || itemsRecipe;
     const medList: RecipeItemData[] = listaItems.map((it) => ({
@@ -3402,11 +3517,11 @@ function HistoriasClinicas({
     }));
 
     return {
-      clinicaNombre: config.clinicaNombre || "Centro Medico Especializado",
-      doctorNombre: config.doctorNombre || "Medico Tratante",
-      especialidad: config.especialidad || "Medicina General / Especialidades",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       telefonoContacto: config.telefonoContacto || pacienteSeleccionado.telefono,
       direccionClinica: config.direccionClinica,
       logoBase64: config.logoBase64,
@@ -3448,7 +3563,9 @@ function HistoriasClinicas({
     if (c.recipeMedicamentos) {
       try {
         itemsParsed = JSON.parse(c.recipeMedicamentos);
-      } catch {}
+      } catch {
+        avisar("El récipe guardado de esta consulta está dañado; revisa los medicamentos antes de reimprimirlo.", "error");
+      }
     }
     const recipeData = construirRecipeReportData(itemsParsed, c);
     if (recipeData) {
@@ -3478,17 +3595,18 @@ function HistoriasClinicas({
 
   const handleDescargarPdfConsulta = (c: ConsultaMedica) => {
     if (!pacienteSeleccionado) return;
+    if (faltanDatosLegalesMedico()) return;
     const esForaneo =
       pacienteSeleccionado.tipoOrigen === "Foráneo" ||
       pacienteSeleccionado.tipoOrigen === "FORANEO" ||
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
-      doctorNombre: config.doctorNombre || "Médico Titular",
-      especialidad: config.especialidad || "Dermatología / Medicina General",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       logoBase64: config.logoBase64,
       firmaBase64: config.firmaBase64,
       encabezadoTexto: config.encabezadoTexto,
@@ -3501,7 +3619,7 @@ function HistoriasClinicas({
           : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
-        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        origen: `${esForaneo ? "Foráneo" : "Local"}${pacienteSeleccionado.ciudadOrigen ? ` (${pacienteSeleccionado.ciudadOrigen})` : ""}`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
@@ -3529,17 +3647,18 @@ function HistoriasClinicas({
 
   const handleEnviarWhatsAppConsulta = (c: ConsultaMedica) => {
     if (!pacienteSeleccionado) return;
+    if (faltanDatosLegalesMedico()) return;
     const esForaneo =
       pacienteSeleccionado.tipoOrigen === "Foráneo" ||
       pacienteSeleccionado.tipoOrigen === "FORANEO" ||
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
-      doctorNombre: config.doctorNombre || "Médico Titular",
-      especialidad: config.especialidad || "Dermatología / Medicina General",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       logoBase64: config.logoBase64,
       firmaBase64: config.firmaBase64,
       encabezadoTexto: config.encabezadoTexto,
@@ -3552,7 +3671,7 @@ function HistoriasClinicas({
           : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
-        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        origen: `${esForaneo ? "Foráneo" : "Local"}${pacienteSeleccionado.ciudadOrigen ? ` (${pacienteSeleccionado.ciudadOrigen})` : ""}`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
@@ -3583,17 +3702,18 @@ function HistoriasClinicas({
 
   const handleEnviarCorreoConsulta = (c: ConsultaMedica) => {
     if (!pacienteSeleccionado) return;
+    if (faltanDatosLegalesMedico()) return;
     const esForaneo =
       pacienteSeleccionado.tipoOrigen === "Foráneo" ||
       pacienteSeleccionado.tipoOrigen === "FORANEO" ||
       (pacienteSeleccionado.origen && pacienteSeleccionado.origen.includes("Foráneo"));
 
     const data: ConsultaReportData = {
-      clinicaNombre: config.clinicaNombre || "Mi Consultorio Médico",
-      doctorNombre: config.doctorNombre || "Médico Titular",
-      especialidad: config.especialidad || "Dermatología / Medicina General",
-      matriculaMPPS: config.matriculaMPPS || "109842",
-      colegioMedicos: config.colegioMedicos || "5421",
+      clinicaNombre: config.clinicaNombre || "Consultorio Médico",
+      doctorNombre: config.doctorNombre,
+      especialidad: config.especialidad || "",
+      matriculaMPPS: config.matriculaMPPS,
+      colegioMedicos: config.colegioMedicos,
       logoBase64: config.logoBase64,
       firmaBase64: config.firmaBase64,
       encabezadoTexto: config.encabezadoTexto,
@@ -3606,7 +3726,7 @@ function HistoriasClinicas({
           : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
-        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        origen: `${esForaneo ? "Foráneo" : "Local"}${pacienteSeleccionado.ciudadOrigen ? ` (${pacienteSeleccionado.ciudadOrigen})` : ""}`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
@@ -4927,6 +5047,36 @@ function Procedimientos({
     return [];
   });
 
+  // Las cotizaciones de pacientes con ficha se cargan del servidor (se ven desde cualquier equipo);
+  // en el navegador solo quedan las de prospectos sin ficha, que el servidor no puede guardar.
+  useEffect(() => {
+    if (!tenantId) return;
+    listarCotizaciones()
+      .then((lista) => {
+        const delServidor: CotizacionGuardada[] = lista.map((c) => ({
+          id: `srv-${c.id}`,
+          backendId: c.id,
+          pacienteId: c.paciente?.id ?? null,
+          pacienteNombre: c.paciente?.nombreCompleto || "Paciente",
+          pacienteCedula: c.paciente?.identificacion || "S/C",
+          pacienteTelefono: c.paciente?.telefono || undefined,
+          procedimientoNombre: c.procedimientoNombre,
+          descripcion: c.descripcion || undefined,
+          costoUSD: Number(c.costoUSD) || 0,
+          costoVES: Number(c.costoVES) || 0,
+          costoCOP: Number(c.costoCOP) || 0,
+          tasaBCV: Number(c.tasaBCV) || 0,
+          tasaCOP: Number(c.tasaCOP) || 0,
+          estado: c.estado,
+          fecha: (c.fecha || "").slice(0, 10),
+          fechaPlanificada: c.fechaPlanificada || undefined,
+        }));
+        setCotizaciones((prev) => [...prev.filter((c) => !c.backendId), ...delServidor]
+          .sort((x, y) => (y.fecha || "").localeCompare(x.fecha || "")));
+      })
+      .catch(() => avisar("No se pudieron cargar las cotizaciones del servidor; ves solo las guardadas en este equipo.", "error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
   // Guardar en localStorage cuando cambie
   useEffect(() => {
     try {
@@ -4951,8 +5101,8 @@ function Procedimientos({
 
   // Modal para ajuste rápido de tasas
   const [modalTasas, setModalTasas] = useState(false);
-  const [tempTasaBCV, setTempTasaBCV] = useState(config?.tasaBCV || 950);
-  const [tempTasaCOP, setTempTasaCOP] = useState(config?.tasaCOP || 4000);
+  const [tempTasaBCV, setTempTasaBCV] = useState(config?.tasaBCV || 0);
+  const [tempTasaCOP, setTempTasaCOP] = useState(config?.tasaCOP || 0);
   const [guardandoTasasModal, setGuardandoTasasModal] = useState(false);
 
   // Filtros del Historial
@@ -4971,8 +5121,8 @@ function Procedimientos({
   }, [pacienteInicialId, pacientes]);
 
   // Cálculo en tiempo real
-  const tasaBCV = Number(config?.tasaBCV) || 950;
-  const tasaCOP = Number(config?.tasaCOP) || 4000;
+  const tasaBCV = Number(config?.tasaBCV) || 0;
+  const tasaCOP = Number(config?.tasaCOP) || 0;
   const usdNum = parseFloat(String(precioUSD)) || 0;
   const vesNum = usdNum * tasaBCV;
   const copNum = usdNum * tasaCOP;
@@ -5004,15 +5154,15 @@ function Procedimientos({
   // Guardar Cotización
   const handleGuardarCotizacion = async (generarPdfDespues = false) => {
     if (!busquedaPaciente.trim() && !pacienteSeleccionado) {
-      alert("Por favor selecciona o ingresa el nombre del paciente.");
+      avisar("Por favor selecciona o ingresa el nombre del paciente.");
       return;
     }
     if (!nombreProcedimiento.trim()) {
-      alert("Por favor ingresa el nombre del procedimiento o cirugía.");
+      avisar("Por favor ingresa el nombre del procedimiento o cirugía.");
       return;
     }
     if (usdNum <= 0) {
-      alert("Por favor ingresa un precio base en USD mayor a 0.");
+      avisar("Por favor ingresa un precio base en USD mayor a 0.");
       return;
     }
 
@@ -5040,40 +5190,43 @@ function Procedimientos({
         fechaPlanificada: fechaPlanificada || undefined,
       };
 
-      // Si no existe en el catálogo del backend, guardarlo en background
-      if (tenantId) {
+      // Con paciente registrado, la cotización se guarda en el servidor ANTES de mostrarse como
+      // hecha (antes decía "registrado" aunque el servidor la rechazara).
+      if (pacienteSeleccionado) {
+        try {
+          const creada = await crearCotizacion({
+            pacienteId: pacienteSeleccionado.id,
+            procedimientoNombre: nombreProcedimiento.trim(),
+            descripcion: descripcionClinica.trim() || undefined,
+            costoUSD: usdNum,
+            costoVES: vesNum,
+            costoCOP: copNum,
+            tasaBCV,
+            tasaCOP,
+            fechaPlanificada: fechaPlanificada || undefined,
+          });
+          nuevaCot.backendId = creada.id;
+        } catch (err) {
+          avisar(`La cotización NO se guardó: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
+          return;
+        }
+      }
+
+      // Si el procedimiento no está en el catálogo, se agrega (sin inventar duración: 30 min por defecto del catálogo)
+      if (tenantId && !(procedimientos || []).some((p) => p.nombre.trim().toLowerCase() === nombreProcedimiento.trim().toLowerCase())) {
         crearProcedimiento(tenantId, {
           nombre: nombreProcedimiento.trim(),
           descripcion: descripcionClinica.trim() || null,
           costo: usdNum,
           moneda: "USD",
-          duracionMinutos: 45,
-        }).catch(() => {});
+          duracionMinutos: 30,
+        }).catch(() => avisar("La cotización se guardó, pero el procedimiento no se agregó al catálogo.", "error"));
       }
 
       setCotizaciones((prev) => [nuevaCot, ...prev]);
-      dispararToast("¡Cotización / Procedimiento registrado exitosamente!");
-
-      // Persistir en el backend real cuando la cotización está vinculada a un paciente
-      // registrado (la tabla exige un paciente real — un prospecto sin ficha se queda
-      // como registro local hasta que se le cree su ficha).
-      if (pacienteSeleccionado) {
-        crearCotizacion({
-          pacienteId: pacienteSeleccionado.id,
-          procedimientoNombre: nombreProcedimiento.trim(),
-          descripcion: descripcionClinica.trim() || undefined,
-          costoUSD: usdNum,
-          costoVES: vesNum,
-          costoCOP: copNum,
-          tasaBCV,
-          tasaCOP,
-          fechaPlanificada: fechaPlanificada || undefined,
-        }).then((creada) => {
-          setCotizaciones((prev) => prev.map((c) => (c.id === nuevaCot.id ? { ...c, backendId: creada.id } : c)));
-        }).catch((err) => {
-          dispararToast(`⚠️ Cotización guardada localmente, pero no en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-        });
-      }
+      dispararToast(pacienteSeleccionado
+        ? "¡Cotización registrada!"
+        : "Cotización guardada solo en este equipo: el paciente no tiene ficha. Créale la ficha para guardarla en el servidor.");
 
       if (generarPdfDespues) {
         ejecutarPdfCotizacion(nuevaCot);
@@ -5160,28 +5313,29 @@ function Procedimientos({
   };
 
   // Cambiar estado de una cotización en el historial
-  const cambiarEstado = (id: string, nuevoEstado: CotizacionGuardada["estado"]) => {
-    setCotizaciones((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, estado: nuevoEstado } : c))
-    );
-    dispararToast(`Estado actualizado a: ${nuevoEstado}`);
+  const cambiarEstado = async (id: string, nuevoEstado: CotizacionGuardada["estado"]) => {
     const cot = cotizaciones.find((c) => c.id === id);
     if (cot?.backendId) {
-      actualizarEstadoCotizacion(cot.backendId, nuevoEstado).catch((err) => {
-        dispararToast(`⚠️ Estado actualizado localmente, pero no en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-      });
+      try {
+        await actualizarEstadoCotizacion(cot.backendId, nuevoEstado);
+      } catch (err) {
+        avisar(`No se pudo cambiar el estado: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
+        return;
+      }
     }
+    setCotizaciones((prev) => prev.map((c) => (c.id === id ? { ...c, estado: nuevoEstado } : c)));
+    dispararToast(`Estado actualizado a: ${nuevoEstado}`);
   };
 
   // Eliminar una cotización
   const eliminarCotizacion = (id: string) => {
     if (confirm("¿Estás seguro de eliminar este registro del historial?")) {
       const cot = cotizaciones.find((c) => c.id === id);
-      setCotizaciones((prev) => prev.filter((c) => c.id !== id));
-      dispararToast("Registro eliminado.");
-      if (cot?.backendId) {
-        eliminarCotizacionApi(cot.backendId).catch((err) => {
-          dispararToast(`⚠️ Se quitó de la lista, pero no se pudo eliminar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+      const quitar = () => { setCotizaciones((prev) => prev.filter((c) => c.id !== id)); dispararToast("Registro eliminado."); };
+      if (!cot?.backendId) { quitar(); return; }
+      {
+        eliminarCotizacionApi(cot.backendId).then(quitar).catch((err) => {
+          avisar(`No se pudo eliminar: ${err instanceof Error ? err.message : "error desconocido"}`);
         });
       }
     }
@@ -5980,7 +6134,7 @@ function SalaEspera({
   const [enviandoComprobante, setEnviandoComprobante] = useState(false);
   const [comprobanteMsg, setComprobanteMsg] = useState<string | null>(null);
 
-  const tasaBCV = Number(config?.tasaBCV) || 950;
+  const tasaBCV = Number(config?.tasaBCV) || 0;
 
   const dispararToast = (msg: string) => {
     setToastExito(msg);
@@ -6059,7 +6213,7 @@ function SalaEspera({
     e.preventDefault();
     const nombreFinal = admitirNombreManual.trim();
     if (!nombreFinal) {
-      alert("Por favor ingresa o selecciona un paciente.");
+      avisar("Por favor ingresa o selecciona un paciente.");
       return;
     }
 
@@ -6129,7 +6283,6 @@ function SalaEspera({
           montoCOP: montoCOPNum,
           hora: nuevoTurno.horaLlegada,
         };
-        onAgregarCobro(cobroItem);
         try {
           await procesarCobro({
             pacienteId: pacienteIdResuelto,
@@ -6141,8 +6294,11 @@ function SalaEspera({
             metodoPago: metodoPagoBackend(admitirMetodoPago),
             referenciaPago: admitirReferencia.trim() || undefined,
           });
+          onAgregarCobro(cobroItem);
         } catch (err) {
-          dispararToast(`⚠️ El pago se registró en caja pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
+          // Antes el pago quedaba en la caja de la pantalla aunque el servidor lo rechazara.
+          Object.assign(nuevoTurno, { estadoPago: "PENDIENTE", metodoPago: undefined, montoCobrado: 0, montoUSD: 0, montoVES: 0, montoCOP: 0 });
+          avisar(`El paciente quedó admitido, pero el pago NO se registró: ${err instanceof Error ? err.message : "error del servidor"}. Cóbralo de nuevo desde la sala de espera.`, "error");
         }
       }
 
@@ -6226,6 +6382,41 @@ function SalaEspera({
       montoUSDNum = montoNum;
     }
 
+
+    if (montoNum > 0) {
+      const cobroItem: CobroItem = {
+        turno: modalPago.turnoNumero,
+        pacienteNombre: modalPago.pacienteNombre,
+        identificacion: modalPago.pacienteCedula,
+        concepto: modalPago.motivo || "Consulta Médica",
+        metodoPago: pagoMetodo,
+        referencia: pagoReferencia.trim() || "N/A",
+        moneda: monedaCobro,
+        montoCobrado: montoNum,
+        montoUSD: montoUSDNum,
+        montoVES: montoVESNum,
+        montoCOP: montoCOPNum,
+        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      try {
+        await procesarCobro({
+          pacienteId: modalPago.pacienteId ?? undefined,
+          concepto: modalPago.motivo || "Consulta Médica",
+          montoTotal: montoNum,
+          monedaCobrada: monedaCobro,
+          montoRecibido: montoNum,
+          monedaPago: monedaCobro,
+          metodoPago: metodoPagoBackend(pagoMetodo),
+          referenciaPago: pagoReferencia.trim() || undefined,
+        });
+        onAgregarCobro(cobroItem);
+      } catch (err) {
+        // Si el servidor no lo guardó, el turno sigue pendiente y el modal queda abierto para reintentar.
+        avisar(`El pago NO se registró: ${err instanceof Error ? err.message : "error del servidor"}. Intenta de nuevo.`, "error");
+        return;
+      }
+    }
+
     setTurnos((prev) =>
       prev.map((t) =>
         t.id === modalPago.id
@@ -6243,38 +6434,6 @@ function SalaEspera({
           : t
       )
     );
-
-    if (montoNum > 0) {
-      const cobroItem: CobroItem = {
-        turno: modalPago.turnoNumero,
-        pacienteNombre: modalPago.pacienteNombre,
-        identificacion: modalPago.pacienteCedula,
-        concepto: modalPago.motivo || "Consulta Médica",
-        metodoPago: pagoMetodo,
-        referencia: pagoReferencia.trim() || "N/A",
-        moneda: monedaCobro,
-        montoCobrado: montoNum,
-        montoUSD: montoUSDNum,
-        montoVES: montoVESNum,
-        montoCOP: montoCOPNum,
-        hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-      onAgregarCobro(cobroItem);
-      try {
-        await procesarCobro({
-          pacienteId: modalPago.pacienteId ?? undefined,
-          concepto: modalPago.motivo || "Consulta Médica",
-          montoTotal: montoNum,
-          monedaCobrada: monedaCobro,
-          montoRecibido: montoNum,
-          monedaPago: monedaCobro,
-          metodoPago: metodoPagoBackend(pagoMetodo),
-          referenciaPago: pagoReferencia.trim() || undefined,
-        });
-      } catch (err) {
-        dispararToast(`⚠️ El pago se registró en caja pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-      }
-    }
 
     dispararToast("Pago registrado exitosamente.");
     setModalPago(null);
@@ -6370,31 +6529,16 @@ function SalaEspera({
       fecha: hoy(),
       horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       tasaBCV: config?.tasaBCV || tasaBCV,
-      tasaCOP: config?.tasaCOP || 4200,
+      tasaCOP: config?.tasaCOP || 0,
       cobros: cobrosLocales,
       totalUSD: totalCajaUSD,
       totalVES: totalCajaVES,
       totalCOP: totalCajaCOP,
       totalPacientes: cobrosLocales.length,
     };
+    // onAgregarCierre lo guarda en el servidor (totales + detalle de cobros) y avisa si falla.
     onAgregarCierre(dataCierre);
     setMostrarModalCierre(false);
-    try {
-      await registrarCierreCaja({
-        fecha: dataCierre.fecha,
-        horaCierre: dataCierre.horaCierre,
-        responsableNombre: dataCierre.responsableNombre,
-        tasaBCV: dataCierre.tasaBCV,
-        tasaCOP: dataCierre.tasaCOP,
-        totalUSD: dataCierre.totalUSD,
-        totalVES: dataCierre.totalVES,
-        totalCOP: dataCierre.totalCOP,
-        totalPacientes: dataCierre.totalPacientes,
-      });
-      dispararToast("Cierre de caja generado y guardado en el servidor.");
-    } catch (err) {
-      dispararToast(`⚠️ Cierre generado localmente, pero no se pudo guardar en el servidor: ${err instanceof Error ? err.message : "error desconocido"}`);
-    }
     if (onVerDocumento) {
       onVerDocumento({ tipo: "CIERRE_CAJA", data: dataCierre });
     } else {
@@ -7275,15 +7419,28 @@ function AgendaMedica({
   const [citas, setCitas] = useState<CitaAgendaItem[]>([]);
   const [cargandoCitas, setCargandoCitas] = useState(false);
 
-  // Fechas bloqueadas (días no laborables / feriados / congresos) — se mantiene por ahora en
-  // localStorage (configuración de baja frecuencia, no datos clínicos); migrar a BloqueoAgenda
-  // del backend queda pendiente para una siguiente pasada.
+  // Fechas bloqueadas (días no laborables / feriados / congresos): se guardan en el servidor
+  // (preferencia "salud_agenda_bloqueos") para que Recepción y el médico vean las mismas. Antes
+  // vivían solo en este navegador y otra PC podía agendar en un día bloqueado.
   const [fechasBloqueadas, setFechasBloqueadas] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(claveFechasBloqueadas(tenantId));
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   });
+  useEffect(() => {
+    leerPreferencia<string[]>("salud_agenda_bloqueos")
+      .then((delServidor) => {
+        if (Array.isArray(delServidor)) {
+          setFechasBloqueadas(delServidor);
+          try { localStorage.setItem(claveFechasBloqueadas(tenantId), JSON.stringify(delServidor)); } catch { /* sin almacenamiento */ }
+        } else if (fechasBloqueadas.length > 0) {
+          guardarPreferencia("salud_agenda_bloqueos", fechasBloqueadas).catch(() => {});
+        }
+      })
+      .catch(() => avisar("No se pudieron cargar las fechas bloqueadas de la agenda desde el servidor.", "error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   // Formulario Agendar Cita
   const [formCedula, setFormCedula] = useState("");
@@ -7377,7 +7534,9 @@ function AgendaMedica({
       localStorage.setItem(claveFechasBloqueadas(tenantId), JSON.stringify(nuevas));
       window.dispatchEvent(new Event("aurora_agenda_updated"));
     } catch {}
-    dispararToast(yaBloqueada ? `✓ Fecha ${f} desbloqueada para consultas.` : `🔒 Fecha ${f} bloqueada (No laborable).`);
+    guardarPreferencia("salud_agenda_bloqueos", nuevas).catch((e) =>
+      avisar(`El bloqueo quedó solo en este equipo: ${e instanceof Error ? e.message : "error del servidor"}`, "error"));
+    dispararToast(yaBloqueada ? `Fecha ${f} desbloqueada para consultas.` : `Fecha ${f} bloqueada (no laborable).`);
     onCambio();
   };
 
@@ -7546,12 +7705,12 @@ function AgendaMedica({
   const handleGuardarCita = async (e: React.FormEvent) => {
     e.preventDefault();
     if (estaBloqueadaSeleccionada) {
-      alert("⚠️ La fecha seleccionada se encuentra BLOQUEADA. Desbloquéala primero para poder agendar pacientes.");
+      avisar("⚠️ La fecha seleccionada se encuentra BLOQUEADA. Desbloquéala primero para poder agendar pacientes.");
       return;
     }
     const nombreCompleto = `${formNombres.trim()} ${formApellidos.trim()}`.trim();
     if (!nombreCompleto) {
-      alert("Por favor ingresa el nombre del paciente.");
+      avisar("Por favor ingresa el nombre del paciente.");
       return;
     }
 
@@ -7572,7 +7731,7 @@ function AgendaMedica({
       onCambio();
       dispararToast(`¡Cita agendada con éxito para ${nombreCompleto} a las ${formHora}!`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo agendar la cita.");
+      avisar(err instanceof Error ? err.message : "No se pudo agendar la cita.");
     } finally {
       setGuardando(false);
     }
@@ -7588,7 +7747,7 @@ function AgendaMedica({
       onCambio();
       dispararToast("Cita cancelada.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo cancelar la cita.");
+      avisar(err instanceof Error ? err.message : "No se pudo cancelar la cita.");
     }
   };
 
@@ -7603,7 +7762,7 @@ function AgendaMedica({
     e.preventDefault();
     if (!citaParaReprogramar) return;
     if (fechasBloqueadas.includes(reprogFecha)) {
-      alert("La fecha destino está bloqueada. Elige otra fecha.");
+      avisar("La fecha destino está bloqueada. Elige otra fecha.");
       return;
     }
 
@@ -7617,42 +7776,40 @@ function AgendaMedica({
       dispararToast(`✓ Cita reprogramada para el ${reprogFecha} a las ${reprogHora}`);
       setCitaParaReprogramar(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo reprogramar la cita.");
+      avisar(err instanceof Error ? err.message : "No se pudo reprogramar la cita.");
     } finally {
       setReprogramando(false);
     }
   };
 
-  // Pasar paciente directamente a sala de espera
-  const handlePasarASalaEspera = (cita: CitaAgendaItem) => {
+  // Pasar paciente directamente a sala de espera. Se registra en el servidor (salud_sala_espera),
+  // igual que la admisión desde la sala: antes solo se guardaba en este navegador y el médico,
+  // en otro equipo, nunca veía el turno aunque aquí dijera "ingresado".
+  const handlePasarASalaEspera = async (cita: CitaAgendaItem) => {
     try {
-      const turnosRaw = localStorage.getItem(claveSalaEsperaTurnos(tenantId));
-      const turnosList: TurnoSalaEspera[] = turnosRaw ? JSON.parse(turnosRaw) : [];
-      const maxNum = turnosList.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0);
-      const nuevoNumero = maxNum + 1;
-      const codigoTurno = `T-${String(nuevoNumero).padStart(2, "0")}`;
-
-      const nuevoTurno: TurnoSalaEspera = {
-        id: `turno-${Date.now()}`,
-        turnoNumero: nuevoNumero,
-        codigoTurno,
-        pacienteId: null,
-        pacienteNombre: cita.pacienteNombre,
-        pacienteCedula: cita.pacienteCedula,
-        pacienteTelefono: cita.pacienteTelefono,
-        horaLlegada: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        fecha: hoy(),
-        motivo: cita.motivo,
-        consultorio: "Consultorio 1 (Doctor)",
-        estado: "EN_ESPERA",
-        estadoPago: "PENDIENTE",
-      };
-
-      localStorage.setItem(claveSalaEsperaTurnos(tenantId), JSON.stringify([...turnosList, nuevoTurno]));
-      dispararToast(`¡${cita.pacienteNombre} ingresado a Sala de Espera con Turno ${codigoTurno}!`);
+      let pacienteId = cita.pacienteId ?? null;
+      const cedula = (cita.pacienteCedula || "").trim();
+      const cedulaValida = cedula && !/^s\/?c$/i.test(cedula);
+      if (!pacienteId && cedulaValida) {
+        const encontrado = await buscarPacientePorIdentificacion(cedula);
+        if (encontrado) pacienteId = encontrado.id;
+      }
+      if (!pacienteId) {
+        const nombreCompleto = (cita.pacienteNombre || "").trim();
+        const [primerNombre, ...resto] = nombreCompleto.split(/\s+/);
+        const creado = await crearPaciente({
+          identificacion: cedulaValida ? cedula : `SC-${Date.now()}`,
+          nombres: primerNombre || nombreCompleto || "Paciente",
+          apellidos: resto.join(" ") || "-",
+          telefono: cita.pacienteTelefono && !/^s\/?t$/i.test(cita.pacienteTelefono) ? cita.pacienteTelefono : undefined,
+        });
+        pacienteId = creado.id;
+      }
+      await registrarLlegadaSalaEspera(pacienteId, "Consultorio 1 (Doctor)");
+      dispararToast(`${cita.pacienteNombre} quedó en la sala de espera.`);
       onCambio();
-    } catch {
-      alert("Error al transferir paciente a sala de espera.");
+    } catch (err) {
+      avisar(`No se pudo pasar a ${cita.pacienteNombre} a la sala de espera: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
     }
   };
 
@@ -8417,8 +8574,8 @@ function ResumenesFinancieros({
                   responsableNombre: config?.secretariaNombre || config?.doctorNombre || "Recepción y Caja",
                   fecha: hoy(),
                   horaCierre: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                  tasaBCV: config?.tasaBCV || 56.4,
-                  tasaCOP: config?.tasaCOP || 4200,
+                  tasaBCV: config?.tasaBCV || 0,
+                  tasaCOP: config?.tasaCOP || 0,
                   cobros: cobrosLocales,
                   totalUSD,
                   totalVES,

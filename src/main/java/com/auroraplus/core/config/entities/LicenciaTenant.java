@@ -29,6 +29,20 @@ public class LicenciaTenant {
     @Column(name = "fecha_vencimiento_pago", nullable = false)
     private LocalDate fechaVencimientoPago;
 
+    // Constancia de aceptación de Términos y Privacidad en el registro público (V97).
+    @Column(name = "terminos_aceptados_en")
+    private java.time.LocalDateTime terminosAceptadosEn;
+
+    @Column(name = "terminos_version", length = 20)
+    private String terminosVersion;
+
+    @Column(name = "terminos_ip", length = 64)
+    private String terminosIp;
+
+    /** Plan que eligió en la web antes de registrarse ("basico" o "full"); solo informativo. */
+    @Column(name = "plan_solicitado", length = 20)
+    private String planSolicitado;
+
     @Column(name = "nombre_empresa", nullable = false)
     private String nombreEmpresa;
 
@@ -246,6 +260,11 @@ public class LicenciaTenant {
     @Column(name = "limite_usuarios")
     private Integer limiteUsuarios;
 
+    // Cuenta de verificacion (V101): puede cambiar de vertical desde el Hub y usar todas las
+    // verticales. Nace activa en las cuentas creadas desde el superadmin.
+    @Column(name = "permite_cambio_vertical", nullable = false)
+    private boolean permiteCambioVertical = false;
+
     @Transient
     private Long cantidadUsuarios;
 
@@ -260,6 +279,14 @@ public class LicenciaTenant {
     public boolean isActiva() { return activa; }
     public void setActiva(boolean activa) { this.activa = activa; }
     public LocalDate getFechaVencimientoPago() { return fechaVencimientoPago; }
+    public java.time.LocalDateTime getTerminosAceptadosEn() { return terminosAceptadosEn; }
+    public void setTerminosAceptadosEn(java.time.LocalDateTime v) { this.terminosAceptadosEn = v; }
+    public String getTerminosVersion() { return terminosVersion; }
+    public void setTerminosVersion(String v) { this.terminosVersion = v; }
+    public String getTerminosIp() { return terminosIp; }
+    public void setTerminosIp(String v) { this.terminosIp = v; }
+    public String getPlanSolicitado() { return planSolicitado; }
+    public void setPlanSolicitado(String v) { this.planSolicitado = v; }
     public void setFechaVencimientoPago(LocalDate fechaVencimientoPago) { this.fechaVencimientoPago = fechaVencimientoPago; }
     public String getNombreEmpresa() { return nombreEmpresa; }
     public void setNombreEmpresa(String nombreEmpresa) { this.nombreEmpresa = nombreEmpresa; }
@@ -323,6 +350,8 @@ public class LicenciaTenant {
     public void setMargenToleranciaDescuadre(BigDecimal margenToleranciaDescuadre) { this.margenToleranciaDescuadre = margenToleranciaDescuadre; }
     public Integer getLimiteUsuarios() { return limiteUsuarios; }
     public void setLimiteUsuarios(Integer limiteUsuarios) { this.limiteUsuarios = limiteUsuarios; }
+    public boolean isPermiteCambioVertical() { return permiteCambioVertical; }
+    public void setPermiteCambioVertical(boolean permiteCambioVertical) { this.permiteCambioVertical = permiteCambioVertical; }
     public Long getCantidadUsuarios() { return cantidadUsuarios; }
     public void setCantidadUsuarios(Long cantidadUsuarios) { this.cantidadUsuarios = cantidadUsuarios; }
 
@@ -372,4 +401,31 @@ public class LicenciaTenant {
     public void setSlugCatalogo(String slugCatalogo) { this.slugCatalogo = slugCatalogo; }
     public java.math.BigDecimal getCostoEnvioDelivery() { return costoEnvioDelivery; }
     public void setCostoEnvioDelivery(java.math.BigDecimal costoEnvioDelivery) { this.costoEnvioDelivery = costoEnvioDelivery; }
+
+    // Impuestos y cargos (Comercio, V96). Todo apagado por defecto.
+    @Column(name = "cobra_iva", nullable = false)
+    private Boolean cobraIva = false;
+    @Column(name = "alicuota_iva", nullable = false, precision = 5, scale = 2)
+    private java.math.BigDecimal alicuotaIva = new java.math.BigDecimal("16.00");
+    @Column(name = "precios_incluyen_iva", nullable = false)
+    private Boolean preciosIncluyenIva = true;
+    @Column(name = "igtf_activo", nullable = false)
+    private Boolean igtfActivo = false;
+    @Column(name = "alicuota_igtf", nullable = false, precision = 5, scale = 2)
+    private java.math.BigDecimal alicuotaIgtf = new java.math.BigDecimal("3.00");
+    @Column(name = "catalogo_precio_con_iva", nullable = false)
+    private Boolean catalogoPrecioConIva = true;
+
+    public Boolean getCobraIva() { return cobraIva; }
+    public void setCobraIva(Boolean cobraIva) { this.cobraIva = cobraIva; }
+    public java.math.BigDecimal getAlicuotaIva() { return alicuotaIva; }
+    public void setAlicuotaIva(java.math.BigDecimal alicuotaIva) { this.alicuotaIva = alicuotaIva; }
+    public Boolean getPreciosIncluyenIva() { return preciosIncluyenIva; }
+    public void setPreciosIncluyenIva(Boolean preciosIncluyenIva) { this.preciosIncluyenIva = preciosIncluyenIva; }
+    public Boolean getIgtfActivo() { return igtfActivo; }
+    public void setIgtfActivo(Boolean igtfActivo) { this.igtfActivo = igtfActivo; }
+    public java.math.BigDecimal getAlicuotaIgtf() { return alicuotaIgtf; }
+    public void setAlicuotaIgtf(java.math.BigDecimal alicuotaIgtf) { this.alicuotaIgtf = alicuotaIgtf; }
+    public Boolean getCatalogoPrecioConIva() { return catalogoPrecioConIva; }
+    public void setCatalogoPrecioConIva(Boolean catalogoPrecioConIva) { this.catalogoPrecioConIva = catalogoPrecioConIva; }
 }

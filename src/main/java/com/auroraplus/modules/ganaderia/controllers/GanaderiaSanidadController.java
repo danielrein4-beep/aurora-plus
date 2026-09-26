@@ -48,6 +48,7 @@ public class GanaderiaSanidadController {
         public String gradoCmt; // GRADO_1_TRAZAS, GRADO_2_POSITIVO, GRADO_3_CLINICA
         public String farmacoAplicado;
         public Integer diasRetiroLeche;
+        public Integer diasRetiroCarne;
         public String veterinario;
         public BigDecimal costo;
         public String notas;
@@ -63,19 +64,30 @@ public class GanaderiaSanidadController {
         if (!"ACTIVO".equals(animal.getEstado()) || !"HEMBRA".equalsIgnoreCase(animal.getSexo())) throw new IllegalStateException("Mastitis solo puede registrarse en una hembra activa");
 
         LocalDate fecha = request.fecha != null ? request.fecha : LocalDate.now();
-        int retiroDias = request.diasRetiroLeche != null ? request.diasRetiroLeche : 3;
+        if (request.farmacoAplicado == null || request.farmacoAplicado.isBlank()) {
+            throw new RuntimeException("Indica el fármaco aplicado");
+        }
+        java.util.Optional<Medicamento> catalogo = medicamentoRepository.findByTenantId(tenantId).stream()
+            .filter(m -> m.getNombre().equalsIgnoreCase(request.farmacoAplicado.trim()))
+            .findFirst();
+        // Los días de retiro salen de lo que indica el usuario o del catálogo del fármaco; nunca de un
+        // valor supuesto (antes 3 días de leche y 7 de carne para cualquier medicamento).
+        Integer retiroLeche = request.diasRetiroLeche != null && request.diasRetiroLeche > 0 ? request.diasRetiroLeche
+            : catalogo.map(Medicamento::getDiasRetiroLeche).orElse(null);
+        Integer retiroCarne = request.diasRetiroCarne != null && request.diasRetiroCarne >= 0 ? request.diasRetiroCarne
+            : catalogo.map(Medicamento::getDiasRetiroCarne).orElse(null);
+        if (retiroLeche == null) throw new RuntimeException("Indica los días de retiro de leche del fármaco");
+        if (retiroCarne == null) throw new RuntimeException("Indica los días de retiro de carne del fármaco");
+        int retiroDias = retiroLeche;
+        int retiroCarneDias = retiroCarne;
 
-        Medicamento med = medicamentoRepository.findByTenantId(tenantId).stream()
-            .filter(m -> m.getNombre().equalsIgnoreCase(request.farmacoAplicado))
-            .findFirst()
-            .orElseGet(() -> {
+        Medicamento med = catalogo.orElseGet(() -> {
                 Medicamento nuevo = new Medicamento();
                 nuevo.setTenantId(tenantId);
-                nuevo.setNombre(request.farmacoAplicado != null && !request.farmacoAplicado.isBlank()
-                    ? request.farmacoAplicado : "Tratamiento Mastitis Intramamario");
+                nuevo.setNombre(request.farmacoAplicado.trim());
                 nuevo.setTipoTratamiento("ANTIBIOTICO");
                 nuevo.setDiasRetiroLeche(retiroDias);
-                nuevo.setDiasRetiroCarne(7);
+                nuevo.setDiasRetiroCarne(retiroCarneDias);
                 return medicamentoRepository.save(nuevo);
             });
 
@@ -91,7 +103,7 @@ public class GanaderiaSanidadController {
         aplicacion.setVeterinarioResponsable(request.veterinario);
         aplicacion.setCosto(request.costo);
         aplicacion.setFechaFinRetiroLeche(fecha.plusDays(retiroDias));
-        aplicacion.setFechaFinRetiroCarne(fecha.plusDays(7));
+        aplicacion.setFechaFinRetiroCarne(fecha.plusDays(retiroCarneDias));
 
         return ResponseEntity.ok(aplicacionMedicamentoRepository.save(aplicacion));
     }

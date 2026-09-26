@@ -48,6 +48,9 @@ import java.util.stream.Collectors;
  *   super-admin.
  * - Al entrar, la finca acepta que la comisión aplica aunque el trato que
  *   nació aquí se cierre por fuera.
+ *
+ * Acceso por niveles (VerificacionMercadoService): mirar es libre; ofertar y
+ * chatear piden ubicación y cédula verificada; publicar pide además el hierro.
  */
 @RestController
 @RequestMapping("/api/ganaderia/mercado")
@@ -69,6 +72,12 @@ public class MercadoGanaderoController {
 
     @Autowired
     private AvisosMercadoService avisos;
+
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.VerificacionMercadoService verificacion;
+
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.GanaderiaSanidadService sanidad;
 
     /** Clave para los alias y referencias opacas: sin ella no se puede volver del alias a la finca. */
     @Value("${jwt.secret}")
@@ -155,7 +164,7 @@ public class MercadoGanaderoController {
     public List<Map<String, Object>> misOfertas() {
         Long yo = tenantActual();
         List<Map<String, Object>> ofertas = jdbc.queryForList(
-            "SELECT DISTINCT ON (o.publicacion_id) o.id, o.publicacion_id, o.monto_ofertado AS monto, o.estado, o.fecha, o.traspasado "
+            "SELECT DISTINCT ON (o.publicacion_id) o.id, o.publicacion_id, o.monto_ofertado AS monto, o.estado, o.fecha, o.traspasado, o.pago_confirmado "
                 + "FROM ofertas_compra o WHERE o.comprador_tenant_id = ? ORDER BY o.publicacion_id, o.id DESC", yo);
         if (ofertas.isEmpty()) return List.of();
         Map<Long, Map<String, Object>> cards = tarjetas(jdbc.queryForList(
@@ -172,6 +181,7 @@ public class MercadoGanaderoController {
             oferta.put("estado", o.get("estado"));
             oferta.put("fecha", o.get("fecha"));
             oferta.put("traspasado", o.get("traspasado"));
+            oferta.put("pagoConfirmado", o.get("pago_confirmado"));
             Map<String, Object> fila = new LinkedHashMap<>();
             fila.put("oferta", oferta);
             fila.put("publicacion", publicacion);
@@ -259,7 +269,7 @@ public class MercadoGanaderoController {
         Map<String, Object> cerrada = null;
         if (esMia) {
             List<Map<String, Object>> ofertas = jdbc.queryForList(
-                "SELECT o.id, o.monto_ofertado AS monto, o.estado, o.fecha, o.mensaje, o.comprador_tenant_id AS \"compradorTenantId\" "
+                "SELECT o.id, o.monto_ofertado AS monto, o.estado, o.fecha, o.mensaje, o.traspasado, o.pago_confirmado AS \"pagoConfirmado\", o.motivo_anulacion AS \"motivoAnulacion\", o.comprador_tenant_id AS \"compradorTenantId\" "
                     + "FROM ofertas_compra o WHERE o.publicacion_id = ? AND o.comprador_tenant_id IS NOT NULL ORDER BY o.monto_ofertado DESC, o.id", id);
             Map<Long, Map<String, Object>> perfiles = perfiles(ofertas.stream().map(o -> numero(o.get("compradorTenantId"))).collect(Collectors.toSet()));
             for (Map<String, Object> o : ofertas) {
@@ -270,12 +280,25 @@ public class MercadoGanaderoController {
             }
             salida.put("ofertas", ofertas);
             if ("VENDIDA".equals(fila.get("estado")) && compradorCerrado != null) {
-                salida.put("contraparte", contacto(compradorCerrado));
+                Map<String, Object> comprador = contacto(compradorCerrado);
+                salida.put("contraparte", comprador);
                 cerrada = ofertaAceptada(id);
+                // Datos para la nota de movilización (la emite quien vende: los animales salen de su finca).
+                Map<String, Object> nota = new LinkedHashMap<>();
+                nota.put("animalIds", delLote);
+                nota.put("destino", comprador.get("nombre"));
+                nota.put("origen", jdbc.queryForList("SELECT nombre FROM fincas_ganaderia WHERE tenant_id = ?", String.class, yo).stream().findFirst()
+                    .orElseGet(() -> (String) contacto(yo).get("nombre")));
+                // Si ya se emitió una nota de venta con estos animales, se ofrece descargarla en vez de duplicarla.
+                nota.put("emitidas", jdbc.queryForList(
+                    "SELECT DISTINCT g.id, g.numero_guia AS \"numeroGuia\", g.fecha FROM guias_traslado g JOIN detalles_guia_traslado d ON d.guia_id = g.id "
+                        + "WHERE g.tenant_id = ? AND g.motivo = 'VENTA' AND d.animal_id IN (" + marcadores(delLote.size()) + ") ORDER BY g.id DESC",
+                    concatenar(List.<Object>of(yo), new ArrayList<Object>(delLote)).toArray()));
+                salida.put("notaMovilizacion", nota);
             }
         } else {
             salida.put("misOfertas", jdbc.queryForList(
-                "SELECT id, monto_ofertado AS monto, estado, fecha, mensaje, traspasado FROM ofertas_compra "
+                "SELECT id, monto_ofertado AS monto, estado, fecha, mensaje, traspasado, pago_confirmado AS \"pagoConfirmado\", motivo_anulacion AS \"motivoAnulacion\" FROM ofertas_compra "
                     + "WHERE publicacion_id = ? AND comprador_tenant_id = ? ORDER BY id DESC", id, yo));
             if ("VENDIDA".equals(fila.get("estado")) && yo.equals(compradorCerrado)) {
                 salida.put("contraparte", contacto(vendedor));
@@ -309,6 +332,31 @@ public class MercadoGanaderoController {
         return condiciones();
     }
 
+    // ─────────────────────────── verificación de la finca ───────────────────────────
+
+    /** Qué tiene verificado la finca y qué le falta. Nunca devuelve el contenido de los documentos. */
+    @GetMapping("/verificacion")
+    public Map<String, Object> miVerificacion() {
+        return verificacion.estado(tenantActual());
+    }
+
+    public static class VerificacionRequest {
+        public String titularNombre;
+        public String titularCedula;
+        public String numeroHierro;
+        /** PROPIEDAD, ARRENDAMIENTO o COMODATO (opcional). */
+        public String tipoTierra;
+        /** CEDULA, HIERRO, TIERRA → archivo nuevo (los que no vienen no se tocan). */
+        public Map<String, com.auroraplus.modules.ganaderia.services.VerificacionMercadoService.Archivo> archivos;
+    }
+
+    @PostMapping("/verificacion")
+    public Map<String, Object> enviarVerificacion(@RequestBody VerificacionRequest req) {
+        AuthContext.exigirRol(ROLES_NEGOCIO);
+        return verificacion.guardar(tenantActual(), AuthContext.getUsername(), req.titularNombre, req.titularCedula,
+            req.numeroHierro, req.tipoTierra, req.archivos);
+    }
+
     private void exigirCondiciones() {
         if (!Boolean.TRUE.equals(condiciones().get("aceptadas"))) {
             throw new RuntimeException("Antes de negociar en el mercado debes aceptar sus condiciones");
@@ -339,6 +387,7 @@ public class MercadoGanaderoController {
         AuthContext.exigirRol(ROLES_NEGOCIO);
         exigirCondiciones();
         Long yo = tenantActual();
+        verificacion.exigir(yo, com.auroraplus.modules.ganaderia.services.VerificacionMercadoService.Nivel.VENDER);
         List<Long> ids = req.animalIds != null && !req.animalIds.isEmpty() ? req.animalIds.stream().distinct().toList()
             : req.animalId != null ? List.of(req.animalId) : List.of();
         if (ids.isEmpty()) throw new RuntimeException("Elige el animal que vas a publicar");
@@ -352,6 +401,8 @@ public class MercadoGanaderoController {
         if (animales.size() != ids.size()) throw new RuntimeException(ids.size() == 1 ? "Ese animal no está en tu hato" : "Algún animal del lote no está en tu hato");
         for (Map<String, Object> a : animales) {
             if (!"ACTIVO".equals(a.get("estado"))) throw new RuntimeException("Solo se pueden publicar animales activos (arete " + a.get("arete") + ")");
+            // Un animal en retiro de carne (vacuna o medicamento) no se puede vender, tampoco aquí.
+            sanidad.validarAptoParaVentaConsumo(numero(a.get("id")));
         }
         Integer yaPublicado = jdbc.queryForObject(
             "SELECT COUNT(*) FROM publicaciones_venta p WHERE p.estado = 'ACTIVA' AND (p.animal_id IN (" + marcadores(ids.size()) + ") "
@@ -463,6 +514,7 @@ public class MercadoGanaderoController {
         AuthContext.exigirRol(ROLES_NEGOCIO);
         exigirCondiciones();
         Long yo = tenantActual();
+        verificacion.exigir(yo, com.auroraplus.modules.ganaderia.services.VerificacionMercadoService.Nivel.COMPRAR);
         Map<String, Object> pub = unaFila("SELECT id, tenant_id, estado FROM publicaciones_venta WHERE id = ?", id);
         if (pub == null || !"ACTIVA".equals(pub.get("estado"))) throw new RuntimeException("Esta publicación ya no está disponible");
         Long vendedor = numero(pub.get("tenant_id"));
@@ -515,6 +567,19 @@ public class MercadoGanaderoController {
         BigDecimal monto = (BigDecimal) oferta.get("monto_ofertado");
         LocalDateTime ahora = LocalDateTime.now();
 
+        // Los animales tienen que seguir en el hato y fuera de retiro al cerrar el trato: entre
+        // publicar y aceptar pudieron venderse por otro lado, morir o recibir un medicamento.
+        List<Map<String, Object>> animalesPub = jdbc.queryForList(
+            "SELECT id, arete, estado FROM animales WHERE tenant_id = ? AND (id = (SELECT animal_id FROM publicaciones_venta WHERE id = ?) "
+                + "OR id IN (SELECT animal_id FROM mercado_ganado_lote_animales WHERE publicacion_id = ?)) FOR UPDATE", yo, pubId, pubId);
+        if (animalesPub.isEmpty()) throw new RuntimeException("Los animales de esta publicación ya no están en tu hato");
+        for (Map<String, Object> a : animalesPub) {
+            if (!"ACTIVO".equals(a.get("estado"))) {
+                throw new RuntimeException("El animal " + a.get("arete") + " ya no está activo (" + a.get("estado") + "). Retira la publicación.");
+            }
+            sanidad.validarAptoParaVentaConsumo(numero(a.get("id")));
+        }
+
         int cerradas = jdbc.update("UPDATE publicaciones_venta SET estado = 'VENDIDA', fecha_cierre = ?, comprador_tenant_id = ?, precio_final = ? "
             + "WHERE id = ? AND estado = 'ACTIVA'", Timestamp.valueOf(ahora), comprador, monto, pubId);
         if (cerradas == 0) throw new RuntimeException("Esta publicación ya fue cerrada");
@@ -547,12 +612,20 @@ public class MercadoGanaderoController {
         AuthContext.exigirRol(ROLES_NEGOCIO);
         Long yo = tenantActual();
         Map<String, Object> oferta = unaFila(
-            "SELECT o.id, o.publicacion_id, o.monto_ofertado, o.estado, o.traspasado, p.animal_id, p.tenant_id AS vendedor "
+            "SELECT o.id, o.publicacion_id, o.monto_ofertado, o.estado, o.traspasado, o.pago_confirmado, p.animal_id, p.tenant_id AS vendedor "
                 + "FROM ofertas_compra o JOIN publicaciones_venta p ON p.id = o.publicacion_id WHERE o.id = ? AND o.comprador_tenant_id = ?",
             ofertaId, yo);
         if (oferta == null) throw new RuntimeException("Oferta no encontrada");
         if (!"ACEPTADA".equals(oferta.get("estado"))) throw new RuntimeException("Solo se recibe un animal cuando el vendedor aceptó la oferta");
         if (Boolean.TRUE.equals(oferta.get("traspasado"))) throw new RuntimeException("Este animal ya está en tu hato");
+        if (!Boolean.TRUE.equals(oferta.get("pago_confirmado"))) {
+            throw new RuntimeException("El vendedor todavía no confirma que recibió el pago. Cuando lo confirme podrás recibir el animal.");
+        }
+        // Se marca como traspasada ANTES de copiar y solo si nadie lo hizo ya: con dos clics seguidos
+        // (o dos pestañas) ambos pasaban la revisión de arriba y el animal y la CXP se duplicaban.
+        if (jdbc.update("UPDATE ofertas_compra SET traspasado = TRUE WHERE id = ? AND traspasado IS NOT TRUE", ofertaId) == 0) {
+            throw new RuntimeException("Este animal ya está en tu hato");
+        }
 
         Long pubId = numero(oferta.get("publicacion_id"));
         Long vendedor = numero(oferta.get("vendedor"));
@@ -565,16 +638,126 @@ public class MercadoGanaderoController {
             if (primero == null) primero = numero(copia.get("id"));
             aretes.add(String.valueOf(copia.get("arete")));
         }
-        jdbc.update("UPDATE ofertas_compra SET traspasado = TRUE WHERE id = ?", ofertaId);
         String titulo = tituloDe(pubId);
-        motorFinanciero.registrarMovimientoEnMoneda(yo, MovimientoCaja.TipoMovimiento.CXP, (BigDecimal) oferta.get("monto_ofertado"), "USD",
+        // El vendedor ya confirmó el pago: la cuenta por pagar del comprador nace saldada (con su egreso
+        // en caja), en vez de quedar como una deuda pendiente que ya se pagó.
+        BigDecimal montoCompra = (BigDecimal) oferta.get("monto_ofertado");
+        MovimientoCaja cxp = motorFinanciero.registrarMovimientoEnMoneda(yo, MovimientoCaja.TipoMovimiento.CXP, montoCompra, "USD",
             recortar("Compra en Mercado Ganadero: " + titulo + " a " + nombreFinca(vendedor), 250), "ganaderia", "MERCADO_OFERTA", ofertaId);
+        if (cxp != null && cxp.getId() != null) {
+            motorFinanciero.abonarMovimiento(yo, cxp.getId(), montoCompra, "USD");
+        }
         insertarMensaje(pubId, yo, yo, nombreEmisor(yo), delLote.size() == 1
             ? "Animal recibido en el hato con el arete " + aretes.get(0) + "."
             : delLote.size() + " animales recibidos en el hato.", true);
         Map<String, Object> salida = detalle(pubId);
         salida.put("animalRecibidoId", primero);
         return salida;
+    }
+
+    /**
+     * El vendedor confirma que le llegó el pago acordado: salda su cuenta por cobrar (con el ingreso en
+     * caja) y habilita al comprador para recibir el animal en su hato.
+     */
+    @PostMapping("/ofertas/{ofertaId:[0-9]+}/confirmar-pago")
+    @Transactional
+    public Map<String, Object> confirmarPago(@PathVariable Long ofertaId) {
+        AuthContext.exigirRol(ROLES_NEGOCIO);
+        Long yo = tenantActual();
+        Map<String, Object> oferta = unaFila(
+            "SELECT o.id, o.publicacion_id, o.comprador_tenant_id, o.monto_ofertado, o.estado FROM ofertas_compra o "
+                + "JOIN publicaciones_venta p ON p.id = o.publicacion_id WHERE o.id = ? AND p.tenant_id = ?", ofertaId, yo);
+        if (oferta == null) throw new RuntimeException("Oferta no encontrada");
+        if (!"ACEPTADA".equals(oferta.get("estado"))) throw new RuntimeException("Solo se confirma el pago de un trato cerrado");
+        if (jdbc.update("UPDATE ofertas_compra SET pago_confirmado = TRUE, fecha_pago_confirmado = ? WHERE id = ? AND pago_confirmado = FALSE",
+                Timestamp.valueOf(LocalDateTime.now()), ofertaId) == 0) {
+            throw new RuntimeException("El pago de este trato ya estaba confirmado");
+        }
+        // Si el vendedor ya lo abonó a mano desde Finanzas, no se cobra dos veces.
+        for (Map<String, Object> cxc : cxcDelTrato(yo, ofertaId)) {
+            BigDecimal saldo = (BigDecimal) cxc.get("saldo_pendiente");
+            if (saldo != null && saldo.signum() > 0) {
+                motorFinanciero.abonarMovimiento(yo, numero(cxc.get("id")), saldo, String.valueOf(cxc.get("moneda")));
+            }
+        }
+        Long pubId = numero(oferta.get("publicacion_id"));
+        Long comprador = numero(oferta.get("comprador_tenant_id"));
+        insertarMensaje(pubId, comprador, yo, nombreEmisor(yo),
+            "El vendedor confirmó que recibió el pago. Ya puedes recibir el animal en tu hato.", true);
+        avisos.avisar(comprador, "Pago confirmado: " + tituloDe(pubId),
+            "El vendedor confirmó tu pago de " + dinero((BigDecimal) oferta.get("monto_ofertado")) + ". Ya puedes recibir el animal en tu hato.");
+        return detalle(pubId);
+    }
+
+    /**
+     * Deshace un trato que se cayó (no pagó, no se presentó, se arrepintió). Lo puede hacer cualquiera
+     * de las dos fincas, con motivo, mientras el animal no se haya traspasado ni el pago confirmado:
+     * el animal vuelve a estar activo, la publicación se reabre y se anulan la cuenta por cobrar y las
+     * comisiones que todavía no se cobraron.
+     */
+    @PostMapping("/ofertas/{ofertaId:[0-9]+}/anular")
+    @Transactional
+    public Map<String, Object> anularTrato(@PathVariable Long ofertaId, @RequestBody Map<String, String> body) {
+        AuthContext.exigirRol(ROLES_NEGOCIO);
+        Long yo = tenantActual();
+        String motivo = body != null && body.get("motivo") != null ? body.get("motivo").trim() : "";
+        if (motivo.length() < 5) throw new RuntimeException("Explica brevemente por qué se anula el trato");
+        Map<String, Object> oferta = unaFila(
+            "SELECT o.id, o.publicacion_id, o.comprador_tenant_id, o.monto_ofertado, o.estado, o.traspasado, o.pago_confirmado, p.tenant_id AS vendedor "
+                + "FROM ofertas_compra o JOIN publicaciones_venta p ON p.id = o.publicacion_id WHERE o.id = ?", ofertaId);
+        if (oferta == null) throw new RuntimeException("Oferta no encontrada");
+        Long vendedor = numero(oferta.get("vendedor"));
+        Long comprador = numero(oferta.get("comprador_tenant_id"));
+        if (!yo.equals(vendedor) && !yo.equals(comprador)) throw new RuntimeException("Oferta no encontrada");
+        if (!"ACEPTADA".equals(oferta.get("estado"))) throw new RuntimeException("Solo se puede anular un trato cerrado");
+        if (Boolean.TRUE.equals(oferta.get("traspasado"))) throw new RuntimeException("El animal ya está en el hato del comprador: este trato no se puede anular");
+        if (Boolean.TRUE.equals(oferta.get("pago_confirmado"))) {
+            throw new RuntimeException("El pago ya se confirmó. Si hay que devolver el dinero, coordínenlo por el chat y escribe a soporte para anularlo.");
+        }
+        List<Map<String, Object>> cxcs = cxcDelTrato(vendedor, ofertaId);
+        for (Map<String, Object> cxc : cxcs) {
+            BigDecimal saldo = (BigDecimal) cxc.get("saldo_pendiente");
+            BigDecimal monto = (BigDecimal) cxc.get("monto");
+            if (saldo != null && monto != null && saldo.compareTo(monto) < 0) {
+                throw new RuntimeException("El vendedor ya registró abonos de este trato en Finanzas. Escribe a soporte para anularlo.");
+            }
+        }
+        Integer comisionesCobradas = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM comisiones_plataforma WHERE referencia_id = ? AND origen IN ('mercado-ganado-vendedor', 'mercado-ganado-comprador') AND pagada = TRUE",
+            Integer.class, ofertaId);
+        if (comisionesCobradas != null && comisionesCobradas > 0) {
+            throw new RuntimeException("La comisión de este trato ya se cobró. Escribe a soporte para anularlo.");
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
+        if (jdbc.update("UPDATE ofertas_compra SET estado = 'ANULADA', motivo_anulacion = ?, anulada_por_tenant_id = ?, fecha_anulacion = ? "
+                + "WHERE id = ? AND estado = 'ACEPTADA' AND traspasado IS NOT TRUE AND pago_confirmado = FALSE",
+                recortar(motivo, 300), yo, Timestamp.valueOf(ahora), ofertaId) == 0) {
+            throw new RuntimeException("Este trato cambió mientras tanto. Recarga la página.");
+        }
+        Long pubId = numero(oferta.get("publicacion_id"));
+        // Los animales vuelven al hato del vendedor como activos (solo los que siguen vendidos por este trato).
+        jdbc.update("UPDATE animales SET estado = 'ACTIVO' WHERE tenant_id = ? AND estado = 'VENDIDO' AND (id = (SELECT animal_id FROM publicaciones_venta WHERE id = ?) "
+            + "OR id IN (SELECT animal_id FROM mercado_ganado_lote_animales WHERE publicacion_id = ?))", vendedor, pubId, pubId);
+        jdbc.update("UPDATE publicaciones_venta SET estado = 'ACTIVA', fecha_cierre = NULL, comprador_tenant_id = NULL, precio_final = NULL WHERE id = ? AND estado = 'VENDIDA'", pubId);
+        jdbc.update("DELETE FROM comisiones_plataforma WHERE referencia_id = ? AND origen IN ('mercado-ganado-vendedor', 'mercado-ganado-comprador') AND pagada = FALSE", ofertaId);
+        for (Map<String, Object> cxc : cxcs) {
+            jdbc.update("UPDATE movimientos_caja SET saldo_pendiente = 0, estado = 'ANULADO', concepto = LEFT(concepto || ' (trato anulado)', 255) WHERE id = ?",
+                numero(cxc.get("id")));
+        }
+
+        String quien = yo.equals(vendedor) ? "El vendedor" : "El comprador";
+        String titulo = tituloDe(pubId);
+        insertarMensaje(pubId, comprador, yo, nombreEmisor(yo), quien + " anuló el trato. Motivo: " + motivo, true);
+        Long otro = yo.equals(vendedor) ? comprador : vendedor;
+        avisos.avisar(otro, "Trato anulado: " + titulo, quien + " anuló el trato por " + titulo + ". Motivo: " + motivo);
+        return detalle(pubId);
+    }
+
+    /** La cuenta por cobrar que se creó al aceptar la oferta (ver aceptar). */
+    private List<Map<String, Object>> cxcDelTrato(Long vendedor, Long ofertaId) {
+        return jdbc.queryForList("SELECT id, monto, saldo_pendiente, moneda FROM movimientos_caja WHERE tenant_id = ? AND tipo = 'CXC' "
+            + "AND referencia_tipo = 'MERCADO_OFERTA' AND referencia_id = ? AND (estado IS NULL OR estado <> 'ANULADO')", vendedor, ofertaId);
     }
 
     /** Copia un animal del vendedor al hato del comprador, con su historial de pesos y vacunas. */
@@ -759,6 +942,7 @@ public class MercadoGanaderoController {
         exigirCondiciones();
         if (!texto(req.contenido)) throw new RuntimeException("Escribe un mensaje");
         Long yo = tenantActual();
+        verificacion.exigir(yo, com.auroraplus.modules.ganaderia.services.VerificacionMercadoService.Nivel.COMPRAR);
         Long compradorConv = compradorDeConversacion(id, req.comprador);
         Map<String, Object> pub = unaFila("SELECT estado, tenant_id FROM publicaciones_venta WHERE id = ?", id);
         Long vendedor = numero(pub.get("tenant_id"));
@@ -888,9 +1072,13 @@ public class MercadoGanaderoController {
             p.put("totalCalificaciones", 0L);
             salida.put(numero(r.get("tenant_id")), p);
         }
-        for (Long t : jdbc.queryForList("SELECT DISTINCT tenant_id FROM pagos_suscripcion_tenant WHERE tenant_id IN (" + en + ") "
-                + "AND monto > 0 AND (estado IS NULL OR estado = 'CONFIRMADO')", Long.class, ids)) {
-            if (salida.containsKey(t)) salida.get(t).put("verificado", true);
+        // "Verificado por Aurora" = el equipo revisó la cédula del titular; hierro y tierra suman sellos aparte.
+        for (Map.Entry<Long, Set<String>> e : verificacion.aprobadosDe(tenants).entrySet()) {
+            Map<String, Object> p = salida.get(e.getKey());
+            if (p == null) continue;
+            p.put("verificado", e.getValue().contains("CEDULA"));
+            p.put("hierroVerificado", e.getValue().contains("HIERRO"));
+            p.put("tierraVerificada", e.getValue().contains("TIERRA"));
         }
         for (Map<String, Object> r : jdbc.queryForList("SELECT tenant_id, COUNT(*) AS n FROM publicaciones_venta WHERE estado = 'VENDIDA' "
                 + "AND tenant_id IN (" + en + ") GROUP BY tenant_id", ids)) {
@@ -919,6 +1107,8 @@ public class MercadoGanaderoController {
         p.put("nombre", revelado && datos != null && datos.get("nombreReal") != null ? datos.get("nombreReal") : alias);
         p.put("revelado", revelado);
         p.put("verificado", datos != null && Boolean.TRUE.equals(datos.get("verificado")));
+        p.put("hierroVerificado", datos != null && Boolean.TRUE.equals(datos.get("hierroVerificado")));
+        p.put("tierraVerificada", datos != null && Boolean.TRUE.equals(datos.get("tierraVerificada")));
         Object alta = datos == null ? null : datos.get("fechaAlta");
         p.put("mesesEnAurora", alta == null ? null : ChronoUnit.MONTHS.between(((java.sql.Date) alta).toLocalDate(), LocalDate.now()));
         p.put("diasEnAurora", alta == null ? null : ChronoUnit.DAYS.between(((java.sql.Date) alta).toLocalDate(), LocalDate.now()));
@@ -963,7 +1153,7 @@ public class MercadoGanaderoController {
     }
 
     private Map<String, Object> ofertaAceptada(Long publicacionId) {
-        return unaFila("SELECT id, monto_ofertado AS monto, traspasado FROM ofertas_compra WHERE publicacion_id = ? AND estado = 'ACEPTADA' LIMIT 1", publicacionId);
+        return unaFila("SELECT id, monto_ofertado AS monto, traspasado, pago_confirmado AS \"pagoConfirmado\" FROM ofertas_compra WHERE publicacion_id = ? AND estado = 'ACEPTADA' LIMIT 1", publicacionId);
     }
 
     /**

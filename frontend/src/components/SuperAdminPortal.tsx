@@ -1,8 +1,11 @@
-import { obtenerCuentasCobro, guardarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { obtenerCuentasCobro, guardarCuentasCobro, combinarCuentasCobro, type SaasCuentasCobroConfig } from "../cuentasCobroConfig";
+import { obtenerCuentasCobroSuperAdmin, guardarCuentasCobroSuperAdmin } from "../api";
+import PagosPorVerificar from "./PagosPorVerificar";
 import React, { useState, useEffect, useMemo } from "react";
 import AuroraLogo from "../AuroraLogo";
-import SuperAdminActividad from "./SuperAdminActividad";
-import SuperAdminInteligencia from "./SuperAdminInteligencia";
+import SuperAdminPanorama from "./SuperAdminPanorama";
+import { VistaNegocio } from "./SuperAdminInteligencia";
+import SuperAdminVertical, { VERTICALES_SUPERADMIN } from "./SuperAdminVertical";
 import SuperAdminFichaTenant from "./SuperAdminFichaTenant";
 import SuperAdminSeguridad from "./SuperAdminSeguridad";
 import SuperAdminEquipo, { ROLES_EQUIPO } from "./SuperAdminEquipo";
@@ -24,6 +27,7 @@ import {
   obtenerStatsSuperAdmin,
   ejecutarBarridoSuspensionSuperAdmin,
   listarPagosSuperAdmin,
+  listarPagosReportadosSuperAdmin,
   registrarPagoSuperAdmin,
   listarComisionesPendientesSuperAdmin,
   type ComisionPlataforma,
@@ -35,6 +39,7 @@ import {
   salirDeImpersonacion,
   crearTenantSuperAdmin,
   activarTenantSuperAdmin,
+  permitirCambioVerticalSuperAdmin,
   desactivarTenantSuperAdmin,
   cambiarPlanTenantSuperAdmin,
   listarModulosTenantSuperAdmin,
@@ -93,13 +98,26 @@ const MODULOS_SISTEMA = [
 ];
 
 /** [migas de pan, título] de cada vista del panel. */
-const TITULOS_VISTA: Record<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO", [string, string]> = {
+/**
+ * Clave inicial de cada negocio nuevo: al azar y distinta cada vez (antes todos recibían
+ * "admin123"). Se ve en el formulario para entregársela al cliente, que la cambia al entrar.
+ * Sin letras ni números que se confunden (0/O, 1/l/I).
+ */
+function generarClaveTemporal(): string {
+  const letras = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const azar = new Uint32Array(10);
+  crypto.getRandomValues(azar);
+  return Array.from(azar, (n) => letras[n % letras.length]).join("");
+}
+
+const TITULOS_VISTA: Record<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "VERTICAL" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO", [string, string]> = {
   TENANTS: ["Clientes", "Directorio de negocios"],
   PAGOS: ["Ingresos", "Cobros y suscripciones"],
   FINANZAS: ["Ingresos", "Finanzas, gastos fijos y flujo de caja"],
   METRICAS: ["Inteligencia", "Métricas y rendimiento del SaaS"],
-  ACTIVIDAD: ["Inteligencia", "Actividad por vertical"],
-  INTELIGENCIA: ["Inteligencia", "Datos de negocios, comercios y salud"],
+  ACTIVIDAD: ["Verticales", "Panorama de verticales"],
+  INTELIGENCIA: ["Inteligencia", "Clientes: ingresos recurrentes, bajas y salud"],
+  VERTICAL: ["Verticales", "Vertical"],
   SOPORTE: ["Operaciones", "Soporte y asistencia a negocios"],
   AUDITORIA: ["Seguridad", "Bitácora de auditoría"],
   SEGURIDAD: ["Seguridad", "Configuración de la cuenta"],
@@ -114,6 +132,7 @@ const ROLES_POR_VISTA: Record<keyof typeof TITULOS_VISTA, RolEquipoSuperAdmin[]>
   METRICAS: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
   ACTIVIDAD: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
   INTELIGENCIA: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
+  VERTICAL: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
   SOPORTE: ["PROPIETARIO", "SOPORTE"],
   AUDITORIA: ["PROPIETARIO"],
   SEGURIDAD: ["PROPIETARIO", "SOPORTE", "FINANZAS", "ANALISTA"],
@@ -216,7 +235,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     mesesVigencia: 1,
     monedaBase: "USD",
     usuarioInicial: "admin",
-    passwordInicial: "admin123",
+    passwordInicial: generarClaveTemporal(),
     accesoTotal: false,
     limiteUsuarios: undefined,
   });
@@ -281,6 +300,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   const puedeVer = (vista: keyof typeof TITULOS_VISTA) =>
     !perfil || (perfil.debeCambiarClave ? vista === "SEGURIDAD" : ROLES_POR_VISTA[vista].includes(perfil.rol));
 
+  // Vertical abierta en su página dedicada (grupo "Verticales" del menú)
+  const [verticalActiva, setVerticalActiva] = useState("mediclinic");
+  const abrirVertical = (id: string) => { setVerticalActiva(id); setVistaPrincipal("VERTICAL"); };
+
   // Ficha completa del negocio (panel lateral)
   const [fichaTenantId, setFichaTenantId] = useState<number | null>(null);
 
@@ -289,7 +312,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   // VISTA PRINCIPAL (TENANTS vs FINANZAS)
   // VISTA PRINCIPAL (TENANTS vs PAGOS vs FINANZAS)
-  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO">("TENANTS");
+  const [vistaPrincipal, setVistaPrincipal] = useState<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "VERTICAL" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO">("TENANTS");
 
   // FILTROS Y ESTADOS DEL MODULO DEDICADO DE HISTORIAL DE PAGOS
   const [filtroPagosTenant, setFiltroPagosTenant] = useState<number | "TODOS">("TODOS");
@@ -359,6 +382,16 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     setFeedback({ msg, tipo });
     setTimeout(() => setFeedback(null), 5000);
   };
+
+  // En teléfono el menú lateral es un cajón que se abre con el botón de la cabecera: antes ocupaba
+  // toda la pantalla y el contenido quedaba debajo, así que al tocar una opción "no pasaba nada".
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+
+  // Pagos reportados por clientes que faltan por verificar: se ven en el menú aunque no se abra Cobros.
+  const [pagosPorVerificar, setPagosPorVerificar] = useState(0);
+  useEffect(() => {
+    listarPagosReportadosSuperAdmin().then((r) => setPagosPorVerificar(r.length)).catch(() => {});
+  }, []);
 
   const cargarTodo = async () => {
     setLoadingData(true);
@@ -694,6 +727,21 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     }
   };
 
+  const handleCambioVertical = async (tenantId: number, permitido: boolean) => {
+    const nombre = tenants.find((x) => x.tenantId === tenantId)?.nombreEmpresa || `Negocio #${tenantId}`;
+    const aviso = permitido
+      ? `¿Permitir que "${nombre}" cambie de vertical desde el Hub? Podrá entrar a todas las verticales sin importar su plan. Úsalo solo en cuentas de verificación.`
+      : `¿Quitarle a "${nombre}" el cambio de vertical? Volverá a ver solo lo que tiene contratado.`;
+    if (!window.confirm(aviso)) return;
+    try {
+      await permitirCambioVerticalSuperAdmin(tenantId, permitido);
+      avisar(permitido ? `${nombre} ya puede cambiar de vertical.` : `${nombre} ya no puede cambiar de vertical.`);
+      cargarTodo();
+    } catch (err: any) {
+      avisar(err?.message || "No se pudo cambiar el permiso", "error");
+    }
+  };
+
   const handleDesactivar = async (tenantId: number) => {
     if (!confirm(`Confirma suspender manualmente el Tenant #${tenantId}?`)) return;
     try {
@@ -706,6 +754,12 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
   };
 
   const handleCambiarPlan = async (tenantId: number, plan: TipoLicencia) => {
+    // Cambia lo que el negocio puede usar al instante: se confirma antes (antes bastaba tocar el selector).
+    const nombre = tenants.find((x) => x.tenantId === tenantId)?.nombreEmpresa || `Negocio #${tenantId}`;
+    if (!window.confirm(`¿Cambiar el plan de "${nombre}" a ${plan}? Afecta de inmediato a qué módulos puede entrar.`)) {
+      cargarTodo();
+      return;
+    }
     try {
       await cambiarPlanTenantSuperAdmin(tenantId, plan);
       avisar(`Plan actualizado a ${plan} para Tenant #${tenantId}.`);
@@ -815,6 +869,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       // ("aurora_auth_token", etc.) que nadie más leía, así que "Impersonar" no
       // dejaba realmente logueado como el tenant al entrar a /dashboard.
       guardarSesion({ token: res.token, rol: "DUENO_ADMIN", username: "soporte-superadmin", tenantId: Number(res.tenantId) });
+      // Enciende la franja "Modo soporte técnico activo" (App.tsx) para no olvidar que se está
+      // operando dentro del negocio de un cliente. Antes nadie escribía estas claves.
+      try {
+        sessionStorage.setItem("aurora_impersonando", "true");
+        sessionStorage.setItem("aurora_impersonando_tenant_nombre", res.nombreEmpresa || `Negocio #${res.tenantId}`);
+        sessionStorage.setItem("aurora_impersonando_tenant_id", String(res.tenantId));
+      } catch { /* sin sessionStorage: solo se pierde la franja */ }
       setTimeout(() => {
         window.location.href = "/dashboard";
       }, 1000);
@@ -902,6 +963,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
 
   const handleConcederAccesoTotal = async () => {
     if (!tenantParaModulos) return;
+    if (!window.confirm(`¿Dar acceso total a "${tenantParaModulos.nombreEmpresa}"? Activa todos los módulos y extiende su licencia sin cobro.`)) return;
     setConcediendoAccesoTotal(true);
     try {
       await concederAccesoTotalSuperAdmin(tenantParaModulos.tenantId);
@@ -991,7 +1053,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         mesesVigencia: 1,
         monedaBase: "USD",
         usuarioInicial: "admin",
-        passwordInicial: "admin123",
+        passwordInicial: generarClaveTemporal(),
         accesoTotal: false,
         limiteUsuarios: undefined,
       });
@@ -1282,8 +1344,13 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       )}
 
-      {/* BARRA LATERAL (SIDEBAR) ENTERPRISE */}
-      <aside className="w-full md:w-64 lg:w-72 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 h-auto md:h-screen z-20 shadow-xs">
+      {/* Fondo que cierra el menú en teléfono */}
+      {menuMovilAbierto && (
+        <div className="fixed inset-0 z-30 md:hidden" style={{ backgroundColor: "rgba(15, 23, 42, 0.45)" }} onClick={() => setMenuMovilAbierto(false)} aria-hidden="true" />
+      )}
+
+      {/* BARRA LATERAL (SIDEBAR) ENTERPRISE — en teléfono, cajón deslizable */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-[82vw] max-w-xs transition-transform duration-200 ${menuMovilAbierto ? "translate-x-0" : "-translate-x-full"} md:static md:translate-x-0 md:w-64 lg:w-72 md:max-w-none bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 h-full md:h-screen shadow-xs`}>
         {/* PARTE SUPERIOR: BRANDING & ESTADO */}
         <div className="p-5 border-b border-slate-100 space-y-3">
           <div className="flex items-center gap-3">
@@ -1320,18 +1387,21 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         <nav className="p-4 space-y-5 flex-1 overflow-y-auto">
           {(() => {
             const abiertosSoporte = pendientesSoporte;
-            const grupos: { titulo: string; items: { vista: typeof vistaPrincipal; label: string; icono: string; badge?: string | number; alerta?: boolean; alAbrir?: () => void }[] }[] = [
+            const grupos: { titulo: string; items: { vista: typeof vistaPrincipal; label: string; icono: string; badge?: string | number; alerta?: boolean; alAbrir?: () => void; verticalId?: string }[] }[] = [
               { titulo: "Clientes", items: [
                 { vista: "TENANTS", label: "Directorio de negocios", icono: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4", badge: tenants.length },
               ]},
               { titulo: "Ingresos", items: [
-                { vista: "PAGOS", label: "Cobros y suscripciones", icono: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z", badge: historialPagos.length, alAbrir: () => cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant) },
+                { vista: "PAGOS", label: "Cobros y suscripciones", icono: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z", badge: pagosPorVerificar > 0 ? `${pagosPorVerificar} por verificar` : historialPagos.length, alerta: pagosPorVerificar > 0, alAbrir: () => cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant) },
                 { vista: "FINANZAS", label: "Finanzas y contabilidad", icono: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", alAbrir: () => cargarDatosFinancieros() },
+              ]},
+              { titulo: "Verticales", items: [
+                { vista: "ACTIVIDAD", label: "Panorama de verticales", icono: "M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" },
+                ...VERTICALES_SUPERADMIN.map((v) => ({ vista: "VERTICAL" as const, label: v.nombre, icono: v.icono, verticalId: v.id, alAbrir: () => setVerticalActiva(v.id) })),
               ]},
               { titulo: "Inteligencia", items: [
                 { vista: "METRICAS", label: "Métricas del SaaS", icono: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", alAbrir: () => cargarAnalytics() },
-                { vista: "ACTIVIDAD", label: "Actividad por vertical", icono: "M3 12h4l3-8 4 16 3-8h4" },
-                { vista: "INTELIGENCIA", label: "Inteligencia de datos", icono: "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" },
+                { vista: "INTELIGENCIA", label: "Clientes y retención", icono: "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" },
               ]},
               { titulo: "Operaciones", items: [
                 { vista: "SOPORTE", label: "Soporte y asistencia", icono: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z", badge: abiertosSoporte, alerta: abiertosSoporte > 0, alAbrir: () => cargarTicketsSoporte() },
@@ -1350,11 +1420,11 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">{g.titulo}</div>
                 <div className="space-y-0.5">
                   {g.items.map((it) => {
-                    const activo = vistaPrincipal === it.vista;
+                    const activo = vistaPrincipal === it.vista && (!it.verticalId || it.verticalId === verticalActiva);
                     return (
                       <button
-                        key={it.vista}
-                        onClick={() => { setVistaPrincipal(it.vista); it.alAbrir?.(); }}
+                        key={it.verticalId ?? it.vista}
+                        onClick={() => { setVistaPrincipal(it.vista); it.alAbrir?.(); setMenuMovilAbierto(false); }}
                         className={`w-full px-3 py-2 rounded-xl text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
                           activo ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" : "text-slate-700 hover:bg-slate-50"
                         }`}
@@ -1448,14 +1518,24 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       {/* AREA DE CONTENIDO PRINCIPAL (MAIN WORKSPACE) */}
       <div className="flex-1 h-full overflow-y-auto flex flex-col bg-slate-100/70">
         {/* HEADER SUPERIOR DEL WORKSPACE */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10 shadow-2xs">
-          <div>
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4 sticky top-0 z-10 shadow-2xs">
+          <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setMenuMovilAbierto(true)}
+            className="md:hidden p-2 -ml-1 rounded-xl border border-slate-200 bg-white text-slate-700 cursor-pointer shrink-0"
+            aria-label="Abrir menú"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-slate-400 text-xs font-medium">Administración</span>
               <span className="text-slate-300 text-xs">/</span>
               <span className="font-bold text-slate-800 text-xs">{TITULOS_VISTA[vistaPrincipal][0]}</span>
             </div>
-            <h1 className="font-['Outfit'] font-black text-xl text-slate-900 mt-0.5">{TITULOS_VISTA[vistaPrincipal][1]}</h1>
+            <h1 className="font-['Outfit'] font-black text-lg sm:text-xl text-slate-900 mt-0.5 truncate">{vistaPrincipal === "VERTICAL" ? VERTICALES_SUPERADMIN.find((v) => v.id === verticalActiva)?.nombre : TITULOS_VISTA[vistaPrincipal][1]}</h1>
+          </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1755,6 +1835,10 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
       {/* VISTA: MODULO DEDICADO DE HISTORIAL DE COBROS Y PAGOS */}
       {vistaPrincipal === "PAGOS" && (
         <div className="space-y-6 animate-fadeIn">
+          <PagosPorVerificar
+            onConteo={setPagosPorVerificar}
+            onCambio={() => { cargarPagos(filtroPagosTenant === "TODOS" ? undefined : filtroPagosTenant); cargarTodo(); }}
+          />
           {/* BARRA SUPERIOR DE PAGOS */}
           <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -1785,6 +1869,9 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                 onClick={() => {
                   setCuentasConfigForm(obtenerCuentasCobro());
                   setShowConfigCuentasModal(true);
+                  obtenerCuentasCobroSuperAdmin()
+                    .then((c) => { if (c && Object.keys(c).length) setCuentasConfigForm(combinarCuentasCobro(c)); })
+                    .catch(() => {});
                 }}
                 className="px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
               >
@@ -2399,6 +2486,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             onSoporte={() => ejecutarConAutorizacionMaestra(() => handleImpersonar(t.tenantId))}
             onActivar={() => handleActivar(t.tenantId)}
             onSuspender={() => handleDesactivar(t.tenantId)}
+            onCambioVertical={(permitido) => handleCambioVertical(t.tenantId, permitido)}
           />
         );
       })()}
@@ -2429,17 +2517,24 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         </div>
       )}
 
-      {/* VISTA: ACTIVIDAD OPERATIVA POR VERTICAL (incluye Canal Endémico de la red) */}
+      {/* VISTA: PANORAMA DE VERTICALES (compara todas y lleva a cada página) */}
       {vistaPrincipal === "ACTIVIDAD" && (
         <div className="animate-fadeIn">
-          <SuperAdminActividad />
+          <SuperAdminPanorama onAbrirVertical={abrirVertical} />
         </div>
       )}
 
-      {/* VISTA: INTELIGENCIA DE DATOS (MRR/churn/salud de clientes, comercios, salud y canal endémico) */}
+      {/* VISTA: PÁGINA DEDICADA DE UNA VERTICAL (métricas, gráficas, reportes y control) */}
+      {vistaPrincipal === "VERTICAL" && (
+        <div className="animate-fadeIn">
+          <SuperAdminVertical key={verticalActiva} verticalId={verticalActiva} onAbrirFicha={(id) => setFichaTenantId(id)} />
+        </div>
+      )}
+
+      {/* VISTA: CLIENTES Y RETENCIÓN (ingresos recurrentes, bajas y salud de clientes) */}
       {vistaPrincipal === "INTELIGENCIA" && (
         <div className="animate-fadeIn">
-          <SuperAdminInteligencia />
+          <VistaNegocio />
         </div>
       )}
 
@@ -3218,6 +3313,11 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                                   : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
                               }`}
                             >
+                              {m.imagen && (
+                                <a href={m.imagen} download={`captura-ticket-${m.id}.png`} title="Descargar la captura" className="block mb-1.5">
+                                  <img src={m.imagen} alt="Captura del cliente" className="max-h-64 rounded-xl border border-slate-200" />
+                                </a>
+                              )}
                               <div className="leading-relaxed whitespace-pre-wrap">{m.contenido}</div>
                               <div
                                 className={`text-[10px] mt-1.5 text-right font-mono flex items-center justify-end gap-1 ${
@@ -4847,11 +4947,17 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
             </div>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                guardarCuentasCobro(cuentasConfigForm);
-                avisar("Cuentas de cobro actualizadas exitosamente. Los clientes ya ven los datos.");
-                setShowConfigCuentasModal(false);
+                // Antes solo se guardaba en este navegador y ningún cliente veía el cambio.
+                try {
+                  await guardarCuentasCobroSuperAdmin({ ...cuentasConfigForm });
+                  guardarCuentasCobro(cuentasConfigForm);
+                  avisar("Cuentas de cobro guardadas. Todos los negocios ya ven estos datos al pagar.");
+                  setShowConfigCuentasModal(false);
+                } catch (err: any) {
+                  avisar(err?.message || "No se pudieron guardar las cuentas de cobro.", "error");
+                }
               }}
               className="space-y-4 text-xs"
             >
