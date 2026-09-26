@@ -3278,8 +3278,8 @@ function HistoriasClinicas({
   const [itemsRecipe, setItemsRecipe] = useState<ItemRecipePrescrito[]>([]);
   const [form, setForm] = useState({
     motivoConsulta: "",
-    talla: "1.75",
-    peso: "70.0",
+    talla: "",
+    peso: "",
     // Antes no existían — los informes médicos imprimían "120/80, 75bpm,
     // 36.8°C, 99% SatO2" fijos para CUALQUIER paciente porque no había dónde
     // capturarlos de verdad. El backend (ConsultaMedica.java) ya los guarda;
@@ -3356,8 +3356,8 @@ function HistoriasClinicas({
     setItemsRecipe([]);
     setForm({
       motivoConsulta: "",
-      talla: "1.75",
-      peso: "70.0",
+      talla: "",
+      peso: "",
       presionArterial: "",
       frecuenciaCardiaca: "",
       frecuenciaRespiratoria: "",
@@ -3387,9 +3387,10 @@ function HistoriasClinicas({
   const construirReportData = (): ConsultaReportData | null => {
     if (faltanDatosLegalesMedico()) return null;
     if (!pacienteSeleccionado) return null;
-    const pKg = parseFloat(form.peso) || 70;
-    const tM = parseFloat(form.talla) || 1.75;
-    const imcCalc = (pKg / (tM * tM)).toFixed(1);
+    // Sin peso o talla no se inventan valores (antes salían 70 kg / 1,75 m y un IMC calculado con ellos).
+    const pKg = parseFloat(form.peso);
+    const tM = parseFloat(form.talla);
+    const imcCalc = pKg > 0 && tM > 0 ? (pKg / (tM * tM)).toFixed(1) : "No registrado";
 
     const esForaneo =
       pacienteSeleccionado.tipoOrigen === "Foráneo" ||
@@ -3414,7 +3415,7 @@ function HistoriasClinicas({
           : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
-        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        origen: `${esForaneo ? "Foráneo" : "Local"}${pacienteSeleccionado.ciudadOrigen ? ` (${pacienteSeleccionado.ciudadOrigen})` : ""}`,
         fechaConsulta: hoy(),
       },
       signosVitales: {
@@ -3422,14 +3423,14 @@ function HistoriasClinicas({
         fc: form.frecuenciaCardiaca || "No registrado",
         fr: form.frecuenciaRespiratoria || "No registrado",
         temp: form.temperatura || "No registrado",
-        peso: `${form.peso || "70"} kg`,
-        talla: `${form.talla || "1.75"} m`,
+        peso: form.peso ? `${form.peso} kg` : "No registrado",
+        talla: form.talla ? `${form.talla} m` : "No registrado",
         imc: imcCalc,
         satO2: form.saturacionOxigeno ? `${form.saturacionOxigeno}%` : "No registrado",
       },
-      motivoConsulta: form.motivoConsulta || "Control de rutina y evolución clínica",
+      motivoConsulta: form.motivoConsulta || "No registrado",
       evolucionClinica: form.evolucionClinica,
-      diagnosticoCIE10: form.descripcionDiagnostico || "Evaluación Clínica General",
+      diagnosticoCIE10: form.descripcionDiagnostico || "No registrado",
       planTratamiento: construirTextoPlanTratamiento(),
       proximaCita: form.proximaCita,
     };
@@ -3472,8 +3473,8 @@ function HistoriasClinicas({
         planTratamiento: construirTextoPlanTratamiento(),
         recipeMedicamentos: itemsRecipe.length > 0 ? JSON.stringify(itemsRecipe) : undefined,
         anotacionesPrivadas: form.anotacionesPrivadas,
-        talla: form.talla,
-        peso: form.peso,
+        talla: form.talla || undefined,
+        peso: form.peso || undefined,
         presionArterial: form.presionArterial.trim() || undefined,
         frecuenciaCardiaca: form.frecuenciaCardiaca ? Number(form.frecuenciaCardiaca) : undefined,
         frecuenciaRespiratoria: form.frecuenciaRespiratoria ? Number(form.frecuenciaRespiratoria) : undefined,
@@ -3617,7 +3618,7 @@ function HistoriasClinicas({
           : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
-        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        origen: `${esForaneo ? "Foráneo" : "Local"}${pacienteSeleccionado.ciudadOrigen ? ` (${pacienteSeleccionado.ciudadOrigen})` : ""}`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
@@ -3669,7 +3670,7 @@ function HistoriasClinicas({
           : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
-        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        origen: `${esForaneo ? "Foráneo" : "Local"}${pacienteSeleccionado.ciudadOrigen ? ` (${pacienteSeleccionado.ciudadOrigen})` : ""}`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
@@ -3724,7 +3725,7 @@ function HistoriasClinicas({
           : pacienteSeleccionado.edad ?? "",
         telefono: pacienteSeleccionado.telefono || "No registrado",
         email: pacienteSeleccionado.email || "",
-        origen: esForaneo ? `Foráneo (${pacienteSeleccionado.ciudadOrigen || "Cúcuta"})` : `Local (${pacienteSeleccionado.ciudadOrigen || "San Cristóbal"})`,
+        origen: `${esForaneo ? "Foráneo" : "Local"}${pacienteSeleccionado.ciudadOrigen ? ` (${pacienteSeleccionado.ciudadOrigen})` : ""}`,
         fechaConsulta: fechaDeConsulta(c),
       },
       signosVitales: {
@@ -7765,36 +7766,34 @@ function AgendaMedica({
     }
   };
 
-  // Pasar paciente directamente a sala de espera
-  const handlePasarASalaEspera = (cita: CitaAgendaItem) => {
+  // Pasar paciente directamente a sala de espera. Se registra en el servidor (salud_sala_espera),
+  // igual que la admisión desde la sala: antes solo se guardaba en este navegador y el médico,
+  // en otro equipo, nunca veía el turno aunque aquí dijera "ingresado".
+  const handlePasarASalaEspera = async (cita: CitaAgendaItem) => {
     try {
-      const turnosRaw = localStorage.getItem(claveSalaEsperaTurnos(tenantId));
-      const turnosList: TurnoSalaEspera[] = turnosRaw ? JSON.parse(turnosRaw) : [];
-      const maxNum = turnosList.reduce((max, t) => Math.max(max, t.turnoNumero || 0), 0);
-      const nuevoNumero = maxNum + 1;
-      const codigoTurno = `T-${String(nuevoNumero).padStart(2, "0")}`;
-
-      const nuevoTurno: TurnoSalaEspera = {
-        id: `turno-${Date.now()}`,
-        turnoNumero: nuevoNumero,
-        codigoTurno,
-        pacienteId: null,
-        pacienteNombre: cita.pacienteNombre,
-        pacienteCedula: cita.pacienteCedula,
-        pacienteTelefono: cita.pacienteTelefono,
-        horaLlegada: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        fecha: hoy(),
-        motivo: cita.motivo,
-        consultorio: "Consultorio 1 (Doctor)",
-        estado: "EN_ESPERA",
-        estadoPago: "PENDIENTE",
-      };
-
-      localStorage.setItem(claveSalaEsperaTurnos(tenantId), JSON.stringify([...turnosList, nuevoTurno]));
-      dispararToast(`¡${cita.pacienteNombre} ingresado a Sala de Espera con Turno ${codigoTurno}!`);
+      let pacienteId = cita.pacienteId ?? null;
+      const cedula = (cita.pacienteCedula || "").trim();
+      const cedulaValida = cedula && !/^s\/?c$/i.test(cedula);
+      if (!pacienteId && cedulaValida) {
+        const encontrado = await buscarPacientePorIdentificacion(cedula);
+        if (encontrado) pacienteId = encontrado.id;
+      }
+      if (!pacienteId) {
+        const nombreCompleto = (cita.pacienteNombre || "").trim();
+        const [primerNombre, ...resto] = nombreCompleto.split(/\s+/);
+        const creado = await crearPaciente({
+          identificacion: cedulaValida ? cedula : `SC-${Date.now()}`,
+          nombres: primerNombre || nombreCompleto || "Paciente",
+          apellidos: resto.join(" ") || "-",
+          telefono: cita.pacienteTelefono && !/^s\/?t$/i.test(cita.pacienteTelefono) ? cita.pacienteTelefono : undefined,
+        });
+        pacienteId = creado.id;
+      }
+      await registrarLlegadaSalaEspera(pacienteId, "Consultorio 1 (Doctor)");
+      dispararToast(`${cita.pacienteNombre} quedó en la sala de espera.`);
       onCambio();
-    } catch {
-      avisar("Error al transferir paciente a sala de espera.");
+    } catch (err) {
+      avisar(`No se pudo pasar a ${cita.pacienteNombre} a la sala de espera: ${err instanceof Error ? err.message : "error del servidor"}`, "error");
     }
   };
 
