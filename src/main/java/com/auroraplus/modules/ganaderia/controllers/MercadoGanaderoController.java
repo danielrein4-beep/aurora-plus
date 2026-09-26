@@ -617,6 +617,11 @@ public class MercadoGanaderoController {
         if (oferta == null) throw new RuntimeException("Oferta no encontrada");
         if (!"ACEPTADA".equals(oferta.get("estado"))) throw new RuntimeException("Solo se recibe un animal cuando el vendedor aceptó la oferta");
         if (Boolean.TRUE.equals(oferta.get("traspasado"))) throw new RuntimeException("Este animal ya está en tu hato");
+        // Se marca como traspasada ANTES de copiar y solo si nadie lo hizo ya: con dos clics seguidos
+        // (o dos pestañas) ambos pasaban la revisión de arriba y el animal y la CXP se duplicaban.
+        if (jdbc.update("UPDATE ofertas_compra SET traspasado = TRUE WHERE id = ? AND traspasado IS NOT TRUE", ofertaId) == 0) {
+            throw new RuntimeException("Este animal ya está en tu hato");
+        }
 
         Long pubId = numero(oferta.get("publicacion_id"));
         Long vendedor = numero(oferta.get("vendedor"));
@@ -629,7 +634,6 @@ public class MercadoGanaderoController {
             if (primero == null) primero = numero(copia.get("id"));
             aretes.add(String.valueOf(copia.get("arete")));
         }
-        jdbc.update("UPDATE ofertas_compra SET traspasado = TRUE WHERE id = ?", ofertaId);
         String titulo = tituloDe(pubId);
         motorFinanciero.registrarMovimientoEnMoneda(yo, MovimientoCaja.TipoMovimiento.CXP, (BigDecimal) oferta.get("monto_ofertado"), "USD",
             recortar("Compra en Mercado Ganadero: " + titulo + " a " + nombreFinca(vendedor), 250), "ganaderia", "MERCADO_OFERTA", ofertaId);
