@@ -57,6 +57,8 @@ public class WebConfig implements WebMvcConfigurer {
                 "/api/auth/registro-negocio", "/api/auth/olvide-clave", "/api/auth/resetear-clave",
                 "/api/auth/super-admin/recuperar-clave/*",
                 "/api/public/contacto",
+                // Pedidos del catálogo público: sin login, cualquiera podía llenar la bandeja de un negocio de pedidos falsos.
+                "/api/public/catalogo/*/pedidos", "/api/public/catalogo/*/pedidos/*/comprobante",
                 // Portal público de recepción de laboratorio (sin login, como los de
                 // arriba) — sin límite, cualquiera podría martillarlo con cargas falsas.
                 "/api/public/laboratorio/portal/*/subir",

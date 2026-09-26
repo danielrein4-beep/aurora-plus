@@ -29,7 +29,16 @@ import java.util.Map;
 @RequestMapping("/api/salud/config")
 public class ConfiguracionMedicaController {
 
-    private static final String PIN_DE_FABRICA = "1234";
+    // Ya no hay PIN de fábrica: mientras el médico no elige el suyo, ningún PIN es válido (el
+    // frontend le pide crearlo, ver ModalConfigurarClavePrimeraVez). Antes "1234" abría la
+    // historia clínica de cualquier consultorio que no lo hubiera cambiado.
+    private static final java.util.Set<String> PINES_TRIVIALES = java.util.Set.of(
+        "0000", "1111", "2222", "3333", "4444", "5555", "6666", "7777", "8888", "9999", "1234", "4321", "1212", "0123");
+
+    // Con 4 dígitos hay solo 10.000 combinaciones: sin límite se adivina en minutos.
+    private static final int MAX_FALLOS_PIN = 5;
+    private static final long BLOQUEO_PIN_MS = 10 * 60 * 1000L;
+    private final java.util.concurrent.ConcurrentHashMap<Long, long[]> fallosPin = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Autowired
     private ConfiguracionMedicaRepository configuracionMedicaRepository;
@@ -53,11 +62,31 @@ public class ConfiguracionMedicaController {
         Long tenantId = TenantContext.getCurrentTenant();
         String pin = body.get("pin") != null ? body.get("pin").trim() : "";
 
-        ConfiguracionMedica config = configuracionMedicaRepository.findByTenantId(tenantId).orElse(null);
-        boolean valido = (config == null || config.getClaveDoctorHash() == null)
-            ? PIN_DE_FABRICA.equals(pin)
-            : passwordEncoder.matches(pin, config.getClaveDoctorHash());
+        long ahora = System.currentTimeMillis();
+        long[] estado = fallosPin.computeIfAbsent(tenantId, k -> new long[2]); // [fallos, bloqueadoHasta]
+        synchronized (estado) {
+            if (estado[1] > ahora) {
+                long minutos = Math.max(1, (estado[1] - ahora) / 60000 + 1);
+                throw new RuntimeException("Demasiados intentos con el PIN. Espera " + minutos + " minutos.");
+            }
+        }
 
+        ConfiguracionMedica config = configuracionMedicaRepository.findByTenantId(tenantId).orElse(null);
+        boolean valido = config != null && config.getClaveDoctorHash() != null
+            && Boolean.TRUE.equals(config.getClaveDoctorPersonalizada())
+            && passwordEncoder.matches(pin, config.getClaveDoctorHash());
+
+        synchronized (estado) {
+            if (valido) {
+                estado[0] = 0;
+                estado[1] = 0;
+            } else if (++estado[0] >= MAX_FALLOS_PIN) {
+                estado[0] = 0;
+                estado[1] = ahora + BLOQUEO_PIN_MS;
+                auditoriaService.registrar(tenantId, "SALUD", "SEGURIDAD", "ConfiguracionMedica", tenantId,
+                    "PIN del médico bloqueado 10 minutos por " + MAX_FALLOS_PIN + " intentos fallidos");
+            }
+        }
         return ResponseEntity.ok(Map.of("valido", valido));
     }
 
@@ -69,6 +98,9 @@ public class ConfiguracionMedicaController {
         String pinNuevo = body.get("pinNuevo") != null ? body.get("pinNuevo").trim() : "";
         if (pinNuevo.length() != 4 || !pinNuevo.chars().allMatch(Character::isDigit)) {
             throw new RuntimeException("El PIN debe tener exactamente 4 dígitos numéricos");
+        }
+        if (PINES_TRIVIALES.contains(pinNuevo)) {
+            throw new RuntimeException("Ese PIN es demasiado fácil de adivinar. Elige otro.");
         }
 
         ConfiguracionMedica config = obtenerOCrear(tenantId);

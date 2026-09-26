@@ -31,6 +31,11 @@ import java.util.concurrent.atomic.AtomicLong;
 public class RateLimitInterceptor implements HandlerInterceptor {
 
     private static final int LIMITE_PETICIONES = 5;
+    // Los inicios de sesión de un negocio salen todos de la misma IP (el WiFi del local): con 5
+    // por minuto, el sexto empleado quedaba bloqueado al abrir el turno. La fuerza bruta contra
+    // una cuenta la frena el bloqueo por cuenta de AuthService (8 fallos, 15 minutos).
+    private static final int LIMITE_LOGIN = 30;
+    private static final java.util.Set<String> RUTAS_LOGIN = java.util.Set.of("/api/auth/login", "/api/auth/login-directo");
     private static final long VENTANA_MS = 60_000;
     // Un contador sin actividad por más de esto se considera abandonado y se
     // limpia oportunistamente — evita que el mapa crezca sin límite con IPs
@@ -76,7 +81,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             inicioVentanaActual = contador.inicioVentana;
         }
 
-        if (intentos > LIMITE_PETICIONES) {
+        int limite = RUTAS_LOGIN.contains(request.getRequestURI()) ? LIMITE_LOGIN : LIMITE_PETICIONES;
+        if (intentos > limite) {
             long segundosRestantes = Math.max(1, (VENTANA_MS - (ahora - inicioVentanaActual)) / 1000);
             response.setStatus(429);
             response.setHeader("Retry-After", String.valueOf(segundosRestantes));

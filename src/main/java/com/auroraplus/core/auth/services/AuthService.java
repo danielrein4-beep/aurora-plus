@@ -38,6 +38,39 @@ public class AuthService {
         long bloqueadoHasta = 0;
     }
 
+    // Bloqueo por CUENTA para los usuarios de los negocios. El límite por IP (RateLimitInterceptor)
+    // no alcanza: un equipo entero entra desde el mismo WiFi, así que ese límite tiene que ser
+    // holgado; lo que frena la fuerza bruta contra una cuenta es esto.
+    private static final int MAX_INTENTOS_USUARIO = 8;
+    private static final long BLOQUEO_USUARIO_MS = 15 * 60 * 1000L;
+    private final java.util.concurrent.ConcurrentHashMap<String, IntentosSuperAdmin> intentosUsuario = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void verificarNoBloqueado(String clave) {
+        IntentosSuperAdmin i = intentosUsuario.get(clave);
+        if (i == null) return;
+        synchronized (i) {
+            long ahora = System.currentTimeMillis();
+            if (i.bloqueadoHasta > ahora) {
+                long minutos = Math.max(1, (i.bloqueadoHasta - ahora) / 60000 + 1);
+                throw new RuntimeException("Demasiados intentos fallidos con esta cuenta. Intenta de nuevo en " + minutos + " minutos o usa \"Olvidé mi clave\".");
+            }
+        }
+    }
+
+    private void registrarFallo(String clave) {
+        IntentosSuperAdmin i = intentosUsuario.computeIfAbsent(clave, k -> new IntentosSuperAdmin());
+        synchronized (i) {
+            long ahora = System.currentTimeMillis();
+            if (i.bloqueadoHasta != 0 && i.bloqueadoHasta <= ahora) { i.fallos = 0; i.bloqueadoHasta = 0; }
+            i.fallos++;
+            if (i.fallos >= MAX_INTENTOS_USUARIO) i.bloqueadoHasta = ahora + BLOQUEO_USUARIO_MS;
+        }
+    }
+
+    private static String claveIntentos(String username) {
+        return username == null ? "" : username.trim().toLowerCase();
+    }
+
     @Autowired
     private TokenRecuperacionClaveRepository tokenRecuperacionClaveRepository;
 
@@ -98,12 +131,16 @@ public class AuthService {
      * volver al mensaje genérico o añadir CAPTCHA tras varios intentos.
      */
     public ResultadoLogin login(Long tenantId, String username, String password) {
+        String claveBloqueo = claveIntentos(username);
+        verificarNoBloqueado(claveBloqueo);
         Usuario usuario = usuarioRepository.buscarPorTenantYUsername(tenantId, username)
             .orElseThrow(() -> new RuntimeException("Cuenta no existente, por favor registrarse..."));
 
         if (!usuario.isActivo() || !passwordEncoder.matches(password, usuario.getPasswordHash())) {
+            registrarFallo(claveBloqueo);
             throw new RuntimeException("Usuario o contraseña incorrectos");
         }
+        intentosUsuario.remove(claveBloqueo);
 
         String token = jwtService.generarTokenTenant(tenantId, usuario.getUsername(), usuario.getRol().name(), usuario.getTokenVersion());
         return new ResultadoLogin(token, usuario.getRol().name(), usuario.getUsername(), tenantId);
@@ -117,6 +154,8 @@ public class AuthService {
      */
     public ResultadoLogin loginPorUsername(String username, String password) {
         String cleanUser = username != null ? username.trim() : "";
+        String claveBloqueo = claveIntentos(cleanUser);
+        verificarNoBloqueado(claveBloqueo);
         List<Usuario> candidatos = usuarioRepository.buscarPorUsernameEnTodosLosTenants(cleanUser);
         if (candidatos.isEmpty() && !cleanUser.contains("@")) {
             candidatos = usuarioRepository.buscarPorUsernameEnTodosLosTenants(cleanUser + "@gmail.com");
@@ -133,8 +172,10 @@ public class AuthService {
             .toList();
 
         if (coincidentes.isEmpty()) {
+            registrarFallo(claveBloqueo);
             throw new RuntimeException("Usuario o contraseña incorrectos");
         }
+        intentosUsuario.remove(claveBloqueo);
         Usuario usuario = coincidentes.get(0);
         String token = jwtService.generarTokenTenant(usuario.getTenantId(), usuario.getUsername(), usuario.getRol().name(), usuario.getTokenVersion());
         return new ResultadoLogin(token, usuario.getRol().name(), usuario.getUsername(), usuario.getTenantId());
