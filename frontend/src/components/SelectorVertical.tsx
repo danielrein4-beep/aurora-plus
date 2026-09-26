@@ -60,7 +60,12 @@ export default function SelectorVertical() {
         Cambiar vertical ▾
       </button>
       {abierto && (
-        <div className="absolute right-0 mt-2 w-60 z-50 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-xl p-1.5 whitespace-normal">
+        // En teléfono el botón vive dentro de una fila que se desliza de lado y el menú quedaba
+        // recortado fuera de la pantalla: ahí se abre como ventana fija, con fondo oscuro.
+        <div className="fixed inset-0 z-[90] sm:hidden" style={{ backgroundColor: "rgba(15, 23, 42, 0.45)" }} onClick={() => setAbierto(false)} aria-hidden="true" />
+      )}
+      {abierto && (
+        <div className="fixed left-4 right-4 top-24 z-[95] sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-60 sm:z-50 max-h-[70dvh] overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 shadow-xl p-1.5 whitespace-normal">
           <div className="px-3 pt-1.5 pb-2 text-[11px] text-slate-500 dark:text-white/50">
             Cuenta de verificación. Los datos siguen siendo los de este negocio.
           </div>
@@ -70,7 +75,7 @@ export default function SelectorVertical() {
               <button
                 key={v.industry}
                 onClick={() => cambiar(v)}
-                className={`w-full text-left px-3 py-2 rounded-xl text-sm transition cursor-pointer ${
+                className={`w-full text-left px-3 py-3 sm:py-2 rounded-xl text-sm transition cursor-pointer ${
                   actual ? "bg-slate-100 dark:bg-white/10 font-semibold text-slate-900 dark:text-white" : "text-slate-700 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
                 }`}
               >
