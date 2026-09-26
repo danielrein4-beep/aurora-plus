@@ -140,8 +140,8 @@ export default function ModalAltaAnimal({
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-lg w-full border border-emerald-500/30 text-left space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
             Alta de Animal en el Hato
@@ -157,7 +157,7 @@ export default function ModalAltaAnimal({
           {/* Selector de Origen: Nacimiento vs Compra */}
           <div>
             <label className="text-slate-400 block mb-1.5 font-bold">Origen del Animal *</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid [&>*]:min-w-0 grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setFormAnimal({ ...formAnimal, origen: "NACIMIENTO", tipoAnimal: formAnimal.tipoAnimal === "VACA" ? "BECERRA" : formAnimal.tipoAnimal })}
@@ -192,7 +192,7 @@ export default function ModalAltaAnimal({
                 <IconSprout size={13} />
                 <span>Datos de Nacimiento & Trazabilidad Maternal</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid [&>*]:min-w-0 grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 block mb-1">Madre (Opcional - Genealogía)</label>
                   <select
@@ -235,7 +235,7 @@ export default function ModalAltaAnimal({
                   className="w-full p-2.5 rounded-xl bg-slate-900 border border-white/15 text-slate-900 dark:text-white font-medium text-xs"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-400 block mb-1">Precio de Compra (USD) *</label>
                   <input
@@ -263,7 +263,7 @@ export default function ModalAltaAnimal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Número de Arete / Chapeta *</label>
               <input
@@ -287,7 +287,7 @@ export default function ModalAltaAnimal({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Raza</label>
               <input
@@ -349,7 +349,7 @@ export default function ModalAltaAnimal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Peso Inicial (kg)</label>
               <input
@@ -389,7 +389,7 @@ export default function ModalAltaAnimal({
 
           {/* Estados Reproductivo & Productivo — solo aplican a hembras */}
           {formAnimal.sexo === "HEMBRA" && (
-            <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+            <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
               <div>
                 <label className="text-slate-400 block mb-1">Estado Reproductivo</label>
                 <select
@@ -415,23 +415,23 @@ export default function ModalAltaAnimal({
             </div>
           )}
 
-          <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+          <div className="pt-3 border-t border-white/10 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => onCerrar()}
-              className="px-4 py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
+              className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl text-slate-400 hover:text-white cursor-pointer">
               Cancelar
             </button>
             <button
               type="button"
               onClick={(e) => handleGuardarAnimal(e, true)}
-              className="apple-glass-btn text-slate-700 dark:text-white font-bold px-5 py-2 rounded-xl cursor-pointer border border-emerald-500/30">
+              className="w-full sm:w-auto apple-glass-btn text-slate-700 dark:text-white font-bold px-5 py-2.5 sm:py-2 rounded-xl cursor-pointer border border-emerald-500/30">
               Guardar y Cerrar
             </button>
             <button
               type="submit"
               title="Deja el formulario abierto, listo para dar de alta el siguiente animal del mismo lote/compra"
-              className="btn-cyber-neon text-white font-bold px-6 py-2 rounded-xl cursor-pointer">
+              className="w-full sm:w-auto btn-cyber-neon text-white font-bold px-6 py-2.5 sm:py-2 rounded-xl cursor-pointer">
               Guardar y Agregar Otro
             </button>
           </div>

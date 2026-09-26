@@ -62,8 +62,8 @@ export default function ModalOrdeno({
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-md w-full border border-sky-500/30 text-left space-y-4">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-md w-full border border-sky-500/30 text-left space-y-4">
         <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
           Registrar Ordeño
         </h3>
@@ -81,7 +81,7 @@ export default function ModalOrdeno({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Turno</label>
               <select
@@ -108,7 +108,7 @@ export default function ModalOrdeno({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">% Grasa</label>
               <input
@@ -136,7 +136,7 @@ export default function ModalOrdeno({
 
           <div>
             <label className="text-slate-400 block mb-1">Destino de la Leche *</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid [&>*]:min-w-0 grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setFormOrdeno({ ...formOrdeno, destino: "TANQUE" })}

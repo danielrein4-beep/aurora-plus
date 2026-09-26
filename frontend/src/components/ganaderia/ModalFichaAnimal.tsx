@@ -8,8 +8,8 @@ interface Props {
 /** Ficha corta del animal con su código QR para imprimir y pegar en la manga. */
 export default function ModalFichaAnimal({ animal, onCerrar }: Props) {
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-sm w-full border border-emerald-500/30 text-center space-y-4">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-sm w-full border border-emerald-500/30 text-center space-y-4">
         <h3 className="font-['Outfit'] font-black text-xl text-slate-900 dark:text-white">
           Ficha de Trazabilidad
         </h3>

@@ -54,8 +54,8 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
   };
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-      <div className="apple-glass rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
+    <div className="fixed inset-0 z-[2000] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/60 backdrop-blur-md">
+      <div className="apple-glass rounded-3xl p-5 sm:p-8 my-2 sm:my-0 min-w-0 max-w-lg w-full border border-rose-500/40 text-left space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-white/10">
           <div className="flex items-center gap-2">
             <span className="text-rose-400"><IconWarning size={20} /></span>
@@ -87,7 +87,7 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Cuarto Mamario Afectado *</label>
               <select
@@ -115,7 +115,7 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Fármaco Intramamario / Antibiótico</label>
               <input
@@ -157,7 +157,7 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid [&>*]:min-w-0 grid-cols-2 gap-3">
             <div>
               <label className="text-slate-400 block mb-1">Veterinario / Técnico</label>
               <input
