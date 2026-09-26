@@ -98,6 +98,18 @@ const MODULOS_SISTEMA = [
 ];
 
 /** [migas de pan, título] de cada vista del panel. */
+/**
+ * Clave inicial de cada negocio nuevo: al azar y distinta cada vez (antes todos recibían
+ * "admin123"). Se ve en el formulario para entregársela al cliente, que la cambia al entrar.
+ * Sin letras ni números que se confunden (0/O, 1/l/I).
+ */
+function generarClaveTemporal(): string {
+  const letras = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const azar = new Uint32Array(10);
+  crypto.getRandomValues(azar);
+  return Array.from(azar, (n) => letras[n % letras.length]).join("");
+}
+
 const TITULOS_VISTA: Record<"TENANTS" | "PAGOS" | "METRICAS" | "ACTIVIDAD" | "INTELIGENCIA" | "VERTICAL" | "FINANZAS" | "SOPORTE" | "AUDITORIA" | "SEGURIDAD" | "EQUIPO", [string, string]> = {
   TENANTS: ["Clientes", "Directorio de negocios"],
   PAGOS: ["Ingresos", "Cobros y suscripciones"],
@@ -223,7 +235,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
     mesesVigencia: 1,
     monedaBase: "USD",
     usuarioInicial: "admin",
-    passwordInicial: "admin123",
+    passwordInicial: generarClaveTemporal(),
     accesoTotal: false,
     limiteUsuarios: undefined,
   });
@@ -1037,7 +1049,7 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
         mesesVigencia: 1,
         monedaBase: "USD",
         usuarioInicial: "admin",
-        passwordInicial: "admin123",
+        passwordInicial: generarClaveTemporal(),
         accesoTotal: false,
         limiteUsuarios: undefined,
       });

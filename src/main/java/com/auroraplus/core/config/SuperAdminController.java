@@ -80,9 +80,19 @@ public class SuperAdminController {
     @Autowired(required = false)
     private com.auroraplus.core.auditoria.repositories.RegistroAuditoriaRepository registroAuditoriaRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${AURORA_TENANT_DESARROLLO:true}")
+    private boolean tenantDesarrollo;
+
+    /** Los negocios reales: en el servidor, el id 1 reservado del sistema no se lista ni cuenta. */
+    private List<LicenciaTenant> negociosVisibles() {
+        List<LicenciaTenant> todos = licenciaTenantRepository.findAll();
+        if (tenantDesarrollo) return todos;
+        return todos.stream().filter(l -> !Long.valueOf(1L).equals(l.getTenantId())).collect(java.util.stream.Collectors.toList());
+    }
+
     @GetMapping
     public List<LicenciaTenant> listar() {
-        List<LicenciaTenant> lista = licenciaTenantRepository.findAll();
+        List<LicenciaTenant> lista = negociosVisibles();
         for (LicenciaTenant lic : lista) {
             lic.setCantidadUsuarios(usuarioRepository.countByTenantId(lic.getTenantId()));
         }
@@ -103,7 +113,7 @@ public class SuperAdminController {
 
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> obtenerStats() {
-        List<LicenciaTenant> todos = licenciaTenantRepository.findAll();
+        List<LicenciaTenant> todos = negociosVisibles();
         LocalDate hoy = LocalDate.now();
         LocalDate limite7Dias = hoy.plusDays(7);
 
@@ -845,7 +855,7 @@ public class SuperAdminController {
                 break;
         }
 
-        List<LicenciaTenant> todosTenants = licenciaTenantRepository.findAll();
+        List<LicenciaTenant> todosTenants = negociosVisibles();
         List<PagoSuscripcionTenant> todosPagos = pagoSuscripcionRepository.findAllByOrderByFechaPagoDesc();
 
         List<PagoSuscripcionTenant> pagosConfirmados = todosPagos.stream()

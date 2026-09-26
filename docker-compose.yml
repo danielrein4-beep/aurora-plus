@@ -82,6 +82,8 @@ services:
       PLATAFORMA_WHATSAPP_PLANTILLA_AVISO: ${PLATAFORMA_WHATSAPP_PLANTILLA_AVISO:-}
       WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
       VERIFICACION_SIMULAR_ENVIO: "false"
+      # El id 1 queda reservado e inactivo: sin tenant de desarrollo ni catálogo de ejemplo en producción.
+      AURORA_TENANT_DESARROLLO: "false"
       # Cifra las cédulas y registros de hierro del Mercado Ganadero. Obligatoria
       # y fija: si cambia, los documentos ya cargados no se pueden abrir.
       MERCADO_DOCUMENTOS_SECRET: ${MERCADO_DOCUMENTOS_SECRET:?Defina MERCADO_DOCUMENTOS_SECRET en .env antes de levantar en producción}

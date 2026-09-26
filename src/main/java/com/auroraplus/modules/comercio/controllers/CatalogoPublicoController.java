@@ -26,6 +26,10 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/public/catalogo")
 public class CatalogoPublicoController {
 
+    /** Solo en desarrollo el tenant 1 muestra un catálogo de ejemplo (ver LicenciaDataInitializer). */
+    @org.springframework.beans.factory.annotation.Value("${AURORA_TENANT_DESARROLLO:true}")
+    private boolean tenantDesarrollo;
+
     @Autowired
     private LicenciaTenantRepository licenciaTenantRepository;
 
@@ -166,7 +170,7 @@ public class CatalogoPublicoController {
         }
 
         // 3. Si no hay items cargados en BD, catalogo modelo unicamente para entorno de pruebas (tenantId == 1)
-        if (productos.isEmpty() && Long.valueOf(1L).equals(tenantId)) {
+        if (productos.isEmpty() && tenantDesarrollo && Long.valueOf(1L).equals(tenantId)) {
             productos.addAll(generarCatalogoModelo(tasaVes));
         }
 
@@ -476,7 +480,10 @@ public class CatalogoPublicoController {
             }
         }
 
-        String numPedido = "PED-" + String.format("%04d", (int)(Math.random() * 9000) + 1000);
+        // Fecha + 4 caracteres al azar: antes eran 4 dígitos (9.000 valores) y dos pedidos del mismo
+        // negocio terminaban con el mismo número, lo que confundía la confirmación por WhatsApp.
+        String azar = Long.toString(java.util.concurrent.ThreadLocalRandom.current().nextLong(36L * 36 * 36 * 36), 36).toUpperCase();
+        String numPedido = "PED-" + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyMMdd")) + "-" + "0".repeat(4 - azar.length()) + azar;
 
         PedidoWebComercio pedido = new PedidoWebComercio();
         pedido.setTenantId(tenantId);

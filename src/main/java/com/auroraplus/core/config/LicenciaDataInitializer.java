@@ -27,15 +27,24 @@ public class LicenciaDataInitializer implements CommandLineRunner {
 
     private static final Long TENANT_DESARROLLO = 1L;
 
+    /**
+     * En el servidor (AURORA_TENANT_DESARROLLO=false en docker-compose) el id 1 se sigue
+     * reservando, porque si no el primer cliente real recibiría el id 1 y heredaría lo que el
+     * código trata como entorno de pruebas (catálogo de ejemplo). Pero queda inactivo y fuera
+     * del panel del super admin.
+     */
+    @org.springframework.beans.factory.annotation.Value("${AURORA_TENANT_DESARROLLO:true}")
+    private boolean tenantDesarrollo;
+
     @Override
     public void run(String... args) {
         if (licenciaTenantRepository.findByTenantId(TENANT_DESARROLLO).isEmpty()) {
             LicenciaTenant licencia = new LicenciaTenant();
             licencia.setTenantId(TENANT_DESARROLLO);
             licencia.setTipoLicencia(LicenciaTenant.TipoLicencia.INDUSTRIAL);
-            licencia.setActiva(true);
+            licencia.setActiva(tenantDesarrollo);
             licencia.setFechaVencimientoPago(LocalDate.now().plusYears(1));
-            licencia.setNombreEmpresa("Tenant de Desarrollo");
+            licencia.setNombreEmpresa(tenantDesarrollo ? "Tenant de Desarrollo" : "Reservado del sistema");
             licencia.setModuloPrincipal("tamanaco-comercial");
             licencia.setFechaAlta(LocalDate.now());
             licenciaTenantRepository.save(licencia);

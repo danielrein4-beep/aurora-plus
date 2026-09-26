@@ -2874,6 +2874,16 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
     // sincronización DETIENE el cobro por completo: no se limpia el carrito, no se
     // descuenta stock local, y se muestra el motivo exacto para que el cajero corrija
     // la cantidad o cancele.
+    // Un producto que no está guardado en el servidor no se puede vender: antes esas líneas se
+    // omitían en silencio (o, si ninguna estaba guardada, la venta quedaba solo en este navegador,
+    // sin stock, caja ni libro fiscal).
+    const sinGuardar = carrito.filter((l) => !l.backendId);
+    if (!user?.tenantId || sinGuardar.length > 0) {
+      avisar(!user?.tenantId
+        ? "La sesión no tiene un negocio asociado. Cierra sesión y vuelve a entrar."
+        : `Estos productos no están guardados en el servidor: ${sinGuardar.map((l) => l.nombre).join(", ")}. Recarga el inventario o guárdalos antes de venderlos.`, "error");
+      return;
+    }
     if (user?.tenantId) {
       try {
         // Todo el ticket en una sola operación: si una línea falla (p. ej. stock), no queda nada
@@ -2897,6 +2907,8 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             montoPagadoAhora: esCredito ? 0 : undefined,
             diasCredito: esCredito ? 15 : undefined,
             nombreCliente: esCredito ? clienteParaVenta.nombre : undefined,
+            // Con el cliente ya guardado, el servidor aplica su precio mayorista y enlaza la venta y la CXC a su ficha.
+            clienteId: clienteParaVenta.backendId,
             aplicaIva: modoEuro() ? undefined : aplicaIvaVenta,
             aplicaIgtf: modoEuro() ? undefined : aplicaIgtfVenta,
             delivery: desgloseFiscal.delivery > 0 ? desgloseFiscal.delivery : undefined,
