@@ -737,7 +737,7 @@ function generarComprobantePedidoPDF(
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7.5);
   doc.setTextColor(140, 140, 140);
-  doc.text("Comprobante generado automáticamente. No reemplaza factura fiscal.", margin, y);
+  doc.text("Este comprobante no reemplaza la factura fiscal.", margin, y);
 
   doc.save(`Pedido_${pedido.numeroPedido}.pdf`);
 }
