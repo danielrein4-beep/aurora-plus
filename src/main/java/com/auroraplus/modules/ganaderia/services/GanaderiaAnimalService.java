@@ -21,6 +21,7 @@ public class GanaderiaAnimalService {
     @Autowired private PotreroRepository potreroRepository;
     @Autowired private GanaderiaEngordeService engordeService;
     @Autowired private BajaAnimalRepository bajaAnimalRepository;
+    @Autowired private PublicacionesMercadoService publicacionesMercado;
 
     /** Causa de baja que no es una muerte: el animal sale del hato como ROBADO y no cuenta en la mortalidad. */
     public static final String CAUSA_ROBO = "Robo / abigeato";
@@ -113,6 +114,7 @@ public class GanaderiaAnimalService {
         animal.setEstado(esRobo(motivo) ? "ROBADO" : "MUERTO");
         animal.setPotrero(null);
         animalRepository.save(animal);
+        publicacionesMercado.retirarPublicacionesDe(tenantId, animal.getId());
 
         BajaAnimal baja = new BajaAnimal();
         baja.setTenantId(tenantId);
@@ -141,6 +143,8 @@ public class GanaderiaAnimalService {
         if (datos.getLote() != null) animal.setLote(datos.getLote());
         if (datos.getEstadoReproductivo() != null) animal.setEstadoReproductivo(datos.getEstadoReproductivo());
         if (datos.getEstadoProductivo() != null) animal.setEstadoProductivo(datos.getEstadoProductivo());
-        return animalRepository.save(animal);
+        Animal guardado = animalRepository.save(animal);
+        if (!"ACTIVO".equals(guardado.getEstado())) publicacionesMercado.retirarPublicacionesDe(tenantId, guardado.getId());
+        return guardado;
     }
 }

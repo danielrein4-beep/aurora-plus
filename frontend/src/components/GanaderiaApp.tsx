@@ -453,12 +453,16 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
     try {
       const res = await procesarColaGanaderia(tenantId, {
         registrar_peso: async (acc) => {
-          await registrarPesoGanaderia(tenantId, acc.payload.animalId, acc.payload.peso);
+          // Con el día en que se pesó sin señal y la clave de la cola: un reintento no duplica el pesaje.
+          await registrarPesoGanaderia(tenantId, acc.payload.animalId, acc.payload.peso, fechaLocalISO(new Date(acc.creadaEn)), acc.claveIdempotencia);
         },
         rotar_potrero: async (acc) => {
           await rotarPotreroGanaderia(acc.payload.potreroOrigenId, tenantId, acc.payload.potreroDestinoId);
         },
         registrar_ordeno: async (acc) => {
+          // Si el servidor ya lo guardó y se cortó la señal, el reintento choca con "Ya existe un ordeño"
+          // para ese turno: cuenta como sincronizado, no como error (y no se suma dos veces al tanque).
+          try {
           await registrarOrdenoGanaderia(tenantId, {
             animalId: acc.payload.animalId,
             cantidadLitros: acc.payload.litros,
@@ -467,6 +471,9 @@ export default function GanaderiaApp({ onSalir, deepLinkAnimalId }: Props) {
             fecha: fechaLocalISO(new Date(acc.creadaEn)),
             precioVentaLitro: precioLecheUSD > 0 ? precioLecheUSD : undefined,
           });
+          } catch (e) {
+            if (!(e instanceof Error && e.message.includes("Ya existe un ordeño"))) throw e;
+          }
         },
         aplicar_vacuna: async (acc) => {
           await aplicarVacunaGanaderia(tenantId, {

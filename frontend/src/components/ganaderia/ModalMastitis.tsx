@@ -22,6 +22,7 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
     gradoCmt: "GRADO_2",
     farmacoAplicado: "",
     diasRetiroLeche: 0,
+    diasRetiroCarne: "" as string,
     veterinario: "",
     costo: 0,
     notas: "",
@@ -38,14 +39,15 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
         gradoCmt: formMastitis.gradoCmt,
         farmacoAplicado: formMastitis.farmacoAplicado,
         diasRetiroLeche: Number(formMastitis.diasRetiroLeche),
+        diasRetiroCarne: Number(formMastitis.diasRetiroCarne),
         veterinario: formMastitis.veterinario,
         costo: Number(formMastitis.costo),
         notas: formMastitis.notas,
       });
       const vaca = animales.find(a => a.id === Number(formMastitis.animalId));
       notificar(`Alerta sanitaria: Mastitis registrada en ${vaca?.arete || 'vaca'}. Cuarto ${formMastitis.cuartoAfectado} en tratamiento. Bloqueo de leche activo por ${formMastitis.diasRetiroLeche} días.`);
-    } catch {
-      notificar("No se pudo registrar el tratamiento de mastitis — revisa tu conexión.");
+    } catch (err) {
+      notificar(`No se pudo registrar el tratamiento de mastitis: ${err instanceof Error ? err.message : "revisa tu conexión"}`);
       return;
     }
     onCerrar();
@@ -136,6 +138,20 @@ export default function ModalMastitis({ animales, animalesActivos, tenantId, not
                 placeholder="Ej. 4"
                 value={formMastitis.diasRetiroLeche || ""}
                 onChange={e => setFormMastitis({ ...formMastitis, diasRetiroLeche: Number(e.target.value) })}
+                className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 tabular-nums font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-rose-400 block mb-1 font-bold">Días de Retiro de Carne *</label>
+              <input
+                type="number"
+                onFocus={e => e.target.select()}
+                min="0"
+                max="120"
+                required
+                placeholder="Según el prospecto"
+                value={formMastitis.diasRetiroCarne}
+                onChange={e => setFormMastitis({ ...formMastitis, diasRetiroCarne: e.target.value })}
                 className="w-full p-2.5 rounded-xl bg-slate-900 border border-rose-500/40 text-rose-300 tabular-nums font-bold"
               />
             </div>

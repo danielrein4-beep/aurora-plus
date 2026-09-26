@@ -30,10 +30,15 @@ public class RegistroPesoController {
     @Autowired
     private AnimalRepository animalRepository;
 
+    @Autowired
+    private com.auroraplus.core.sync.IdempotenciaService idempotenciaService;
+
     public static class RegistroRequest {
         public Long animalId;
         public LocalDate fecha;
         public BigDecimal pesoKg;
+        /** Viene de la cola sin conexión: un reintento con la misma clave no duplica el pesaje. */
+        public String claveIdempotencia;
     }
 
     @PostMapping
@@ -42,6 +47,10 @@ public class RegistroPesoController {
         AuthContext.exigirRol("DUENO_ADMIN", "ADMINISTRADOR_FINCA", "ENCARGADO_FINCA");
         Long tenantId = GanaderiaTenantAccess.requireTenant();
         if (request.animalId == null) throw new IllegalArgumentException("Debe indicar el animal");
+        java.util.Optional<Long> yaGuardado = idempotenciaService.obtenerSiYaProcesada(tenantId, request.claveIdempotencia);
+        if (yaGuardado.isPresent()) {
+            return ResponseEntity.ok(registroPesoRepository.findById(yaGuardado.get()).orElseThrow());
+        }
         Animal animal = animalRepository.findForUpdateByIdAndTenantId(request.animalId, tenantId)
             .orElseThrow(() -> new RuntimeException("Animal no encontrado"));
         if (request.pesoKg == null || request.pesoKg.compareTo(BigDecimal.ZERO) <= 0) {
@@ -54,6 +63,7 @@ public class RegistroPesoController {
         registro.setFecha(request.fecha != null ? request.fecha : LocalDate.now());
         registro.setPesoKg(request.pesoKg);
         registroPesoRepository.save(registro);
+        idempotenciaService.registrar(tenantId, request.claveIdempotencia, "registrar_peso_ganaderia", registro.getId());
 
         // Mantiene sincronizado el peso "actual" del animal con el último registro.
         animal.setPesoActual(request.pesoKg);

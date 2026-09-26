@@ -4641,10 +4641,10 @@ export function obtenerReporteOrdenoGanaderia(tenantId: number, desde: string, h
   return request(`/api/ganaderia/ordeno/reporte?tenantId=${tenantId}&desde=${desde}&hasta=${hasta}`);
 }
 
-export function registrarPesoGanaderia(tenantId: number, animalId: number, pesoKg: number, fecha?: string): Promise<RegistroPesoGanaderia> {
+export function registrarPesoGanaderia(tenantId: number, animalId: number, pesoKg: number, fecha?: string, claveIdempotencia?: string): Promise<RegistroPesoGanaderia> {
   return request(`/api/ganaderia/pesos?tenantId=${tenantId}`, {
     method: "POST",
-    body: JSON.stringify({ animalId, pesoKg, fecha }),
+    body: JSON.stringify({ animalId, pesoKg, fecha, claveIdempotencia }),
   });
 }
 
@@ -4888,6 +4888,7 @@ export function registrarMastitisGanaderia(tenantId: number, datos: {
   gradoCmt?: string;
   farmacoAplicado?: string;
   diasRetiroLeche?: number;
+  diasRetiroCarne?: number;
   veterinario?: string;
   costo?: number;
   notas?: string;

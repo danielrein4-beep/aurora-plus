@@ -76,6 +76,9 @@ public class MercadoGanaderoController {
     @Autowired
     private com.auroraplus.modules.ganaderia.services.VerificacionMercadoService verificacion;
 
+    @Autowired
+    private com.auroraplus.modules.ganaderia.services.GanaderiaSanidadService sanidad;
+
     /** Clave para los alias y referencias opacas: sin ella no se puede volver del alias a la finca. */
     @Value("${jwt.secret}")
     private String secreto;
@@ -397,6 +400,8 @@ public class MercadoGanaderoController {
         if (animales.size() != ids.size()) throw new RuntimeException(ids.size() == 1 ? "Ese animal no está en tu hato" : "Algún animal del lote no está en tu hato");
         for (Map<String, Object> a : animales) {
             if (!"ACTIVO".equals(a.get("estado"))) throw new RuntimeException("Solo se pueden publicar animales activos (arete " + a.get("arete") + ")");
+            // Un animal en retiro de carne (vacuna o medicamento) no se puede vender, tampoco aquí.
+            sanidad.validarAptoParaVentaConsumo(numero(a.get("id")));
         }
         Integer yaPublicado = jdbc.queryForObject(
             "SELECT COUNT(*) FROM publicaciones_venta p WHERE p.estado = 'ACTIVA' AND (p.animal_id IN (" + marcadores(ids.size()) + ") "
@@ -560,6 +565,19 @@ public class MercadoGanaderoController {
         Long comprador = numero(oferta.get("comprador_tenant_id"));
         BigDecimal monto = (BigDecimal) oferta.get("monto_ofertado");
         LocalDateTime ahora = LocalDateTime.now();
+
+        // Los animales tienen que seguir en el hato y fuera de retiro al cerrar el trato: entre
+        // publicar y aceptar pudieron venderse por otro lado, morir o recibir un medicamento.
+        List<Map<String, Object>> animalesPub = jdbc.queryForList(
+            "SELECT id, arete, estado FROM animales WHERE tenant_id = ? AND (id = (SELECT animal_id FROM publicaciones_venta WHERE id = ?) "
+                + "OR id IN (SELECT animal_id FROM mercado_ganado_lote_animales WHERE publicacion_id = ?)) FOR UPDATE", yo, pubId, pubId);
+        if (animalesPub.isEmpty()) throw new RuntimeException("Los animales de esta publicación ya no están en tu hato");
+        for (Map<String, Object> a : animalesPub) {
+            if (!"ACTIVO".equals(a.get("estado"))) {
+                throw new RuntimeException("El animal " + a.get("arete") + " ya no está activo (" + a.get("estado") + "). Retira la publicación.");
+            }
+            sanidad.validarAptoParaVentaConsumo(numero(a.get("id")));
+        }
 
         int cerradas = jdbc.update("UPDATE publicaciones_venta SET estado = 'VENDIDA', fecha_cierre = ?, comprador_tenant_id = ?, precio_final = ? "
             + "WHERE id = ? AND estado = 'ACTIVA'", Timestamp.valueOf(ahora), comprador, monto, pubId);
