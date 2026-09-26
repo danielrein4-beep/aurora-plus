@@ -3289,7 +3289,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
 
                 {/* ── TOPBAR PROFESIONAL: SALUDO, FECHA & HORA EN VIVO, TASAS Y TEMA ── */}
-        <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 shadow-sm flex-shrink-0">
+        <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shadow-sm flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setSidebarAbierto(true)}
@@ -3367,10 +3367,10 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
               TAB 1: POS MOSTRADOR ULTRA RÁPIDO
             ══════════════════════════════════════════════════════════════════ */}
         {tab === "pos" && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-115px)]">
-            
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:h-[calc(100vh-115px)]">
+
             {/* Columna Izquierda (7 cols): Catálogo, Buscador & Categorías */}
-            <div className="lg:col-span-7 xl:col-span-8 flex flex-col h-full bg-white/60 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl">
+            <div className="lg:col-span-7 xl:col-span-8 flex flex-col lg:h-full bg-white/60 dark:bg-slate-900/60 rounded-3xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 lg:overflow-hidden shadow-xl">
               
               {/* Barra de Búsqueda Reactiva */}
               <div className="relative mb-3 flex-shrink-0">
@@ -3488,7 +3488,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
             </div>
 
             {/* Columna Derecha (5 cols): Carrito de Venta & Cobro */}
-            <div className="lg:col-span-5 xl:col-span-4 flex flex-col h-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl overflow-hidden">
+            <div className="lg:col-span-5 xl:col-span-4 flex flex-col lg:h-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-2xl lg:overflow-hidden">
               
               {/* Cliente en Mostrador - Registro Rápido HORECA & Autocompletado */}
               <div className="flex-shrink-0 pb-3 mb-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
@@ -3549,7 +3549,7 @@ export default function ComercioApp({ onSalir, onIrAEquipoRoles }: { onSalir: ()
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                       <input
                         value={cedulaClienteInput}
                         onChange={(e) => manejarCambioCedula(e.target.value)}
@@ -6333,7 +6333,7 @@ function TasaBadgeComercio({ tenantId, origenTasaActiva, tasaVes, tasaCop, onOri
           <span className="underline">Configurar tasa →</span>
         )}
         {tasaCop && (
-          <span className="text-slate-500 dark:text-slate-400 text-[10px] font-normal">· COP {Number(tasaCop.tasa).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+          <span className="hidden sm:inline text-slate-500 dark:text-slate-400 text-[10px] font-normal">· COP {Number(tasaCop.tasa).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
         )}
         <span className="text-slate-500 dark:text-slate-400 text-[9px]">▼</span>
       </button>
