@@ -1,5 +1,6 @@
 import { avisar } from "../avisos";
 import React, { useState, useEffect, useRef } from "react";
+import { comprimirImagenFactura } from "../utils/imageCompression";
 import AuroraLogo from "../AuroraLogo";
 import {
   SaasSoporteTicket,
@@ -38,6 +39,86 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
   });
 
   const mensajesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Capturas de pantalla adjuntas (al crear el caso y en el chat) y la que se está viendo en grande.
+  const [imagenNuevo, setImagenNuevo] = useState<string | null>(null);
+  const [imagenChat, setImagenChat] = useState<string | null>(null);
+  const [imagenGrande, setImagenGrande] = useState<string | null>(null);
+  const [preparandoImagen, setPreparandoImagen] = useState(false);
+  const leerImagen = async (archivo: File | undefined, destino: (url: string) => void) => {
+    if (!archivo) return;
+    if (!archivo.type.startsWith("image/")) { avisar("Solo se pueden adjuntar imágenes."); return; }
+    setPreparandoImagen(true);
+    try {
+      const comprimida = await comprimirImagenFactura(archivo);
+      const url = await new Promise<string>((ok, mal) => {
+        const lector = new FileReader();
+        lector.onload = () => ok(String(lector.result));
+        lector.onerror = () => mal(new Error("No se pudo leer la imagen"));
+        lector.readAsDataURL(comprimida);
+      });
+      destino(url);
+    } catch (e) {
+      avisar(e instanceof Error ? e.message : "No se pudo adjuntar la imagen");
+    } finally {
+      setPreparandoImagen(false);
+    }
+  };
+
+  // Burbuja: se puede arrastrar con el dedo y esconder (se recuerda en este equipo). Si se esconde,
+  // el soporte se abre desde el menú lateral ("Soporte"), que manda el evento aurora:abrir-soporte.
+  const [oculta, setOculta] = useState(() => {
+    try { return localStorage.getItem("aurora_soporte_oculto") === "1"; } catch { return false; }
+  });
+  const [pos, setPos] = useState<{ derecha: number; abajo: number }>(() => {
+    try {
+      const g = JSON.parse(localStorage.getItem("aurora_soporte_pos") || "null");
+      if (g && typeof g.derecha === "number" && typeof g.abajo === "number") return g;
+    } catch { /* sin almacenamiento */ }
+    return { derecha: 20, abajo: 20 };
+  });
+  const arrastre = useRef<{ x: number; y: number; derecha: number; abajo: number; movido: boolean; ultima?: { derecha: number; abajo: number } } | null>(null);
+  const alPresionar = (e: React.PointerEvent) => {
+    arrastre.current = { x: e.clientX, y: e.clientY, derecha: pos.derecha, abajo: pos.abajo, movido: false };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+  const alMover = (e: React.PointerEvent) => {
+    const a = arrastre.current;
+    if (!a) return;
+    const dx = e.clientX - a.x;
+    const dy = e.clientY - a.y;
+    if (!a.movido && Math.hypot(dx, dy) < 6) return;
+    a.movido = true;
+    a.ultima = {
+      derecha: Math.min(Math.max(8, a.derecha - dx), window.innerWidth - 64),
+      abajo: Math.min(Math.max(8, a.abajo - dy), window.innerHeight - 64),
+    };
+    setPos(a.ultima);
+  };
+  const alSoltar = () => {
+    const a = arrastre.current;
+    arrastre.current = null;
+    if (!a) return;
+    if (a.movido) {
+      try { localStorage.setItem("aurora_soporte_pos", JSON.stringify(a.ultima ?? pos)); } catch { /* sin almacenamiento */ }
+    } else {
+      setAbierto(true);
+    }
+  };
+  const esconderBurbuja = () => {
+    setOculta(true);
+    try { localStorage.setItem("aurora_soporte_oculto", "1"); } catch { /* sin almacenamiento */ }
+    avisar("Escondiste el botón de soporte. Lo encuentras en el menú, en \"Soporte\".", "info");
+  };
+  const mostrarBurbujaDeNuevo = () => {
+    setOculta(false);
+    try { localStorage.removeItem("aurora_soporte_oculto"); } catch { /* sin almacenamiento */ }
+  };
+  useEffect(() => {
+    const abrir = () => { setVista("LISTA"); setAbierto(true); };
+    window.addEventListener("aurora:abrir-soporte", abrir);
+    return () => window.removeEventListener("aurora:abrir-soporte", abrir);
+  }, []);
   const sesion = leerSesion();
 
   // Cargar tickets del tenant
@@ -111,13 +192,14 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
   // Enviar mensaje en chat
   const handleEnviarMensaje = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ticketActivo || !nuevoMensaje.trim() || enviando) return;
+    if (!ticketActivo || (!nuevoMensaje.trim() && !imagenChat) || enviando) return;
 
     setEnviando(true);
     try {
-      const msg = await enviarMensajeTicketTenant(ticketActivo.id, nuevoMensaje.trim(), sesion?.username);
+      const msg = await enviarMensajeTicketTenant(ticketActivo.id, nuevoMensaje.trim(), sesion?.username, imagenChat);
       setMensajes((prev) => [...prev, msg]);
       setNuevoMensaje("");
+      setImagenChat(null);
     } catch (err: any) {
       avisar("Error al enviar mensaje: " + (err.message || "Error de conexion"));
     } finally {
@@ -136,7 +218,9 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
         ...nuevoForm,
         tenantId: sesion?.tenantId,
         usuarioCreador: sesion?.username,
+        imagen: imagenNuevo,
       });
+      setImagenNuevo(null);
       await cargarTickets();
       setTicketActivo(nuevo);
       setVista("CHAT");
@@ -156,17 +240,32 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
 
   const ticketsNoLeidos = tickets.reduce((acc, t) => acc + (t.mensajesNoLeidos || 0), 0);
   const hayTicketActivo = tickets.some((t) => !ESTADOS_CERRADOS.includes(String(t.estado).toUpperCase()));
-  const mostrarBurbuja = !abierto && (!soloConTicketActivo || hayTicketActivo);
+  const mostrarBurbuja = !abierto && !oculta && (!soloConTicketActivo || hayTicketActivo);
 
   return (
     <>
       {/* BOTON FLOTANTE DE ASISTENCIA */}
       {mostrarBurbuja && (
-        <div className="soporte-flotante fixed bottom-5 right-5 z-40">
+        <div className="soporte-flotante fixed z-40" style={{ right: pos.derecha, bottom: pos.abajo }}>
           <button
-            onClick={() => setAbierto(true)}
-            className="flex items-center gap-2.5 px-4 py-3 bg-emerald-500 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 font-bold text-xs transition-all transform hover:scale-105 cursor-pointer"
-            title="Abrir chat de soporte en vivo con Aurora Plus"
+            type="button"
+            onClick={esconderBurbuja}
+            aria-label="Esconder el botón de soporte"
+            title="Esconder (lo encuentras en el menú, en Soporte)"
+            style={{ backgroundColor: "#334155", color: "#FFFFFF" }}
+            className="absolute -top-2 -left-2 z-10 w-5 h-5 rounded-full text-[11px] leading-none flex items-center justify-center shadow cursor-pointer"
+          >
+            ×
+          </button>
+          <button
+            onPointerDown={alPresionar}
+            onPointerMove={alMover}
+            onPointerUp={alSoltar}
+            onPointerCancel={() => { arrastre.current = null; }}
+            style={{ touchAction: "none" }}
+            className="flex items-center gap-2.5 p-3 sm:px-4 sm:py-3 bg-emerald-500 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-500/30 font-bold text-xs transition-colors cursor-pointer select-none"
+            title="Soporte Aurora (arrastra para moverlo)"
+            aria-label="Abrir soporte de Aurora"
           >
             <div className="relative">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -176,8 +275,8 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white"></span>
               )}
             </div>
-            <span>Soporte Aurora</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+            <span className="hidden sm:inline">Soporte Aurora</span>
+            <span className="hidden sm:inline w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
           </button>
         </div>
       )}
@@ -199,6 +298,11 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
                 <div className="text-[10px] text-emerald-100 font-medium">
                   Chat en vivo con ingenieria
                 </div>
+                {oculta && (
+                  <button type="button" onClick={mostrarBurbujaDeNuevo} className="text-[10px] font-bold underline cursor-pointer text-emerald-50">
+                    Volver a mostrar el botón flotante
+                  </button>
+                )}
               </div>
             </div>
 
@@ -367,6 +471,21 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
                   ></textarea>
                 </div>
 
+                <div className="space-y-1">
+                  {imagenNuevo ? (
+                    <div className="flex items-center gap-2">
+                      <img src={imagenNuevo} alt="Captura adjunta" className="h-16 rounded-lg border border-slate-200" />
+                      <button type="button" onClick={() => setImagenNuevo(null)} className="text-xs font-bold text-rose-600 cursor-pointer">Quitar</button>
+                    </div>
+                  ) : (
+                    <label className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-600 ${preparandoImagen ? "opacity-60" : "cursor-pointer"}`}>
+                      {preparandoImagen ? "Preparando…" : "Adjuntar captura de pantalla (opcional)"}
+                      <input type="file" accept="image/*" className="hidden" disabled={preparandoImagen}
+                        onChange={(e) => { leerImagen(e.target.files?.[0], setImagenNuevo); e.target.value = ""; }} />
+                    </label>
+                  )}
+                </div>
+
                 <div className="pt-2">
                   <button
                     type="submit"
@@ -432,6 +551,11 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
                               : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
                           }`}
                         >
+                          {m.imagen && (
+                            <button type="button" onClick={() => setImagenGrande(m.imagen || null)} className="block mb-1.5 cursor-zoom-in">
+                              <img src={m.imagen} alt="Captura adjunta" className="max-h-48 rounded-xl" />
+                            </button>
+                          )}
                           <div className="leading-relaxed whitespace-pre-wrap">{m.contenido}</div>
                           <div
                             className={`text-[9px] mt-1 text-right font-mono ${
@@ -450,7 +574,19 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
               </div>
 
               {/* INPUT BAR TIPO WHATSAPP */}
+              {imagenChat && (
+                <div className="px-3 pt-2 bg-white border-t border-slate-200 flex items-center gap-2">
+                  <img src={imagenChat} alt="Captura por enviar" className="h-12 rounded-lg border border-slate-200" />
+                  <button type="button" onClick={() => setImagenChat(null)} className="text-xs font-bold text-rose-600 cursor-pointer">Quitar</button>
+                </div>
+              )}
               <form onSubmit={handleEnviarMensaje} className="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+                <label title="Adjuntar captura de pantalla" aria-label="Adjuntar captura de pantalla"
+                  className={`shrink-0 w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 ${preparandoImagen ? "opacity-60" : "cursor-pointer hover:bg-slate-50"}`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12.5l-8.2 8.2a5 5 0 01-7.1-7.1l8.9-8.9a3.3 3.3 0 014.7 4.7l-8.9 8.9a1.7 1.7 0 01-2.4-2.4l8.2-8.2" /></svg>
+                  <input type="file" accept="image/*" className="hidden" disabled={preparandoImagen}
+                    onChange={(e) => { leerImagen(e.target.files?.[0], setImagenChat); e.target.value = ""; }} />
+                </label>
                 <input
                   type="text"
                   placeholder="Escribe tu mensaje para el soporte..."
@@ -461,7 +597,7 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
                 />
                 <button
                   type="submit"
-                  disabled={enviando || !nuevoMensaje.trim()}
+                  disabled={enviando || (!nuevoMensaje.trim() && !imagenChat)}
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-500 text-white font-bold text-xs rounded-2xl transition-all shadow-xs shadow-emerald-500/20 cursor-pointer disabled:opacity-40"
                 >
                   Enviar
@@ -469,6 +605,12 @@ export default function TenantSoporteWidget({ solicitudApertura, soloConTicketAc
               </form>
             </div>
           )}
+        </div>
+      )}
+
+      {imagenGrande && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 cursor-zoom-out" style={{ backgroundColor: "rgba(15, 23, 42, 0.85)" }} onClick={() => setImagenGrande(null)}>
+          <img src={imagenGrande} alt="Captura adjunta" className="max-w-full max-h-full rounded-xl" />
         </div>
       )}
     </>

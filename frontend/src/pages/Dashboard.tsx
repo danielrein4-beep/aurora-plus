@@ -921,6 +921,14 @@ export default function Dashboard() {
           </div>
 
           <button
+            onClick={() => window.dispatchEvent(new Event("aurora:abrir-soporte"))}
+            className="apple-glass-btn text-xs font-light uppercase tracking-wide px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
+            title="Abrir el chat de soporte de Aurora"
+          >
+            Soporte
+          </button>
+
+          <button
             onClick={logout}
             className="apple-glass-btn text-xs font-light uppercase tracking-wide px-3.5 py-2 rounded-full text-slate-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400 border border-slate-300/60 dark:border-white/15 transition-colors cursor-pointer"
             title="Cerrar sesión de Aurora"

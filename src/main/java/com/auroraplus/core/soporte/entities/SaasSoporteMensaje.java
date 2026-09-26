@@ -49,6 +49,13 @@ public class SaasSoporteMensaje {
     public LocalDateTime getFechaEnvio() { return fechaEnvio; }
     public void setFechaEnvio(LocalDateTime fechaEnvio) { this.fechaEnvio = fechaEnvio; }
 
+    /** Captura de pantalla adjunta (data URL de imagen, comprimida en el navegador). */
+    @Column(name = "imagen", columnDefinition = "TEXT")
+    private String imagen;
+
+    public String getImagen() { return imagen; }
+    public void setImagen(String imagen) { this.imagen = imagen; }
+
     public boolean isLeidoPorDestinatario() { return leidoPorDestinatario; }
     public void setLeidoPorDestinatario(boolean leidoPorDestinatario) { this.leidoPorDestinatario = leidoPorDestinatario; }
 }

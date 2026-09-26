@@ -222,6 +222,7 @@ public class SaasSoporteController {
         msg.setEmisorTipo("TENANT");
         msg.setEmisorNombre(usuario);
         msg.setContenido(mensajeInicial.trim());
+        msg.setImagen(validarImagen((String) body.get("imagen")));
         msg.setFechaEnvio(LocalDateTime.now());
         msg.setLeidoPorDestinatario(false);
         mensajeRepository.save(msg);
@@ -250,10 +251,12 @@ public class SaasSoporteController {
     ) {
         SaasSoporteTicket ticket = ticketDelTenant(id);
 
+        String imagen = validarImagen(body.get("imagen"));
         String contenido = body.get("contenido");
-        if (contenido == null || contenido.trim().isEmpty()) {
+        if ((contenido == null || contenido.trim().isEmpty()) && imagen == null) {
             throw new RuntimeException("El mensaje no puede estar vacio");
         }
+        if (contenido == null || contenido.trim().isEmpty()) contenido = "(Captura de pantalla adjunta)";
 
         // Quién escribe sale de la sesión, no del body (antes se podía firmar con cualquier nombre).
         String usuarioSesion = com.auroraplus.core.auth.AuthContext.getUsername();
@@ -264,6 +267,7 @@ public class SaasSoporteController {
         msg.setEmisorTipo("TENANT");
         msg.setEmisorNombre(emisor);
         msg.setContenido(contenido.trim());
+        msg.setImagen(imagen);
         msg.setFechaEnvio(LocalDateTime.now());
         msg.setLeidoPorDestinatario(false);
         SaasSoporteMensaje guardado = mensajeRepository.save(msg);
@@ -278,6 +282,16 @@ public class SaasSoporteController {
         ticketRepository.save(ticket);
 
         return ResponseEntity.ok(guardado);
+    }
+
+    private static final int MAX_LARGO_IMAGEN = 4_000_000; // ~3 MB de imagen en base64
+
+    /** Solo imágenes en data URL y de tamaño razonable (el navegador ya las comprime). */
+    private static String validarImagen(String imagen) {
+        if (imagen == null || imagen.isBlank()) return null;
+        if (!imagen.startsWith("data:image/")) throw new RuntimeException("Solo se pueden adjuntar imágenes");
+        if (imagen.length() > MAX_LARGO_IMAGEN) throw new RuntimeException("La imagen es demasiado pesada. Toma la captura de nuevo o recórtala.");
+        return imagen;
     }
 
     /** Un negocio solo ve y escribe en sus propios tickets (el id de la URL no basta). */

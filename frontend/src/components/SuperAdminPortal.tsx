@@ -3313,6 +3313,11 @@ export default function SuperAdminPortal({ onClose }: SuperAdminPortalProps) {
                                   : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
                               }`}
                             >
+                              {m.imagen && (
+                                <a href={m.imagen} download={`captura-ticket-${m.id}.png`} title="Descargar la captura" className="block mb-1.5">
+                                  <img src={m.imagen} alt="Captura del cliente" className="max-h-64 rounded-xl border border-slate-200" />
+                                </a>
+                              )}
                               <div className="leading-relaxed whitespace-pre-wrap">{m.contenido}</div>
                               <div
                                 className={`text-[10px] mt-1.5 text-right font-mono flex items-center justify-end gap-1 ${

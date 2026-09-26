@@ -5828,6 +5828,8 @@ export interface SaasSoporteMensaje {
   contenido: string;
   fechaEnvio: string;
   leidoPorDestinatario: boolean;
+  /** Captura de pantalla adjunta (data URL). */
+  imagen?: string | null;
 }
 
 export interface CrearTicketRequest {
@@ -5838,6 +5840,8 @@ export interface CrearTicketRequest {
   categoria?: string;
   prioridad?: string;
   usuarioCreador?: string;
+  /** Captura de pantalla del problema (data URL, opcional). */
+  imagen?: string | null;
 }
 
 // SUPER ADMIN SOPORTE APIS
@@ -5911,7 +5915,7 @@ export async function listarMensajesTicketTenant(ticketId: number): Promise<Saas
   return res.json();
 }
 
-export async function enviarMensajeTicketTenant(ticketId: number, contenido: string, emisorNombre?: string): Promise<SaasSoporteMensaje> {
+export async function enviarMensajeTicketTenant(ticketId: number, contenido: string, emisorNombre?: string, imagen?: string | null): Promise<SaasSoporteMensaje> {
   const sesion = leerSesion();
   const res = await fetch(`/api/tenant/soporte/tickets/${ticketId}/mensajes`, {
     method: "POST",
@@ -5919,7 +5923,7 @@ export async function enviarMensajeTicketTenant(ticketId: number, contenido: str
       "Content-Type": "application/json",
       ...(sesion?.token ? { Authorization: `Bearer ${sesion.token}` } : {}),
     },
-    body: JSON.stringify({ contenido, emisorNombre: emisorNombre || sesion?.username || "Usuario" }),
+    body: JSON.stringify({ contenido, emisorNombre: emisorNombre || sesion?.username || "Usuario", imagen: imagen || undefined }),
   });
   if (!res.ok) throw new Error("Error al enviar mensaje");
   return res.json();
